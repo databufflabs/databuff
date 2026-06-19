@@ -26,7 +26,29 @@
         }
       ]
     },
-    "upFlowResources": {},
+    "upFlowResources": {
+      "service.http": [
+        {
+          "resource": "/demo/checkout",
+          "serviceId": "",
+          "service": "",
+          "serviceType": "web",
+          "componentType": "service.http",
+          "allCnt": 10,
+          "slowCnt": 0,
+          "errCnt": 0,
+          "normalCnt": 10,
+          "errRate": 0.0,
+          "slowRate": 0.0,
+          "reqRate": 0.03333333333333333,
+          "avgTime": 240000000.0,
+          "avgLatency": 240000000,
+          "maxTime": 240000000,
+          "alias": "",
+          "typeIcon": "web"
+        }
+      ]
+    },
     "downFlowResources": {
       "service.http": [
         {

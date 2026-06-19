@@ -141,7 +141,15 @@ public final class ServiceFlowExtractor {
         }
         for (DcSpan child : children) {
             if (ServiceFlowSpanRules.isVirtualSpan(child)) {
-                findChildren(inbound, child, childrenByParent, bySpanId, newChildren);
+                // Component spans become virtual services after fill; attach them to the flow tree.
+                if (ServiceFlowSpanRules.isVirtualServiceSpan(child) && child.isIn == 1) {
+                    linkPeerRelation(inbound, child, bySpanId);
+                    if (child.is_parent == 0) {
+                        newChildren.add(child);
+                    }
+                } else {
+                    findChildren(inbound, child, childrenByParent, bySpanId, newChildren);
+                }
                 continue;
             }
             if (child.isIn == 1) {

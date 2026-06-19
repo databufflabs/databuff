@@ -70,6 +70,42 @@ class ServiceFlowExtractorTest {
     }
 
     @Test
+    void extractIncludesVirtualComponentServicesAfterVirtualServiceFill() throws Exception {
+        DcSpan root = span("trace-4", "root", "", "service-a", "service-a-id");
+        root.resource = "GET /demo/checkout";
+        root.name = "GET /demo/checkout";
+        root.type = "SPAN_KIND_SERVER";
+        root.metaHttpMethod = "GET";
+
+        DcSpan dbClient = span("trace-4", "db", "root", "service-a", "service-a-id");
+        dbClient.type = "SPAN_KIND_CLIENT";
+        dbClient.meta = "{\"db.system\":\"mysql\",\"db.name\":\"demo_apm\","
+                + "\"db.statement\":\"INSERT INTO demo_order_audit(order_id) VALUES (?)\","
+                + "\"server.address\":\"mysql\",\"server.port\":\"3306\"}";
+
+        DcSpan redisClient = span("trace-4", "redis", "root", "service-a", "service-a-id");
+        redisClient.type = "SPAN_KIND_CLIENT";
+        redisClient.meta = "{\"db.system\":\"redis\",\"db.statement\":\"GET cart:10001\","
+                + "\"server.address\":\"redis\",\"server.port\":\"6379\"}";
+
+        List<DcSpan> spans = List.of(root, dbClient, redisClient);
+        FillPathAndRelationUtil.fillRelations(spans);
+        new VirtualServiceExtractor(new VirtualServiceInstanceRegistry(
+                new MetricWriteRouter(
+                        java.util.Map.of(DorisTableNames.METRIC_SERVICE_INSTANCE,
+                                new DorisBatchWriter(16))),
+                60_000L))
+                .extractFromTrace(spans);
+
+        assertThat(dbClient.service).startsWith("[mysql]");
+        assertThat(redisClient.service).startsWith("[redis]");
+
+        List<OptimizedMetric> metrics = ServiceFlowExtractor.extractFromTrace(spans);
+        assertThat(metrics.stream().map(metric -> tagValue(metric, "service")).distinct().toList())
+                .contains("service-a", "[mysql]demo_apm", "[redis]redis:6379");
+    }
+
+    @Test
     void extractIgnoresOutboundRemoteHttpAfterVirtualServiceFill() throws Exception {
         DcSpan root = span("trace-3", "root", "", "service-a", "service-a-id");
         root.resource = "GET /demo/checkout";

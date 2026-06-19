@@ -315,6 +315,36 @@ def _match_special(actual: Any, expected: dict[str, Any], path: str) -> bool:
         if missing:
             raise JsonAssertError(path, f"missing keys {missing}")
         return True
+    if key == "$containsServices":
+        if not isinstance(actual, list):
+            raise JsonAssertError(path, f"expected list, got {type(actual).__name__}")
+        actual_services = {
+            str(item.get("service"))
+            for item in actual
+            if isinstance(item, dict) and item.get("service") is not None
+        }
+        missing = [item for item in arg if item not in actual_services]
+        if missing:
+            raise JsonAssertError(path, f"missing child services {missing}")
+        return True
+    if key == "$nestedServiceChildren":
+        if not isinstance(actual, list):
+            raise JsonAssertError(path, f"expected list, got {type(actual).__name__}")
+        if not isinstance(arg, dict):
+            raise JsonAssertError(path, "expected object matcher for $nestedServiceChildren")
+        for service_name, child_matcher in arg.items():
+            node = next(
+                (
+                    item
+                    for item in actual
+                    if isinstance(item, dict) and str(item.get("service")) == str(service_name)
+                ),
+                None,
+            )
+            if node is None:
+                raise JsonAssertError(path, f"missing service node {service_name!r}")
+            _match(node.get("children"), child_matcher, f"{path}.{service_name}.children")
+        return True
     if key == "$minNonNullValues":
         if not isinstance(actual, list):
             raise JsonAssertError(path, f"expected list, got {type(actual).__name__}")

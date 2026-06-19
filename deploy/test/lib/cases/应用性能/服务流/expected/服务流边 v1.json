@@ -1,5 +1,14 @@
 [
   {
+    "srcService": "service-b",
+    "dstService": "[mysql]demo_apm",
+    "callCount": 20,
+    "errorCount": 10,
+    "avgDuration": 37.5,
+    "srcServiceId": "5457a0119281bb98",
+    "dstServiceId": "[mysql]demo_apm"
+  },
+  {
     "srcService": "service-a",
     "dstService": "service-b",
     "callCount": 20,
@@ -9,6 +18,24 @@
     "dstServiceId": "service-b"
   },
   {
+    "srcService": "service-a",
+    "dstService": "[mysql]demo_apm",
+    "callCount": 10,
+    "errorCount": 0,
+    "avgDuration": 20.0,
+    "srcServiceId": "9bf61532d56eb7b5",
+    "dstServiceId": "[mysql]demo_apm"
+  },
+  {
+    "srcService": "service-a",
+    "dstService": "[elasticsearch]es:9200",
+    "callCount": 10,
+    "errorCount": 0,
+    "avgDuration": 18.0,
+    "srcServiceId": "9bf61532d56eb7b5",
+    "dstServiceId": "[elasticsearch]es:9200"
+  },
+  {
     "srcService": "",
     "dstService": "service-a",
     "callCount": 10,
@@ -16,5 +43,32 @@
     "avgDuration": 240.0,
     "srcServiceId": "",
     "dstServiceId": "service-a"
+  },
+  {
+    "srcService": "service-b",
+    "dstService": "[redis]redis:6379",
+    "callCount": 10,
+    "errorCount": 0,
+    "avgDuration": 13.0,
+    "srcServiceId": "5457a0119281bb98",
+    "dstServiceId": "[redis]redis:6379"
+  },
+  {
+    "srcService": "service-a",
+    "dstService": "[redis]redis:6379",
+    "callCount": 10,
+    "errorCount": 0,
+    "avgDuration": 13.0,
+    "srcServiceId": "9bf61532d56eb7b5",
+    "dstServiceId": "[redis]redis:6379"
+  },
+  {
+    "srcService": "service-a",
+    "dstService": "[kafka]order-events",
+    "callCount": 10,
+    "errorCount": 0,
+    "avgDuration": 8.0,
+    "srcServiceId": "9bf61532d56eb7b5",
+    "dstServiceId": "[kafka]order-events"
   }
 ]

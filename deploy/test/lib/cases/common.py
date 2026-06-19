@@ -12,6 +12,8 @@ DEMO_SERVICE_A = "service-a"
 DEMO_SERVICE_B = "service-b"
 DEMO_SERVICE_A_ID = "9bf61532d56eb7b5"
 DEMO_SERVICE_B_ID = "5457a0119281bb98"
+DEMO_ENTRY_PATH_ID = "-4605470139737123236"
+DEMO_CHECKOUT_RESOURCE = "GET /demo/checkout"
 DEMO_MYSQL_DEMO_APM_ID = "c72cc83a8831e407"
 DEMO_EXCEPTION_INSUFFICIENT_STOCK = "InsufficientStockException"
 
@@ -52,6 +54,23 @@ def service_body(frm_ms: int, to_ms: int, service: str = DEMO_SERVICE_A, **extra
     body["serviceId"] = service
     body.update(extra)
     return body
+
+
+def service_level_flow_body(frm_ms: int, to_ms: int, **extra: Any) -> dict[str, Any]:
+    """POST /webapi/trace/serviceFlow — aggregated service-level tree."""
+    return service_body(frm_ms, to_ms, service=DEMO_SERVICE_A, **extra)
+
+
+def interface_level_flow_body(frm_ms: int, to_ms: int, **extra: Any) -> dict[str, Any]:
+    """POST /webapi/trace/multipleServiceFlow — interface-level tree for checkout entry."""
+    return service_body(
+        frm_ms,
+        to_ms,
+        service=DEMO_SERVICE_A,
+        entrypointPathId=DEMO_ENTRY_PATH_ID,
+        resource=DEMO_CHECKOUT_RESOURCE,
+        **extra,
+    )
 
 
 def error_span_list_body(frm_ms: int, to_ms: int, **extra: Any) -> dict[str, Any]:

@@ -1,0 +1,67 @@
+{
+  "status": 200,
+  "message": "success",
+  "data": {
+    "serviceFlows": {
+      "service-a": {
+        "uid": "2323653842941039958",
+        "parentId": "",
+        "level": 0,
+        "service": "service-a",
+        "name": "service-a",
+        "resource": "GET /demo/checkout",
+        "serviceId": "9bf61532d56eb7b5",
+        "srcCall": {
+          "$range": [1, 20]
+        },
+        "call": {
+          "$range": [1, 20]
+        },
+        "isIn": 1,
+        "error": 0,
+        "duration": {
+          "$range": [1, 10000000000]
+        },
+        "avgDuration": {
+          "$range": [1, 300000000]
+        },
+        "callPct": {
+          "$range": [0, 1]
+        },
+        "avgCall": {
+          "$range": [0, 5]
+        },
+        "durationCvPct": {
+          "$range": [0, 1]
+        },
+        "maxDuration": {
+          "$range": [1, 10000000000]
+        },
+        "minDuration": {
+          "$range": [1, 10000000000]
+        },
+        "outCall": {
+          "$range": [50, 70]
+        },
+        "resources": ["GET /demo/checkout"],
+        "pathIds": ["2323653842941039958"],
+        "serviceDurationRange": [],
+        "children": {
+          "$minLength": 5,
+          "$containsServices": [
+            "service-b",
+            "[mysql]demo_apm",
+            "[redis]redis:6379",
+            "[kafka]order-events",
+            "[elasticsearch]es:9200"
+          ],
+          "$nestedServiceChildren": {
+            "service-b": {
+              "$containsServices": ["[mysql]demo_apm", "[redis]redis:6379"]
+            }
+          }
+        }
+      }
+    }
+  }
+}

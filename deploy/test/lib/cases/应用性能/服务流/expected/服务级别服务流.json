@@ -1,0 +1,35 @@
+{
+  "status": 200,
+  "message": "success",
+  "data": {
+    "serviceFlows": {
+      "service-a": {
+        "serviceId": "9bf61532d56eb7b5",
+        "service": "service-a",
+        "name": "service-a",
+        "call": {
+          "$range": [50, 70]
+        },
+        "avgDuration": {
+          "$range": [1, 300000000]
+        },
+        "avgCall": {
+          "$range": [1, 300000000]
+        },
+        "callPct": 100,
+        "durationCvPct": 0,
+        "serviceDurationRange": [],
+        "children": {
+          "$minLength": 5,
+          "$containsServices": [
+            "service-b",
+            "[mysql]demo_apm",
+            "[redis]redis:6379",
+            "[kafka]order-events",
+            "[elasticsearch]es:9200"
+          ]
+        }
+      }
+    }
+  }
+}
