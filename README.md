@@ -9,6 +9,8 @@
 <h3>国产开源 · AI Native OpenTelemetry APM</h3>
 
 <p align="center">
+  <a href="docs/README.md">文档</a>
+  &nbsp;|&nbsp;
   <a href="README_en.md">English</a>
   &nbsp;|&nbsp;
   <a href="#交流群">交流群</a>

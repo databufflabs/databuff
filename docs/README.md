@@ -27,6 +27,7 @@ curl -fsSL https://databuff.ai/databuff/ai-apm-install.sh | bash
 ### 使用手册
 
 - [AI 平台](使用手册/AI平台.md)
+- [自定义数字专家](使用手册/自定义数字专家.md)
 - [外部 MCP 集成](使用手册/外部MCP集成.md)
 - [应用性能](使用手册/应用性能.md)
 - [告警](使用手册/告警.md)

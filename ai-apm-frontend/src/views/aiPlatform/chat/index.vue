@@ -259,7 +259,7 @@
                       </el-option>
                     </el-select>
                     <span
-                      v-for="item in quickExperts"
+                      v-for="item in inlineQuickExperts"
                       :key="item.expertId"
                       :class="['expert-trigger-btn', { 'is-active': expertId === item.expertId, 'is-disabled': sending || serverRunning }]"
                       @click="toggleQuickExpert(item.expertId)"
@@ -267,6 +267,47 @@
                       <i :class="item.icon"></i>
                       <span class="expert-trigger-btn-text">{{ expertDisplayName(item.expertId) }}</span>
                     </span>
+                    <el-popover
+                      v-if="quickExpertGroups.hasOverflow"
+                      v-model="showExpertOverflowPopover"
+                      trigger="click"
+                      placement="top-start"
+                      popper-class="chat-expert-overflow-popover"
+                      :disabled="sending || serverRunning"
+                      @show="resetExpertOverflowKeyword"
+                    >
+                      <div class="expert-overflow-panel">
+                        <el-input
+                          v-model="expertOverflowKeyword"
+                          size="small"
+                          prefix-icon="el-icon-search"
+                          clearable
+                          :placeholder="$t('modules.components.query-filter.components.s_e5f71fc3')"
+                          @click.native.stop
+                        />
+                        <div class="expert-overflow-list">
+                          <div
+                            v-for="item in filteredOverflowExperts"
+                            :key="item.expertId"
+                            :class="['expert-overflow-item', { 'is-active': expertId === item.expertId }]"
+                            @click="selectOverflowExpert(item.expertId)"
+                          >
+                            <i :class="item.icon"></i>
+                            <span class="expert-overflow-item-text">{{ expertDisplayName(item.expertId) }}</span>
+                          </div>
+                          <div v-if="!filteredOverflowExperts.length" class="expert-overflow-empty">
+                            {{ $t('modules.views.aiPlatform.experts.s_0ab9d46f') }}
+                          </div>
+                        </div>
+                      </div>
+                      <span
+                        slot="reference"
+                        :class="['expert-trigger-btn', { 'is-active': isOverflowExpertActive, 'is-disabled': sending || serverRunning }]"
+                      >
+                        <i class="el-icon-user"></i>
+                        <span class="expert-trigger-btn-text">{{ $t('modules.views.aiPlatform.experts.s_95e85417') }}</span>
+                      </span>
+                    </el-popover>
                   </div>
                   <div class="composer-actions-right">
                     <div class="input-count">{{ draft.length }}/{{ maxInputLength }}</div>
@@ -435,7 +476,7 @@ import {
   MAX_UPLOAD_FILE_SIZE,
   MAX_UPLOAD_FILE_SIZE_MB,
   EXPERT_NAME_KEYS,
-  QUICK_EXPERTS,
+  groupQuickExperts,
 } from './constants';
 import AiPlatformApi, {
   AiChatMessage,
@@ -535,7 +576,6 @@ export default class AiPlatformChat extends Vue {
   private greetingNowTs = Date.now()
   private greetingTimer: number | null = null
   private uploadItems: UploadItem[] = []
-  private quickExperts = QUICK_EXPERTS
   private allowedFileAccept = ALLOWED_FILE_ACCEPT
   private sendIcon = sendIcon
   private sendActiveIcon = sendActiveIcon
@@ -554,6 +594,35 @@ export default class AiPlatformChat extends Vue {
   private selectedToolDetailView: 'params' | 'result' = 'result'
   private modelOptions: ChatModelOption[] = []
   private selectedModelKey = ''
+  private showExpertOverflowPopover = false
+  private expertOverflowKeyword = ''
+
+  private get quickExpertGroups () {
+    return groupQuickExperts(this.experts)
+  }
+
+  private get inlineQuickExperts () {
+    return this.quickExpertGroups.inline
+  }
+
+  private get overflowQuickExperts () {
+    return this.quickExpertGroups.overflow
+  }
+
+  private get filteredOverflowExperts () {
+    const keyword = this.expertOverflowKeyword.trim().toLowerCase()
+    if (!keyword) {
+      return this.overflowQuickExperts
+    }
+    return this.overflowQuickExperts.filter(item => {
+      const name = this.expertDisplayName(item.expertId).toLowerCase()
+      return item.expertId.toLowerCase().includes(keyword) || name.includes(keyword)
+    })
+  }
+
+  private get isOverflowExpertActive (): boolean {
+    return this.overflowQuickExperts.some(item => item.expertId === this.expertId)
+  }
 
   private get conversationStarted (): boolean {
     return this.messages.length > 0 || this.sending || this.serverRunning
@@ -900,6 +969,19 @@ export default class AiPlatformChat extends Vue {
       return
     }
     this.expertId = this.expertId === expertId ? 'brain' : expertId
+  }
+
+  private resetExpertOverflowKeyword () {
+    this.expertOverflowKeyword = ''
+  }
+
+  private selectOverflowExpert (expertId: string) {
+    if (this.sending || this.serverRunning) {
+      return
+    }
+    this.expertId = this.expertId === expertId ? DEFAULT_EXPERT_ID : expertId
+    this.showExpertOverflowPopover = false
+    this.expertOverflowKeyword = ''
   }
 
   private expertDisplayName (expertId?: string): string {
@@ -3017,6 +3099,67 @@ export default class AiPlatformChat extends Vue {
     display: flex;
     flex-direction: column;
     background: #f8f9fc;
+  }
+}
+
+.chat-expert-overflow-popover {
+  padding: 0;
+  border: 1px solid #e7edf7;
+  border-radius: 12px;
+  box-shadow: 0 10px 28px rgba(15, 23, 42, 0.12);
+
+  .expert-overflow-panel {
+    width: 220px;
+    padding: 10px;
+  }
+
+  .el-input__inner {
+    border-radius: 8px;
+    border-color: #e7edf7;
+    background: #f8faff;
+  }
+
+  .expert-overflow-list {
+    margin-top: 8px;
+    max-height: 240px;
+    overflow-y: auto;
+  }
+
+  .expert-overflow-item {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    min-height: 36px;
+    padding: 0 10px;
+    border-radius: 8px;
+    color: #34445e;
+    font-size: 13px;
+    cursor: pointer;
+    transition: background 0.15s ease, color 0.15s ease;
+
+    &:hover {
+      background: #f3f7ff;
+      color: #2962ff;
+    }
+
+    &.is-active {
+      background: #eaf1ff;
+      color: #2962ff;
+    }
+  }
+
+  .expert-overflow-item-text {
+    min-width: 0;
+    overflow: hidden;
+    white-space: nowrap;
+    text-overflow: ellipsis;
+  }
+
+  .expert-overflow-empty {
+    padding: 12px 10px;
+    color: #98a2b3;
+    font-size: 12px;
+    text-align: center;
   }
 }
 </style>
