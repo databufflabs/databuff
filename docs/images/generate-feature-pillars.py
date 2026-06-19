@@ -129,7 +129,7 @@ def main() -> None:
     render(
         ROOT / "feature-pillars.png",
         "OpenTelemetry APM",
-        "AI Native",
+        "AI 原生",
         ["链路追踪", "服务指标", "服务拓扑", "告警"],
         ["智能问数", "服务巡检", "故障分析", "MCP"],
         "标准 OTLP 后端 · Trace 组装 · 指标派生 · AI 数据底座",

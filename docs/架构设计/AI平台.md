@@ -4,7 +4,7 @@
 
 传统 APM 的 AI 往往是「外挂聊天框」—— 看不懂真实数据，回答靠猜。
 
-DataBuff 的 AI 平台从第一天就按 **AI Native** 设计：**AI 直接读 APM 数据，多专家协同干活**。
+DataBuff 的 AI 平台从第一天就按 **AI 原生** 设计：**AI 直接读 OpenTelemetry APM 数据，多专家协同干活**。
 
 ---
 
@@ -99,12 +99,14 @@ AI 不是独立系统 —— 它直接长在 APM 数据之上。这意味着：
 - 问「慢 Trace」→ 拉的是真实链路数据
 - 问「服务关系」→ 画的是真实拓扑
 
-**这是「AI + APM」与「APM + 聊天框」的本质区别。**
+**这是「AI 原生 OpenTelemetry APM」与「APM + 聊天框」的本质区别。**
 
 ---
 
 ## 开放生态
 
 - **多模型支持**：OpenAI 兼容、Anthropic 等主流 LLM 即配即用
-- **MCP 协议**：外部 Agent（如 Cursor、Claude）可调用平台能力
+- **MCP 协议**：外部 Agent（如 Cursor、Claude）可调用平台能力；平台也可作为 MCP 客户端接入外部 MCP 服务
 - **Skill 可定制**：内置 Skill 可覆盖，支持按业务场景扩展
+
+接入外部 MCP 的操作步骤见 [使用手册 · 外部 MCP 集成](../使用手册/外部MCP集成.md)。
