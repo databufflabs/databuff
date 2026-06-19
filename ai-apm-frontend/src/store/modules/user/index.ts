@@ -329,7 +329,7 @@ const actions: ActionTree<State, any> = {
       productNameCn: 'AI Native一体化观测平台',
       productNameEn: 'DATABUFF',
       copyright: '',
-      loginLogo: '/img/logo_text_h.svg',
+      loginLogo: '/img/logo_login.png',
       headerLogo: '/img/logo_wh.svg',
       headerCollapseLogo: '/img/logo_wh.svg',
       faviconLogo: '/img/favicon.ico',

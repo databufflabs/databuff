@@ -1,7 +1,7 @@
 <div align="center">
 
 <p align="center">
-  <img src="ai-apm-frontend/public/img/logo-icon.png" alt="" height="56" align="middle" />
+  <img src="ai-apm-frontend/public/img/logo_login.png" alt="" height="56" align="middle" />
   &nbsp;&nbsp;
   <img src="ai-apm-frontend/public/img/logo_wordmark.svg" alt="Databuff" height="32" align="middle" />
 </p>

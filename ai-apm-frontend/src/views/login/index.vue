@@ -3,7 +3,8 @@
     <div class="login-content">
       <div v-if="loginLogo || productNameCn" class="login-logo-slogan">
         <div v-if="loginLogo" class="login-logo-wrap">
-          <img :src="loginLogo" alt="logo" class="login-logo" />
+          <img :src="loginLogo" alt="" class="login-logo-icon" />
+          <img src="/img/logo_wordmark.svg" alt="Databuff" class="login-logo-wordmark" />
         </div>
         <div v-if="productNameCn" class="login-slogan">{{ productNameCn }}</div>
       </div>
@@ -97,11 +98,19 @@ export default class Login extends Vue {
       display: flex;
       align-items: center;
       justify-content: center;
+      gap: 12px;
     }
 
-    .login-logo {
+    .login-logo-icon {
       display: block;
       height: 100%;
+      width: auto;
+    }
+
+    .login-logo-wordmark {
+      display: block;
+      height: 24px;
+      width: auto;
     }
 
     .login-slogan {
