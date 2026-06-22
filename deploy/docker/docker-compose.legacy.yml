@@ -1,8 +1,8 @@
-# DataBuff APM Docker 本地部署
-# 启动: ./start.sh（首次会初始化 Doris）或 docker compose up -d
-# 停止: ./stop.sh 或 docker compose down
+# DataBuff APM Docker — legacy compose (docker-compose v1.18–1.28)
+# 去掉 cpus / depends_on.condition / healthcheck.start_period / networks.name
+# 启动顺序由 start.sh 分阶段控制，就绪检测由 init-doris.sh / runtime.sh 负责
 
-version: "3.8"
+version: "3.2"
 
 services:
   ai-apm-doris-fe:
@@ -10,7 +10,6 @@ services:
     container_name: ai-apm-doris-fe
     hostname: ai-apm-doris-fe
     restart: unless-stopped
-    cpus: 1
     mem_limit: 2g
     working_dir: /opt/apache-doris
     environment:
@@ -34,23 +33,20 @@ services:
       test: ["CMD-SHELL", "bash -c 'exec 3<>/dev/tcp/127.0.0.1/9030' && curl -sf http://127.0.0.1:8030/api/bootstrap"]
       interval: 10s
       timeout: 5s
-      retries: 30
-      start_period: 120s
+      retries: 60
 
   ai-apm-doris-be:
     image: apache/doris:be-4.1.1
     container_name: ai-apm-doris-be
     hostname: ai-apm-doris-be
     restart: unless-stopped
-    cpus: 2
     mem_limit: 6g
     working_dir: /opt/apache-doris
     environment:
       FE_SERVERS: fe1:172.20.80.2:9010
       BE_ADDR: 172.20.80.5:9050
     depends_on:
-      ai-apm-doris-fe:
-        condition: service_healthy
+      - ai-apm-doris-fe
     volumes:
       - ./data/be-storage:/opt/apache-doris/be/storage
     ports:
@@ -62,15 +58,13 @@ services:
       test: ["CMD-SHELL", "curl -sf http://127.0.0.1:8040/api/health"]
       interval: 10s
       timeout: 5s
-      retries: 30
-      start_period: 120s
+      retries: 60
 
   ai-apm-ingest:
     image: ${APM_INGEST_IMAGE}
     container_name: ai-apm-ingest
     hostname: ai-apm-ingest
     restart: unless-stopped
-    cpus: 2
     mem_limit: 5g
     environment:
       TZ: Asia/Shanghai
@@ -81,16 +75,13 @@ services:
       - "4317:4317"
       - "4318:4318"
     depends_on:
-      ai-apm-doris-fe:
-        condition: service_healthy
-      ai-apm-doris-be:
-        condition: service_healthy
+      - ai-apm-doris-fe
+      - ai-apm-doris-be
     healthcheck:
       test: ["CMD-SHELL", "bash -c 'exec 3<>/dev/tcp/127.0.0.1/4318'"]
       interval: 10s
       timeout: 5s
-      retries: 20
-      start_period: 60s
+      retries: 40
     networks:
       apm:
         ipv4_address: 172.20.80.3
@@ -100,7 +91,6 @@ services:
     container_name: ai-apm-web
     hostname: ai-apm-web
     restart: unless-stopped
-    cpus: 1
     mem_limit: 2g
     environment:
       TZ: Asia/Shanghai
@@ -109,23 +99,19 @@ services:
     ports:
       - "27403:27403"
     depends_on:
-      ai-apm-doris-fe:
-        condition: service_healthy
-      ai-apm-doris-be:
-        condition: service_healthy
+      - ai-apm-doris-fe
+      - ai-apm-doris-be
     healthcheck:
       test: ["CMD-SHELL", "bash -c 'exec 3<>/dev/tcp/127.0.0.1/27403'"]
       interval: 10s
       timeout: 5s
-      retries: 20
-      start_period: 90s
+      retries: 40
     networks:
       apm:
         ipv4_address: 172.20.80.4
 
 networks:
   apm:
-    name: databuff-ai-apm
     driver: bridge
     ipam:
       config:

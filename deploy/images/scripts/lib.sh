@@ -587,6 +587,16 @@ publish_version_manifest() {
   cp -f "$resolve_lib" "$dist_resolve"
   chmod +x "$dist_resolve"
   publish_pkg "$dist_resolve"
+
+  compose_check="${APM_COMMON_SRC}/scripts/check-compose.sh"
+  if [[ ! -f "$compose_check" ]]; then
+    echo "[build] missing check-compose.sh: ${compose_check}" >&2
+    exit 1
+  fi
+  dist_compose_check="${APM_BUILD_DIST:-${TMPDIR:-/tmp}}/check-compose.sh"
+  cp -f "$compose_check" "$dist_compose_check"
+  chmod +x "$dist_compose_check"
+  publish_pkg "$dist_compose_check"
 }
 
 detect_image_arch() {

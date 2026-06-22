@@ -207,6 +207,31 @@ done
 if ! docker info >/dev/null 2>&1; then
   fail "Docker 不可用"
 fi
+_compose_check_lib=""
+_src="${BASH_SOURCE[0]:-$0}"
+if [[ -n "$_src" && "$_src" != /dev/fd/* && "$_src" != /dev/stdin && "$_src" != - ]]; then
+  _dir="$(cd "$(dirname "$_src")" && pwd)"
+  for _f in "${_dir}/../common/scripts/check-compose.sh"; do
+    if [[ -f "$_f" ]]; then
+      _compose_check_lib="$_f"
+      break
+    fi
+  done
+fi
+if [[ -z "$_compose_check_lib" ]]; then
+  _compose_check_lib="$(mktemp "${TMPDIR:-/tmp}/check-compose.XXXXXX.sh")"
+  if ! curl -fsSL "${PKG_BASE%/}/check-compose.sh" -o "$_compose_check_lib"; then
+    rm -f "$_compose_check_lib"
+    fail "缺少 Docker Compose，且无法下载版本检查脚本"
+  fi
+  # shellcheck source=/dev/null
+  . "$_compose_check_lib"
+  rm -f "$_compose_check_lib"
+else
+  # shellcheck source=/dev/null
+  . "$_compose_check_lib"
+fi
+ensure_compose_cli
 log_done "${BLD}(1/5)${RST} 检查运行环境"
 
 log "${BLD}(2/5)${RST} 下载部署包"

@@ -27,7 +27,18 @@ _load_compose_deploy_env() {
 }
 _load_compose_deploy_env
 
+# shellcheck source=../../common/scripts/check-compose.sh
+if [ -f "${_DOCKER_COMPOSE_ROOT}/scripts/check-compose.sh" ]; then
+  # shellcheck disable=SC1091
+  . "${_DOCKER_COMPOSE_ROOT}/scripts/check-compose.sh"
+else
+  # shellcheck disable=SC1091
+  . "$(cd "$(dirname "${BASH_SOURCE[0]}")/../../common/scripts" && pwd)/check-compose.sh"
+fi
+ensure_compose_cli
+
 export COMPOSE_PROJECT_NAME="${COMPOSE_PROJECT_NAME:-databuff-ai-apm}"
+apm_select_compose_file "${_DOCKER_COMPOSE_ROOT}"
 
 APM_CONTAINERS=(
   ai-apm-web
@@ -45,9 +56,9 @@ remove_apm_containers() {
 
 compose_cmd() {
   if docker compose version >/dev/null 2>&1; then
-    docker compose "$@"
+    docker compose -f "$COMPOSE_FILE" "$@"
   elif command -v docker-compose >/dev/null 2>&1; then
-    docker-compose "$@"
+    docker-compose -f "$COMPOSE_FILE" "$@"
   else
     echo "[compose] docker compose not found" >&2
     exit 1
@@ -76,6 +87,11 @@ compose_down_legacy_project() {
 }
 
 prepare_compose_start() {
+  if ! compose_cmd config >/dev/null 2>&1; then
+    echo "[compose] ERROR: invalid docker-compose.yml:" >&2
+    compose_cmd config >&2 || true
+    exit 1
+  fi
   compose_cmd down --remove-orphans >/dev/null 2>&1 || true
   compose_down_legacy_project
   remove_apm_containers

@@ -1,6 +1,8 @@
 # DataBuff APM · OTLP demo seeder
 # Usage: INGEST_HOST=192.168.1.10 ./start.sh
 
+version: "3.8"
+
 services:
   ai-apm-demo:
     image: ${APM_DEMO_IMAGE}

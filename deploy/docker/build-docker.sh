@@ -49,11 +49,13 @@ stage_main_package() {
     "${STAGE_DIR}/scripts"
 
   cp -f "${APM_DOCKER_SRC}/docker-compose.yml" "${STAGE_DIR}/"
+  cp -f "${APM_DOCKER_SRC}/docker-compose.legacy.yml" "${STAGE_DIR}/"
   cp -f "${APM_DOCKER_SRC}/start.sh" "${STAGE_DIR}/"
   cp -f "${APM_DOCKER_SRC}/stop.sh" "${STAGE_DIR}/"
   cp -f "${APM_DOCKER_SRC}/reset-table.sh" "${STAGE_DIR}/"
   cp -R "${APM_DOCKER_SRC}/scripts/." "${STAGE_DIR}/scripts/"
   cp -f "${APM_COMMON_SRC}/scripts/doris-be-wait.sh" "${STAGE_DIR}/scripts/doris-be-wait.sh"
+  cp -f "${APM_COMMON_SRC}/scripts/check-compose.sh" "${STAGE_DIR}/scripts/check-compose.sh"
   stage_runtime_env_sh "${STAGE_DIR}/env.sh" "$RELEASE_VERSION"
   cp -f "${APM_DOCKER_SRC}/scripts/image-pkg.sh" "${STAGE_DIR}/scripts/image-pkg.sh"
   cp -R "${APM_COMMON_SRC}/sql/." "${STAGE_DIR}/sql/"
