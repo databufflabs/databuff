@@ -2,8 +2,6 @@
 # 启动: ./start.sh（首次会初始化 Doris）或 docker compose up -d
 # 停止: ./stop.sh 或 docker compose down
 
-version: "3.8"
-
 services:
   ai-apm-doris-fe:
     image: apache/doris:fe-4.1.1

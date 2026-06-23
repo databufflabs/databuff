@@ -28,14 +28,14 @@ export DORIS_BE_IMAGE=apache/doris:be-4.1.1
 export ZOOKEEPER_IMAGE=bitnamilegacy/zookeeper:3.9
 
 # 部署包下载地址（databuff-site nginx 对外提供，如 ai-apm-install.sh）
-export APM_PKG_BASE="${APM_PKG_BASE:-https://databuff.ai/databuff}"
+export APM_PKG_BASE="${APM_PKG_BASE:-http://192.168.50.140/databuff}"
 # 安装完成摘要等面向用户的脚本下载地址（不暴露内部 CDN / 构建机地址）
-export APM_PUBLIC_PKG_BASE="${APM_PUBLIC_PKG_BASE:-https://databuff.ai/databuff}"
+export APM_PUBLIC_PKG_BASE="${APM_PUBLIC_PKG_BASE:-http://192.168.50.140/databuff}"
 # 运行时按版本解析：${APM_PKG_BASE}/${APM_VERSION}/images；infra 固定 ${APM_PKG_BASE}/infra/images
 export APM_INFRA_IMAGES_PKG_BASE="${APM_INFRA_IMAGES_PKG_BASE:-${APM_PKG_BASE%/}/infra/images}"
 
 # 构建机 SCP 上传目标（databuff-site 静态目录，由 nginx 映射为 APM_PKG_BASE）
-export APM_PKG_UPLOAD_HOST="${APM_PKG_UPLOAD_HOST:-databuff.ai}"
+export APM_PKG_UPLOAD_HOST="${APM_PKG_UPLOAD_HOST:-192.168.50.140}"
 export APM_PKG_UPLOAD_USER="${APM_PKG_UPLOAD_USER:-root}"
 export APM_PKG_UPLOAD_PASS="${APM_PKG_UPLOAD_PASS:-Databuff@123}"
 export APM_PKG_REMOTE_DIR="${APM_PKG_REMOTE_DIR:-/opt/databuff-site/databuff}"

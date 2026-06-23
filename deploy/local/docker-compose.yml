@@ -1,8 +1,6 @@
 # DataBuff APM 本地开发 — Doris + ingest/web/demo（JAR 目录挂载，改 jar 后 restart 即可）
 # 启动: ./start.sh  |  停止: ./stop.sh  |  Doris 重装: ./install.sh
 
-version: "3.8"
-
 services:
   ai-apm-doris-fe:
     image: ${DORIS_FE_IMAGE:-apache/doris:fe-4.1.1}

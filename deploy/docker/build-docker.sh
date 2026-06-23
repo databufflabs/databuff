@@ -49,7 +49,7 @@ stage_main_package() {
     "${STAGE_DIR}/scripts"
 
   cp -f "${APM_DOCKER_SRC}/docker-compose.yml" "${STAGE_DIR}/"
-  cp -f "${APM_DOCKER_SRC}/docker-compose.legacy.yml" "${STAGE_DIR}/"
+  cp -f "${APM_DOCKER_SRC}/docker-compose.legacy.yml" "${STAGE_DIR}/scripts/docker-compose.legacy.yml"
   cp -f "${APM_DOCKER_SRC}/start.sh" "${STAGE_DIR}/"
   cp -f "${APM_DOCKER_SRC}/stop.sh" "${STAGE_DIR}/"
   cp -f "${APM_DOCKER_SRC}/reset-table.sh" "${STAGE_DIR}/"

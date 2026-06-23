@@ -36,34 +36,34 @@ ensure_compose_cli() {
   fi
 }
 
-apm_select_compose_file() {
+apm_materialize_compose_file() {
   local root="$1"
-  local default_file="${root}/docker-compose.yml"
-  local legacy_file="${root}/docker-compose.legacy.yml"
+  local compose_file="${root}/docker-compose.yml"
+  local legacy_file="${root}/scripts/docker-compose.legacy.yml"
 
   if [ -n "${COMPOSE_FILE:-}" ]; then
     return 0
   fi
 
+  local use_legacy=0
+  local ver=""
+
   if docker compose version >/dev/null 2>&1; then
-    export COMPOSE_FILE="$default_file"
-    return 0
+    use_legacy=0
+  else
+    ver="$(_apm_compose_v1_version)"
+    if _apm_version_ge "$ver" "$APM_COMPOSE_MODERN_MIN_V1"; then
+      use_legacy=0
+    elif [ -f "$legacy_file" ]; then
+      use_legacy=1
+    fi
   fi
 
-  local ver
-  ver="$(_apm_compose_v1_version)"
-  if _apm_version_ge "$ver" "$APM_COMPOSE_MODERN_MIN_V1"; then
-    export COMPOSE_FILE="$default_file"
-    return 0
+  if [ "$use_legacy" = "1" ]; then
+    echo "[compose] docker-compose ${ver}: using legacy compose layout" >&2
+    cp -f "$legacy_file" "$compose_file"
   fi
 
-  if [ -f "$legacy_file" ]; then
-    echo "[compose] docker-compose ${ver}: using legacy compose file" >&2
-    export COMPOSE_FILE="$legacy_file"
-    return 0
-  fi
-
-  echo "[compose] WARNING: docker-compose ${ver} may not support docker-compose.yml;" >&2
-  echo "[compose] missing ${legacy_file}; falling back to default compose file" >&2
-  export COMPOSE_FILE="$default_file"
+  rm -f "$legacy_file"
+  export COMPOSE_FILE="$compose_file"
 }

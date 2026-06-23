@@ -263,6 +263,10 @@ log "${BLD}(5/5)${RST} 安装并启动"
 mkdir -p "$(dirname "$INSTALL_DIR")"
 mv "$STAGING" "$INSTALL_DIR"
 INSTALL_DEPLOYED=1
+# shellcheck source=scripts/check-compose.sh
+. "${INSTALL_DIR}/scripts/check-compose.sh"
+ensure_compose_cli
+apm_materialize_compose_file "$INSTALL_DIR"
 log_done "${BLD}(5/5)${RST} 安装到 ${INSTALL_DIR}"
 
 if [ "$SKIP_START" = "1" ]; then

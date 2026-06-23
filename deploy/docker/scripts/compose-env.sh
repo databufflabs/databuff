@@ -38,7 +38,7 @@ fi
 ensure_compose_cli
 
 export COMPOSE_PROJECT_NAME="${COMPOSE_PROJECT_NAME:-databuff-ai-apm}"
-apm_select_compose_file "${_DOCKER_COMPOSE_ROOT}"
+apm_materialize_compose_file "${_DOCKER_COMPOSE_ROOT}"
 
 APM_CONTAINERS=(
   ai-apm-web

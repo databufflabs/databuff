@@ -3,7 +3,7 @@
   <parent>
     <artifactId>databuff-ai-apm</artifactId>
     <groupId>com.databuff.apm</groupId>
-    <version>0.1.1-SNAPSHOT</version>
+    <version>${revision}</version>
   </parent>
   <modelVersion>4.0.0</modelVersion>
   <artifactId>ai-apm-demo</artifactId>

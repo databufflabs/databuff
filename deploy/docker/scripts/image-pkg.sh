@@ -289,11 +289,6 @@ download_file_via_curl_once() {
   local progress_interval="${IMAGE_DOWNLOAD_PROGRESS_INTERVAL:-10}"
   local min_delta=134217728 # 128MiB（chunked 无 Content-Length 时）
   local curl_pid start cur pct last_bytes=-1
-  local -a curl_extra=()
-
-  if [[ "${IMAGE_DOWNLOAD_HTTP2:-0}" != "1" ]]; then
-    curl_extra+=(--http1.1)
-  fi
 
   if [[ -n "$expected" && "$expected" -gt 0 ]]; then
     min_delta=$(( expected / 10 )) # 约每 10% 打印一次
@@ -303,9 +298,9 @@ download_file_via_curl_once() {
   fi
 
   if [[ "$resume" == "1" && -f "$dest" ]]; then
-    curl -fsSL "${curl_extra[@]}" -C - -o "$dest" "$url" &
+    curl -fsSL -C - -o "$dest" "$url" &
   else
-    curl -fsSL "${curl_extra[@]}" -o "$dest" "$url" &
+    curl -fsSL -o "$dest" "$url" &
   fi
   curl_pid=$!
   start=$SECONDS
@@ -414,7 +409,7 @@ download_image_tarball() {
     expected="$(resolve_tarball_content_length "$base" "$name" 2>/dev/null || true)"
     if ! download_file_via_curl "$url" "$dest" "$name" "$expected"; then
       echo "[image-pkg] failed to download: ${url}" >&2
-      echo "[image-pkg] hint: large downloads may fail over HTTP/2 (curl error 92); script retries with HTTP/1.1 resume" >&2
+      echo "[image-pkg] hint: large downloads may fail over HTTP/2 (curl error 92); retry or check nginx" >&2
       echo "[image-pkg] hint: run deploy/images/build-images.sh on build machine, or check nginx dir permissions (parent dirs must be 755)" >&2
       return 1
     fi
@@ -428,7 +423,7 @@ download_image_tarball() {
 
   if ! download_file_via_curl "$url" "$dest" "$name" ""; then
     echo "[image-pkg] failed to download: ${url}" >&2
-    echo "[image-pkg] hint: large downloads may fail over HTTP/2 (curl error 92); script retries with HTTP/1.1 resume" >&2
+    echo "[image-pkg] hint: large downloads may fail over HTTP/2 (curl error 92); retry or check nginx" >&2
     echo "[image-pkg] hint: run deploy/images/build-images.sh on build machine, or check nginx dir permissions (parent dirs must be 755)" >&2
     return 1
   fi
