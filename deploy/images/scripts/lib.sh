@@ -501,6 +501,32 @@ pull_and_save_public_image_tarball() {
   docker save -o "$dest" "$image_ref"
 }
 
+pull_public_image() {
+  local image_ref="$1"
+  local arch="$2"
+
+  echo "[build] pull ${image_ref} (linux/${arch}) ..."
+  docker pull --platform "linux/${arch}" "$image_ref"
+}
+
+# 已 pull 的镜像直接 save | gzip，避免 fe.tar + be.tar + load + save 的峰值磁盘占用
+save_pulled_images_gz() {
+  local dest_gz="$1"
+  shift
+  local refs=("$@")
+
+  echo "[build] export $(basename "$dest_gz") ..."
+  docker save "${refs[@]}" | gzip -1 >"$dest_gz"
+  write_image_tarball_size_sidecar "$dest_gz"
+}
+
+rmi_public_images_quiet() {
+  local ref
+  for ref in "$@"; do
+    docker rmi "$ref" >/dev/null 2>&1 || true
+  done
+}
+
 build_and_export_service_tarballs() {
   local svc="$1"
   local component="$2"
@@ -569,6 +595,7 @@ export_apm_stack_tarballs() {
     gz_tar="$(compress_image_tarball "$raw_tar")"
     tarballs+=("$gz_tar")
     echo "[build]   -> $(basename "$gz_tar")"
+    rmi_public_images_quiet "$ingest_ref" "$web_ref" "$demo_ref"
   done
 
   rm -rf "$ingest_ctx" "$web_ctx" "$demo_ctx" "$tmp_load"
@@ -577,31 +604,29 @@ export_apm_stack_tarballs() {
 }
 
 export_infra_image_tarballs() {
-  local doris_version zk_version arch dist_dir tmp_load raw_tar tarballs=()
+  local doris_version zk_version arch dist_dir gz_tar tarballs=()
 
   doris_version="$(doris_image_version)"
   zk_version="$(zookeeper_image_version)"
   dist_dir="$(mktemp -d "${TMPDIR:-/tmp}/apm-infra-image-tarballs.XXXXXX")"
-  tmp_load="$(mktemp -d "${TMPDIR:-/tmp}/apm-infra-load.XXXXXX")"
 
   for arch in $(image_arch_list); do
-    echo "[build] pull doris-stack (linux/${arch}): fe + be ..."
-    pull_and_save_public_image_tarball "${DORIS_FE_IMAGE}" "$arch" "${tmp_load}/doris-fe.tar"
-    pull_and_save_public_image_tarball "${DORIS_BE_IMAGE}" "$arch" "${tmp_load}/doris-be.tar"
-    docker load -i "${tmp_load}/doris-fe.tar"
-    docker load -i "${tmp_load}/doris-be.tar"
-    rm -f "${tmp_load}/"*.tar
+    echo "[build] doris-stack (linux/${arch}): pull fe + be, save | gzip ..."
+    pull_public_image "${DORIS_FE_IMAGE}" "$arch"
+    pull_public_image "${DORIS_BE_IMAGE}" "$arch"
+    gz_tar="${dist_dir}/$(image_tarball_name doris-stack "$doris_version" "$arch")"
+    save_pulled_images_gz "$gz_tar" "${DORIS_FE_IMAGE}" "${DORIS_BE_IMAGE}"
+    tarballs+=("$gz_tar")
+    rmi_public_images_quiet "${DORIS_FE_IMAGE}" "${DORIS_BE_IMAGE}"
 
-    raw_tar="${dist_dir}/$(image_tarball_name doris-stack "$doris_version" "$arch" .tar)"
-    docker save -o "$raw_tar" "${DORIS_FE_IMAGE}" "${DORIS_BE_IMAGE}"
-    tarballs+=("$(compress_image_tarball "$raw_tar")")
-
-    raw_tar="${dist_dir}/$(image_tarball_name zookeeper "$zk_version" "$arch" .tar)"
-    pull_and_save_public_image_tarball "${ZOOKEEPER_IMAGE}" "$arch" "$raw_tar"
-    tarballs+=("$(compress_image_tarball "$raw_tar")")
+    echo "[build] zookeeper (linux/${arch}): pull, save | gzip ..."
+    pull_public_image "${ZOOKEEPER_IMAGE}" "$arch"
+    gz_tar="${dist_dir}/$(image_tarball_name zookeeper "$zk_version" "$arch")"
+    save_pulled_images_gz "$gz_tar" "${ZOOKEEPER_IMAGE}"
+    tarballs+=("$gz_tar")
+    rmi_public_images_quiet "${ZOOKEEPER_IMAGE}"
   done
 
-  rm -rf "$tmp_load"
   publish_infra_image_pkg "${tarballs[@]}"
   rm -rf "$dist_dir"
 }
