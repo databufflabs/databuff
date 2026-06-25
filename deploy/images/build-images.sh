@@ -10,8 +10,10 @@
 #
 # Optional:
 #   SKIP_BUILD=1        复用已有 Maven 产物
+#   SKIP_PKG_UPLOAD=1   跳过上传，仅保留本机离线包
 #   IMAGE_PLATFORMS=linux/amd64,linux/arm64
 #   BUILDX_PROGRESS=plain
+#   APM_BUILD_DIST      本机保留 stack 包目录（默认 deploy/images/dist）
 
 source "$(cd "$(dirname "$0")" && pwd)/scripts/lib.sh"
 
@@ -44,5 +46,6 @@ cat <<EOF
              $(demo_image_ref "$RELEASE_VERSION")
   Arch     : $(image_platforms)
   StackPkg : $(version_images_pkg_base_url "$RELEASE_VERSION")/ai-apm-stack-${RELEASE_VERSION}-<arch>.tar.gz
+  LocalPkg : $(local_images_pkg_dir "$RELEASE_VERSION")/ai-apm-stack-${RELEASE_VERSION}-<arch>.tar.gz
 
 EOF

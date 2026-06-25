@@ -117,5 +117,30 @@ load_local_env() {
 }
 
 ensure_openjdk_image() {
-  ensure_build_openjdk
+  local pull_ref registry_host
+
+  pull_ref="$(openjdk_pull_image)"
+  if docker image inspect "${OPENJDK_IMAGE}" >/dev/null 2>&1; then
+    echo "[local] using local ${OPENJDK_IMAGE}"
+    return 0
+  fi
+  if [[ "$pull_ref" != "${OPENJDK_IMAGE}" ]] && docker image inspect "$pull_ref" >/dev/null 2>&1; then
+    echo "[local] using local ${pull_ref}, tagging as ${OPENJDK_IMAGE}"
+    docker tag "$pull_ref" "${OPENJDK_IMAGE}"
+    return 0
+  fi
+
+  echo "[local] pull ${pull_ref}"
+  if ! docker pull "$pull_ref"; then
+    if [[ -n "${OPENJDK_REGISTRY:-}" ]]; then
+      registry_host="${OPENJDK_REGISTRY%%/*}"
+      echo "[local] pull failed; try: docker login ${registry_host}" >&2
+    else
+      echo "[local] pull failed; check network or docker login" >&2
+    fi
+    exit 1
+  fi
+  if [[ "$pull_ref" != "${OPENJDK_IMAGE}" ]]; then
+    docker tag "$pull_ref" "${OPENJDK_IMAGE}"
+  fi
 }

@@ -121,35 +121,6 @@ openjdk_image_for_platform() {
   printf '%s\n' "${OPENJDK_IMAGE:?set OPENJDK_IMAGE in deploy/env.sh}"
 }
 
-ensure_build_openjdk() {
-  local pull_ref registry_host
-
-  pull_ref="$(openjdk_pull_image)"
-  if docker image inspect "${OPENJDK_IMAGE}" >/dev/null 2>&1; then
-    echo "[build] using local ${OPENJDK_IMAGE}"
-    return 0
-  fi
-  if [[ "$pull_ref" != "${OPENJDK_IMAGE}" ]] && docker image inspect "$pull_ref" >/dev/null 2>&1; then
-    echo "[build] using local ${pull_ref}, tagging as ${OPENJDK_IMAGE}"
-    docker tag "$pull_ref" "${OPENJDK_IMAGE}"
-    return 0
-  fi
-
-  echo "[build] pull ${pull_ref} (local dev)"
-  if ! docker pull "$pull_ref"; then
-    if [[ -n "${OPENJDK_REGISTRY:-}" ]]; then
-      registry_host="${OPENJDK_REGISTRY%%/*}"
-      echo "[build] pull failed; try: docker login ${registry_host}" >&2
-    else
-      echo "[build] pull failed; check network or docker login" >&2
-    fi
-    exit 1
-  fi
-  if [[ "$pull_ref" != "${OPENJDK_IMAGE}" ]]; then
-    docker tag "$pull_ref" "${OPENJDK_IMAGE}"
-  fi
-}
-
 prepare_demo_build_context() {
   local jar_path="$1"
   local ctx
@@ -455,6 +426,11 @@ write_image_tarball_size_sidecar() {
   { stat -c '%s' "$tarball" 2>/dev/null || stat -f '%z' "$tarball"; } >"${tarball}.size"
 }
 
+local_images_pkg_dir() {
+  local version="${1:-$(resolve_release_version)}"
+  printf '%s\n' "${APM_BUILD_DIST:-${APM_IMAGES_ROOT}/dist}/${version}/images"
+}
+
 publish_image_pkg() {
   if [[ "${SKIP_IMAGE_PKG_UPLOAD:-${SKIP_PKG_UPLOAD:-${SKIP_FTP_UPLOAD:-0}}}" == "1" ]]; then
     echo "[build] SKIP_IMAGE_PKG_UPLOAD=1 — skip image tarball upload"
@@ -565,7 +541,7 @@ export_apm_stack_tarballs() {
   local demo_jar="$4"
   local ingest_ref web_ref demo_ref
   local ingest_ctx web_ctx demo_ctx
-  local arch dist_dir tmp_load raw_tar gz_tar tarballs=()
+  local arch dist_dir dist_cleanup=0 tmp_load raw_tar gz_tar tarballs=()
 
   ingest_ref="$(ingest_image_ref "$release_version")"
   web_ref="$(web_image_ref "$release_version")"
@@ -574,7 +550,13 @@ export_apm_stack_tarballs() {
   web_ctx="$(prepare_image_build_context web "$web_jar")"
   demo_ctx="$(prepare_demo_build_context "$demo_jar")"
 
-  dist_dir="$(mktemp -d "${TMPDIR:-/tmp}/apm-stack-export.XXXXXX")"
+  if [[ "${SKIP_LOCAL_IMAGE_PKG_KEEP:-0}" == "1" ]]; then
+    dist_dir="$(mktemp -d "${TMPDIR:-/tmp}/apm-stack-export.XXXXXX")"
+    dist_cleanup=1
+  else
+    dist_dir="$(local_images_pkg_dir "$release_version")"
+    mkdir -p "$dist_dir"
+  fi
   tmp_load="$(mktemp -d "${TMPDIR:-/tmp}/apm-stack-load.XXXXXX")"
   ensure_buildx
 
@@ -594,13 +576,15 @@ export_apm_stack_tarballs() {
     verify_image_tarball_arch "$raw_tar" "$arch"
     gz_tar="$(compress_image_tarball "$raw_tar")"
     tarballs+=("$gz_tar")
-    echo "[build]   -> $(basename "$gz_tar")"
+    echo "[build]   -> ${gz_tar}"
     rmi_public_images_quiet "$ingest_ref" "$web_ref" "$demo_ref"
   done
 
   rm -rf "$ingest_ctx" "$web_ctx" "$demo_ctx" "$tmp_load"
   publish_image_pkg "$release_version" "${tarballs[@]}"
-  rm -rf "$dist_dir"
+  if [[ "$dist_cleanup" == "1" ]]; then
+    rm -rf "$dist_dir"
+  fi
 }
 
 export_infra_image_tarballs() {

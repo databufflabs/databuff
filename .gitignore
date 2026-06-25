@@ -52,6 +52,7 @@ deploy/docker/data/
 deploy/local/data/
 deploy/local/run/
 deploy/images/*/*.jar
+deploy/images/dist/
 ai-apm-demo/target/
 
 ### Integration test artifacts (deploy/test)
