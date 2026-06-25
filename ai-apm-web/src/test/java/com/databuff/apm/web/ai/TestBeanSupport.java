@@ -101,16 +101,38 @@ public final class TestBeanSupport {
     }
 
     public static InMemoryLlmProviderStore llmProviderStore() {
+        return llmProviderStore(defaultProviderProperties());
+    }
+
+    public static InMemoryLlmProviderStore llmProviderStore(ObjectProvider<ExpertRuntimeRegistry> runtimeRegistry) {
+        return llmProviderStore(defaultProviderProperties(), runtimeRegistry);
+    }
+
+    public static InMemoryLlmProviderStore llmProviderStore(AiLlmProviderProperties providerProperties) {
         InMemoryLlmProviderStore store = new InMemoryLlmProviderStore();
+        setField(store, "providerProperties", providerProperties);
         invokeInit(store, "initDefaults");
         return store;
     }
 
-    public static InMemoryLlmProviderStore llmProviderStore(ObjectProvider<ExpertRuntimeRegistry> runtimeRegistry) {
-        InMemoryLlmProviderStore store = new InMemoryLlmProviderStore();
+    public static InMemoryLlmProviderStore llmProviderStore(
+            AiLlmProviderProperties providerProperties,
+            ObjectProvider<ExpertRuntimeRegistry> runtimeRegistry) {
+        InMemoryLlmProviderStore store = llmProviderStore(providerProperties);
         setField(store, "runtimeRegistry", runtimeRegistry);
-        invokeInit(store, "initDefaults");
         return store;
+    }
+
+    public static AiLlmProviderProperties defaultProviderProperties() {
+        AiLlmProviderProperties properties = new AiLlmProviderProperties();
+        properties.setMaskApiKey(true);
+        return properties;
+    }
+
+    public static AiLlmProviderProperties unmaskedProviderProperties() {
+        AiLlmProviderProperties properties = new AiLlmProviderProperties();
+        properties.setMaskApiKey(false);
+        return properties;
     }
 
     public static DataTools dataTools(

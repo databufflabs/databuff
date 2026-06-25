@@ -2031,6 +2031,7 @@ export default {
         "s_5d551c2c": "Provider 名称",
         "s_790d7e1c": "如 Kimi、DeepSeek",
         "s_08f020e8": "留空则不修改",
+        "s_f3a1c902": "出于安全考虑，API Key 已脱敏，界面不会回显；留空表示不修改",
         "s_58aacc17": "请输入 API Key",
         "s_4fd1fecc": "API 类型",
         "s_1cd74b17": "模型管理",

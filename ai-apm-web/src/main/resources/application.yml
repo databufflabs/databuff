@@ -53,6 +53,8 @@ apm:
       queue-size: 100
   ai:
     lookback-minutes: 15
+    provider:
+      mask-api-key: true
   agent:
     agentscope-enabled: ${APM_AGENT_AGENTSCOPE_ENABLED:true}
     builtin-skills-dir: ${APM_BUILTIN_SKILLS_DIR:../deploy/common/skills}

@@ -11,6 +11,7 @@ class AiConfigControllerTest {
         AiConfigController controller = new AiConfigController(TestAiSupport.configService());
         assertThat(controller.listProviders()).isNotEmpty();
         assertThat(controller.status()).containsEntry("ready", false);
+        assertThat(controller.status()).containsEntry("maskProviderApiKey", true);
         assertThat(controller.updateProvider("openai", new UpdateLlmProviderRequest(
                 null, "sk-test", null, true)).enabled()).isTrue();
         assertThat(controller.testProvider(new TestLlmProviderRequest(

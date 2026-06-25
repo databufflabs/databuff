@@ -83,8 +83,9 @@ public final class TestAiSupport {
 
     public static final class AiFixture {
         private final InMemoryLlmProviderStore store = TestBeanSupport.llmProviderStore();
+        private final AiLlmProviderProperties providerProperties = TestBeanSupport.defaultProviderProperties();
         private final AiConfigService aiConfigService =
-                new AiConfigService(store, new LlmCatalogService(), noopPersistence());
+                new AiConfigService(store, new LlmCatalogService(), noopPersistence(), providerProperties);
         private final AgentRuntimeConfig agentRuntimeConfig = new AgentRuntimeConfig();
 
         public InMemoryLlmProviderStore store() {

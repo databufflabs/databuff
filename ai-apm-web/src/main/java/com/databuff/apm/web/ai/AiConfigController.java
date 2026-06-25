@@ -38,7 +38,9 @@ public class AiConfigController {
 
     @GetMapping("/status")
     public Map<String, Boolean> status() {
-        return Map.of("ready", aiConfigService.aiReady());
+        return Map.of(
+                "ready", aiConfigService.aiReady(),
+                "maskProviderApiKey", aiConfigService.maskProviderApiKey());
     }
 
     @PutMapping("/providers/{providerCode}")

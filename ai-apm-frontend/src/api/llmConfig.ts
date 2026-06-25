@@ -33,6 +33,7 @@ export interface LlmProviderDetailView {
   baseUrl: string;
   configured: boolean;
   apiKey?: string | null;
+  apiKeyMasked?: boolean;
   enabled: boolean;
   defaultProvider: boolean;
   models: LlmModelView[];
@@ -117,7 +118,7 @@ export function testLlmProvider (data: TestLlmProviderRequest) {
 }
 
 export function getLlmStatus () {
-  return http.request<{ ready: boolean }>({
+  return http.request<{ ready: boolean; maskProviderApiKey?: boolean }>({
     url: '/api/v1/config/ai/status',
     method: 'get',
   });

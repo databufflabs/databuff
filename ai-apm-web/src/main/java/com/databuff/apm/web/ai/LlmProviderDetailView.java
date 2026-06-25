@@ -9,6 +9,7 @@ public record LlmProviderDetailView(
         String baseUrl,
         boolean configured,
         String apiKey,
+        boolean apiKeyMasked,
         boolean enabled,
         boolean defaultProvider,
         List<LlmModelView> models) {

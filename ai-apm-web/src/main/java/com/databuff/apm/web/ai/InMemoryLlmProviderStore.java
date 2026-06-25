@@ -33,6 +33,8 @@ public class InMemoryLlmProviderStore {
     private final Map<String, Long> providerVersions = new ConcurrentHashMap<>();
     @Autowired
     private ObjectProvider<ExpertRuntimeRegistry> runtimeRegistry;
+    @Autowired
+    private AiLlmProviderProperties providerProperties;
     private final ObjectMapper objectMapper = new ObjectMapper();
     private volatile String defaultProviderCode;
 
@@ -450,13 +452,18 @@ public class InMemoryLlmProviderStore {
                 .map(this::toModelView)
                 .toList();
         String storedKey = apiKeys.get(state.code);
+        boolean maskApiKey = providerProperties == null || providerProperties.maskApiKey();
+        boolean configured = storedKey != null;
+        boolean apiKeyMasked = maskApiKey && configured;
+        String apiKey = apiKeyMasked ? null : storedKey;
         return new LlmProviderDetailView(
                 state.code,
                 state.displayName,
                 state.apiType,
                 state.baseUrl,
-                storedKey != null,
-                storedKey,
+                configured,
+                apiKey,
+                apiKeyMasked,
                 state.enabled,
                 state.code.equals(defaultProviderCode),
                 models);

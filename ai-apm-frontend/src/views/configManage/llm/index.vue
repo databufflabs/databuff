@@ -66,7 +66,8 @@
         <el-form-item label="API Key" prop="apiKey">
           <el-input
             v-model="editForm.apiKey"
-            :placeholder="editConfigured ? $t('modules.views.configManage.llm.s_08f020e8') : $t('modules.views.configManage.llm.s_58aacc17')" />
+            :placeholder="apiKeyPlaceholder" />
+          <p v-if="editApiKeyMasked && editConfigured" class="field-tip">{{ $t('modules.views.configManage.llm.s_f3a1c902') }}</p>
         </el-form-item>
         <el-form-item :label="$t('modules.views.configManage.llm.s_4fd1fecc')" prop="apiType">
           <el-select v-model="editForm.apiType" class="w-full">
@@ -268,6 +269,8 @@ const API_TYPE_OPTIONS = [
   { value: 'anthropic-messages', label: 'Anthropic Messages (anthropic-messages)' },
 ];
 
+const API_KEY_MASK_DISPLAY = '**********';
+
 @Component
 export default class LlmConfigPage extends Vue {
   public $refs!: {
@@ -283,6 +286,7 @@ export default class LlmConfigPage extends Vue {
   private editVisible = false;
   private createVisible = false;
   private editConfigured = false;
+  private editApiKeyMasked = false;
   private apiTypeOptions = API_TYPE_OPTIONS;
 
   private editForm: EditFormState = this.emptyEditForm();
@@ -340,6 +344,13 @@ export default class LlmConfigPage extends Vue {
     return i18n.t('modules.views.configManage.llm.s_19aa7412') as string;
   }
 
+  get apiKeyPlaceholder () {
+    if (this.editConfigured) {
+      return i18n.t('modules.views.configManage.llm.s_08f020e8') as string;
+    }
+    return i18n.t('modules.views.configManage.llm.s_58aacc17') as string;
+  }
+
   private created () {
     this.loadProviders();
   }
@@ -385,12 +396,13 @@ export default class LlmConfigPage extends Vue {
       return;
     }
     this.editConfigured = result.configured;
+    this.editApiKeyMasked = !!result.apiKeyMasked;
     this.editForm = {
       providerCode: result.providerCode,
       providerName: result.providerName,
       apiType: result.apiType || 'openai-completions',
       baseUrl: result.baseUrl,
-      apiKey: result.apiKey || '',
+      apiKey: result.apiKeyMasked ? API_KEY_MASK_DISPLAY : (result.apiKey || ''),
       enabled: result.configured ? result.enabled : true,
       models: result.models.map(model => this.toEditModel(model)),
     };
@@ -422,6 +434,7 @@ export default class LlmConfigPage extends Vue {
   private resetEditForm () {
     this.editForm = this.emptyEditForm();
     this.editConfigured = false;
+    this.editApiKeyMasked = false;
   }
 
   private resetCreateForm () {
@@ -483,6 +496,14 @@ export default class LlmConfigPage extends Vue {
     this.editForm.models[modelIndex].envVars.splice(envIndex, 1);
   }
 
+  private resolveEditApiKey (): string | undefined {
+    const value = (this.editForm.apiKey || '').trim();
+    if (!value || value === API_KEY_MASK_DISPLAY) {
+      return undefined;
+    }
+    return value;
+  }
+
   private parseOptionalInt (value: string): number | null {
     const trimmed = (value || '').trim();
     if (!trimmed) {
@@ -530,7 +551,7 @@ export default class LlmConfigPage extends Vue {
     this.testing = true;
     const { result, error } = await toAsyncWait(testLlmProvider({
       baseUrl: this.editForm.baseUrl,
-      apiKey: this.editForm.apiKey || undefined,
+      apiKey: this.resolveEditApiKey(),
       apiType: this.editForm.apiType,
       modelId,
       providerCode: this.editForm.providerCode,
@@ -563,7 +584,7 @@ export default class LlmConfigPage extends Vue {
       providerName: this.editForm.providerName,
       apiType: this.editForm.apiType,
       baseUrl: this.editForm.baseUrl,
-      apiKey: this.editForm.apiKey || undefined,
+      apiKey: this.resolveEditApiKey(),
       enabled: this.editForm.enabled,
       defaultModelId: defaultModel?.modelId || models[0]?.modelId,
       models,

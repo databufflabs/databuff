@@ -128,12 +128,23 @@ class InMemoryLlmProviderStoreTest {
     }
 
     @Test
-    void returnsConfiguredApiKeyInDetailView() {
+    void omitsApiKeyFromDetailViewWhenMaskEnabled() {
         InMemoryLlmProviderStore store = TestBeanSupport.llmProviderStore();
         store.updateProvider("openai", new UpdateLlmProviderRequest(null, "sk-test-secret-key", null, null));
         var detail = store.getProviderDetail("openai");
         assertThat(detail.configured()).isTrue();
+        assertThat(detail.apiKey()).isNull();
+        assertThat(detail.apiKeyMasked()).isTrue();
+    }
+
+    @Test
+    void returnsApiKeyInDetailViewWhenMaskDisabled() {
+        InMemoryLlmProviderStore store = TestBeanSupport.llmProviderStore(TestBeanSupport.unmaskedProviderProperties());
+        store.updateProvider("openai", new UpdateLlmProviderRequest(null, "sk-test-secret-key", null, null));
+        var detail = store.getProviderDetail("openai");
+        assertThat(detail.configured()).isTrue();
         assertThat(detail.apiKey()).isEqualTo("sk-test-secret-key");
+        assertThat(detail.apiKeyMasked()).isFalse();
     }
 
     @Test

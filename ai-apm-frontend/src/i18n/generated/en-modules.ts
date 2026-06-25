@@ -2031,6 +2031,7 @@ export default {
         "s_5d551c2c": "Provider Name",
         "s_790d7e1c": "Kimi, DeepSeek",
         "s_08f020e8": "Modify",
+        "s_f3a1c902": "For security, the API key is masked and not shown here. Leave blank to keep the current key.",
         "s_58aacc17": "Please enter API Key",
         "s_4fd1fecc": "API Type",
         "s_1cd74b17": "Model management",

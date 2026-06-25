@@ -12,14 +12,17 @@ public class AiConfigService {
     private final InMemoryLlmProviderStore store;
     private final LlmCatalogService catalogService;
     private final LlmProviderPersistence llmProviderPersistence;
+    private final AiLlmProviderProperties providerProperties;
 
     public AiConfigService(
             InMemoryLlmProviderStore store,
             LlmCatalogService catalogService,
-            LlmProviderPersistence llmProviderPersistence) {
+            LlmProviderPersistence llmProviderPersistence,
+            AiLlmProviderProperties providerProperties) {
         this.store = store;
         this.catalogService = catalogService;
         this.llmProviderPersistence = llmProviderPersistence;
+        this.providerProperties = providerProperties;
     }
 
     public List<LlmProviderView> listProviders() {
@@ -70,5 +73,9 @@ public class AiConfigService {
 
     public boolean aiReady() {
         return store.hasEnabledProvider();
+    }
+
+    public boolean maskProviderApiKey() {
+        return providerProperties.maskApiKey();
     }
 }
