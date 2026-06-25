@@ -160,34 +160,10 @@ format_bytes_human() {
   }'
 }
 
-# 可信 Content-Length：HEAD → Range → .size 侧车（openocta chunked 无 Content-Length 时依赖 .size）。
+# 远程 tarball 总大小：只读 ${url}.size 侧车（openocta HEAD/Range 不可用）。
 valid_remote_content_length() {
   local len="$1"
   [[ -n "$len" && "$len" =~ ^[0-9]+$ && "$len" -gt 1048576 ]]
-}
-
-probe_head_content_length() {
-  local url="$1"
-  local headers len ct
-  headers="$(curl -fsSL -I --max-time 30 "$url" 2>/dev/null || true)"
-  len="$(printf '%s\n' "$headers" | awk 'BEGIN{IGNORECASE=1} /^Content-Length:/ {gsub(/\r/,"",$2); print $2; exit}')"
-  ct="$(printf '%s\n' "$headers" | awk 'BEGIN{IGNORECASE=1} /^Content-Type:/ {gsub(/\r/,"",$2); print tolower($2); exit}')"
-  if valid_remote_content_length "$len" && [[ "$ct" == application/octet-stream* || "$ct" == application/octet-stream ]]; then
-    printf '%s\n' "$len"
-  fi
-}
-
-probe_range_content_length() {
-  local url="$1"
-  local headers total ct
-  headers="$(curl -fsSL -r 0-0 -D - -o /dev/null --max-time 30 "$url" 2>/dev/null || true)"
-  total="$(printf '%s\n' "$headers" | awk 'BEGIN{IGNORECASE=1} /^Content-Range:/ {
-    split($0, parts, "/"); gsub(/\r/, "", parts[2]); print parts[2]; exit
-  }')"
-  ct="$(printf '%s\n' "$headers" | awk 'BEGIN{IGNORECASE=1} /^Content-Type:/ {gsub(/\r/,"",$2); print tolower($2); exit}')"
-  if valid_remote_content_length "$total" && [[ "$ct" == application/octet-stream* || "$ct" == application/octet-stream ]]; then
-    printf '%s\n' "$total"
-  fi
 }
 
 probe_sidecar_content_length() {
@@ -199,84 +175,14 @@ probe_sidecar_content_length() {
   fi
 }
 
-pkg_base_path_suffix() {
-  local base="${1%/}"
-  if [[ "$base" == */databuff/* ]]; then
-    printf '%s\n' "${base#*databuff/}"
-    return 0
-  fi
-  if [[ "$base" == */databuff ]]; then
-    return 0
-  fi
-  return 1
-}
-
-detect_internal_size_probe_base() {
-  if [[ -n "${APM_SIZE_PROBE_BASE:-}" ]]; then
-    printf '%s\n' "${APM_SIZE_PROBE_BASE%/}"
-    return 0
-  fi
-  if curl -fsSL --max-time 3 "${APM_INTERNAL_SIZE_PROBE_BASE:-https://databuff.ai/databuff}/VERSION" >/dev/null 2>&1; then
-    printf '%s\n' "${APM_INTERNAL_SIZE_PROBE_BASE:-https://databuff.ai/databuff}"
-    return 0
-  fi
-  return 1
-}
-
-probe_all_content_length_methods() {
-  local url="$1"
-  local len
-
-  len="$(probe_head_content_length "$url" 2>/dev/null || true)"
-  if [[ -n "$len" ]]; then
-    printf '%s\n' "$len"
-    return 0
-  fi
-
-  len="$(probe_range_content_length "$url" 2>/dev/null || true)"
-  if [[ -n "$len" ]]; then
-    printf '%s\n' "$len"
-    return 0
-  fi
-
-  len="$(probe_sidecar_content_length "$url" 2>/dev/null || true)"
-  if [[ -n "$len" ]]; then
-    printf '%s\n' "$len"
-    return 0
-  fi
-
-  return 1
-}
-
 resolve_tarball_content_length() {
   local pkg_base="$1"
   local name="$2"
-  local url suffix mirror_base mirror_url len
-
-  if suffix="$(pkg_base_path_suffix "$pkg_base" 2>/dev/null)" \
-    && mirror_base="$(detect_internal_size_probe_base 2>/dev/null)"; then
-    if [[ -n "$suffix" ]]; then
-      mirror_url="${mirror_base%/}/${suffix}/${name}"
-    else
-      mirror_url="${mirror_base%/}/${name}"
-    fi
-    if len="$(probe_all_content_length_methods "$mirror_url" 2>/dev/null)"; then
-      printf '%s\n' "$len"
-      return 0
-    fi
-  fi
-
-  url="${pkg_base%/}/${name}"
-  if len="$(probe_all_content_length_methods "$url" 2>/dev/null)"; then
-    printf '%s\n' "$len"
-    return 0
-  fi
-
-  return 1
+  probe_sidecar_content_length "${pkg_base%/}/${name}"
 }
 
 probe_remote_content_length() {
-  resolve_tarball_content_length "${1%/*}" "$(basename "$1")" 2>/dev/null || true
+  probe_sidecar_content_length "${1%/*}/$(basename "$1")" 2>/dev/null || true
 }
 
 # 不用 curl --progress-bar：CentOS7 curl 7.29 对 chunked 响应会误报 100% 并一直刷新。
@@ -406,31 +312,31 @@ download_image_tarball() {
   local dest_dir="$4"
   local ext="${5:-${IMAGE_TARBALL_EXT:-.tar.gz}}"
 
-  local name url dest base
+  local name url dest base expected=""
   name="$(image_tarball_name "$component" "$version" "$arch" "$ext")"
   base="$(image_pkg_base_for_component "$component")"
   url="${base%/}/${name}"
   dest="${dest_dir}/${name}"
 
+  expected="$(probe_sidecar_content_length "$url" 2>/dev/null || true)"
+
   if image_pkg_interactive; then
-    echo "[pull-images]   下载 ${name} ..."
-    local expected=""
-    expected="$(resolve_tarball_content_length "$base" "$name" 2>/dev/null || true)"
-    if ! download_file_via_curl "$url" "$dest" "$name" "$expected"; then
-      return 1
+    echo "[pull-images]   下载 ${name} ..." >&2
+    if [[ -z "$expected" ]]; then
+      echo "[pull-images]   未读取到 ${name}.size，进度无百分比" >&2
     fi
-    if ! validate_image_tarball "$dest"; then
-      rm -f "$dest"
-      return 1
-    fi
-    echo "[pull-images]   下载完成 ($(file_size_human "$dest"))，开始导入本地镜像 (大镜像可能需数分钟) ..." >&2
-    return 0
   fi
 
-  if ! download_file_via_curl "$url" "$dest" "$name" ""; then
+  if ! download_file_via_curl "$url" "$dest" "$name" "$expected"; then
     return 1
   fi
-  validate_image_tarball "$dest"
+  if ! validate_image_tarball "$dest"; then
+    rm -f "$dest"
+    return 1
+  fi
+  if image_pkg_interactive; then
+    echo "[pull-images]   下载完成 ($(file_size_human "$dest"))，开始导入本地镜像 (大镜像可能需数分钟) ..." >&2
+  fi
 }
 
 image_pkg_download_failed_hint() {

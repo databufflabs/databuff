@@ -11,6 +11,8 @@
 <p><strong>Ask one question in plain English — AI agents query metrics, traces, and topology together, then tell you what broke.</strong></p>
 
 <p align="center">
+  <a href="https://demo.databuff.ai">Live Demo</a>
+  &nbsp;|&nbsp;
   <a href="docs/README_en.md">Documentation</a>
   &nbsp;|&nbsp;
   <a href="README.md">中文</a>

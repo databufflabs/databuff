@@ -9,6 +9,8 @@
 <h3>国产开源 · AI Native OpenTelemetry APM</h3>
 
 <p align="center">
+  <a href="https://demo.databuff.ai">在线演示</a>
+  &nbsp;|&nbsp;
   <a href="docs/README.md">文档</a>
   &nbsp;|&nbsp;
   <a href="README_en.md">English</a>
