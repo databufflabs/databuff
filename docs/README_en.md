@@ -27,6 +27,7 @@ Install the platform, then install the Demo app to see traces, metrics, topology
 
 ### Getting Started
 
+- [OpenTelemetry OTLP Ingestion](opentelemetry-otlp-ingestion_en.md)
 - [Docker Installation](快速入门/docker安装部署_en.md)
 - [Kubernetes Installation](快速入门/k8s安装部署_en.md)
 

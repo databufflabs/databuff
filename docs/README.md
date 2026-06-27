@@ -27,6 +27,7 @@ curl -fsSL https://databuff.ai/databuff/ai-apm-install.sh | bash
 
 ### 快速入门
 
+- [OpenTelemetry OTLP 接入](opentelemetry-otlp-ingestion.md)
 - [Docker 安装部署](快速入门/docker安装部署.md)
 - [K8s 安装部署](快速入门/k8s安装部署.md)
 
