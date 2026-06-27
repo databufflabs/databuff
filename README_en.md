@@ -58,7 +58,7 @@
 | OpenTelemetry native | ✅ | ✅ | Partial |
 | Self-host · 5 min Docker | ✅ `curl \| bash` | ✅ | ❌ SaaS |
 | Distributed tracing + topology | ✅ | ✅ | ✅ |
-| Open source | ✅ Apache 2.0 | ✅ | ❌ |
+| Open source | ✅  | ✅ | ❌ |
 
 > **One-liner:** Open-source APM where an **AI brain** dispatches metric, trace, and inspection experts — not another chat box on top of dashboards.
 
