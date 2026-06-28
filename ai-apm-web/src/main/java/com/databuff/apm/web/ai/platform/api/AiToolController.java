@@ -171,7 +171,7 @@ public class AiToolController {
             case "timeTool.getCurrentTimeRange" -> toJson(timeTool.getCurrentTimeRange(request.rangeMinutes()));
             case "timeTool.getTimeRangeAroundTime" -> toJson(timeTool.getTimeRangeAroundTime(request.targetTime()));
             case "dataTools.queryServicesAll" -> dataTools.queryServicesAll(
-                    request.keyword(), request.size(), request.fromTime(), request.toTime());
+                    request.keyword(), request.fromTime(), request.toTime());
             case "dataTools.queryServicesByServiceType" -> dataTools.queryServicesByServiceType(
                     firstNonBlank(request.serviceType(), request.service()),
                     request.keyword(),

@@ -2,7 +2,7 @@
   "status": 200,
   "message": "success",
   "data": {
-    "total": 0,
+    "total": 6,
     "healthRangeScoreList": [
       {
         "timestamp": 1781379180000,

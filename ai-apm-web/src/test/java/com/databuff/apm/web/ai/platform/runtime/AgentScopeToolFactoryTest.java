@@ -10,6 +10,7 @@ import com.databuff.apm.web.tools.local.CommonTools;
 import com.databuff.apm.web.tools.local.DataTools;
 import com.databuff.apm.web.tools.local.TimeTool;
 import com.fasterxml.jackson.databind.ObjectMapper;
+import io.agentscope.core.model.ToolSchema;
 import io.agentscope.core.tool.Toolkit;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
@@ -17,6 +18,7 @@ import org.mockito.Mockito;
 
 import java.time.Instant;
 import java.util.List;
+import java.util.Map;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.mockito.Mockito.mock;
@@ -84,6 +86,76 @@ class AgentScopeToolFactoryTest {
                         "queryTraceDetail",
                         "queryServiceAlarms",
                         "queryMetricData");
+    }
+
+    @Test
+    void queryServicesAllSchemaDoesNotRequireTimeRange() {
+        Toolkit toolkit = new Toolkit();
+        factory.registerTools(toolkit, List.of(
+                tool("data.queryServicesAll", "dataTools.queryServicesAll")));
+
+        ToolSchema schema = toolkit.getToolSchemas().stream()
+                .filter(item -> "queryServicesAll".equals(item.getName()))
+                .findFirst()
+                .orElseThrow();
+        @SuppressWarnings("unchecked")
+        List<String> required = (List<String>) schema.getParameters().get("required");
+
+        assertThat(required == null || !required.contains("fromTime")).isTrue();
+        assertThat(required == null || !required.contains("toTime")).isTrue();
+        assertThat(required == null || !required.contains("keyword")).isTrue();
+        @SuppressWarnings("unchecked")
+        Map<String, Object> properties = (Map<String, Object>) schema.getParameters().get("properties");
+        assertThat(properties).doesNotContainKey("size");
+    }
+
+    @Test
+    void queryServiceTopologySchemaDoesNotRequireServiceInstance() {
+        Toolkit toolkit = new Toolkit();
+        factory.registerTools(toolkit, List.of(
+                tool("data.queryServiceTopology", "dataTools.queryServiceTopology")));
+
+        ToolSchema schema = toolkit.getToolSchemas().stream()
+                .filter(item -> "queryServiceTopology".equals(item.getName()))
+                .findFirst()
+                .orElseThrow();
+        @SuppressWarnings("unchecked")
+        List<String> required = (List<String>) schema.getParameters().get("required");
+
+        assertThat(required == null || !required.contains("serviceInstance")).isTrue();
+        assertThat(required).contains("serviceName", "fromTime", "toTime");
+    }
+
+    @Test
+    void queryTraceListSchemaDoesNotRequireOptionalFilters() {
+        Toolkit toolkit = new Toolkit();
+        factory.registerTools(toolkit, List.of(
+                tool("data.queryTraceListByCondition", "dataTools.queryTraceListByCondition")));
+
+        ToolSchema schema = toolkit.getToolSchemas().stream()
+                .filter(item -> "queryTraceListByCondition".equals(item.getName()))
+                .findFirst()
+                .orElseThrow();
+        @SuppressWarnings("unchecked")
+        List<String> required = (List<String>) schema.getParameters().get("required");
+
+        assertThat(required).containsExactly("fromTime", "toTime");
+    }
+
+    @Test
+    void queryServiceAlarmsSchemaDoesNotRequireStatus() {
+        Toolkit toolkit = new Toolkit();
+        factory.registerTools(toolkit, List.of(
+                tool("data.queryServiceAlarms", "dataTools.queryServiceAlarms")));
+
+        ToolSchema schema = toolkit.getToolSchemas().stream()
+                .filter(item -> "queryServiceAlarms".equals(item.getName()))
+                .findFirst()
+                .orElseThrow();
+        @SuppressWarnings("unchecked")
+        List<String> required = (List<String>) schema.getParameters().get("required");
+
+        assertThat(required).containsExactly("serviceId", "fromTime", "toTime");
     }
 
     @Test

@@ -1022,8 +1022,6 @@ public class ServicePortalService {
     }
 
     /** Metric lookback used when meta_service is empty or the requested window has no traffic. */
-    private static final long BASIC_SERVICE_METRIC_FALLBACK_MS = 30L * 24 * 3_600_000L;
-
     /** Max page size for portal {@link #list}. */
     private static final int SERVICE_LIST_MAX_PAGE_SIZE = 500;
 
@@ -1031,34 +1029,21 @@ public class ServicePortalService {
      * Service id/name catalog for portal dropdowns.
      * <p>Sources (in order):
      * <ul>
-     *   <li>{@code ignoreTime=1}: {@code meta_service}, merged with {@code metric_service} distinct (30d)</li>
-     *   <li>otherwise: {@code metric_service} in the requested window, then 30d metric fallback, then meta</li>
+     *   <li>{@code ignoreTime=1}: {@code meta_service}</li>
+     *   <li>otherwise: {@code metric_service} in the requested window, then {@code meta_service}</li>
      * </ul>
      * Aligns with {@link #list} which already read {@code metric_service}.
      */
     public List<Map<String, Object>> basicServices(Map<String, Object> body) {
         boolean ignoreTime = intValue(body.get("ignoreTime"), 0) == 1;
-        long now = System.currentTimeMillis();
-        long portalEnd = PortalTimeParser.portalEndNow();
         if (ignoreTime) {
-            LinkedHashMap<String, Map<String, Object>> merged = new LinkedHashMap<>();
-            for (Map<String, Object> row : loadBasicServiceRows(body)) {
-                merged.put(basicServiceKey(row), row);
-            }
-            for (Map<String, Object> row : loadBasicServicesFromMetrics(
-                    body, portalEnd - BASIC_SERVICE_METRIC_FALLBACK_MS, portalEnd)) {
-                merged.putIfAbsent(basicServiceKey(row), row);
-            }
-            return List.copyOf(merged.values());
+            return loadBasicServiceRows(body);
         }
 
+        long now = System.currentTimeMillis();
         long from = PortalTimeParser.rangeFrom(body, now - 3_600_000L);
         long to = PortalTimeParser.rangeTo(body, now);
         List<Map<String, Object>> rows = loadBasicServicesFromMetrics(body, from, to);
-        if (!rows.isEmpty()) {
-            return rows;
-        }
-        rows = loadBasicServicesFromMetrics(body, portalEnd - BASIC_SERVICE_METRIC_FALLBACK_MS, portalEnd);
         if (!rows.isEmpty()) {
             return rows;
         }
@@ -1067,13 +1052,7 @@ public class ServicePortalService {
 
     /** Full service catalog from Doris {@code meta_service} (no auth-group filter). */
     public List<Map<String, Object>> basicAllServices(Map<String, Object> body) {
-        List<Map<String, Object>> rows = loadBasicServiceRows(body);
-        if (!rows.isEmpty()) {
-            return rows;
-        }
-        long portalEnd = PortalTimeParser.portalEndNow();
-        return loadBasicServicesFromMetrics(
-                body, portalEnd - BASIC_SERVICE_METRIC_FALLBACK_MS, portalEnd);
+        return loadBasicServiceRows(body);
     }
 
     private List<Map<String, Object>> loadBasicServicesFromMetrics(
@@ -1088,16 +1067,8 @@ public class ServicePortalService {
                 .toList();
     }
 
-    private static String basicServiceKey(Map<String, Object> row) {
-        String id = stringValue(row.get("id"), "");
-        if (!id.isBlank()) {
-            return id;
-        }
-        return stringValue(row.get("service"), "");
-    }
-
     private List<Map<String, Object>> loadBasicServiceRows(Map<String, Object> body) {
-        String serviceName = stringValue(body.get("serviceName"), null);
+        String serviceName = normalizeServiceNameFilter(stringValue(body.get("serviceName"), null));
         try {
             String sql = MetricQueryBuilder.metaServicesSql(metricDatabase, serviceName);
             return readRepository.queryMetaServices(sql).stream()
@@ -1181,6 +1152,10 @@ public class ServicePortalService {
     }
 
     private boolean matchesBasicServiceRowFilters(Map<String, Object> row, Map<String, Object> body) {
+        String serviceName = normalizeServiceNameFilter(stringValue(body.get("serviceName"), null));
+        if (serviceName != null && !matchesServiceNameKeyword(row, serviceName)) {
+            return false;
+        }
         String serviceType = stringValue(body.get("serviceType"), null);
         List<String> serviceTypes = parseStringList(body.get("serviceTypes"));
         String rowType = stringValue(row.get("service_type"), "web");
@@ -1189,6 +1164,24 @@ public class ServicePortalService {
         }
         return serviceTypes.isEmpty()
                 || serviceTypes.stream().anyMatch(type -> type.equalsIgnoreCase(rowType));
+    }
+
+    private static String normalizeServiceNameFilter(String serviceName) {
+        if (serviceName == null || serviceName.isBlank()) {
+            return null;
+        }
+        String trimmed = serviceName.trim();
+        if ("null".equalsIgnoreCase(trimmed) || "undefined".equalsIgnoreCase(trimmed)) {
+            return null;
+        }
+        return trimmed;
+    }
+
+    private static boolean matchesServiceNameKeyword(Map<String, Object> row, String serviceName) {
+        String keyword = serviceName.toLowerCase(Locale.ROOT);
+        return stringValue(row.get("name"), "").toLowerCase(Locale.ROOT).contains(keyword)
+                || stringValue(row.get("service"), "").toLowerCase(Locale.ROOT).contains(keyword)
+                || stringValue(row.get("id"), "").toLowerCase(Locale.ROOT).contains(keyword);
     }
 
     private Map<String, Object> toBasicServiceRow(MetaServicePoint point) {

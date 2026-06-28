@@ -44,7 +44,7 @@ public class InMemoryLlmProviderStore {
         seed("volcengine", "火山引擎", "https://ark.cn-beijing.volces.com/api/coding/v3", "kimi-k2.6", DEFAULT_API_TYPE);
         seed("minimax", "MiniMax", "https://api.minimaxi.com/anthropic", "MiniMax-M3", ANTHROPIC_API_TYPE);
         seed("bailian", "百炼", "https://dashscope.aliyuncs.com/compatible-mode/v1", "qwen-plus", DEFAULT_API_TYPE);
-        seed("deepseek", "DeepSeek", "https://api.deepseek.com/v1", "deepseek-chat", DEFAULT_API_TYPE);
+        seed("deepseek", "DeepSeek", "https://api.deepseek.com", "deepseek-v4-flash", DEFAULT_API_TYPE);
         seed("zhipu", "智谱", "https://open.bigmodel.cn/api/paas/v4", "glm-4-flash", DEFAULT_API_TYPE);
         seed("qianfan", "千帆", "https://qianfan.baidubce.com/v2", "ernie-4.0-8k", DEFAULT_API_TYPE);
         seed("openai", "OpenAI", "https://api.openai.com/v1", "gpt-4o-mini", DEFAULT_API_TYPE);

@@ -2077,7 +2077,20 @@ class ServicePortalServiceTest {
   }
 
   @Test
-  void basicServicesWithIgnoreTimeUsesMetaTable() throws Exception {
+  void basicServicesIgnoresLiteralNullServiceNameFilter() throws Exception {
+    ApmReadRepository reader = mock(ApmReadRepository.class);
+    when(reader.queryMetaServices(anyString())).thenReturn(List.of(
+            ApmQueryModels.MetaServicePoint.minimal("demo-order", "Demo Order")));
+
+    ServicePortalService service = TestStorageSupport.servicePortalService(reader);
+    List<Map<String, Object>> rows = service.basicServices(Map.of("ignoreTime", 1, "serviceName", "null"));
+
+    assertThat(rows).hasSize(1);
+    assertThat(rows.get(0).get("id")).isEqualTo("demo-order");
+  }
+
+  @Test
+  void basicServicesWithIgnoreTimeUsesMetaTableOnly() throws Exception {
     ApmReadRepository reader = mock(ApmReadRepository.class);
     when(reader.queryMetaServices(anyString())).thenReturn(List.of(
             ApmQueryModels.MetaServicePoint.minimal("demo-order", "Demo Order")));
@@ -2088,6 +2101,7 @@ class ServicePortalServiceTest {
     assertThat(rows).hasSize(1);
     assertThat(rows.get(0).get("id")).isEqualTo("demo-order");
     assertThat(rows.get(0).get("name")).isEqualTo("Demo Order");
+    verify(reader, never()).queryDistinctTags(anyString());
   }
 
   @Test
@@ -2109,17 +2123,15 @@ class ServicePortalServiceTest {
   }
 
   @Test
-  void basicServicesFallsBackToMetricsWhenMetaEmpty() throws Exception {
+  void basicServicesWithIgnoreTimeReturnsEmptyWhenMetaEmpty() throws Exception {
     ApmReadRepository reader = mock(ApmReadRepository.class);
     when(reader.queryMetaServices(anyString())).thenReturn(List.of());
-    when(reader.queryDistinctTags(anyString())).thenReturn(List.of("demo-pay"));
 
     ServicePortalService service = TestStorageSupport.servicePortalService(reader);
     List<Map<String, Object>> rows = service.basicServices(Map.of("ignoreTime", 1));
 
-    assertThat(rows).hasSize(1);
-    assertThat(rows.get(0).get("id")).isEqualTo("demo-pay");
-    assertThat(rows.get(0).get("service_type")).isEqualTo("web");
+    assertThat(rows).isEmpty();
+    verify(reader, never()).queryDistinctTags(anyString());
   }
 
   @Test
@@ -2140,15 +2152,14 @@ class ServicePortalServiceTest {
   }
 
   @Test
-  void basicAllServicesFallsBackToMetricsWhenMetaEmpty() throws Exception {
+  void basicAllServicesReturnsEmptyWhenMetaEmpty() throws Exception {
     ApmReadRepository reader = mock(ApmReadRepository.class);
     when(reader.queryMetaServices(anyString())).thenReturn(List.of());
-    when(reader.queryDistinctTags(anyString())).thenReturn(List.of("demo-order"));
 
     ServicePortalService service = TestStorageSupport.servicePortalService(reader);
     List<Map<String, Object>> rows = service.basicAllServices(Map.of("ignoreTime", 1));
 
-    assertThat(rows).hasSize(1);
-    assertThat(rows.get(0).get("id")).isEqualTo("demo-order");
+    assertThat(rows).isEmpty();
+    verify(reader, never()).queryDistinctTags(anyString());
   }
 }

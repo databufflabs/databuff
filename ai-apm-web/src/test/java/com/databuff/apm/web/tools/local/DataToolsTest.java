@@ -43,6 +43,24 @@ class DataToolsTest {
 
     @Test
     @SuppressWarnings("unchecked")
+    void treatsLiteralNullKeywordAsUnfiltered() {
+        when(servicePortalService.basicServices(anyMap()))
+                .thenReturn(List.of(Map.of("service", "demo")));
+
+        String output = dataTools.queryServicesAll("null", null, null);
+
+        ArgumentCaptor<Map<String, Object>> captor = ArgumentCaptor.forClass(Map.class);
+        verify(servicePortalService).basicServices(captor.capture());
+        assertThat(captor.getValue())
+                .containsEntry("ignoreTime", 0)
+                .doesNotContainKey("serviceName")
+                .containsKeys("fromTime", "toTime");
+        assertServiceListDefaultHourWindow(captor.getValue());
+        assertThat(output).contains("\"demo\"");
+    }
+
+    @Test
+    @SuppressWarnings("unchecked")
     void queriesServicesByTypeFromCatalog() {
         when(servicePortalService.basicServices(anyMap()))
                 .thenReturn(List.of(Map.of("service", "demo")));
@@ -52,10 +70,11 @@ class DataToolsTest {
         ArgumentCaptor<Map<String, Object>> captor = ArgumentCaptor.forClass(Map.class);
         verify(servicePortalService).basicServices(captor.capture());
         assertThat(captor.getValue())
-                .containsEntry("ignoreTime", 1)
-                .containsEntry("serviceName", "demo");
+                .containsEntry("ignoreTime", 0)
+                .containsEntry("serviceName", "demo")
+                .containsKeys("fromTime", "toTime");
+        assertServiceListDefaultHourWindow(captor.getValue());
         assertThat(captor.getValue().get("serviceTypes")).isEqualTo(List.of("web", "custom"));
-        assertThat(captor.getValue()).doesNotContainKeys("fromTime", "toTime");
         assertThat(output).contains("\"serviceType\":\"service\"").contains("\"demo\"");
     }
 
@@ -65,13 +84,14 @@ class DataToolsTest {
         when(servicePortalService.basicServices(anyMap()))
                 .thenReturn(List.of(Map.of("service", "demo")));
 
-        String output = dataTools.queryServicesAll(null, 10, null, null);
+        String output = dataTools.queryServicesAll(null, null, null);
 
         ArgumentCaptor<Map<String, Object>> captor = ArgumentCaptor.forClass(Map.class);
         verify(servicePortalService).basicServices(captor.capture());
         assertThat(captor.getValue())
-                .containsEntry("ignoreTime", 1)
-                .doesNotContainKeys("fromTime", "toTime");
+                .containsEntry("ignoreTime", 0)
+                .containsKeys("fromTime", "toTime");
+        assertServiceListDefaultHourWindow(captor.getValue());
         assertThat(output).contains("\"serviceType\":\"all\"").contains("\"demo\"");
     }
 
@@ -81,7 +101,7 @@ class DataToolsTest {
         when(servicePortalService.basicServices(anyMap()))
                 .thenReturn(List.of(Map.of("service", "demo")));
 
-        String output = dataTools.queryServicesAll(null, 10, FROM_TIME, TO_TIME);
+        String output = dataTools.queryServicesAll(null, FROM_TIME, TO_TIME);
 
         ArgumentCaptor<Map<String, Object>> captor = ArgumentCaptor.forClass(Map.class);
         verify(servicePortalService).basicServices(captor.capture());
@@ -115,7 +135,7 @@ class DataToolsTest {
 
     @Test
     void rejectsPartialTimeRangeForServiceList() {
-        String output = dataTools.queryServicesAll(null, 10, FROM_TIME, null);
+        String output = dataTools.queryServicesAll(null, FROM_TIME, null);
 
         assertThat(output)
                 .contains("\"ok\":false")
@@ -362,6 +382,12 @@ class DataToolsTest {
         assertThat(sqlCaptor.getValue())
                 .contains("`service_id` IN ('9bf61532d56eb7b5','5457a0119281bb98')")
                 .doesNotContain("[\"9bf61532");
+    }
+
+    private static void assertServiceListDefaultHourWindow(Map<String, Object> body) {
+        long from = ApmTimeZones.wallClockToEpochMilli(String.valueOf(body.get("fromTime")));
+        long to = ApmTimeZones.wallClockToEpochMilli(String.valueOf(body.get("toTime")));
+        assertThat(to - from).isEqualTo(3_600_000L);
     }
 
     private static MetricQueryAggregation aggregation(String function, String field, String alias) {

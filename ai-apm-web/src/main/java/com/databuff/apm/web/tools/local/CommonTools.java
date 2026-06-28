@@ -33,7 +33,7 @@ public class CommonTools {
 
     @Tool(description = "Get current query time range from now backwards. Returns fromTime/toTime in yyyy-MM-dd HH:mm:ss.")
     public Map<String, String> getCurrentTimeRange(
-            @ToolParam(name = "rangeMinutes", description = "Lookback minutes, default 10, minimum 1")
+            @ToolParam(name = "rangeMinutes", required = false, description = "Lookback minutes, default 10, minimum 1")
             Integer rangeMinutes) {
         int minutes = rangeMinutes == null || rangeMinutes < 1 ? 10 : rangeMinutes;
         long endTime = System.currentTimeMillis() / ONE_MINUTE_MS * ONE_MINUTE_MS;

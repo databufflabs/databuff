@@ -582,7 +582,7 @@ class MetricQueryBuilderTest {
     @Test
     void buildsDistinctServicesSql() {
         String sql = MetricQueryBuilder.distinctServicesSql("databuff", 0L, 3_600_000L);
-        assertThat(sql).contains("DISTINCT `service`");
+        assertThat(sql).contains("DISTINCT `service` AS tag_value");
     }
 
     @Test

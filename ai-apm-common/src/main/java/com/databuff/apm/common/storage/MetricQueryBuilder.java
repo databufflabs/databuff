@@ -1265,11 +1265,11 @@ public final class MetricQueryBuilder {
     }
 
     public static String distinctServicesSql(String database, long fromMillis, long toMillis) {        return """
-                SELECT DISTINCT `service`
+                SELECT DISTINCT `service` AS tag_value
                 FROM %s.`metric_service`
                 WHERE %s
                   AND `service` IS NOT NULL AND `service` != ''
-                ORDER BY `service` ASC
+                ORDER BY tag_value ASC
                 """.formatted(database, metricTsWhere(fromMillis, toMillis));
     }
 

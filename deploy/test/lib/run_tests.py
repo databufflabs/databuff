@@ -20,6 +20,14 @@ LIB_ROOT = Path(__file__).resolve().parent
 sys.path.insert(0, str(LIB_ROOT))
 
 from cases import ApiCase, build_cases  # noqa: E402
+from snapshot_expected import snapshot_cases  # noqa: E402
+from ai_chat_integration import (  # noqa: E402
+    AI_CHAT_QUESTIONS,
+    GROUP_DATA_EXPERT,
+    MODULE_AI_PLATFORM,
+    is_llm_ready,
+    run_ai_chat_tool_loop,
+)
 from demo_window import MIN_WARMUP_SECONDS, QUERY_WINDOW_MS, aligned_query_window, trace_batch_bounds  # noqa: E402
 from ingest_warmup import wait_for_ingest_warmup  # noqa: E402
 from json_assert import assert_matches  # noqa: E402
@@ -357,10 +365,35 @@ def main() -> int:
     parser.add_argument("--warmup", type=int, default=int(os.environ.get("TEST_WARMUP_SECONDS", str(MIN_WARMUP_SECONDS))))
     parser.add_argument("--service", default=os.environ.get("TEST_DEMO_SERVICE", "service-a"))
     parser.add_argument("--report-dir", default=str(LIB_ROOT / "reports"))
+    parser.add_argument(
+        "--snapshot",
+        action="store_true",
+        help="record live API responses into expected/*.json (maintainer mode)",
+    )
+    parser.add_argument(
+        "--skip-ai-chat",
+        action="store_true",
+        default=os.environ.get("TEST_SKIP_AI_CHAT", "0") == "1",
+        help="skip AI chat tool parameter integration tests",
+    )
+    parser.add_argument(
+        "--ai-chat-rounds",
+        type=int,
+        default=int(os.environ.get("TEST_AI_CHAT_ROUNDS", "2")),
+        help="rounds per AI chat tool case (default: 2)",
+    )
+    parser.add_argument(
+        "--ai-chat-poll-timeout",
+        type=float,
+        default=float(os.environ.get("TEST_AI_CHAT_POLL_TIMEOUT", "180")),
+        help="seconds to wait for each AI chat session",
+    )
     args = parser.parse_args()
 
     min_warmup = int(os.environ.get("TEST_MIN_WARMUP_SECONDS", str(MIN_WARMUP_SECONDS)))
-    if args.warmup <= 0:
+    if args.snapshot and "TEST_WARMUP_SECONDS" not in os.environ and "--warmup" not in sys.argv:
+        warmup = 0
+    elif args.warmup <= 0:
         warmup = 0
     else:
         warmup = max(args.warmup, min_warmup)
@@ -370,6 +403,16 @@ def main() -> int:
 
     print(f"[test] login {base} ...")
     token = login(base, args.username, args.password, args.timeout)
+
+    if args.snapshot:
+        wait_for_ingest_warmup(warmup)
+        return snapshot_cases(
+            base,
+            token,
+            service=args.service,
+            timeout=args.timeout,
+            warmup=warmup,
+        )
 
     ingest_uptime, warmup_waited = wait_for_ingest_warmup(warmup)
 
@@ -384,6 +427,42 @@ def main() -> int:
     report.ingest_uptime_seconds = ingest_uptime
     report.query_from_ms = frm_ms
     report.query_to_ms = to_ms
+
+    if not args.skip_ai_chat:
+        if is_llm_ready(base, token, args.timeout):
+            print(
+                f"[test] running AI chat tool loop: {args.ai_chat_rounds} rounds x "
+                f"{len(AI_CHAT_QUESTIONS)} questions ..."
+            )
+            ai_results = run_ai_chat_tool_loop(
+                base,
+                token,
+                rounds=args.ai_chat_rounds,
+                poll_timeout_sec=args.ai_chat_poll_timeout,
+            )
+            for item in ai_results:
+                report.results.append(
+                    CaseResult(
+                        module=MODULE_AI_PLATFORM,
+                        group=GROUP_DATA_EXPERT,
+                        name=item.question,
+                        path=f"/webapi/api/v1/ai/sessions/{item.session_id or '-'}/messages",
+                        method="CHAT",
+                        ok=item.ok,
+                        http_status=200 if item.ok else 0,
+                        elapsed_ms=item.elapsed_ms,
+                        detail=item.detail,
+                        expected_file="ai-chat/no-parameter-validation-errors",
+                        expected_json="no Parameter validation failed",
+                    )
+                )
+                report.total += 1
+                if item.ok:
+                    report.passed += 1
+                else:
+                    report.failed += 1
+        else:
+            print("[test] skip AI chat: no enabled LLM provider with API key configured")
 
     json_path = report_dir / f"report-{stamp}.json"
     html_path = report_dir / f"report-{stamp}.html"

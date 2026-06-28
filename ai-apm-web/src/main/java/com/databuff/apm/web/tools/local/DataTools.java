@@ -50,34 +50,32 @@ public class DataTools {
         metricDatabase = storageProperties == null ? "databuff" : storageProperties.metricDatabase();
     }
 
-    @Tool(converter = PlainTextToolResultConverter.class, description = "Query service list from the service catalog (meta_service with metric fallback). Optional keyword filters by service name. Omit fromTime/toTime for the full catalog; pass both in yyyy-MM-dd HH:mm:ss to list services with traffic in that window (obtain via getCurrentTimeRange or getTimeRangeAroundTime). Do not use queryMetricData for service lists.")
+    @Tool(converter = PlainTextToolResultConverter.class, description = "Query service list from the service catalog (meta_service with metric fallback). Optional keyword filters by service name; literal \"null\" means no filter. Defaults to the last 1 hour when fromTime/toTime are omitted; pass both in yyyy-MM-dd HH:mm:ss for a custom window (obtain via getCurrentTimeRange or getTimeRangeAroundTime). Returns up to 20 services. Do not use queryMetricData for service lists.")
     public String queryServicesAll(
-            @ToolParam(name = "keyword", description = "Optional service name keyword")
+            @ToolParam(name = "keyword", required = false, description = "Optional service name keyword; omit or pass null for no filter")
             String keyword,
-            @ToolParam(name = "size", description = "Optional max rows, default 20")
-            Integer size,
-            @ToolParam(name = "fromTime", description = "Optional start time for time-windowed service list, format yyyy-MM-dd HH:mm:ss")
+            @ToolParam(name = "fromTime", required = false, description = "Optional start time; defaults to last 1 hour when omitted, format yyyy-MM-dd HH:mm:ss")
             String fromTime,
-            @ToolParam(name = "toTime", description = "Optional end time for time-windowed service list, format yyyy-MM-dd HH:mm:ss")
+            @ToolParam(name = "toTime", required = false, description = "Optional end time; defaults to last 1 hour when omitted, format yyyy-MM-dd HH:mm:ss")
             String toTime) {
         String timeRangeError = validateOptionalTimeRange(fromTime, toTime);
         if (timeRangeError != null) {
             return error(timeRangeError);
         }
-        return queryServicesInternal("all", keyword, size, fromTime, toTime);
+        return queryServicesInternal("all", keyword, null, fromTime, toTime);
     }
 
-    @Tool(converter = PlainTextToolResultConverter.class, description = "Query service list by serviceType from the service catalog (meta_service with metric fallback). Supported values: service/web, db, mq, cache, remote. Omit fromTime/toTime for the full catalog; pass both in yyyy-MM-dd HH:mm:ss for a time-windowed list. Do not use queryMetricData for service lists.")
+    @Tool(converter = PlainTextToolResultConverter.class, description = "Query service list by serviceType from the service catalog (meta_service with metric fallback). Supported values: service/web, db, mq, cache, remote. Defaults to the last 1 hour when fromTime/toTime are omitted; pass both in yyyy-MM-dd HH:mm:ss for a custom window. Do not use queryMetricData for service lists.")
     public String queryServicesByServiceType(
             @ToolParam(name = "serviceType", description = "Required service type: service, web, db, mq, cache, remote")
             String serviceType,
-            @ToolParam(name = "keyword", description = "Optional service name keyword")
+            @ToolParam(name = "keyword", required = false, description = "Optional service name keyword; omit or pass null for no filter")
             String keyword,
-            @ToolParam(name = "size", description = "Optional max rows, default 20")
+            @ToolParam(name = "size", required = false, description = "Optional max rows, default 20")
             Integer size,
-            @ToolParam(name = "fromTime", description = "Optional start time for time-windowed service list, format yyyy-MM-dd HH:mm:ss")
+            @ToolParam(name = "fromTime", required = false, description = "Optional start time; defaults to last 1 hour when omitted, format yyyy-MM-dd HH:mm:ss")
             String fromTime,
-            @ToolParam(name = "toTime", description = "Optional end time for time-windowed service list, format yyyy-MM-dd HH:mm:ss")
+            @ToolParam(name = "toTime", required = false, description = "Optional end time; defaults to last 1 hour when omitted, format yyyy-MM-dd HH:mm:ss")
             String toTime) {
         if (isBlank(serviceType)) {
             return error("serviceType is required");
@@ -111,27 +109,39 @@ public class DataTools {
         }
         Map<String, Object> result = new LinkedHashMap<>();
         result.put("serviceType", normalized);
-        if (!isBlank(fromTime) && !isBlank(toTime)) {
-            result.put("fromTime", requireWallClockTime(fromTime, "fromTime"));
-            result.put("toTime", requireWallClockTime(toTime, "toTime"));
-        }
+        result.put("fromTime", body.get("fromTime"));
+        result.put("toTime", body.get("toTime"));
         result.put("total", rows.size());
         result.put("data", rows);
         return json(result);
     }
 
+    private static final long ONE_MINUTE_MS = 60_000L;
+    private static final int DEFAULT_SERVICE_LIST_LOOKBACK_MINUTES = 60;
+
     private static Map<String, Object> buildServiceListBody(
             Integer size, String keyword, String fromTime, String toTime) {
         Map<String, Object> body = pageBody(size == null ? 20 : size);
         putIfNotBlank(body, "serviceName", keyword);
+        String effectiveFrom = fromTime;
+        String effectiveTo = toTime;
         if (isBlank(fromTime) && isBlank(toTime)) {
-            body.put("ignoreTime", 1);
-            return body;
+            Map<String, String> defaults = defaultServiceListTimeRange();
+            effectiveFrom = defaults.get("fromTime");
+            effectiveTo = defaults.get("toTime");
         }
         body.put("ignoreTime", 0);
-        body.put("fromTime", requireWallClockTime(fromTime, "fromTime"));
-        body.put("toTime", requireWallClockTime(toTime, "toTime"));
+        body.put("fromTime", requireWallClockTime(effectiveFrom, "fromTime"));
+        body.put("toTime", requireWallClockTime(effectiveTo, "toTime"));
         return body;
+    }
+
+    private static Map<String, String> defaultServiceListTimeRange() {
+        long endTime = System.currentTimeMillis() / ONE_MINUTE_MS * ONE_MINUTE_MS;
+        long startTime = endTime - DEFAULT_SERVICE_LIST_LOOKBACK_MINUTES * ONE_MINUTE_MS;
+        return Map.of(
+                "fromTime", ApmTimeZones.formatWallClock(startTime),
+                "toTime", ApmTimeZones.formatWallClock(endTime));
     }
 
     private static void applyServiceTypeFilter(Map<String, Object> body, String normalized) {
@@ -150,7 +160,7 @@ public class DataTools {
     public String queryServiceTopology(
             @ToolParam(name = "serviceName", description = "Service name, not serviceId")
             String serviceName,
-            @ToolParam(name = "serviceInstance", description = "Optional service instance")
+            @ToolParam(name = "serviceInstance", required = false, description = "Optional service instance")
             String serviceInstance,
             @ToolParam(name = "fromTime", description = "Required start time, format yyyy-MM-dd HH:mm:ss")
             String fromTime,
@@ -177,21 +187,21 @@ public class DataTools {
 
     @Tool(converter = PlainTextToolResultConverter.class, description = "Query trace list for a service call condition. Uses service/call_graph_stats for metric stats and trace/call_spans for trace rows. fromTime/toTime are required in yyyy-MM-dd HH:mm:ss.")
     public String queryTraceListByCondition(
-            @ToolParam(name = "srcServiceId", description = "Optional upstream/source serviceId")
+            @ToolParam(name = "srcServiceId", required = false, description = "Optional upstream/source serviceId")
             String srcServiceId,
-            @ToolParam(name = "serviceId", description = "Optional downstream/target serviceId")
+            @ToolParam(name = "serviceId", required = false, description = "Optional downstream/target serviceId")
             String serviceId,
-            @ToolParam(name = "componentType", description = "Optional componentType, default service.http")
+            @ToolParam(name = "componentType", required = false, description = "Optional componentType, default service.http")
             String componentType,
-            @ToolParam(name = "resource", description = "Optional endpoint/resource/sql/command filter")
+            @ToolParam(name = "resource", required = false, description = "Optional endpoint/resource/sql/command filter")
             String resource,
-            @ToolParam(name = "direction", description = "Optional direction: in, out, both")
+            @ToolParam(name = "direction", required = false, description = "Optional direction: in, out, both")
             String direction,
             @ToolParam(name = "fromTime", description = "Required start time, format yyyy-MM-dd HH:mm:ss")
             String fromTime,
             @ToolParam(name = "toTime", description = "Required end time, format yyyy-MM-dd HH:mm:ss")
             String toTime,
-            @ToolParam(name = "size", description = "Optional max trace rows, default 50")
+            @ToolParam(name = "size", required = false, description = "Optional max trace rows, default 50")
             Integer size) {
         String timeRangeError = validateTimeRange(fromTime, toTime);
         if (timeRangeError != null) {
@@ -219,7 +229,7 @@ public class DataTools {
     public String queryMetricData(
             @ToolParam(name = "queryRequests", description = "Required list of QueryRequest objects. Use the Doris metric table name directly in measurement, for example metric_service or metric_service_db. Each item has measurement, aggregations (function/field/alias), wheres (field/operator/value), groupBy, interval, intervalUnit, start, and end.")
             List<MetricQueryRequest> queryRequests,
-            @ToolParam(name = "size", description = "Optional max rows per query, default 200")
+            @ToolParam(name = "size", required = false, description = "Optional max rows per query, default 200")
             Integer size) {
         if (readRepository == null) {
             return error("metric query dependencies are not ready");
@@ -262,7 +272,7 @@ public class DataTools {
     public String queryServiceAlarms(
             @ToolParam(name = "serviceId", description = "Service entity id or name")
             String serviceId,
-            @ToolParam(name = "status", description = "Optional alarm status: 0 open/pending, 1 closed")
+            @ToolParam(name = "status", required = false, description = "Optional alarm status: 0 open/pending, 1 closed")
             Integer status,
             @ToolParam(name = "fromTime", description = "Required start time, format yyyy-MM-dd HH:mm:ss")
             String fromTime,
@@ -645,7 +655,11 @@ public class DataTools {
     }
 
     private static boolean isBlank(String value) {
-        return value == null || value.trim().isEmpty();
+        if (value == null || value.trim().isEmpty()) {
+            return true;
+        }
+        String normalized = value.trim();
+        return "null".equalsIgnoreCase(normalized) || "undefined".equalsIgnoreCase(normalized);
     }
 
     private String error(String message) {

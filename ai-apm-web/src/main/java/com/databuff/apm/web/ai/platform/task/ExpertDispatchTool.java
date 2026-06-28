@@ -37,7 +37,7 @@ public class ExpertDispatchTool {
             String targetExpertId,
             @ToolParam(name = "task", description = "Task for the target expert; faithfully restate the user's request only—do not expand scope or add metrics/fields the user did not ask for")
             String task,
-            @ToolParam(name = "contextJson", description = "Optional JSON context")
+            @ToolParam(name = "contextJson", required = false, description = "Optional JSON context")
             String contextJson,
             RuntimeContext runtimeContext) {
         String sessionId = resolveDispatchSessionId(contextJson, runtimeContext);
