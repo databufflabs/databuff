@@ -13,6 +13,7 @@ import com.databuff.apm.web.ai.agent.AiRuntimeForwarder;
 import com.databuff.apm.web.ai.agent.AiRuntimeRouter;
 import com.databuff.apm.web.ai.agent.AiSessionStore;
 import com.databuff.apm.web.ai.agent.AgentRuntimeConfig;
+import com.databuff.apm.web.ai.mcp.standard.JavaBeanToolExecutor;
 import com.databuff.apm.web.ai.platform.api.AiToolController;
 import com.databuff.apm.web.ai.platform.expert.ExpertManagementService;
 import com.databuff.apm.web.ai.platform.runtime.AgentScopeToolFactory;
@@ -36,6 +37,8 @@ import com.databuff.apm.web.tools.local.TimeTool;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import org.springframework.beans.factory.ObjectProvider;
 import org.springframework.test.util.ReflectionTestUtils;
+
+import static org.mockito.Mockito.mock;
 
 /**
  * Helpers for unit tests that construct Spring beans without a context.
@@ -231,11 +234,21 @@ public final class TestBeanSupport {
         AiToolController controller = new AiToolController();
         setField(controller, "toolManagementService", toolManagementService);
         setField(controller, "expertManagementService", expertManagementService);
-        setField(controller, "commonTools", new CommonTools(objectMapper));
-        setField(controller, "dataTools", dataTools);
-        setField(controller, "timeTool", timeTool);
-        setField(controller, "objectMapper", objectMapper);
+        setField(controller, "javaBeanToolExecutor", javaBeanToolExecutor(
+                dataTools, timeTool, objectMapper));
         return controller;
+    }
+
+    public static JavaBeanToolExecutor javaBeanToolExecutor(
+            DataTools dataTools,
+            TimeTool timeTool,
+            ObjectMapper objectMapper) {
+        return new JavaBeanToolExecutor(
+                new CommonTools(objectMapper),
+                dataTools,
+                inspectTools(mock(ServicePortalService.class), objectMapper),
+                timeTool,
+                objectMapper);
     }
 
     public static NotifyChannelService notifyChannelService() {

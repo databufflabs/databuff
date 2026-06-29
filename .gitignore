@@ -54,7 +54,7 @@ deploy/local/run/
 deploy/images/*/*.jar
 deploy/images/dist/
 ai-apm-demo/target/
-
+.cursor/
 ### Integration test artifacts (deploy/test)
 deploy/test/lib/reports/
 deploy/test/lib/fixtures/captured/

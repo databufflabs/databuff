@@ -1,19 +1,12 @@
 package com.databuff.apm.web.ai.platform.api;
 
+import com.databuff.apm.web.ai.mcp.standard.JavaBeanToolExecutor;
 import com.databuff.apm.web.ai.platform.AiPlatformApiException;
 import com.databuff.apm.web.ai.platform.expert.ExpertManagementService;
 import com.databuff.apm.web.ai.platform.tool.AiToolDefinition;
 import com.databuff.apm.web.ai.platform.tool.JavaBeanToolAllowlist;
 import com.databuff.apm.web.ai.platform.tool.ToolManagementService;
 import com.databuff.apm.web.ai.platform.tool.ToolType;
-import com.databuff.apm.web.tools.local.CommonTools;
-import com.databuff.apm.web.tools.local.DataTools;
-import com.databuff.apm.web.tools.local.InspectTools;
-import com.databuff.apm.web.tools.local.TimeTool;
-import com.databuff.apm.web.tools.local.MetricQueryRequest;
-import com.databuff.apm.web.tools.local.TrendChartSpec;
-import com.fasterxml.jackson.core.JsonProcessingException;
-import com.fasterxml.jackson.databind.ObjectMapper;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.web.bind.annotation.DeleteMapping;
 import org.springframework.web.bind.annotation.GetMapping;
@@ -37,15 +30,7 @@ public class AiToolController {
     @Autowired
     private ExpertManagementService expertManagementService;
     @Autowired
-    private CommonTools commonTools;
-    @Autowired
-    private DataTools dataTools;
-    @Autowired
-    private InspectTools inspectTools;
-    @Autowired
-    private TimeTool timeTool;
-    @Autowired
-    private ObjectMapper objectMapper;
+    private JavaBeanToolExecutor javaBeanToolExecutor;
 
     @GetMapping
     public List<AiToolDefinition> list() {
@@ -111,14 +96,18 @@ public class AiToolController {
     }
 
     @PostMapping("/{toolId}/test")
-    public Map<String, Object> test(@PathVariable String toolId, @RequestBody(required = false) TestToolRequest request) {
+    public Map<String, Object> test(
+            @PathVariable String toolId,
+            @RequestBody(required = false) JavaBeanToolExecutor.TestToolRequest request) {
         AiToolDefinition tool = toolManagementService.find(toolId)
                 .orElseThrow(() -> AiPlatformApiException.notFound("tool", toolId));
         if (tool.type() != ToolType.JAVA_BEAN) {
             throw AiPlatformApiException.badRequest("only JAVA_BEAN tools can be tested in this release");
         }
-        TestToolRequest safeRequest = request == null ? TestToolRequest.empty() : request;
-        String output = invokeJavaBeanTool(tool.implementation(), safeRequest);
+        JavaBeanToolExecutor.TestToolRequest safeRequest = request == null
+                ? JavaBeanToolExecutor.TestToolRequest.empty()
+                : request;
+        String output = javaBeanToolExecutor.invoke(tool.implementation(), safeRequest);
         return Map.of("toolId", toolId, "ok", true, "output", output);
     }
 
@@ -163,65 +152,8 @@ public class AiToolController {
                 now);
     }
 
-    private String invokeJavaBeanTool(String implementation, TestToolRequest request) {
-        return switch (implementation) {
-            case "commonTools.getCurrentTimeRange" -> toJson(commonTools.getCurrentTimeRange(request.rangeMinutes()));
-            case "commonTools.getTimeRangeAroundTime" -> toJson(commonTools.getTimeRangeAroundTime(request.targetTime()));
-            case "commonTools.drawTrendCharts" -> commonTools.drawTrendCharts(request.charts());
-            case "timeTool.getCurrentTimeRange" -> toJson(timeTool.getCurrentTimeRange(request.rangeMinutes()));
-            case "timeTool.getTimeRangeAroundTime" -> toJson(timeTool.getTimeRangeAroundTime(request.targetTime()));
-            case "dataTools.queryServicesAll" -> dataTools.queryServicesAll(
-                    request.keyword(), request.fromTime(), request.toTime());
-            case "dataTools.queryServicesByServiceType" -> dataTools.queryServicesByServiceType(
-                    firstNonBlank(request.serviceType(), request.service()),
-                    request.keyword(),
-                    request.size(),
-                    request.fromTime(),
-                    request.toTime());
-            case "dataTools.queryServiceTopology" -> dataTools.queryServiceTopology(
-                    request.serviceName(),
-                    request.serviceInstance(),
-                    request.fromTime(),
-                    request.toTime());
-            case "dataTools.queryTraceListByCondition" -> dataTools.queryTraceListByCondition(
-                    request.srcServiceId(),
-                    firstNonBlank(request.serviceId(), request.service()),
-                    request.componentType(),
-                    request.resource(),
-                    request.direction(),
-                    request.fromTime(),
-                    request.toTime(),
-                    request.size());
-            case "dataTools.queryTraceDetail" -> dataTools.queryTraceDetail(request.traceId());
-            case "dataTools.queryServiceAlarms" -> dataTools.queryServiceAlarms(
-                    firstNonBlank(request.serviceId(), request.service()), request.status(),
-                    request.fromTime(), request.toTime());
-            case "dataTools.queryMetricData" -> dataTools.queryMetricData(
-                    request.queryRequests(),
-                    request.size());
-            case "inspectTools.inspectService" -> inspectTools.inspectService(
-                    firstNonBlank(request.serviceName(), request.service()));
-            default -> throw AiPlatformApiException.badRequest("unsupported implementation: " + implementation);
-        };
-    }
-
-    private String toJson(Object value) {
-        try {
-            return objectMapper.writeValueAsString(value);
-        } catch (JsonProcessingException ex) {
-            throw AiPlatformApiException.badRequest("failed to serialize tool output: " + ex.getMessage());
-        }
-    }
-
     private static boolean blank(String value) {
         return value == null || value.isBlank();
-    }
-
-    private static String firstNonBlank(String first, String second) {
-        if (!blank(first)) {
-            return first;
-        }
-        return second;
     }
 
     public record SaveToolRequest(
@@ -248,41 +180,5 @@ public class AiToolController {
 
     private static String normalizeCategory(String category) {
         return category == null || category.isBlank() ? "默认分类" : category.trim();
-    }
-
-    public record TestToolRequest(
-            String service,
-            String serviceType,
-            String serviceId,
-            String serviceName,
-            String serviceInstance,
-            String srcServiceId,
-            String traceId,
-            String keyword,
-            String componentType,
-            String resource,
-            String direction,
-            String metric,
-            String measurement,
-            String field,
-            String tagsJson,
-            List<MetricQueryRequest> queryRequests,
-            String fromTime,
-            String toTime,
-            String queryType,
-            String groupBy,
-            String targetTime,
-            Integer interval,
-            Integer size,
-            Integer status,
-            Integer rangeMinutes,
-            List<TrendChartSpec> charts) {
-
-        static TestToolRequest empty() {
-            return new TestToolRequest(
-                    null, null, null, null, null, null, null, null,
-                    null, null, null, null, null, null, null, null,
-                    null, null, null, null, null, null, null, null, null, null);
-        }
     }
 }

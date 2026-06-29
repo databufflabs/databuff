@@ -1,0 +1,12 @@
+{
+  "name": "databuff-apm",
+  "description": "DataBuff APM MCP — metrics, traces, topology, alerts, inspection",
+  "mcp": {
+    "transport": "streamable-http",
+    "url": "http://YOUR_DATABUFF_HOST:PORT/mcp"
+  },
+  "skills": [
+    "skill.data.metrics",
+    "skill.inspection.health"
+  ]
+}

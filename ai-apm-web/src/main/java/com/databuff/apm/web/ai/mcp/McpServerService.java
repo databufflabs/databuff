@@ -8,6 +8,12 @@ import java.io.IOException;
 import java.util.List;
 import java.util.Map;
 
+/**
+ * Legacy demo MCP endpoint backing {@code /api/v1/mcp/*}.
+ *
+ * @deprecated Use the standard MCP Server at {@code POST /mcp} instead.
+ */
+@Deprecated
 @Service
 public class McpServerService {
 

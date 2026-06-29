@@ -112,7 +112,9 @@ AI 不是独立系统 —— 它直接长在 APM 数据之上。这意味着：
 ## 开放生态
 
 - **多模型支持**：OpenAI 兼容、Anthropic 等主流 LLM 即配即用
-- **MCP 协议**：外部 Agent（如 Cursor、Claude）可调用平台能力；平台也可作为 MCP 客户端接入外部 MCP 服务
+- **MCP 协议**：外部 Agent（如 Cursor、Claude）可通过标准 `/mcp` 端点调用平台 APM 工具；平台也可作为 MCP 客户端接入外部 MCP 服务
 - **Skill 可定制**：内置 Skill 可覆盖，支持按业务场景扩展
 
-接入外部 MCP、创建可被大脑路由的自定义专家，见 [使用手册 · 自定义数字专家](../使用手册/自定义数字专家.md) 与 [外部 MCP 集成](../使用手册/外部MCP集成.md)。
+外部 Agent 将 DataBuff 作 MCP Server 接入，见 [使用手册 · Agent 集成](../使用手册/Agent集成.md)。平台内接入外部 MCP、创建可被大脑路由的自定义专家，见 [自定义数字专家](../使用手册/自定义数字专家.md) 与 [外部 MCP 集成](../使用手册/外部MCP集成.md)。
+
+> 内置 AI 对话（AgentScope）仍走 JAVA_BEAN 工具注册；MCP Server 为并行对外通路，不替代平台 UI 专家绑定。

@@ -21,7 +21,8 @@ public class WebMvcConfiguration implements WebMvcConfigurer {
 
     @Override
     public void configurePathMatch(PathMatchConfigurer configurer) {
-        configurer.addPathPrefix("/webapi", clazz -> clazz.isAnnotationPresent(RestController.class));
+        configurer.addPathPrefix("/webapi", clazz -> clazz.isAnnotationPresent(RestController.class)
+                && !clazz.getPackageName().startsWith("com.databuff.apm.web.ai.mcp.standard"));
     }
 
     @Override
