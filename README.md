@@ -17,6 +17,9 @@
   &nbsp;|&nbsp;
   <a href="#交流群">交流群</a>
 </p>
+<p align="center">
+  在线演示Demo，需要加入交流群获取账号密码
+</p>
 
 </div>
 
