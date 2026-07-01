@@ -71,7 +71,7 @@ if [ -z "${APM_DEMO_IMAGE:-}" ]; then
   exit 1
 fi
 
-if [ -f "${ROOT}/scripts/image-pkg.sh" ]; then
+if [ "${SKIP_PULL_IMAGES:-0}" != "1" ] && [ -f "${ROOT}/scripts/image-pkg.sh" ]; then
   # shellcheck source=scripts/image-pkg.sh
   . "${ROOT}/scripts/image-pkg.sh"
   load_demo_image_from_pkg

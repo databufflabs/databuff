@@ -19,6 +19,7 @@ Demo 源码位于仓库根目录 [`ai-apm-demo/`](../ai-apm-demo/)。
 | [`images/build-images.sh`](images/build-images.sh) | 编译 jar → 构建 **databuffhub/** 镜像 → 导出 amd/arm 离线包并上传 |
 | [`images/upload-infra-images.sh`](images/upload-infra-images.sh) | 拉取 **Doris FE/BE、ZooKeeper** 多架构镜像 → 导出 tar → 上传到镜像包目录 |
 | [`docker/build-docker.sh`](docker/build-docker.sh) | 打 Docker 部署包 + install 脚本 → **SCP 上传到 databuff-site** |
+| [`docker/build-docker-offline.sh`](docker/build-docker-offline.sh) | 打 Docker **一体化离线大包**（部署包 + 镜像，按架构） |
 | [`k8s/build-k8s.sh`](k8s/build-k8s.sh) | 打 Helm / K8s 部署包 + install 脚本 → **SCP 上传到 databuff-site** |
 | [`k8s/download-images.sh`](k8s/download-images.sh) | 按本机架构从镜像包目录下载 K8s 所需镜像并 `docker load` / `ctr import` |
 | [`k8s/download-apm-images.sh`](k8s/download-apm-images.sh) | 仅强制更新 ingest / web 两个镜像包 |
@@ -33,14 +34,17 @@ Demo 源码位于仓库根目录 [`ai-apm-demo/`](../ai-apm-demo/)。
 ### 发布流程
 
 ```bash
+# 0. 基础设施镜像（Doris + ZooKeeper）— 通常只做一次，或 Doris 版本升级时重做
+./deploy/images/upload-infra-images.sh
+
 # 1. 应用镜像（含 amd/arm 离线包上传）
 ./deploy/images/build-images.sh
 
-# 2. 基础组件镜像（Doris + ZooKeeper 离线包上传）
-./deploy/images/upload-infra-images.sh
-
-# 3. Docker 部署包 → databuff-site
+# 2. Docker 部署包 → databuff-site
 ./deploy/docker/build-docker.sh
+
+# 3. Docker 一体化离线大包（按架构，复用已有 infra 包）
+./deploy/docker/build-docker-offline.sh
 
 # 4. K8s 部署包 → databuff-site
 ./deploy/k8s/build-k8s.sh

@@ -11,8 +11,10 @@ docker/
 ├── start.sh / stop.sh
 ├── demo/                 # demo 造数 Compose 包
 ├── ai-apm-install.sh
+├── ai-apm-offline-install.sh   # 离线包内 install.sh 模板
 ├── ai-apm-demo-install.sh
 ├── build-docker.sh       # 打部署包并 SCP 上传到 databuff-site
+├── build-docker-offline.sh # 打一体化离线大包（部署包 + 镜像）
 ├── data/                 # Doris 持久化
 └── scripts/
 ```
@@ -27,13 +29,35 @@ docker/
 curl -fsSL https://databuff.ai/databuff/ai-apm-install.sh | bash
 ```
 
+## 离线安装（一体化大包）
+
+下载对应架构的离线包，解压后执行 `install.sh`，**全程无需联网**：
+
+```bash
+tar -xzf databuff-ai-apm-offline-0.1.1-amd64.tar.gz
+cd databuff-ai-apm-offline-0.1.1-amd64
+sudo ./install.sh
+```
+
+离线包由 `build-docker-offline.sh` 生成，内含：部署脚本包、`ai-apm-stack` 镜像、`doris-stack` 镜像。
+
 ## 构建与发布
+
+**每次发版**（应用版本变更）：
 
 ```bash
 ./deploy/images/build-images.sh          # 构建 databuffhub/* 镜像 + 导出离线包
-./deploy/images/upload-infra-images.sh   # Doris / ZooKeeper 离线包
 ./deploy/docker/build-docker.sh          # 部署脚本包
+./deploy/docker/build-docker-offline.sh  # 一体化离线大包（按架构）
 ```
+
+**仅首次或 Doris 版本升级时**（`deploy/env.sh` 中 `DORIS_*_IMAGE` 变更）：
+
+```bash
+./deploy/images/upload-infra-images.sh   # Doris / ZooKeeper 离线包，打一次即可复用
+```
+
+离线打包会优先用本机 `dist/infra/images/` 里已有的 `doris-stack-*`；没有则从 `APM_PKG_BASE/infra/images/` 拉取，无需每次重跑 infra 构建。
 
 **本地开发**（离线包 load 或本地 build 后的镜像）：
 

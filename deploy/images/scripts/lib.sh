@@ -256,6 +256,11 @@ version_docker_pkg_remote_dir() {
   printf '%s\n' "$(pkg_remote_dir)/${version}/docker"
 }
 
+version_offline_pkg_remote_dir() {
+  local version="${1:-$(resolve_release_version)}"
+  printf '%s\n' "$(pkg_remote_dir)/${version}/offline"
+}
+
 version_k8s_pkg_remote_dir() {
   local version="${1:-$(resolve_release_version)}"
   printf '%s\n' "$(pkg_remote_dir)/${version}/k8s"
@@ -429,6 +434,10 @@ write_image_tarball_size_sidecar() {
 local_images_pkg_dir() {
   local version="${1:-$(resolve_release_version)}"
   printf '%s\n' "${APM_BUILD_DIST:-${APM_IMAGES_ROOT}/dist}/${version}/images"
+}
+
+local_infra_images_pkg_dir() {
+  printf '%s\n' "${APM_BUILD_DIST:-${APM_IMAGES_ROOT}/dist}/infra/images"
 }
 
 publish_image_pkg() {
@@ -610,6 +619,17 @@ export_infra_image_tarballs() {
     tarballs+=("$gz_tar")
     rmi_public_images_quiet "${ZOOKEEPER_IMAGE}"
   done
+
+  if [[ "${SKIP_LOCAL_IMAGE_PKG_KEEP:-0}" != "1" ]]; then
+    local keep_dir
+    keep_dir="$(local_infra_images_pkg_dir)"
+    mkdir -p "$keep_dir"
+    for tarball in "${tarballs[@]}"; do
+      cp -f "$tarball" "${keep_dir}/$(basename "$tarball")"
+      write_image_tarball_size_sidecar "${keep_dir}/$(basename "$tarball")"
+    done
+    echo "[build]   local infra pkgs: ${keep_dir}/"
+  fi
 
   publish_infra_image_pkg "${tarballs[@]}"
   rm -rf "$dist_dir"
