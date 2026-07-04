@@ -39,6 +39,8 @@ docker-compose up -d
 docker-compose down
 ```
 
+> **运维详情**：[Docker 运维参考](../运维参考/Docker运维.md) — 安装目录、启停、端口、健康检查、日志排障与升级卸载。内网环境见 [离线安装](../运维参考/离线安装.md)。
+
 ## 3. 安装 Demo（可选）
 
 让 Demo 应用持续上报 Trace，打开平台就能看到链路和拓扑。

@@ -36,7 +36,7 @@ public class OpenAiCompatibleChatClient {
                     "messages", new Object[] {
                             Map.of("role", "user", "content", userMessage)
                     }));
-            URI uri = URI.create(LlmChatModelFactory.normalizeBaseUrl(provider.baseUrl()) + "/chat/completions");
+            URI uri = URI.create(LlmChatModelFactory.buildOpenAiChatCompletionsUrl(provider.baseUrl()));
             HttpRequest.Builder builder = HttpRequest.newBuilder(uri)
                     .timeout(Duration.ofSeconds(60))
                     .header("Content-Type", "application/json")
@@ -67,15 +67,13 @@ public class OpenAiCompatibleChatClient {
                     "messages", new Object[] {
                             Map.of("role", "user", "content", userMessage)
                     }));
-            URI uri = URI.create(LlmChatModelFactory.normalizeBaseUrl(provider.baseUrl()) + "/messages");
+            URI uri = URI.create(LlmChatModelFactory.buildAnthropicMessagesUrl(provider.baseUrl()));
             HttpRequest.Builder builder = HttpRequest.newBuilder(uri)
                     .timeout(Duration.ofSeconds(60))
                     .header("Content-Type", "application/json")
                     .header("anthropic-version", "2023-06-01")
                     .POST(HttpRequest.BodyPublishers.ofString(body));
-            if (provider.apiKey() != null && !provider.apiKey().isBlank()) {
-                builder.header("x-api-key", provider.apiKey().trim());
-            }
+            applyAnthropicAuth(builder, provider.apiKey());
             HttpResponse<String> response = httpClient.send(builder.build(), HttpResponse.BodyHandlers.ofString());
             if (response.statusCode() < 200 || response.statusCode() >= 300) {
                 return ChatResult.failed("HTTP " + response.statusCode());
@@ -110,6 +108,15 @@ public class OpenAiCompatibleChatClient {
         public ResolvedLlmProvider(String providerCode, String baseUrl, String defaultModel, String apiKey) {
             this(providerCode, baseUrl, defaultModel, apiKey, "openai-completions");
         }
+    }
+
+    static void applyAnthropicAuth(HttpRequest.Builder builder, String apiKey) {
+        if (apiKey == null || apiKey.isBlank()) {
+            return;
+        }
+        String trimmed = apiKey.trim();
+        builder.header("x-api-key", trimmed);
+        builder.header("Authorization", "Bearer " + trimmed);
     }
 
     public record ChatResult(boolean ok, String content, String error) {

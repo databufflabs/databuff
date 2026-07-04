@@ -1,4 +1,6 @@
 // 设置日期的秒钟，返回新的日期
+import dayjs from 'dayjs';
+
 export const setDateBySeconds = (date: Date | number | string, seconds: number) => {
   const tDate = new Date(date)
   tDate.setSeconds(seconds, 0);
@@ -29,6 +31,24 @@ export const calcInterval = (start: number, end: number) => {
     interval = 60 // 间隔1分钟，1～119个点
   }
   return interval
+}
+
+/** Compact list header range: same-day end omits the date prefix. */
+export function formatCompactTimeRange (
+  from: Date | string | number,
+  to: Date | string | number,
+) {
+  const fromDay = dayjs(from);
+  const toDay = dayjs(to);
+  const fullFormat = 'YYYY-MM-DD HH:mm:ss';
+  const timeFormat = 'HH:mm:ss';
+  if (!fromDay.isValid() || !toDay.isValid()) {
+    return { value0: '', value1: '' };
+  }
+  return {
+    value0: fromDay.format(fullFormat),
+    value1: fromDay.isSame(toDay, 'day') ? toDay.format(timeFormat) : toDay.format(fullFormat),
+  };
 }
 
 /**

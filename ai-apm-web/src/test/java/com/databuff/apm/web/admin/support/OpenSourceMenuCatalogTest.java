@@ -62,6 +62,7 @@ class OpenSourceMenuCatalogTest {
                 "/appMonitor/errors",
                 "/appMonitor/external",
                 "/appMonitor/globalTopology",
+                "/appMonitor/logs",
                 "/appMonitor/msgQueue",
                 "/appMonitor/service",
                 "/appMonitor/serviceAnalysis",

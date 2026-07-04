@@ -10,11 +10,6 @@ import io.opentelemetry.proto.trace.v1.ScopeSpans;
 import io.opentelemetry.proto.trace.v1.Span;
 import io.opentelemetry.proto.trace.v1.Status;
 
-import java.net.URI;
-import java.net.http.HttpClient;
-import java.net.http.HttpRequest;
-import java.net.http.HttpResponse;
-import java.time.Duration;
 import java.time.Instant;
 import java.util.concurrent.ThreadLocalRandom;
 
@@ -29,6 +24,10 @@ public final class OtlpTraceFixture {
     }
 
     public static byte[] sampleTraceExport() {
+        return nextTraceBatch().traceBytes();
+    }
+
+    public static DemoTraceBatch nextTraceBatch() {
         long traceEnd = Instant.now().toEpochMilli() * 1_000_000L;
         long traceStart = traceEnd - 240_000_000L;
         ByteString traceId = randomId(16);
@@ -45,7 +44,7 @@ public final class OtlpTraceFixture {
         ByteString esClient = randomId(8);
         ByteString redisServerB = randomId(8);
         ByteString remoteHttpClient = randomId(8);
-        return ExportTraceServiceRequest.newBuilder()
+        byte[] traceBytes = ExportTraceServiceRequest.newBuilder()
                 .addResourceSpans(ResourceSpans.newBuilder()
                         .setResource(serviceResource(SERVICE_A, "service-a-1", "demo-host-a"))
                         .addScopeSpans(ScopeSpans.newBuilder()
@@ -163,6 +162,20 @@ public final class OtlpTraceFixture {
                                         kv("server.port", "6379")))))
                 .build()
                 .toByteArray();
+        return new DemoTraceBatch(
+                traceBytes,
+                traceId,
+                traceStart,
+                traceEnd,
+                spanRef(SERVICE_A, "service-a-1", "demo-host-a", root, traceStart + 10_000_000L),
+                spanRef(SERVICE_A, "service-a-1", "demo-host-a", httpClient, traceStart + 25_000_000L),
+                spanRef(SERVICE_B, "service-b-1", "demo-host-b", httpServer, traceStart + 55_000_000L),
+                spanRef(SERVICE_B, "service-b-1", "demo-host-b", dubboMysql, traceStart + 165_000_000L));
+    }
+
+    private static DemoTraceBatch.SpanRef spanRef(
+            String service, String instanceId, String hostName, ByteString spanId, long timeNanos) {
+        return new DemoTraceBatch.SpanRef(spanId, service, instanceId, hostName, timeNanos);
     }
 
     public static byte[] sampleErrorTraceExport() {
@@ -194,11 +207,15 @@ public final class OtlpTraceFixture {
     }
 
     public static int postErrorTraces(String ingestBaseUrl) throws Exception {
-        return postProtobuf(ingestBaseUrl, "/v1/traces", sampleErrorTraceExport());
+        return OtlpHttpExporter.postProtobuf(ingestBaseUrl, "/v1/traces", sampleErrorTraceExport());
     }
 
     public static int postTraces(String ingestBaseUrl) throws Exception {
-        return postProtobuf(ingestBaseUrl, "/v1/traces", sampleTraceExport());
+        return postTraceBatch(ingestBaseUrl, nextTraceBatch());
+    }
+
+    public static int postTraceBatch(String ingestBaseUrl, DemoTraceBatch batch) throws Exception {
+        return OtlpHttpExporter.postProtobuf(ingestBaseUrl, "/v1/traces", batch.traceBytes());
     }
 
     public static byte[] sampleJvmGcOnlyExport() {
@@ -210,24 +227,7 @@ public final class OtlpTraceFixture {
     }
 
     public static int postMetrics(String ingestBaseUrl) throws Exception {
-        return postProtobuf(ingestBaseUrl, "/v1/metrics", sampleJvmPoolMetricsExport());
-    }
-
-    private static final HttpClient HTTP_CLIENT = HttpClient.newBuilder()
-            .connectTimeout(Duration.ofSeconds(5))
-            .build();
-
-    private static int postProtobuf(String ingestBaseUrl, String path, byte[] body) throws Exception {
-        String url = ingestBaseUrl.replaceAll("/$", "") + path;
-        HttpRequest request = HttpRequest.newBuilder()
-                .uri(URI.create(url))
-                .timeout(Duration.ofSeconds(10))
-                .header("Content-Type", "application/x-protobuf")
-                .header("Authorization", "Basic YWRtaW5AZXhhbXBsZS5jb206T3Blbk9ic2VydmVAMjAyNg==")
-                .POST(HttpRequest.BodyPublishers.ofByteArray(body))
-                .build();
-        HttpResponse<Void> response = HTTP_CLIENT.send(request, HttpResponse.BodyHandlers.discarding());
-        return response.statusCode();
+        return OtlpHttpExporter.postProtobuf(ingestBaseUrl, "/v1/metrics", sampleJvmPoolMetricsExport());
     }
 
     /** CLI: post one trace batch, or {@code --dump <file>} to write fixture bytes. */
@@ -247,16 +247,27 @@ public final class OtlpTraceFixture {
             System.out.println("wrote " + args[1]);
             return;
         }
+        if (args.length >= 2 && "--dump-logs".equals(args[0])) {
+            java.nio.file.Files.write(java.nio.file.Path.of(args[1]), OtlpLogFixture.logExport(nextTraceBatch()));
+            System.out.println("wrote " + args[1]);
+            return;
+        }
         String base = args.length > 0 ? args[0] : "http://127.0.0.1:4318";
-        int status = postTraces(base);
+        DemoTraceBatch batch = nextTraceBatch();
+        int status = postTraceBatch(base, batch);
         if (status < 200 || status >= 300) {
             throw new IllegalStateException("OTLP trace export failed with HTTP " + status);
+        }
+        int logStatus = OtlpLogFixture.postLogs(base, batch);
+        if (logStatus < 200 || logStatus >= 300) {
+            throw new IllegalStateException("OTLP log export failed with HTTP " + logStatus);
         }
         int metricStatus = postMetrics(base);
         if (metricStatus < 200 || metricStatus >= 300) {
             throw new IllegalStateException("OTLP metric export failed with HTTP " + metricStatus);
         }
-        System.out.println("seeded trace + metrics to " + base + " (HTTP " + status + "/" + metricStatus + ")");
+        System.out.println("seeded trace + logs + metrics to " + base + " (HTTP " + status + "/" + logStatus
+                + "/" + metricStatus + ")");
     }
 
     private static Resource.Builder serviceResource(String serviceName, String instanceId, String hostName) {

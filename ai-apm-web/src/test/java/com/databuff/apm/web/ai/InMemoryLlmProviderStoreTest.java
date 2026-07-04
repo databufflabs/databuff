@@ -60,6 +60,29 @@ class InMemoryLlmProviderStoreTest {
     }
 
     @Test
+    void testsAnthropicConnectionAgainstHttpServer() throws Exception {
+        com.sun.net.httpserver.HttpServer server =
+                com.sun.net.httpserver.HttpServer.create(new InetSocketAddress(0), 0);
+        server.createContext("/anthropic/v1/messages", exchange -> {
+            exchange.sendResponseHeaders(200, -1);
+            exchange.close();
+        });
+        server.start();
+        try {
+            InMemoryLlmProviderStore store = TestBeanSupport.llmProviderStore();
+            int port = server.getAddress().getPort();
+            assertThat(store.testConnection(new TestLlmProviderRequest(
+                    "http://127.0.0.1:" + port + "/anthropic",
+                    "key",
+                    LlmApiTypes.ANTHROPIC_MESSAGES,
+                    "MiniMax-M3",
+                    null)).ok()).isTrue();
+        } finally {
+            server.stop(0);
+        }
+    }
+
+    @Test
     void requiresModelIdForConnectivityTest() {
         InMemoryLlmProviderStore store = TestBeanSupport.llmProviderStore();
         TestLlmProviderResult result = store.testConnection(new TestLlmProviderRequest(

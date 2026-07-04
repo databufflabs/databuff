@@ -15,12 +15,19 @@
             
           </div>
 
-          <div class="font-12 line-clamp-3" :title="item.message">
-            <span class="describe">{{ $t('modules.views.appMonitor.traceDetail.s_bd002975') }}</span>{{ item.messageKey ? $t(item.messageKey) : item.message }}</div>
+          <div class="font-12">
+            <span class="describe">{{ $t('modules.views.alarmCenter.eventDetail.s_3fea7ca7') }}</span>
+            <span :class="['log-level', 'log-level-' + (item.status || 'INFO').toLowerCase()]">{{ item.status || 'INFO' }}</span>
+          </div>
+          <div class="font-12 line-clamp-3" :title="item._displayMessage">
+            <span class="describe">{{ $t('modules.views.appMonitor.traceDetail.s_bd002975') }}</span>{{ item.messageKey ? $t(item.messageKey) : item._displayMessage }}</div>
         </div>
       </el-timeline-item>
     </el-timeline>
     <div v-if='!noMore' @click="loadMoreHandle" :class='["load-more-btn describe tc font-12", listLoading ? "" : "cp db-blue"]'>{{ listLoading ? $t('modules.views.appMonitor.traceDetail.s_26b5bd49') : $t('modules.views.appMonitor.traceDetail.s_77281549')  }}</div>
+    <div v-if="traceId && logList.length" class="tc mt-8">
+      <span @click="viewAllLogsHandle" class="db-blue cp font-12">在日志分析中查看全部</span>
+    </div>
 
     <div v-if='!logList.length && !listLoading' class="describe tc mt-20">{{ $t('modules.components.charts.s_21efd88b') }}</div>
   </div>
@@ -113,8 +120,8 @@ export default class SpanLog extends Vue {
       data.forEach((log: any) => {
         log.id = uuidv4();
         log._message = (log.message || '').split('\n')
-        log._timestamp = log.timestamp ? +log.timestamp.substring(0, 13) : '';
-        log._timestamp = String(log._timestamp).length === 13 ? dayjs(+log._timestamp).format('YYYY-MM-DD HH:mm:ss') : log._timestamp
+        log._displayMessage = this.formatLogMessage(log.message)
+        log._timestamp = this.formatLogTimestamp(log.timestamp)
         const { service_type, type } = (this.getBasicServiceMap || {})[log?.service] || {};
         log.service_type = type || service_type || 'default'
       })
@@ -134,6 +141,34 @@ export default class SpanLog extends Vue {
     this.getTableList(this.queryParams.pageNum + 1)
   }
 
+  /** Trace detail already shows trace id — strip redundant traceId from log body. */
+  private formatLogMessage (message: any) {
+    if (!message) {
+      return ''
+    }
+    return String(message)
+      .replace(/\s*trace[_\s-]?id\s*[=:]\s*[a-fA-F0-9]+\s*/gi, ' ')
+      .replace(/\s{2,}/g, ' ')
+      .trim()
+  }
+
+  /** API returns epoch millis string; tolerate legacy ISO timestamps. */
+  private formatLogTimestamp (timestamp: any) {
+    if (!timestamp) {
+      return ''
+    }
+    const text = String(timestamp).trim()
+    if (!text) {
+      return ''
+    }
+    if (/^\d{10,13}$/.test(text)) {
+      const millis = text.length > 10 ? +text.substring(0, 13) : +text * 1000
+      return dayjs(millis).format('YYYY-MM-DD HH:mm:ss')
+    }
+    const parsed = dayjs(text)
+    return parsed.isValid() ? parsed.format('YYYY-MM-DD HH:mm:ss') : text
+  }
+
   private viewServiceDetail (service: string) {
     const serviceitem = this.getBasicServiceMap[service];
     if (!serviceitem) {
@@ -145,6 +180,25 @@ export default class SpanLog extends Vue {
         ...this.getRouteTimeOrRange,
         sid: encodeURIComponent(serviceitem.id)
       }
+    })
+  }
+
+  private viewAllLogsHandle () {
+    if (!this.traceId) {
+      return
+    }
+    const query: Record<string, string> = {
+      traceId: encodeURIComponent(this.traceId),
+    }
+    if (this.spanId) {
+      query.spanId = encodeURIComponent(this.spanId)
+    }
+    this.$router.push({
+      path: '/appMonitor/logs',
+      query: {
+        ...this.getRouteTimeOrRange,
+        ...query,
+      },
     })
   }
 }
@@ -166,5 +220,17 @@ export default class SpanLog extends Vue {
 }
 .span-log-item {
   line-height: 20px;
+}
+.log-level {
+  font-weight: 500;
+}
+.log-level-info, .log-level-debug, .log-level-trace {
+  color: var(--color-text-secondary);
+}
+.log-level-warn {
+  color: #e6a23c;
+}
+.log-level-error, .log-level-fatal {
+  color: #f56c6c;
 }
 </style>

@@ -61,6 +61,8 @@ const appMonitor: BreadcrumbPath = {
   '/appMonitor/resourceDetail': ['/appMonitor', '/appMonitor/serviceAnalysis'],
   // 链路追踪
   '/appMonitor/trace': ['/appMonitor'],
+  // 日志分析
+  '/appMonitor/logs': ['/appMonitor'],
   // 调用链详情
   '/appMonitor/traceDetail': ['/appMonitor', '/appMonitor/trace'],
   // Profiling

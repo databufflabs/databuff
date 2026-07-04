@@ -29,6 +29,8 @@ curl -fsSL https://databuff.ai/databuff/ai-apm-k8s-install.sh | bash -s -- --ver
 APM_VERSION=0.1.1 curl -fsSL https://databuff.ai/databuff/ai-apm-k8s-install.sh | bash
 ```
 
+> **运维详情**：[Kubernetes 运维参考](../运维参考/K8s运维.md) — 启停、NodePort 访问、离线镜像与扩缩容。
+
 ## 3. 安装 Demo（可选）
 
 让 Demo 应用向平台上报 Trace，快速看到链路和拓扑。

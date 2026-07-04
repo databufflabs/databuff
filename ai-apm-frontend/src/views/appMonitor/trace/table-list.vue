@@ -17,10 +17,19 @@
 
       <template slot="total" slot-scope="{ total }">
         <div class="describe">
-          <span class="time-range mr-15">{{ $t('modules.views.appMonitor.serviceCallDetail.s_c4023f57', { value0: query.fromTime, value1: query.toTime }) }}</span>
-          <span>{{ $t('modules.views.appMonitor.trace.s_1d0e7889', { value0: new Intl.NumberFormat().format(total) }) }}</span>
+          <span class="mr-15">{{ $t('modules.views.appMonitor.trace.s_1d0e7889', { value0: new Intl.NumberFormat().format(total) }) }}</span>
+          <span class="time-range">{{ $t('modules.views.appMonitor.serviceCallDetail.s_c4023f57', listTimeDisplay) }}</span>
         </div>
       </template>
+      <el-table-column slot="suffix" label="日志" width="72" align="center" fixed="right">
+        <template slot-scope="{ row }">
+          <span
+            v-if="row.trace_id"
+            @click.stop="viewLogsHandle(row)"
+            class="db-blue cp font-12">查看</span>
+          <span v-else class="describe">-</span>
+        </template>
+      </el-table-column>
     </db-table>
   </div>
 </template>
@@ -29,6 +38,7 @@
 
 import { Vue, Component, Prop } from 'vue-property-decorator'
 import ApmApi from '@/api/apm'
+import { formatCompactTimeRange } from '@/utils/timeFormat'
 
 @Component({})
 export default class ServiceTable extends Vue {
@@ -40,6 +50,10 @@ export default class ServiceTable extends Vue {
       ...this.query,
       ...this.filter, 
     }
+  }
+
+  get listTimeDisplay () {
+    return formatCompactTimeRange(this.query.fromTime, this.query.toTime);
   }
 
   get getBasicServiceMap () {
@@ -110,6 +124,22 @@ export default class ServiceTable extends Vue {
         ft: `${+spanStart}`,
         tt: `${+spanEnd}`,
       }
+    })
+  }
+
+  private viewLogsHandle (row: any) {
+    if (!row?.trace_id) {
+      return
+    }
+    const spanStart = String(row?.start).substring(0, 13);
+    const spanEnd = String(row?.end).substring(0, 13);
+    this.$router.push({
+      path: '/appMonitor/logs',
+      query: {
+        traceId: encodeURIComponent(row.trace_id),
+        ft: `${+spanStart}`,
+        tt: `${+spanEnd}`,
+      },
     })
   }
 

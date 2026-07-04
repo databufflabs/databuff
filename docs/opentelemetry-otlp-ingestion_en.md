@@ -14,7 +14,7 @@ DataBuff is an open-source, AI-native OpenTelemetry APM backend. The **Ingest** 
 |--------|------------------|------------------|
 | Traces | Yes | Yes (`/v1/traces`) |
 | Metrics | Yes | Yes (`/v1/metrics`) |
-| Logs | Planned ([Roadmap](Roadmap_en.md)) | Planned |
+| Logs | Yes | Yes (`/v1/logs`) |
 
 ## Prerequisites
 
@@ -81,6 +81,15 @@ service:
     metrics:
       receivers: [otlp]
       exporters: [otlp]
+    logs:
+      receivers: [otlp]
+      exporters: [otlp]
+```
+
+For logs, set in your SDK:
+
+```bash
+export OTEL_LOGS_EXPORTER=otlp
 ```
 
 For TLS-terminated or remote deployments, point exporters at the reachable OTLP URL and configure TLS on your reverse proxy.
@@ -89,6 +98,8 @@ For TLS-terminated or remote deployments, point exporters at the reachable OTLP 
 
 1. Install the optional [Demo app](快速入门/docker安装部署_en.md#3-install-the-demo-optional) — it reports sample traces to Ingest.
 2. In the Web UI, open **Application Performance** and confirm services and traces appear within a few minutes.
+
+For how data is stored and queried, see [Telemetry Pipeline and Storage](架构设计/遥测数据流_en.md).
 
 ## Open source
 

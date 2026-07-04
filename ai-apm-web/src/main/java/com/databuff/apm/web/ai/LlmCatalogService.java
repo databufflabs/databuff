@@ -31,7 +31,7 @@ public class LlmCatalogService {
             throw new IllegalArgumentException(
                     "Anthropic 兼容接口不支持统一 /models 目录，请手工添加模型");
         }
-        String modelsUrl = buildModelsUrl(request.baseUrl());
+        String modelsUrl = LlmChatModelFactory.buildOpenAiModelsUrl(request.baseUrl());
         HttpRequest.Builder builder = HttpRequest.newBuilder(URI.create(modelsUrl))
                 .timeout(Duration.ofSeconds(30))
                 .GET();
@@ -89,14 +89,6 @@ public class LlmCatalogService {
             }
         }
         return null;
-    }
-
-    private String buildModelsUrl(String baseUrl) {
-        String normalized = baseUrl.trim().replaceAll("/+$", "");
-        if (normalized.endsWith("/models")) {
-            return normalized;
-        }
-        return normalized + "/models";
     }
 
     private String normalizeApiType(String apiType) {

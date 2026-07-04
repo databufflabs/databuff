@@ -29,6 +29,8 @@ curl -fsSL https://databuff.ai/databuff/ai-apm-k8s-install.sh | bash -s -- --ver
 APM_VERSION=0.1.1 curl -fsSL https://databuff.ai/databuff/ai-apm-k8s-install.sh | bash
 ```
 
+> **Operations**: [Kubernetes Operations Reference](../运维参考/K8s运维_en.md) — start/stop, NodePort access, offline images, scaling.
+
 ## 3. Install the Demo (Optional)
 
 Let the demo app report traces to the platform and quickly see call chains and topology.

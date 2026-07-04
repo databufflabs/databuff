@@ -6,6 +6,8 @@
 
 # Architecture · AI Platform
 
+> Read [Telemetry Pipeline and Storage](遥测数据流_en.md) first.
+
 ## Design Intent
 
 AI in traditional APM is often a "bolt-on chat box" — it cannot read real data and guesses answers.

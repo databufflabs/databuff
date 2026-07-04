@@ -7,6 +7,7 @@ import com.databuff.apm.common.serde.DCSpanJsonEncoder;
 import com.databuff.apm.common.serde.DcSpanUtil;
 import com.databuff.apm.common.trace.TraceSpanNames;
 import com.google.protobuf.ByteString;
+import io.opentelemetry.proto.collector.logs.v1.ExportLogsServiceRequest;
 import io.opentelemetry.proto.collector.metrics.v1.ExportMetricsServiceRequest;
 import io.opentelemetry.proto.collector.trace.v1.ExportTraceServiceRequest;
 import io.opentelemetry.proto.common.v1.AnyValue;
@@ -405,6 +406,47 @@ class OtelConverterTest {
                 .build();
 
         assertThat(converter.convertTraces(request)).hasSize(2);
+    }
+
+    @Test
+    void convertsLogExportToOtlLogLine() {
+        ExportLogsServiceRequest request = ExportLogsServiceRequest.newBuilder()
+                .addResourceLogs(io.opentelemetry.proto.logs.v1.ResourceLogs.newBuilder()
+                        .setResource(Resource.newBuilder()
+                                .addAttributes(kv("service.name", "checkout"))
+                                .addAttributes(kv("host.name", "host-1")))
+                        .addScopeLogs(io.opentelemetry.proto.logs.v1.ScopeLogs.newBuilder()
+                                .addLogRecords(io.opentelemetry.proto.logs.v1.LogRecord.newBuilder()
+                                        .setTimeUnixNano(1_700_000_000_000_000_000L)
+                                        .setSeverityNumber(io.opentelemetry.proto.logs.v1.SeverityNumber.SEVERITY_NUMBER_INFO)
+                                        .setSeverityText("INFO")
+                                        .setTraceId(ByteString.fromHex("0102030405060708090a0b0c0d0e0f10"))
+                                        .setSpanId(ByteString.fromHex("0102030405060708"))
+                                        .setBody(AnyValue.newBuilder().setStringValue("order created")))))
+                .build();
+
+        List<OtelConverter.ConvertedLog> converted = converter.convertLogs(request);
+        assertThat(converted).hasSize(1);
+        OtlLogLine line = converted.get(0).line();
+        assertThat(line.service()).isEqualTo("checkout");
+        assertThat(line.body()).isEqualTo("order created");
+        assertThat(line.traceId()).isEqualTo("0102030405060708090a0b0c0d0e0f10");
+        assertThat(line.spanId()).isEqualTo("0102030405060708");
+        assertThat(line.severity()).isEqualTo("INFO");
+    }
+
+    @Test
+    void skipsLogsWithoutServiceName() {
+        ExportLogsServiceRequest request = ExportLogsServiceRequest.newBuilder()
+                .addResourceLogs(io.opentelemetry.proto.logs.v1.ResourceLogs.newBuilder()
+                        .setResource(Resource.newBuilder())
+                        .addScopeLogs(io.opentelemetry.proto.logs.v1.ScopeLogs.newBuilder()
+                                .addLogRecords(io.opentelemetry.proto.logs.v1.LogRecord.newBuilder()
+                                        .setTimeUnixNano(1_700_000_000_000_000_000L)
+                                        .setBody(AnyValue.newBuilder().setStringValue("orphan")))))
+                .build();
+
+        assertThat(converter.convertLogs(request)).isEmpty();
     }
 
     private static KeyValue kv(String key, String value) {

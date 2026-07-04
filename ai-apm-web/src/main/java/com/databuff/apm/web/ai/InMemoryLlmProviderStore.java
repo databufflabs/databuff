@@ -530,7 +530,7 @@ public class InMemoryLlmProviderStore {
                 "model", modelId,
                 "messages", List.of(Map.of("role", "user", "content", "ping")),
                 "max_tokens", 8));
-        URI uri = URI.create(LlmChatModelFactory.normalizeBaseUrl(request.baseUrl()) + "/chat/completions");
+        URI uri = URI.create(LlmChatModelFactory.buildOpenAiChatCompletionsUrl(request.baseUrl()));
         HttpRequest.Builder builder = HttpRequest.newBuilder(uri)
                 .timeout(Duration.ofSeconds(30))
                 .header("Content-Type", "application/json")
@@ -550,15 +550,13 @@ public class InMemoryLlmProviderStore {
                 "model", modelId,
                 "max_tokens", 8,
                 "messages", List.of(Map.of("role", "user", "content", "ping"))));
-        URI uri = URI.create(LlmChatModelFactory.normalizeBaseUrl(request.baseUrl()) + "/messages");
+        URI uri = URI.create(LlmChatModelFactory.buildAnthropicMessagesUrl(request.baseUrl()));
         HttpRequest.Builder builder = HttpRequest.newBuilder(uri)
                 .timeout(Duration.ofSeconds(30))
                 .header("Content-Type", "application/json")
                 .header("anthropic-version", "2023-06-01")
                 .POST(HttpRequest.BodyPublishers.ofString(body));
-        if (request.apiKey() != null && !request.apiKey().isBlank()) {
-            builder.header("x-api-key", request.apiKey().trim());
-        }
+        OpenAiCompatibleChatClient.applyAnthropicAuth(builder, request.apiKey());
         HttpResponse<String> response = HttpClient.newHttpClient().send(builder.build(), HttpResponse.BodyHandlers.ofString());
         if (response.statusCode() >= 200 && response.statusCode() < 300) {
             return new TestLlmProviderResult(true, "连接成功");

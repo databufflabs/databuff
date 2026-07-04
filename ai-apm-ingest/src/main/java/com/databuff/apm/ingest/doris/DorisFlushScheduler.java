@@ -23,6 +23,9 @@ import java.util.concurrent.TimeoutException;
 public class DorisFlushScheduler {
 
     private static final Logger log = LoggerFactory.getLogger(DorisFlushScheduler.class);
+    private static final java.util.Set<String> PARTITIONED_TABLES = java.util.Set.of(
+            DorisTableNames.TRACE_DC_SPAN,
+            DorisTableNames.LOG_DC_RECORD);
 
     private final AggregateComponent aggregateComponent;
     private final MetaServiceCollector metaServiceCollector;
@@ -48,18 +51,18 @@ public class DorisFlushScheduler {
     public void flush() {
         flushMetrics();
         for (DorisStreamLoadSink sink : sinks) {
-            if ("trace_dc_span".equals(sink.table())) {
+            if (PARTITIONED_TABLES.contains(sink.table())) {
                 flushSink(sink);
             }
         }
     }
 
-    /** Flush trace-derived and OTLP metrics without blocking on trace_dc_span. */
+    /** Flush trace-derived and OTLP metrics without blocking on partitioned trace/log tables. */
     public void flushMetrics() {
         stageMetaServices();
         aggregateComponent.flushPendingMetrics();
         for (DorisStreamLoadSink sink : sinks) {
-            if (!"trace_dc_span".equals(sink.table())) {
+            if (!PARTITIONED_TABLES.contains(sink.table())) {
                 flushSink(sink);
             }
         }

@@ -6,6 +6,8 @@
 
 # Architecture · Application Performance
 
+> Read [Telemetry Pipeline and Storage](遥测数据流_en.md) first.
+
 ## Design Intent
 
 APM should not be a burden for ops teams — **minimal architecture, full features, works out of the box**.

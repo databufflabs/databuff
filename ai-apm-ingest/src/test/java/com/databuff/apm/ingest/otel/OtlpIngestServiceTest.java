@@ -2,6 +2,7 @@ package com.databuff.apm.ingest.otel;
 
 import com.databuff.apm.ingest.gateway.PipelineGateway;
 import com.databuff.apm.ingest.metric.MetricWriteRouter;
+import com.databuff.apm.ingest.log.OtlpLogDirectWriter;
 import com.databuff.apm.ingest.metric.OtlpMetricDirectWriter;
 import com.databuff.apm.ingest.support.IngestTestComponents;
 import com.databuff.apm.ingest.component.AggregateComponent;
@@ -63,7 +64,8 @@ class OtlpIngestServiceTest {
 
         OtlpIngestService service = new OtlpIngestService(new OtelConverter(),
                 new PipelineGateway(traceComponent, metricComponent),
-                noopMetricWriter());
+                noopMetricWriter(),
+                noopLogWriter());
 
         ExportTraceServiceRequest request = ExportTraceServiceRequest.newBuilder()
                 .addResourceSpans(ResourceSpans.newBuilder()
@@ -100,7 +102,8 @@ class OtlpIngestServiceTest {
 
         OtlpIngestService service = new OtlpIngestService(new OtelConverter(),
                 new PipelineGateway(traceComponent, metricComponent),
-                noopMetricWriter());
+                noopMetricWriter(),
+                noopLogWriter());
 
         ByteString traceId = ByteString.fromHex("0102030405060708090a0b0c0d0e0f10");
         ByteString rootSpanId = ByteString.fromHex("0102030405060708");
@@ -165,7 +168,7 @@ class OtlpIngestServiceTest {
         traceComponent.start(1);
 
         OtlpIngestService service = new OtlpIngestService(new OtelConverter(),
-                new PipelineGateway(traceComponent, metricComponent), metricWriter);
+                new PipelineGateway(traceComponent, metricComponent), metricWriter, noopLogWriter());
 
         ExportMetricsServiceRequest request = ExportMetricsServiceRequest.newBuilder()
                 .addResourceMetrics(io.opentelemetry.proto.metrics.v1.ResourceMetrics.newBuilder()
@@ -189,6 +192,10 @@ class OtlpIngestServiceTest {
 
     private static OtlpMetricDirectWriter noopMetricWriter() {
         return new OtlpMetricDirectWriter(MetricWriteRouter.singleTable(new DorisBatchWriter(1)));
+    }
+
+    private static OtlpLogDirectWriter noopLogWriter() {
+        return new OtlpLogDirectWriter(new DorisBatchWriter(1), null);
     }
 
     private static KeyValue kv(String key, String value) {

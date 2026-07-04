@@ -10,10 +10,14 @@ import com.databuff.apm.common.util.ServiceKeyUtil;
 import java.io.IOException;
 
 import com.fasterxml.jackson.databind.ObjectMapper;
+import io.opentelemetry.proto.collector.logs.v1.ExportLogsServiceRequest;
 import io.opentelemetry.proto.collector.metrics.v1.ExportMetricsServiceRequest;
 import io.opentelemetry.proto.collector.trace.v1.ExportTraceServiceRequest;
 import io.opentelemetry.proto.common.v1.AnyValue;
 import io.opentelemetry.proto.common.v1.KeyValue;
+import io.opentelemetry.proto.logs.v1.LogRecord;
+import io.opentelemetry.proto.logs.v1.ResourceLogs;
+import io.opentelemetry.proto.logs.v1.ScopeLogs;
 import io.opentelemetry.proto.metrics.v1.HistogramDataPoint;
 import io.opentelemetry.proto.metrics.v1.Metric;
 import io.opentelemetry.proto.metrics.v1.NumberDataPoint;
@@ -215,6 +219,150 @@ public final class OtelConverter {
         }
     }
 
+    /** OTLP ExportLogsServiceRequest → {@link OtlLogLine} list. */
+    public List<ConvertedLog> convertLogs(ExportLogsServiceRequest request) {
+        List<ConvertedLog> out = new ArrayList<>();
+        for (ResourceLogs resourceLogs : request.getResourceLogsList()) {
+            String serviceName = attribute(resourceLogs.getResource().getAttributesList(), "service.name");
+            if (serviceName == null || serviceName.isBlank()) {
+                continue;
+            }
+            String serviceKey = ServiceKeyUtil.of(serviceName);
+            String hostName = attribute(resourceLogs.getResource().getAttributesList(), "host.name");
+            if (hostName == null) {
+                hostName = "";
+            }
+            String resourceJson = encodeAttributes(resourceLogs.getResource().getAttributesList());
+            for (ScopeLogs scopeLogs : resourceLogs.getScopeLogsList()) {
+                for (LogRecord logRecord : scopeLogs.getLogRecordsList()) {
+                    OtlLogLine line = buildLogLine(serviceName, serviceKey, hostName, resourceJson, logRecord);
+                    if (line != null) {
+                        out.add(new ConvertedLog(serviceKey, line));
+                    }
+                }
+            }
+        }
+        return out;
+    }
+
+    private OtlLogLine buildLogLine(
+            String serviceName,
+            String serviceKey,
+            String hostName,
+            String resourceJson,
+            LogRecord logRecord) {
+        long timeNs = logRecord.getTimeUnixNano();
+        if (timeNs <= 0) {
+            timeNs = logRecord.getObservedTimeUnixNano();
+        }
+        if (timeNs <= 0) {
+            return null;
+        }
+        String body = logBody(logRecord.getBody());
+        String attributesJson = encodeAttributes(logRecord.getAttributesList());
+        if ((body == null || body.isBlank()) && (attributesJson == null || attributesJson.isBlank())) {
+            return null;
+        }
+        String severityText = logRecord.getSeverityText();
+        int severityNumber = logRecord.getSeverityNumberValue();
+        if (severityText == null || severityText.isBlank()) {
+            severityText = severityFromNumber(severityNumber);
+        }
+        return new OtlLogLine(
+                timeNs,
+                logRecord.getObservedTimeUnixNano(),
+                DATETIME.format(Instant.ofEpochSecond(0, timeNs)),
+                serviceKey,
+                serviceName,
+                hostName,
+                hex(logRecord.getTraceId()),
+                hex(logRecord.getSpanId()),
+                severityText,
+                severityNumber,
+                body == null ? "" : body,
+                attributesJson,
+                resourceJson);
+    }
+
+    private static String severityFromNumber(int severityNumber) {
+        if (severityNumber >= 21) {
+            return "FATAL";
+        }
+        if (severityNumber >= 17) {
+            return "ERROR";
+        }
+        if (severityNumber >= 13) {
+            return "WARN";
+        }
+        if (severityNumber >= 9) {
+            return "INFO";
+        }
+        if (severityNumber >= 5) {
+            return "DEBUG";
+        }
+        if (severityNumber >= 1) {
+            return "TRACE";
+        }
+        return "UNSPECIFIED";
+    }
+
+    private String encodeAttributes(List<KeyValue> attributes) {
+        if (attributes == null || attributes.isEmpty()) {
+            return null;
+        }
+        Map<String, String> map = new LinkedHashMap<>();
+        collectAttributes(map, attributes);
+        if (map.isEmpty()) {
+            return null;
+        }
+        try {
+            return METRIC_JSON.writeValueAsString(map);
+        } catch (IOException e) {
+            return null;
+        }
+    }
+
+    private static String logBody(AnyValue body) {
+        if (body == null) {
+            return null;
+        }
+        if (body.hasStringValue()) {
+            return body.getStringValue();
+        }
+        if (body.hasBytesValue()) {
+            return body.getBytesValue().toStringUtf8();
+        }
+        if (body.hasKvlistValue()) {
+            Map<String, String> map = new LinkedHashMap<>();
+            for (KeyValue kv : body.getKvlistValue().getValuesList()) {
+                String value = anyValue(kv.getValue());
+                if (value != null && !value.isBlank()) {
+                    map.put(kv.getKey(), value);
+                }
+            }
+            try {
+                return METRIC_JSON.writeValueAsString(map);
+            } catch (IOException e) {
+                return map.toString();
+            }
+        }
+        if (body.hasArrayValue()) {
+            List<String> values = new ArrayList<>();
+            for (AnyValue item : body.getArrayValue().getValuesList()) {
+                String value = anyValue(item);
+                if (value != null) {
+                    values.add(value);
+                }
+            }
+            try {
+                return METRIC_JSON.writeValueAsString(values);
+            } catch (IOException e) {
+                return values.toString();
+            }
+        }
+        return anyValue(body);
+    }
+
     private static String firstNonBlank(String... values) {
         for (String value : values) {
             if (value != null && !value.isBlank()) {
@@ -390,5 +538,8 @@ public final class OtelConverter {
     }
 
     public record ConvertedMetric(String serviceKey, OtlMetricLine line) {
+    }
+
+    public record ConvertedLog(String serviceKey, OtlLogLine line) {
     }
 }

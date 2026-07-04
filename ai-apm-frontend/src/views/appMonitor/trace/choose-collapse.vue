@@ -10,38 +10,6 @@
 
     <div class="choose-collapse-body">
       <simplebar style="height: 100%;padding-right: 12px;">
-        <el-collapse v-if="filterList.length" value="duration" class="filter-collapse duration-filter-collapse">
-          <el-collapse-item name="duration">
-            <template slot="title">
-              <div class="flex-h-jc">
-                <span>{{ $t('modules.views.alarmCenter.problemDetail.s_207c26c9') }}</span>
-                <span v-show="manualModifyMin || manualModifyMax" class="filter-btn-wrapper flex-h">
-                  <span @click.stop="() => {}" class="filter-btn flex-h">
-                    <span class="db-icon-filter icon-filter"></span>
-                  </span>
-                  <span @click.stop="durationChangeHandle()" class="filter-btn flex-h">
-                    <span class="db-icon-close icon-close"></span>
-                  </span>
-                </span>
-              </div>
-            </template>
-            <div class="duration-setting-cont flex-h mt-5">
-              <span class="describe mr-5">Min</span>
-              <el-input v-model="formatMinModel"
-                @change="minModelChange"
-                placeholder="ns" size="mini" :class="['duration-ipt mr-15', manualModifyMin ? '' : 'describe']"></el-input>
-              <el-input v-model="formatMaxModel"
-                @change="maxModelChange"
-                placeholder="ns" size="mini" :class="['duration-ipt', manualModifyMax ? '' : 'describe']"></el-input>
-              <span class="describe ml-5">Max</span>
-            </div>
-            <el-slider v-model="durationRange" range :min="getMinDuration" :max="getMaxDuration"
-              @change="durationChangeHandle"
-              :show-tooltip="false"
-              class="duration-slider"></el-slider>
-          </el-collapse-item>
-        </el-collapse>
-
         <el-collapse v-model="activeNames" class="filter-collapse">
           <el-collapse-item
             v-for="item in filterList"
@@ -90,17 +58,8 @@
 import { Vue, Component, Prop, Watch } from 'vue-property-decorator';
 import i18n from '@/i18n';
 import Simplebar from 'simplebar-vue'
-import humanFormat from 'human-format';
 import { toAsyncWait } from '@/utils/common';
 import ApmApi from '@/api/apm'
-
-const nsFormat = new humanFormat.Scale({
-  ns: 1,
-  µs: 1000,
-  ms: 1000000,
-  s: 1e9,
-  min: 60 * 1e9,
-});
 
 interface FilterType {
   label: string;      // 类型中文名
@@ -160,13 +119,6 @@ export default class ChooseCollapse extends Vue {
   public async init () {
     this.filterList = []
     this.filterLoadedMapping = {}
-    this.durationRange = [0, 0];
-    this.formatMinModel = '';
-    this.formatMaxModel = '';
-    this.getMinDuration = 0;
-    this.getMaxDuration = 0;
-    this.manualModifyMin = false;
-    this.manualModifyMax = false;
     this.getActiveNames()
     this.getParams(this.activeNames, true)
 
@@ -240,7 +192,6 @@ export default class ChooseCollapse extends Vue {
         })
       });
       this.filterList = filterList
-      this.initDuration(data.duration || {})
 
       // 存储筛选项的已加载状态
       let loadedNames = [...names]
@@ -274,16 +225,6 @@ export default class ChooseCollapse extends Vue {
             } else {
               filterItem.model = values.split(',').filter(_t => _t && keys.indexOf(_t) > -1)
             }
-          } else if (key === 'minDuration') {
-            const val = Number(values)
-            this.formatMinModel = humanFormat(Number(values), { scale: nsFormat })
-            this.manualModifyMin = val > this.getMinDuration
-            this.durationRange = [val, this.durationRange[1]]
-          } else if (key === 'maxDuration') {
-            const val = Number(values)
-            this.formatMaxModel = humanFormat(Number(values), { scale: nsFormat })
-            this.manualModifyMax = val < this.getMaxDuration
-            this.durationRange = [this.durationRange[0], val]
           }
         });
       } catch (err) {
@@ -340,12 +281,6 @@ export default class ChooseCollapse extends Vue {
     // 设置路由中的参数
     // 格式： multisearch=encodeURIComponent(aaa=xx,xxx,xxx;bbb=xxx;ccc=xxx,xxx)
     const _params: any = {}
-    if (this.manualModifyMin) {
-      _params.minDuration = this.durationRange[0]
-    }
-    if (this.manualModifyMax) {
-      _params.maxDuration = this.durationRange[1]
-    }
     this.filterList.filter(t => t.model.length).forEach(t => {
       const { name, model } = t
       if (name !== 'error') {
@@ -379,85 +314,6 @@ export default class ChooseCollapse extends Vue {
       target.model = [];
     }
     this.changeHandle()
-  }
-
-  // 响应时间
-  private durationRange = [0, 0];
-  private formatMinModel = ''; // 最小值输入框value
-  private formatMaxModel = ''; // 最大值输入框value
-  private getMinDuration = 0; // 范围最小值
-  private getMaxDuration = 0; // 范围最大值
-  private manualModifyMin = false; // 是否自定义最小值
-  private manualModifyMax = false; // 是否自定义最大值
-  private initDuration (duration: any) {
-    const min = duration.min || 0;
-    const max = duration.max || duration.min || 0;
-    if (!this.manualModifyMin) {
-      this.getMinDuration = min;
-      this.formatMinModel = humanFormat(min, { scale: nsFormat });
-    }
-    if (!this.manualModifyMax) {
-      this.getMaxDuration = max;
-      this.formatMaxModel = humanFormat(max, { scale: nsFormat });
-    }
-    this.durationRange = [
-      this.manualModifyMin ? this.durationRange[0] : this.getMinDuration,
-      this.manualModifyMax ? this.durationRange[1] : this.getMaxDuration
-    ];
-  }
-  private durationChangeHandle (val?: any) {
-    if (!val) {
-      this.durationRange = [this.getMinDuration, this.getMaxDuration];
-    }
-    const [min, max] = this.durationRange;
-    this.formatMinModel = humanFormat(min, { scale: nsFormat });
-    this.formatMaxModel = humanFormat(max, { scale: nsFormat });
-    this.manualModifyMin = min > this.getMinDuration;
-    this.manualModifyMax = max < this.getMaxDuration;
-    this.changeHandle()
-  }
-  private minModelChange (val: string) {
-    if (!(val.trim())) {
-      this.formatMinModel = humanFormat(this.getMinDuration, { scale: nsFormat });
-      this.durationRange = [this.getMinDuration, this.durationRange[1]]
-      this.manualModifyMin = false;
-    } else if (typeof Number(val.trim()) === 'number' && !isNaN(Number(val.trim()))) {
-      this.formatMinModel = humanFormat(Number(val.trim()), { scale: nsFormat })
-      this.durationRange = [Number(val.trim()), this.durationRange[1]]
-      this.manualModifyMin = Number(val.trim()) > this.getMinDuration;
-    } else {
-      try {
-        const result = humanFormat.parse(val.trim(), { scale: nsFormat })
-        this.durationRange = [result, this.durationRange[1]]
-        this.manualModifyMin = result > this.getMinDuration;
-      } catch (err) {
-        this.formatMinModel = humanFormat(this.getMinDuration, { scale: nsFormat });
-        this.durationRange = [this.getMinDuration, this.durationRange[1]]
-        this.manualModifyMin = false;
-      }
-    }
-    this.durationChangeHandle(this.durationRange);
-  }
-  private maxModelChange (val: string) {
-    if (!(val.trim())) {
-      this.formatMaxModel = humanFormat(this.getMaxDuration, { scale: nsFormat });
-      this.manualModifyMax = false;
-    } else if (typeof Number(val.trim()) === 'number' && !isNaN(Number(val.trim()))) {
-      this.formatMaxModel = humanFormat(Number(val.trim()), { scale: nsFormat })
-      this.durationRange = [this.durationRange[0], Number(val.trim())]
-      this.manualModifyMax = Number(val.trim()) < this.getMaxDuration;
-    } else {
-      try {
-        const result = humanFormat.parse(val.trim(), { scale: nsFormat })
-        this.durationRange = [this.durationRange[0], result]
-        this.manualModifyMax = result < this.getMaxDuration;
-      } catch (err) {
-        this.formatMaxModel = humanFormat(this.getMaxDuration, { scale: nsFormat });
-        this.durationRange = [this.durationRange[0], this.getMaxDuration]
-        this.manualModifyMax = false;
-      }
-    }
-    this.durationChangeHandle(this.durationRange);
   }
 
   private toggleCollapsed (status: boolean) {
@@ -513,11 +369,6 @@ export default class ChooseCollapse extends Vue {
     :deep(.el-collapse-item) {
       padding: 2px 0;
       &:not(:last-child) {
-        border-bottom: 1px solid var(--border-color-base);
-      }
-    }
-    &.duration-filter-collapse{
-      :deep(.el-collapse-item) {
         border-bottom: 1px solid var(--border-color-base);
       }
     }
@@ -609,24 +460,6 @@ export default class ChooseCollapse extends Vue {
       &.unknown :deep(.el-checkbox__label::before),
       &.nodata :deep(.el-checkbox__label::before) {
         background: var(--color-info);
-      }
-    }
-  }
-
-  .duration-setting-cont{
-    padding: 0;
-    font-size: 12px;
-  }
-  .duration-slider{
-    margin: 0 8px;
-  }
-  .duration-ipt{
-    :deep(.el-input__inner){
-      padding: 0 6px;
-    }
-    &.describe{
-      :deep(.el-input__inner){
-        color: var(--color-text-secondary);
       }
     }
   }

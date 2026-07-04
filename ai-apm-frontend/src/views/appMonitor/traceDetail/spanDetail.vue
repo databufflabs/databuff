@@ -1,6 +1,11 @@
 <template>
   <div class="span-info-cont">
     <span-detail-baseinfo class="tags-wrapper" v-show='activeName === "tags"' :spanInfo='spanInfo' />
+    <span-log
+      v-if='activeName === "logs"'
+      :trace-id="traceId"
+      :span-id="spanId"
+      :start-time="startTime" />
     <Profiling :detail="spanInfo" v-if='activeName === "profiling"' />
   </div>
 </template>
@@ -14,10 +19,12 @@ import SpanKeys from './spanKeys';
 import { orderBy } from 'lodash';
 import dayjs from 'dayjs';
 import SpanDetailBaseinfo from './spanDetailBaseinfo.vue';
+import SpanLog from './span-log.vue';
 
 @Component({
   components: {
     SpanDetailBaseinfo,
+    SpanLog,
     Profiling,
   },
 })
@@ -28,6 +35,9 @@ export default class SpanInfo extends Vue {
   @Prop() private totalDuration!: any;
   @Prop({ default: 'tags' }) private activeName!: string;
   @Prop() private spanParents!: any[]
+  @Prop({ default: '' }) private traceId!: string
+  @Prop({ default: '' }) private spanId!: string
+  @Prop({ default: 0 }) private startTime!: number
 
   // 是否有性能剖析
   get hasProfiling () {

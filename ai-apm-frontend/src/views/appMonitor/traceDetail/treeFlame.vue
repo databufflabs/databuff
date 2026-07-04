@@ -74,6 +74,10 @@
               v-if="spanMapping[id].hasInner && spanMapping[id].isIn === 1"
               @click.stop="toggleExpandedStatusHandle(id)"
               class="db-blue cp font-12 fw-normal node-extra-info-btn">{{ $t('modules.views.appMonitor.traceDetail.s_ce50ea0b', { value0: innerExpandedIds.includes(id) ? $t('modules.components.text-expand.s_def9e98b') : $t('modules.components.text-expand.s_e2edde5a') }) }}</span>
+            <span
+              v-if="spanMapping[id].hasLog"
+              @click.stop="viewLogsHandle(id)"
+              class="db-blue cp font-12 fw-normal node-extra-log-btn">Logs</span>
             <div :class='["node-extra-info"]'>{{ excutePctMap[id] || '< 0.1%' }}</div>
           </div>
         </div>
@@ -339,6 +343,12 @@ export default class TreeFlame extends Vue {
   private nodeClickHandle (id: string) {
     this.currentSpanId = id
     this.$emit('on-change', { ...this.spanMapping[id] })
+  }
+
+  private viewLogsHandle (id: string) {
+    this.currentSpanId = id
+    this.$emit('on-change', { ...this.spanMapping[id] })
+    this.$emit('view-logs', { ...this.spanMapping[id] })
   }
   // 切换展开/收起
   private toggleExpandedStatusHandle (id: string) {

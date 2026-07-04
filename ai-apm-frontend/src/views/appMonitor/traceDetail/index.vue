@@ -21,6 +21,10 @@
           <span class="sub-describe">
             {{ traceInfo.trace_id || '-' }}
             <i @click.stop="copyNameHandle(traceInfo.trace_id || '-')" class="db-icon-copy font-12 blue cp ml-5"></i>
+            <span
+              v-if="traceInfo.trace_id"
+              @click.stop="viewLogsAnalysisHandle"
+              class="db-blue cp font-12 ml-10">日志分析</span>
           </span>
           <el-alert v-if="spanListOversize" :title="$t('modules.views.appMonitor.traceDetail.s_c605e33a')" type="error" :closable="false" class="oversize-info" />
         </div>
@@ -33,7 +37,8 @@
         <div v-if='activeName === "sort"' class="tree-flame-wrapper flex-1">
           <tree-flame :source='traceSource' :initSpan='currentSpan' :totalExectime='traceInfo.exectime' :totalDuration='traceInfo.duration'
             ref='treeFlameComp' :spanListData='spanListData'
-            @on-change='changeSelectedHandle'></tree-flame>
+            @on-change='changeSelectedHandle'
+            @view-logs='viewSpanLogsHandle'></tree-flame>
         </div>
         <div v-if='activeName === "graph"' class="tree-flame-wrapper flex-1">
            <flame-chart
@@ -447,8 +452,31 @@ export default class SpanDetail extends Vue {
     }
   }
 
+  private viewSpanLogsHandle (node: any) {
+    this.changeSelectedHandle(node);
+    if (!node?.hasLog) {
+      return
+    }
+    this.$nextTick(() => {
+      (this.$refs.spanAside as any)?.showLogsTab?.();
+    });
+  }
+
   private copyNameHandle (name: string) {
     copy(name)
+  }
+
+  private viewLogsAnalysisHandle () {
+    if (!this.traceInfo.trace_id) {
+      return
+    }
+    this.$router.push({
+      path: '/appMonitor/logs',
+      query: {
+        ...this.getRouteTimeOrRange,
+        traceId: encodeURIComponent(this.traceInfo.trace_id),
+      },
+    })
   }
 }
 </script>

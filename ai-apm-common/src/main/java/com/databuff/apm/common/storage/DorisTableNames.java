@@ -6,6 +6,7 @@ import com.databuff.apm.common.metric.MetricSchemaRegistry;
 public final class DorisTableNames {
 
     public static final String TRACE_DC_SPAN = "trace_dc_span";
+    public static final String LOG_DC_RECORD = "log_dc_record";
 
     public static final String METRIC_SERVICE = "metric_service";
     public static final String METRIC_SERVICE_INSTANCE = "metric_service_instance";

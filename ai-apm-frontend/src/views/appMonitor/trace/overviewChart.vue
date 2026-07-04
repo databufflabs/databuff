@@ -56,7 +56,7 @@
               :showEmpty="showEmpty3"
               group='trace'
               :showLegend="true"
-              :colors="['#2962FF', '#00AFF4', '#7A5FF3', '#08BE7E', '#F79532', '#ED3B3B']"
+              :colors="['#2962FF']"
               :yAxisSplitNum="3"
               :textSmallMode="true"
               :interval="timeParams.interval"
@@ -100,19 +100,26 @@ export default class OverviewChartGroup extends Vue {
   private showEmpty1 = false;
   private showEmpty2 = false;
   private showEmpty3 = false;
+
+  private volumeCounts: Record<string, number | null> = {};
   
   get parentLoading () {
     return this.queryLoading || this.searchInitLoading
   }
 
-  public getData () {
+  public getVolumeCounts () {
+    return this.volumeCounts;
+  }
+
+  public async getData () {
     const params: any = {
       ...this.timeParams,
       ...this.query,
     }
-    this.getSpanRequestGraph(params)
+    await this.getSpanRequestGraph(params)
     this.getSpanErrorGraph(params)
     this.getSpanResponseTimeGraph(params)
+    return this.volumeCounts
   }
 
   private async getSpanRequestGraph (params: any) {
@@ -121,6 +128,7 @@ export default class OverviewChartGroup extends Vue {
     this.barLoading1 = false;
     if (!error) {
       const graphData = result.data.callCnts || {}
+      this.volumeCounts = graphData
       this.showEmpty1 = !Object.values(graphData).some((value) => value != null);
       if (!this.showEmpty1) {
         const hitsSource = Object.keys(graphData).sort((a: string, b: string) => Number(a) - Number(b)).map((date) => ({
@@ -133,6 +141,8 @@ export default class OverviewChartGroup extends Vue {
       } else {
         this.chartSource1 = []
       }
+    } else {
+      this.volumeCounts = {}
     }
   }
   private async getSpanErrorGraph (params: any) {
@@ -178,31 +188,22 @@ export default class OverviewChartGroup extends Vue {
     const { result, error } = await toAsyncWait(ApmApi.getSpanResponseTimeGraph(params))
     this.barLoading3 = false;
     if (!error) {
-      const graphData = result.data.percentageLatencys || {}
-      this.showEmpty3 = !Object.values(graphData).some(
-        (item: any) => item && typeof item === 'object'
-      );
+      const graphData = result.data.avgLatencys || {}
+      this.showEmpty3 = !Object.values(graphData).some((value) => value != null);
       if (!this.showEmpty3) {
-        const p50Source: any = { name: 'P50', data: [], unit: 'nanosecond' };
-        const p75Source: any = { name: 'P75', data: [], unit: 'nanosecond' };
-        const p90Source: any = { name: 'P90', data: [], unit: 'nanosecond' };
-        const p95Source: any = { name: 'P95', data: [], unit: 'nanosecond' };
-        const p99Source: any = { name: 'P99', data: [], unit: 'nanosecond' };
-        const maxSource: any = { name: 'Max', data: [], unit: 'nanosecond' };
-        Object.entries(graphData).sort((a: any, b: any) => Number(a[0]) - Number(b[0])).forEach((item: any) => {
-          const key = dayjs(Number(item[0])).format('YYYY-MM-DD HH:mm')
-          const latency = item[1] && typeof item[1] === 'object' ? item[1] : {}
-          p50Source.data.push({ key, value: latency['50.0'] ?? '-' });
-          p75Source.data.push({ key, value: latency['75.0'] ?? '-' });
-          p90Source.data.push({ key, value: latency['90.0'] ?? '-' });
-          p95Source.data.push({ key, value: latency['95.0'] ?? '-' });
-          p99Source.data.push({ key, value: latency['99.0'] ?? '-' });
-          maxSource.data.push({ key, value: latency['100.0'] ?? '-' });
-        });
-        const percentsSource = [
-          p50Source, p75Source, p90Source, p95Source, p99Source, maxSource
-        ];
-        this.chartSource3 = percentsSource;
+        const avgSource = Object.entries(graphData)
+          .sort((a: any, b: any) => Number(a[0]) - Number(b[0]))
+          .map((item: any) => ({
+            key: dayjs(Number(item[0])).format('YYYY-MM-DD HH:mm'),
+            value: item[1] ?? '-',
+          }));
+        this.chartSource3 = [{
+          name: i18n.t('modules.views.appMonitor.cache.s_96a0c062') as string,
+          nameKey: 'modules.views.appMonitor.cache.s_96a0c062',
+          data: avgSource,
+          unit: 'nanosecond',
+          type: 'line',
+        }];
       } else {
         this.chartSource3 = []
       }

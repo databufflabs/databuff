@@ -4,7 +4,9 @@ import com.databuff.apm.common.model.DcSpan;
 import com.databuff.apm.ingest.event.TraceBatchEvent;
 import com.databuff.apm.ingest.event.TraceEvent;
 import com.databuff.apm.ingest.gateway.PipelineGateway;
+import com.databuff.apm.ingest.log.OtlpLogDirectWriter;
 import com.databuff.apm.ingest.metric.OtlpMetricDirectWriter;
+import io.opentelemetry.proto.collector.logs.v1.ExportLogsServiceRequest;
 import io.opentelemetry.proto.collector.metrics.v1.ExportMetricsServiceRequest;
 import io.opentelemetry.proto.collector.trace.v1.ExportTraceServiceRequest;
 import org.slf4j.Logger;
@@ -20,7 +22,8 @@ import java.util.concurrent.atomic.AtomicLong;
  * OTLP 接收入口：protobuf 反序列化后转为 DataBuff 内存对象，经 {@link PipelineGateway} 分发。
  * <p>
  * Trace 链路：convert → enrich → traceId 聚合 → fill → 指标聚合 → 存储<br>
- * Metric 链路：convert → {@link OtlpMetricDirectWriter} → Doris
+ * Metric 链路：convert → {@link OtlpMetricDirectWriter} → Doris<br>
+ * Log 链路：convert → {@link OtlpLogDirectWriter} → Doris
  */
 public final class OtlpIngestService {
 
@@ -29,16 +32,20 @@ public final class OtlpIngestService {
     private final OtelConverter converter;
     private final PipelineGateway gateway;
     private final OtlpMetricDirectWriter metricDirectWriter;
+    private final OtlpLogDirectWriter logDirectWriter;
     private final AtomicLong tracesIngested = new AtomicLong();
     private final AtomicLong metricsIngested = new AtomicLong();
+    private final AtomicLong logsIngested = new AtomicLong();
 
     public OtlpIngestService(
             OtelConverter converter,
             PipelineGateway gateway,
-            OtlpMetricDirectWriter metricDirectWriter) {
+            OtlpMetricDirectWriter metricDirectWriter,
+            OtlpLogDirectWriter logDirectWriter) {
         this.converter = converter;
         this.gateway = gateway;
         this.metricDirectWriter = metricDirectWriter;
+        this.logDirectWriter = logDirectWriter;
     }
 
     /** Step 1：OTLP trace → {@link DcSpan} 对象（不序列化）。 */
@@ -83,12 +90,25 @@ public final class OtlpIngestService {
         return accepted;
     }
 
+    /** OTLP log → mapped rows written directly to Doris. */
+    public int ingestLogs(ExportLogsServiceRequest request) {
+        List<OtelConverter.ConvertedLog> converted = converter.convertLogs(request);
+        logDirectWriter.write(converted.stream().map(OtelConverter.ConvertedLog::line).toList());
+        int accepted = converted.size();
+        logsIngested.addAndGet(accepted);
+        return accepted;
+    }
+
     public long tracesIngested() {
         return tracesIngested.get();
     }
 
     public long metricsIngested() {
         return metricsIngested.get();
+    }
+
+    public long logsIngested() {
+        return logsIngested.get();
     }
 
     private static String shortTraceId(String traceId) {

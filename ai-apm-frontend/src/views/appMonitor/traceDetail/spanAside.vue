@@ -24,8 +24,16 @@
 
     <db-tabnav v-if='detailOptions.length > 1' v-model='detailModel' :tabnavs='detailOptions' :slim='true'></db-tabnav>
 
-    <div class="span-detail-main flex-1">
-      <span-detail :type='detailModel' :row='currentSpan' :spanParents='spanParents' :totalDuration='totalDuration' :activeName='detailModel'></span-detail>
+    <div class="span-detail-main flex-1" v-if="currentSpan">
+      <span-detail
+        :type='detailModel'
+        :row='currentSpan'
+        :spanParents='spanParents'
+        :totalDuration='totalDuration'
+        :activeName='detailModel'
+        :trace-id="currentSpan.trace_id"
+        :span-id="currentSpan.span_id"
+        :start-time="spanStartMillis" />
     </div>
   </div>
 </template>
@@ -53,6 +61,9 @@ export default class SpanAside extends Vue {
       if (!this.hasProfiling && this.detailModel === 'profiling') {
         this.detailModel = 'tags'
       }
+      if (!newVal.hasLog && this.detailModel === 'logs') {
+        this.detailModel = 'tags'
+      }
     }
   }
 
@@ -60,6 +71,7 @@ export default class SpanAside extends Vue {
     const _excutePct = this.currentSpan?.exectime / this.totalExectime;
     return !isNaN(_excutePct) && isFinite(_excutePct) ? _excutePct : '-';
   }
+
   get durationPct () {
     const _durationPct = this.currentSpan?.duration / this.totalDuration;
     return !isNaN(_durationPct) && isFinite(_durationPct) ? _durationPct : '-';
@@ -78,14 +90,33 @@ export default class SpanAside extends Vue {
   // span详情
   public detailModel = 'tags'
 
+  public showLogsTab () {
+    if (!this.currentSpan?.hasLog) {
+      return
+    }
+    this.detailModel = 'logs'
+  }
+
   get detailOptions () {
     const tabs = [
       { label: i18n.t('modules.utils.static.s_24d67862') as string, labelKey: 'modules.utils.static.s_24d67862', value: 'tags' },
     ]
+    if (this.currentSpan?.hasLog) {
+      tabs.push({ label: i18n.t('modules.utils.static.s_456d29ef') as string, labelKey: 'modules.utils.static.s_456d29ef', value: 'logs' })
+    }
     if (this.hasProfiling && this.isDatabuffSource) {
       tabs.push({ label: i18n.t('modules.views.appMonitor.traceDetail.s_9687d0eb') as string, labelKey: 'modules.views.appMonitor.traceDetail.s_9687d0eb', value: 'profiling' })
     }
     return tabs
+  }
+
+  get spanStartMillis () {
+    const start = this.currentSpan?._start || this.currentSpan?.start
+    if (!start) {
+      return 0
+    }
+    const text = String(start)
+    return text.length > 13 ? Math.floor(+text / 1_000_000) : +text
   }
 
   // 是否有性能剖析

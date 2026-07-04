@@ -1311,7 +1311,7 @@ export default {
         "s_6ed40596": "rowShare",
         "s_dbe2c06e": "Host: ",
         "s_0bbeee07": "Service: ",
-        "s_bd002975": "Content: ",
+        "s_bd002975": "Log: ",
         "s_26b5bd49": "Loading......",
         "s_77281549": "addmany",
         "s_7cff89f6": "row:",

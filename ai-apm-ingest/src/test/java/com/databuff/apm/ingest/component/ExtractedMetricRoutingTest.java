@@ -4,6 +4,7 @@ import com.databuff.apm.common.cluster.aggregate.ClusterAggregator;
 import com.databuff.apm.ingest.gateway.PipelineGateway;
 import com.databuff.apm.ingest.metric.MetricTableWriterRegistry;
 import com.databuff.apm.ingest.metric.MetricWriteRouter;
+import com.databuff.apm.ingest.log.OtlpLogDirectWriter;
 import com.databuff.apm.ingest.metric.OtlpMetricDirectWriter;
 import com.databuff.apm.ingest.otel.OtelConverter;
 import com.databuff.apm.ingest.otel.OtlpIngestService;
@@ -113,7 +114,8 @@ class ExtractedMetricRoutingTest {
         OtlpIngestService service = new OtlpIngestService(
                 new OtelConverter(),
                 new PipelineGateway(traceComponent, metricComponent),
-                new OtlpMetricDirectWriter(new MetricWriteRouter(registry.writersByTable())));
+                new OtlpMetricDirectWriter(new MetricWriteRouter(registry.writersByTable())),
+                new OtlpLogDirectWriter(new DorisBatchWriter(128), null));
         long end = System.currentTimeMillis() * 1_000_000L;
         long start = end - 50_000_000L;
         ExportTraceServiceRequest request = ExportTraceServiceRequest.newBuilder()

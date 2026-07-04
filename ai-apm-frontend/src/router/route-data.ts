@@ -316,6 +316,17 @@ const appMonitor: OptionalPropMenu[] = [
   },
   {
     parentId: 4,
+    id: 431,
+    name: '日志分析',
+    path: '/appMonitor/logs',
+    isMenu: true,
+    leaf: true,
+    order: 9.2,
+    time: true,
+    refresh: true,
+  },
+  {
+    parentId: 4,
     id: 410,
     name: '服务流',
     path: '/appMonitor/serviceFlow',

@@ -1,6 +1,8 @@
 package com.databuff.apm.ingest.config;
 
+import com.databuff.apm.common.storage.DorisBatchWriter;
 import com.databuff.apm.ingest.gateway.PipelineGateway;
+import com.databuff.apm.ingest.log.OtlpLogDirectWriter;
 import com.databuff.apm.ingest.metric.OtlpMetricDirectWriter;
 import com.databuff.apm.ingest.meta.MetaServiceCollector;
 import com.databuff.apm.ingest.metric.MetricWriteRouter;
@@ -25,10 +27,18 @@ public class OtlpReceiverConfiguration {
     }
 
     @Bean
+    OtlpLogDirectWriter otlpLogDirectWriter(
+            DorisBatchWriter logBatchWriter,
+            MetaServiceCollector metaServiceCollector) {
+        return new OtlpLogDirectWriter(logBatchWriter, metaServiceCollector);
+    }
+
+    @Bean
     OtlpIngestService otlpIngestService(
             OtelConverter converter,
             PipelineGateway gateway,
-            OtlpMetricDirectWriter otlpMetricDirectWriter) {
-        return new OtlpIngestService(converter, gateway, otlpMetricDirectWriter);
+            OtlpMetricDirectWriter otlpMetricDirectWriter,
+            OtlpLogDirectWriter otlpLogDirectWriter) {
+        return new OtlpIngestService(converter, gateway, otlpMetricDirectWriter, otlpLogDirectWriter);
     }
 }

@@ -32,6 +32,7 @@ public class WebMvcConfiguration implements WebMvcConfigurer {
                         "/webapi/api/**",
                         "/webapi/service/**",
                         "/webapi/trace/**",
+                        "/webapi/log/**",
                         "/webapi/globalTopology/**",
                         "/webapi/cockpit/**",
                         "/webapi/metric/**",

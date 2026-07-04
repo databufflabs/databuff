@@ -2,6 +2,7 @@ package com.databuff.apm.ingest.meta;
 
 import com.databuff.apm.common.meta.MetaServiceInfo;
 import com.databuff.apm.common.model.DcSpan;
+import com.databuff.apm.ingest.otel.OtlLogLine;
 import com.databuff.apm.ingest.otel.OtlMetricLine;
 import com.databuff.apm.common.storage.DorisBatchWriter;
 
@@ -40,6 +41,13 @@ public final class MetaServiceCollector {
         if (info != null) {
             registry.remember(info);
         }
+    }
+
+    public void remember(OtlLogLine line) {
+        if (line == null) {
+            return;
+        }
+        remember(line.serviceId(), line.service());
     }
 
     public void remember(String serviceId, String serviceName) {

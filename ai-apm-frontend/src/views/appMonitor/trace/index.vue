@@ -40,8 +40,6 @@
           class="list"
         />
       </div>
-
-      <div v-else class="trace-cont hide-list">{{ $t('modules.views.appMonitor.serviceCallDetail.s_16853987') }}</div>
     </div>
   </div>
 </template>
@@ -57,6 +55,7 @@ import TableList from './table-list.vue'
 import { toAsyncWait } from '@/utils/common';
 import ApmApi from '@/api/service';
 import { cloneDeep, orderBy } from 'lodash';
+import { DEFAULT_CHART_LIST_LIMIT, resolveRecentRangeFromCounts } from '@/utils/chartListRange';
 
 const StaticParams = {
   parentId: '0',
@@ -89,7 +88,8 @@ export default class Trace extends Vue {
     interval: 3600,
   }
 
-  private showList = false; // 是否显示列表区域，默认不显示
+  private showList = false;
+  private listScope: 'default' | 'minute' = 'default';
   private queryParams: any = {}
   private queryFilter: any = {}
   private queryLoading = false;
@@ -127,31 +127,79 @@ export default class Trace extends Vue {
   }
 
   private async durationChangeHandle () {
-    this.showList = false;
+    this.listScope = 'default';
     this.regetGlobalTime()
     this.searchInitLoading = true
-    await this.$refs.searchGroup.init(cloneDeep(this.timeParams)).then((payload: any) => {
-      const { filter: data } = payload;
+    try {
+      await this.$refs.searchGroup.init(cloneDeep(this.timeParams)).then((payload: any) => {
+        const { filter: data } = payload;
 
-      if (data.sid) {
-        data.serviceId = data.sid
-        delete data.sid
-      }
-      if (data.si) {
-        data.serviceInstance = data.si
-        delete data.si
-      }
-      this.traceIdOversize = (data.traceIds || []).length > 100
-      if (data.traceIds) {
-        data.traceIds = data.traceIds.slice(0, 100)
-      }
-      this.queryParams = { ...StaticParams, ...data };
-      this.$nextTick(() => {
-        this.$refs.chartGroup && this.$refs.chartGroup.getData()
+        if (data.sid) {
+          data.serviceId = data.sid
+          delete data.sid
+        }
+        if (data.si) {
+          data.serviceInstance = data.si
+          delete data.si
+        }
+        this.traceIdOversize = (data.traceIds || []).length > 100
+        if (data.traceIds) {
+          data.traceIds = data.traceIds.slice(0, 100)
+        }
+        this.queryParams = { ...StaticParams, ...data, size: DEFAULT_CHART_LIST_LIMIT };
       })
-    }).finally(() => {
+      await this.$nextTick()
+      await this.$refs.chartGroup?.getData()
+      const { sf, st } = this.$route.query
+      const hasRouteMinute = sf && st && !isNaN(Number(sf)) && !isNaN(Number(st)) && String(sf).length === 13 && String(st).length === 13
+      if (!hasRouteMinute) {
+        await this.applyDefaultListFromChart()
+      }
+    } finally {
       this.searchInitLoading = false
+    }
+  }
+
+  private async applyDefaultListFromChart () {
+    const range = resolveRecentRangeFromCounts(this.$refs.chartGroup?.getVolumeCounts?.(), {
+      interval: this.timeParams.interval,
+      globalToTime: this.timeParams.toTime,
+      limit: DEFAULT_CHART_LIST_LIMIT,
     })
+    if (!range) {
+      this.showList = false
+      return
+    }
+    this.listScope = 'default'
+    this.queryParams = {
+      ...this.queryParams,
+      fromTime: range.fromTime,
+      toTime: range.toTime,
+      size: DEFAULT_CHART_LIST_LIMIT,
+    }
+    this.clearMinuteRoute()
+    this.showList = true
+    this.queryLoading = true
+    try {
+      await this.$nextTick()
+      if (!this.hasRequestAttrParams) {
+        const filter = await this.$refs.chooseCollapse.init()
+        this.queryFilter = { ...filter }
+      }
+      await this.$nextTick()
+      this.$refs.tableList?.refresh()
+    } catch (ignored) {
+      // noop
+    } finally {
+      this.queryLoading = false
+    }
+  }
+
+  private clearMinuteRoute () {
+    const query = { ...this.$route.query }
+    delete query.sf
+    delete query.st
+    this.$router.replace({ query })
   }
 
   private regetGlobalTime () {
@@ -161,6 +209,7 @@ export default class Trace extends Vue {
 
   // 图表点击事件回调
   private chartClickHandle (xAxisName: string, type?: string) {
+    this.listScope = 'minute'
     const { toTime, interval } = this.timeParams
     this.queryParams.fromTime = xAxisName + ':00'
     const _toTime = +new Date(xAxisName) + interval * 1000
@@ -222,15 +271,16 @@ export default class Trace extends Vue {
     if (JSON.stringify(data) === JSON.stringify(this.queryParams)) {
       return
     }
-    this.showList = false;
+    this.listScope = 'default'
     this.clearFilter(routerQuery);
     this.traceIdOversize = (data.traceIds || []).length > 100
     if (data.traceIds) {
       data.traceIds = data.traceIds.slice(0, 100)
     }
-    this.queryParams = { ...StaticParams, ...data }
-    this.$nextTick(() => {
-      this.$refs.chartGroup && this.$refs.chartGroup.getData()
+    this.queryParams = { ...StaticParams, ...data, size: DEFAULT_CHART_LIST_LIMIT }
+    this.$nextTick(async () => {
+      await this.$refs.chartGroup?.getData()
+      await this.applyDefaultListFromChart()
     })
   }
 
@@ -307,14 +357,6 @@ export default class Trace extends Vue {
       &.is-collapsed {
         padding-left: 0;
       }
-    }
-  
-    &.hide-list {
-      align-items: center;
-      justify-content: center;
-      background-color: var(--bg-color);
-      font-size: 14px;
-      color: var(--color-text-regular);
     }
 
     .db-icon-unfold {

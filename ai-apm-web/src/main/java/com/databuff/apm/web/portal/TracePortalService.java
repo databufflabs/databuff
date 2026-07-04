@@ -17,6 +17,7 @@ import com.databuff.apm.common.query.TimeSeriesFillUtil;
 import com.databuff.apm.common.serde.DcSpanUtil;
 import com.databuff.apm.common.storage.ApmReadRepository;
 import com.databuff.apm.common.storage.DorisTableNames;
+import com.databuff.apm.common.storage.LogQueryBuilder;
 import com.databuff.apm.common.storage.MetricQueryBuilder;
 import com.databuff.apm.web.flow.MultipleServiceFlowTreeBuilder;
 import com.databuff.apm.web.flow.ServiceFlowService;
@@ -348,7 +349,7 @@ public class TracePortalService {
 
     public Map<String, Object> graphStats(Map<String, Object> body) {
         Map<String, Object> graphs = buildSpanGraphs(body);
-        return Map.of("percentageLatencys", graphs.getOrDefault("percentageLatencys", Map.of()));
+        return Map.of("avgLatencys", graphs.getOrDefault("avgLatencys", Map.of()));
     }
 
     public Map<String, Object> traceSpans(Map<String, Object> body) {
@@ -775,7 +776,7 @@ public class TracePortalService {
             Map<String, Object> body, long from, long to, int interval) {
         Map<String, Long> callCnts = new LinkedHashMap<>();
         Map<String, Map<String, Long>> errorCnts = new LinkedHashMap<>();
-        Map<String, List<Long>> latencyBuckets = new LinkedHashMap<>();
+        Map<String, Double> sumDurationNs = new LinkedHashMap<>();
 
         List<String> serviceKeys = resolveGraphServiceKeys(body);
         java.util.Collection<String> services = serviceKeys.isEmpty() ? null : serviceKeys;
@@ -805,15 +806,14 @@ public class TracePortalService {
                 }
 
                 if (point.requestCount() > 0 && point.sumDurationNs() > 0) {
-                    long avgNs = (long) (point.sumDurationNs() / point.requestCount());
-                    latencyBuckets.computeIfAbsent(bucket, key -> new ArrayList<>()).add(avgNs);
+                    sumDurationNs.merge(bucket, point.sumDurationNs(), Double::sum);
                 }
             }
         } catch (Exception ignored) {
             return emptyGraphs(from, to, interval);
         }
 
-        return buildGraphResult(callCnts, errorCnts, latencyBuckets, from, to, interval);
+        return buildGraphResult(callCnts, errorCnts, sumDurationNs, from, to, interval);
     }
 
     private Map<String, Map<String, Long>> bucketTraceErrorGraphs(
@@ -967,7 +967,7 @@ public class TracePortalService {
         long from = PortalTimeParser.rangeFrom(body, now - 3_600_000L);
         long to = PortalTimeParser.rangeTo(body, now);
         SpanListScope scope = resolveSpanListScope(body);
-        int limit = Math.max(1, Math.min(size <= 0 ? 50 : size, 500));
+        int limit = Math.max(1, Math.min(size <= 0 ? 50 : size, 1000));
         return new TraceQueryService.SpanListRequest(
                 resolveService(body),
                 parseStringList(body.get("serviceIds")),
@@ -1011,11 +1011,39 @@ public class TracePortalService {
                 .filter(startNs -> startNs > 0L)
                 .min()
                 .orElse(0L);
+        Set<String> logSpanIds = loadLogSpanIds(traceId);
         List<Map<String, Object>> rows = new ArrayList<>();
         for (SpanDetail span : spans) {
-            rows.add(toPortalTraceSpan(span, minStartNs));
+            Map<String, Object> row = toPortalTraceSpan(span, minStartNs);
+            String spanId = span.spanId();
+            row.put("hasLog", spanId != null && !spanId.isBlank() && logSpanIds.contains(spanId));
+            rows.add(row);
         }
         return rows;
+    }
+
+    private Set<String> loadLogSpanIds(String traceId) {
+        if (traceId == null || traceId.isBlank()) {
+            return Set.of();
+        }
+        try {
+            String sql = LogQueryBuilder.spanIdsWithLogsSql(traceDatabase, traceId);
+            List<Map<String, Object>> rows = readRepository.queryRows(sql, 10_000);
+            Set<String> spanIds = new HashSet<>();
+            for (Map<String, Object> row : rows) {
+                Object value = row.get("span_id");
+                if (value == null) {
+                    continue;
+                }
+                String spanId = String.valueOf(value).trim();
+                if (!spanId.isEmpty()) {
+                    spanIds.add(spanId);
+                }
+            }
+            return spanIds;
+        } catch (Exception ignored) {
+            return Set.of();
+        }
     }
 
     private Map<String, Object> toPortalSpan(SpanSummary span) {
@@ -1360,25 +1388,17 @@ public class TracePortalService {
     private Map<String, Object> buildGraphResult(
             Map<String, Long> callCnts,
             Map<String, Map<String, Long>> errorCnts,
-            Map<String, List<Long>> latencyBuckets,
+            Map<String, Double> sumDurationNs,
             long from,
             long to,
             int interval) {
-        Map<String, Map<String, Double>> percentageLatencys = new LinkedHashMap<>();
-        for (Map.Entry<String, List<Long>> entry : latencyBuckets.entrySet()) {
-            List<Long> values = entry.getValue();
-            if (values.isEmpty()) {
-                continue;
+        Map<String, Number> avgLatencys = new LinkedHashMap<>();
+        for (Map.Entry<String, Long> entry : callCnts.entrySet()) {
+            long requestCount = entry.getValue();
+            double sumDuration = sumDurationNs.getOrDefault(entry.getKey(), 0.0);
+            if (requestCount > 0 && sumDuration > 0) {
+                avgLatencys.put(entry.getKey(), sumDuration / requestCount);
             }
-            long max = values.stream().mapToLong(Long::longValue).max().orElse(0L);
-            Map<String, Double> percentiles = new LinkedHashMap<>();
-            percentiles.put("50.0", (double) percentile(values, 0.5));
-            percentiles.put("75.0", (double) percentile(values, 0.75));
-            percentiles.put("90.0", (double) percentile(values, 0.9));
-            percentiles.put("95.0", (double) percentile(values, 0.95));
-            percentiles.put("99.0", (double) percentile(values, 0.99));
-            percentiles.put("100.0", (double) max);
-            percentageLatencys.put(entry.getKey(), percentiles);
         }
 
         Map<String, Number> callCntSeries = new LinkedHashMap<>();
@@ -1387,8 +1407,7 @@ public class TracePortalService {
         Map<String, Object> graphs = new LinkedHashMap<>();
         graphs.put("callCnts", TimeSeriesFillUtil.fillStringKeyMap(callCntSeries, from, to, interval));
         graphs.put("errorCnts", TimeSeriesFillUtil.fillStringKeyObjectMap(errorCnts, from, to, interval));
-        graphs.put("percentageLatencys",
-                TimeSeriesFillUtil.fillStringKeyObjectMap(percentageLatencys, from, to, interval));
+        graphs.put("avgLatencys", TimeSeriesFillUtil.fillStringKeyMap(avgLatencys, from, to, interval));
         return graphs;
     }
 
@@ -1405,7 +1424,7 @@ public class TracePortalService {
         Map<String, Object> graphs = new LinkedHashMap<>();
         graphs.put("callCnts", TimeSeriesFillUtil.fillStringKeyMap(null, from, to, interval));
         graphs.put("errorCnts", TimeSeriesFillUtil.fillStringKeyObjectMap(null, from, to, interval));
-        graphs.put("percentageLatencys", TimeSeriesFillUtil.fillStringKeyObjectMap(null, from, to, interval));
+        graphs.put("avgLatencys", TimeSeriesFillUtil.fillStringKeyMap(null, from, to, interval));
         return graphs;
     }
 

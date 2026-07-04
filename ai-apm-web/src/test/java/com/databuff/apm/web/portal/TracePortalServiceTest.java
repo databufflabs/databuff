@@ -390,9 +390,9 @@ class TracePortalServiceTest {
                 "serviceId", "demo-order"));
 
         @SuppressWarnings("unchecked")
-        Map<String, Map<String, Double>> latencies =
-                (Map<String, Map<String, Double>>) graphs.get("percentageLatencys");
-        assertThat(latencies.get(String.valueOf(bucket * 1000L))).isNotNull();
+        Map<String, Number> latencies =
+                (Map<String, Number>) graphs.get("avgLatencys");
+        assertThat(latencies.get(String.valueOf(bucket * 1000L))).isEqualTo(1_200_000_000.0);
     }
 
     @Test

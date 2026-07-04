@@ -4,6 +4,9 @@ import com.databuff.apm.ingest.otel.OtlpIngestService;
 import io.grpc.Server;
 import io.grpc.ServerBuilder;
 import io.grpc.stub.StreamObserver;
+import io.opentelemetry.proto.collector.logs.v1.ExportLogsServiceRequest;
+import io.opentelemetry.proto.collector.logs.v1.ExportLogsServiceResponse;
+import io.opentelemetry.proto.collector.logs.v1.LogsServiceGrpc;
 import io.opentelemetry.proto.collector.metrics.v1.ExportMetricsServiceRequest;
 import io.opentelemetry.proto.collector.metrics.v1.ExportMetricsServiceResponse;
 import io.opentelemetry.proto.collector.metrics.v1.MetricsServiceGrpc;
@@ -50,6 +53,14 @@ public class OtlpGrpcServer implements ApplicationListener<ApplicationReadyEvent
                     public void export(ExportMetricsServiceRequest request, StreamObserver<ExportMetricsServiceResponse> observer) {
                         ingestService.ingestMetrics(request);
                         observer.onNext(ExportMetricsServiceResponse.getDefaultInstance());
+                        observer.onCompleted();
+                    }
+                })
+                .addService(new LogsServiceGrpc.LogsServiceImplBase() {
+                    @Override
+                    public void export(ExportLogsServiceRequest request, StreamObserver<ExportLogsServiceResponse> observer) {
+                        ingestService.ingestLogs(request);
+                        observer.onNext(ExportLogsServiceResponse.getDefaultInstance());
                         observer.onCompleted();
                     }
                 })

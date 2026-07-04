@@ -37,7 +37,7 @@ class OpenAiCompatibleChatClientTest {
     void parsesAnthropicMessage() throws Exception {
         com.sun.net.httpserver.HttpServer server =
                 com.sun.net.httpserver.HttpServer.create(new InetSocketAddress(0), 0);
-        server.createContext("/anthropic/messages", exchange -> {
+        server.createContext("/anthropic/v1/messages", exchange -> {
             byte[] body = ("{\"content\":[{\"type\":\"text\",\"text\":\"hello from minimax\"}]}").getBytes();
             exchange.sendResponseHeaders(200, body.length);
             exchange.getResponseBody().write(body);

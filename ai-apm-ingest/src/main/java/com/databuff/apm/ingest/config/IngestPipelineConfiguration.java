@@ -88,6 +88,11 @@ public class IngestPipelineConfiguration {
     }
 
     @Bean
+    DorisBatchWriter logBatchWriter() {
+        return new DorisBatchWriter(256);
+    }
+
+    @Bean
     DorisBatchWriter metaServiceBatchWriter() {
         return new DorisBatchWriter(64);
     }
@@ -166,6 +171,15 @@ public class IngestPipelineConfiguration {
     }
 
     @Bean
+    DorisStreamLoadSink logStreamLoadSink(
+            DorisBatchWriter logBatchWriter,
+            DorisStreamLoader loader,
+            @Value("${ingest.doris.trace-database:databuff}") String database,
+            @Value("${ingest.doris.log-table:log_dc_record}") String table) {
+        return new DorisStreamLoadSink(logBatchWriter, loader, database, table);
+    }
+
+    @Bean
     MetricTableWriterRegistry metricTableWriterRegistry(
             DorisStreamLoader loader,
             @Value("${ingest.doris.metric-database:databuff}") String database) {
@@ -181,10 +195,12 @@ public class IngestPipelineConfiguration {
     List<DorisStreamLoadSink> dorisStreamLoadSinks(
             MetricTableWriterRegistry metricTableWriterRegistry,
             DorisStreamLoadSink metaServiceStreamLoadSink,
-            DorisStreamLoadSink traceStreamLoadSink) {
+            DorisStreamLoadSink traceStreamLoadSink,
+            DorisStreamLoadSink logStreamLoadSink) {
         List<DorisStreamLoadSink> sinks = new java.util.ArrayList<>(metricTableWriterRegistry.sinks());
         sinks.add(metaServiceStreamLoadSink);
         sinks.add(traceStreamLoadSink);
+        sinks.add(logStreamLoadSink);
         return sinks;
     }
 

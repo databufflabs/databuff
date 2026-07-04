@@ -39,6 +39,8 @@ docker-compose up -d
 docker-compose down
 ```
 
+> **Operations**: [Docker Operations Reference](../运维参考/Docker运维_en.md) — install directory, start/stop, ports, health checks, logs, upgrade/uninstall. For air-gapped sites see [Offline Installation](../运维参考/离线安装_en.md).
+
 ## 3. Install the Demo (Optional)
 
 Let the demo app continuously report traces so you can see call chains and topology in the platform.

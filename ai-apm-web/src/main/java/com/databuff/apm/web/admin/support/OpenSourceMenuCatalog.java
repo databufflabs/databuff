@@ -33,6 +33,7 @@ public final class OpenSourceMenuCatalog {
         menus.add(menu(4, 407, "接口分析", "/appMonitor/serviceAnalysis", null, true, true, 7, true, true));
         menus.add(menu(4, 408, "错误分析", "/appMonitor/errors", null, true, true, 8, true, true));
         menus.add(menu(4, 409, "链路追踪", "/appMonitor/trace", null, true, true, 9, true, true));
+        menus.add(menu(4, 431, "日志分析", "/appMonitor/logs", null, true, true, 9.2, true, true));
         menus.add(menu(0, 18, "Agent观测", "/aiMonitor", "db-icon-agent", true, false, 4.5, false, false));
         menus.add(menu(18, 1801, "Agent列表", "/aiMonitor/applications", null, true, true, 1, true, true));
         menus.add(menu(18, 1802, "Agent拓扑", "/aiMonitor/topology", null, true, true, 2, true, true));

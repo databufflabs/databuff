@@ -6,6 +6,8 @@
 
 # Architecture · Alerting
 
+> Read [Telemetry Pipeline and Storage](遥测数据流_en.md) first.
+
 ## Design Intent
 
 Alerting value is not "making noise" — it is **detect early, record clearly, and support analysis**.

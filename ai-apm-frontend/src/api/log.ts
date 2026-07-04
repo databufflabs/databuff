@@ -12,10 +12,18 @@ export default {
   /**
    * 获取日志筛选条件
    */
-  getLogsCondition: () => {
+  getLogsCondition: (data?: any) => {
     return http.request({
       url: '/log/conditions',
       method: 'post',
+      data,
+    });
+  },
+  getLogTrend: (data?: any) => {
+    return http.request({
+      url: '/log/trend',
+      method: 'post',
+      data,
     });
   },
   getLogListMock (data?: any) {
