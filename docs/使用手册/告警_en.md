@@ -33,7 +33,6 @@ Evaluation mechanics: [Architecture · Alerting](../架构设计/告警_en.md).
 | Convergence policy | Configuration → Alert Config → Convergence |
 | Silence schedule | Configuration → Alert Config → Silence |
 | Alert list | Alert Center → Alert List |
-| Problem list | Alert Center → Problems (converged incident view) |
 
 > External notifications (Webhook, email, etc.) are not supported yet. See [Roadmap](../Roadmap_en.md) — *Stronger alerting → notification integrations*.
 
@@ -76,12 +75,7 @@ Filter by service, severity, status. Click an alert for details:
 
 Alerts auto-resolve when metrics recover.
 
-### 3. Alert List vs Problem List
-
-- **Alert List**: individual rule-triggered events — handle one by one
-- **Problem List**: converged incident view — see blast radius and recovery efficiency
-
-### 4. Advanced Config
+### 3. Advanced Config
 
 | Setting | Purpose |
 |---------|---------|

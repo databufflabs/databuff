@@ -80,9 +80,7 @@ curl -fsSL https://databuff.ai/databuff/ai-apm-demo-install.sh | bash
 
 1. Open the Web UI and sign in with the default account
 2. **APM → Service List** — confirm demo services have data
-3. **Configuration → Alert Config → Detection Rules → Preset Rules** — enable a rule for a demo service; after 1–2 minutes check **Alert Center → Alert List**
-4. **Configuration → Alert Config → Detection Rules** — create a custom rule for key services (see [Alerting User Guide](../使用手册/告警_en.md))
-5. (Optional) **Configuration → Model Settings** — enter your API key to enable AI:
+3. (Optional) **Configuration → Model Settings** — enter your API key to enable AI:
 
 ![Configure API key](../images/set-api-key.png)
 

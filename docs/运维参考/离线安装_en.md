@@ -16,11 +16,9 @@ When the image registry is unreachable, download the offline bundle for your arc
 
 ## Download the Bundle
 
-Download the all-in-one offline bundle matching your CPU architecture. Latest version:
+Download the all-in-one offline bundle matching your CPU architecture.
 
-```bash
-curl -fsSL https://openocta.com/pkg/databuff/VERSION
-```
+**Recommended**: pick a version and copy the download link on the [install page](https://databuff.ai/#install) under **Docker → Offline Install**.
 
 | Architecture | Bundle filename |
 |--------------|-----------------|
@@ -32,7 +30,19 @@ Download URLs (replace `<version>` with the release, e.g. `0.1.1`):
 - amd64: `https://openocta.com/pkg/databuff/<version>/offline/databuff-ai-apm-offline-<version>-amd64.tar.gz`
 - arm64: `https://openocta.com/pkg/databuff/<version>/offline/databuff-ai-apm-offline-<version>-arm64.tar.gz`
 
-You can also pick a version and copy the download link on the [install page](https://databuff.ai/#install) under **Docker → Offline Install**.
+Example CLI download (amd64 / `0.1.1`):
+
+```bash
+curl -fLO https://openocta.com/pkg/databuff/0.1.1/offline/databuff-ai-apm-offline-0.1.1-amd64.tar.gz
+```
+
+To resolve the latest release automatically, `https://openocta.com/pkg/databuff/VERSION` returns plain text (e.g. `0.1.1`) — **not** the bundle. Query the version first, then download:
+
+```bash
+VERSION=$(curl -fsSL https://openocta.com/pkg/databuff/VERSION)
+ARCH=amd64   # or arm64
+curl -fLO "https://openocta.com/pkg/databuff/${VERSION}/offline/databuff-ai-apm-offline-${VERSION}-${ARCH}.tar.gz"
+```
 
 Each bundle includes deployment scripts, `ai-apm-stack` app images, and `doris-stack` infra images.
 
