@@ -31,8 +31,12 @@ DEMO_PKG_NAME="databuff-apm-demo-${RELEASE_VERSION}.tar.gz"
 APM_IMAGES_DIR="$(local_images_pkg_dir "$RELEASE_VERSION")"
 INFRA_IMAGES_DIR="$(local_infra_images_pkg_dir)"
 OFFLINE_INSTALL_SRC="${DOCKER_ROOT}/ai-apm-offline-install.sh"
+OFFLINE_UPDATE_SRC="${DOCKER_ROOT}/ai-apm-offline-update.sh"
 OFFLINE_DEMO_INSTALL_SRC="${DOCKER_ROOT}/ai-apm-offline-demo-install.sh"
 COMPOSE_CHECK_SRC="${APM_COMMON_SRC}/scripts/check-compose.sh"
+AVX2_CHECK_SRC="${APM_COMMON_SRC}/scripts/check-avx2.sh"
+UPDATE_LIB_SRC="${APM_COMMON_SRC}/scripts/apm-update-lib.sh"
+DEMO_DEPLOY_LIB_SRC="${APM_COMMON_SRC}/scripts/demo-deploy-lib.sh"
 
 resolve_docker_pkg() {
   local name="$DOCKER_PKG_NAME"
@@ -203,15 +207,33 @@ stage_offline_package() {
 
   mkdir -p "${stage_dir}/scripts"
   cp -f "$OFFLINE_INSTALL_SRC" "${stage_dir}/install.sh"
+  cp -f "$OFFLINE_UPDATE_SRC" "${stage_dir}/update.sh"
   cp -f "$OFFLINE_DEMO_INSTALL_SRC" "${stage_dir}/install_demo.sh"
   cp -f "$COMPOSE_CHECK_SRC" "${stage_dir}/scripts/check-compose.sh"
+  cp -f "$AVX2_CHECK_SRC" "${stage_dir}/scripts/check-avx2.sh"
+  cp -f "$UPDATE_LIB_SRC" "${stage_dir}/scripts/apm-update-lib.sh"
+  cp -f "$DEMO_DEPLOY_LIB_SRC" "${stage_dir}/scripts/demo-deploy-lib.sh"
   cp -f "$docker_pkg" "${stage_dir}/${DOCKER_PKG_NAME}"
   cp -f "$demo_pkg" "${stage_dir}/${DEMO_PKG_NAME}"
   cp -f "$apm_stack" "${stage_dir}/"
   cp -f "$doris_stack" "${stage_dir}/"
   printf '%s\n' "$RELEASE_VERSION" >"${stage_dir}/VERSION"
   printf '%s\n' "$arch" >"${stage_dir}/ARCH"
-  chmod +x "${stage_dir}/install.sh" "${stage_dir}/install_demo.sh" "${stage_dir}/scripts/check-compose.sh"
+  cat >"${stage_dir}/README-OFFLINE.txt" <<EOF
+DataBuff AI APM 离线包 v${RELEASE_VERSION} (${arch})
+
+全新安装（会删除旧安装目录与 data/）:
+  sudo ./install.sh
+
+就地升级（保留 /opt/databuff-ai-apm/data/）:
+  sudo ./update.sh
+
+可选 Demo:
+  sudo ./install_demo.sh    # 安装或升级 demo（会自动停掉旧 demo 后替换）
+
+详见包内文档或 https://databuff.ai/docs
+EOF
+  chmod +x "${stage_dir}/install.sh" "${stage_dir}/update.sh" "${stage_dir}/install_demo.sh" "${stage_dir}/scripts/check-compose.sh" "${stage_dir}/scripts/check-avx2.sh"
 
   create_tarball "$stage_dir" "$archive"
   write_image_tarball_size_sidecar "$archive"
@@ -254,6 +276,7 @@ cat <<EOF
   tar -xzf databuff-ai-apm-offline-${RELEASE_VERSION}-<arch>.tar.gz
   cd databuff-ai-apm-offline-${RELEASE_VERSION}-<arch>
   sudo ./install.sh
-  sudo ./install_demo.sh    # 可选：离线安装 demo 造数
+  sudo ./update.sh          # 已有安装时保留 data/ 升级
+  sudo ./install_demo.sh    # 可选：安装或升级 demo（会停掉旧 demo 后替换）
 
 EOF

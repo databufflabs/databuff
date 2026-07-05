@@ -685,6 +685,32 @@ publish_version_manifest() {
   cp -f "$compose_check" "$dist_compose_check"
   chmod +x "$dist_compose_check"
   publish_pkg "$dist_compose_check"
+
+  local avx2_check="${APM_COMMON_SRC}/scripts/check-avx2.sh"
+  if [[ ! -f "$avx2_check" ]]; then
+    echo "[build] missing check-avx2.sh: ${avx2_check}" >&2
+    exit 1
+  fi
+  local dist_avx2_check="${APM_BUILD_DIST:-${TMPDIR:-/tmp}}/check-avx2.sh"
+  cp -f "$avx2_check" "$dist_avx2_check"
+  chmod +x "$dist_avx2_check"
+  publish_pkg "$dist_avx2_check"
+
+  local update_lib="${APM_COMMON_SRC}/scripts/apm-update-lib.sh"
+  if [[ -f "$update_lib" ]]; then
+    local dist_update_lib="${APM_BUILD_DIST:-${TMPDIR:-/tmp}}/apm-update-lib.sh"
+    cp -f "$update_lib" "$dist_update_lib"
+    chmod +x "$dist_update_lib"
+    publish_pkg "$dist_update_lib"
+  fi
+
+  local demo_deploy_lib="${APM_COMMON_SRC}/scripts/demo-deploy-lib.sh"
+  if [[ -f "$demo_deploy_lib" ]]; then
+    local dist_demo_lib="${APM_BUILD_DIST:-${TMPDIR:-/tmp}}/demo-deploy-lib.sh"
+    cp -f "$demo_deploy_lib" "$dist_demo_lib"
+    chmod +x "$dist_demo_lib"
+    publish_pkg "$dist_demo_lib"
+  fi
 }
 
 detect_image_arch() {

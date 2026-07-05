@@ -21,15 +21,6 @@ doris_has_data() {
   return 1
 }
 
-ensure_vm_max_map_count() {
-  required=2000000
-  current="$(sysctl -n vm.max_map_count 2>/dev/null || echo 0)"
-  if [ "$current" -lt "$required" ]; then
-    echo "[start] raising vm.max_map_count ${current} -> ${required}"
-    sysctl -w "vm.max_map_count=${required}" >/dev/null 2>&1 || true
-  fi
-}
-
 chmod +x "${ROOT}/scripts/"*.sh 2>/dev/null || true
 
 if [ -f "${ROOT}/env.sh" ]; then

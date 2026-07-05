@@ -12,8 +12,8 @@
 #   SKIP_START       1=仅下载解压不启动
 #
 # 指定版本:
-#   curl -fsSL .../ai-apm-demo-install.sh | bash -s -- --version 0.1.1
-#   APM_VERSION=0.1.1 curl -fsSL .../ai-apm-demo-install.sh | bash
+#   curl -fsSL .../ai-apm-demo-install.sh | bash -s -- --version 0.1.2
+#   APM_VERSION=0.1.2 curl -fsSL .../ai-apm-demo-install.sh | bash
 
 set -e
 
@@ -112,18 +112,33 @@ fail() {
   exit 1
 }
 
+_demo_lib=""
+_src="${BASH_SOURCE[0]:-$0}"
+if [[ -n "$_src" && "$_src" != /dev/fd/* && "$_src" != /dev/stdin && "$_src" != - ]]; then
+  _dir="$(cd "$(dirname "$_src")" && pwd)"
+  for _f in "${_dir}/../common/scripts/demo-deploy-lib.sh"; do
+    if [[ -f "$_f" ]]; then
+      _demo_lib="$_f"
+      break
+    fi
+  done
+fi
+if [[ -z "$_demo_lib" ]]; then
+  _demo_lib="$(mktemp "${TMPDIR:-/tmp}/demo-deploy-lib.XXXXXX.sh")"
+  if ! curl -fsSL "${PKG_BASE%/}/demo-deploy-lib.sh" -o "$_demo_lib"; then
+    rm -f "$_demo_lib"
+    echo "[install] ERROR: cannot download demo-deploy-lib.sh from ${PKG_BASE}" >&2
+    exit 1
+  fi
+fi
+# shellcheck disable=SC1090,SC1091
+source "$_demo_lib"
+if [[ "$_demo_lib" == "${TMPDIR:-/tmp}/demo-deploy-lib."* ]]; then
+  rm -f "$_demo_lib"
+fi
+
 detect_host_ip() {
-  ip=""
-  if command -v ip >/dev/null 2>&1; then
-    ip="$(ip route get 1.1.1.1 2>/dev/null | awk '{for (i=1;i<=NF;i++) if ($i=="src") {print $(i+1); exit}}')"
-  fi
-  if [ -z "$ip" ] && command -v hostname >/dev/null 2>&1; then
-    ip="$(hostname -I 2>/dev/null | awk '{print $1}')"
-  fi
-  if [ -z "$ip" ]; then
-    return 1
-  fi
-  echo "$ip"
+  demo_detect_host_ip
 }
 
 show_summary() {
@@ -146,6 +161,9 @@ show_summary() {
   echo "    cd ${INSTALL_DIR} && ./start.sh"
   echo -e "  ${DIM}停止${RST}"
   echo "    cd ${INSTALL_DIR} && ./stop.sh"
+  echo -e "  ${DIM}升级${RST}"
+  echo "    cd ${INSTALL_DIR} && ./update.sh"
+  echo "    curl -fsSL ${PKG_BASE}/ai-apm-demo-update.sh | bash"
   echo ""
   echo -e "${CYN}========================================================${RST}"
   echo ""
@@ -163,17 +181,8 @@ stop_old_install() {
   if [ ! -e "$INSTALL_DIR" ]; then
     return 0
   fi
-  if [ -f "${INSTALL_DIR}/docker-compose.yml" ]; then
-    if docker compose version >/dev/null 2>&1; then
-      (cd "$INSTALL_DIR" && COMPOSE_PROJECT_NAME=databuff-apm-demo docker compose down --remove-orphans) >/dev/null 2>&1 || true
-      (cd "$INSTALL_DIR" && COMPOSE_PROJECT_NAME=databuff-ai-apm-demo docker compose down --remove-orphans) >/dev/null 2>&1 || true
-    elif command -v docker-compose >/dev/null 2>&1; then
-      (cd "$INSTALL_DIR" && COMPOSE_PROJECT_NAME=databuff-apm-demo docker-compose down --remove-orphans) >/dev/null 2>&1 || true
-      (cd "$INSTALL_DIR" && COMPOSE_PROJECT_NAME=databuff-ai-apm-demo docker-compose down --remove-orphans) >/dev/null 2>&1 || true
-    fi
-  fi
+  demo_remove_install_dir "$INSTALL_DIR"
   cd /opt 2>/dev/null || cd "${TMPDIR:-/tmp}" 2>/dev/null || true
-  rm -rf "$INSTALL_DIR"
 }
 
 INGEST_HOST="${INGEST_HOST:-}"
@@ -223,7 +232,7 @@ log "${BLD}(4/5)${RST} 解压部署文件"
 mkdir -p "$INSTALL_DIR"
 tar -xzf "$TMP" -C "$INSTALL_DIR" --strip-components=1
 rm -f "$TMP"
-chmod +x "${INSTALL_DIR}/start.sh" "${INSTALL_DIR}/stop.sh" 2>/dev/null || true
+chmod +x "${INSTALL_DIR}/start.sh" "${INSTALL_DIR}/stop.sh" "${INSTALL_DIR}/update.sh" 2>/dev/null || true
 INSTALL_DEPLOYED=1
 log_done "${BLD}(4/5)${RST} 解压到 ${INSTALL_DIR}"
 

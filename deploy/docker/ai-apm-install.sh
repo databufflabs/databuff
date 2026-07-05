@@ -1,6 +1,9 @@
 #!/usr/bin/env bash
 # DataBuff AI APM 一键安装（Doris + ingest + web）
 #
+# 全新安装 / 重装：会删除安装目录（含 data/ 观测数据）。
+# 保留数据升级请使用 update.sh / ai-apm-update.sh。
+#
 #   curl -fsSL https://databuff.ai/databuff/ai-apm-install.sh | bash
 #   curl -fsSL https://databuff.ai/databuff/ai-apm-install.sh | bash -s -- --pull-images
 #
@@ -15,8 +18,8 @@
 #   FORCE_PULL_IMAGES  1=强制重新下载镜像（同 --pull-images）
 #
 # 指定版本:
-#   curl -fsSL .../ai-apm-install.sh | bash -s -- --version 0.1.1
-#   APM_VERSION=0.1.1 curl -fsSL .../ai-apm-install.sh | bash
+#   curl -fsSL .../ai-apm-install.sh | bash -s -- --version 0.1.2
+#   APM_VERSION=0.1.2 curl -fsSL .../ai-apm-install.sh | bash
 
 set -e
 
@@ -191,7 +194,7 @@ stop_old_install() {
 echo ""
 echo -e "${CYN}========================================================${RST}"
 echo -e "${BLD} DataBuff AI APM  一键安装 v${APM_VERSION}${RST}"
-echo -e "${DIM} 全自动执行，无需输入，请稍候${RST}"
+echo -e "${DIM} 全新安装（将清理旧安装目录与 data/）${RST}"
 echo -e "${CYN}========================================================${RST}"
 echo ""
 
@@ -232,6 +235,29 @@ else
   . "$_compose_check_lib"
 fi
 ensure_compose_cli
+_avx2_check_lib=""
+if [[ -n "$_src" && "$_src" != /dev/fd/* && "$_src" != /dev/stdin && "$_src" != - ]]; then
+  for _f in "${_dir}/../common/scripts/check-avx2.sh"; do
+    if [[ -f "$_f" ]]; then
+      _avx2_check_lib="$_f"
+      break
+    fi
+  done
+fi
+if [[ -z "$_avx2_check_lib" ]]; then
+  _avx2_check_lib="$(mktemp "${TMPDIR:-/tmp}/check-avx2.XXXXXX.sh")"
+  if ! curl -fsSL "${PKG_BASE%/}/check-avx2.sh" -o "$_avx2_check_lib"; then
+    rm -f "$_avx2_check_lib"
+    fail "无法下载 AVX2 检查脚本"
+  fi
+  # shellcheck source=/dev/null
+  . "$_avx2_check_lib"
+  rm -f "$_avx2_check_lib"
+else
+  # shellcheck source=/dev/null
+  . "$_avx2_check_lib"
+fi
+ensure_avx2_cpu
 log_done "${BLD}(1/5)${RST} 检查运行环境"
 
 log "${BLD}(2/5)${RST} 下载部署包"

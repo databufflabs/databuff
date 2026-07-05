@@ -6,8 +6,8 @@
 #   export IMAGE_LOAD_CMD=ctr; curl -fsSL https://databuff.ai/databuff/ai-apm-k8s-download-apm-images.sh | bash
 #
 # 指定版本:
-#   curl -fsSL .../ai-apm-k8s-download-apm-images.sh | bash -s -- --version 0.1.1
-#   APM_VERSION=0.1.1 curl -fsSL .../ai-apm-k8s-download-apm-images.sh | bash
+#   curl -fsSL .../ai-apm-k8s-download-apm-images.sh | bash -s -- --version 0.1.2
+#   APM_VERSION=0.1.2 curl -fsSL .../ai-apm-k8s-download-apm-images.sh | bash
 #
 # 部署包内:
 #   ./download-apm-images.sh

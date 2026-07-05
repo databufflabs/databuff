@@ -1,8 +1,10 @@
 #!/usr/bin/env bash
 # DataBuff AI APM 离线安装（解压离线包后在本目录执行）
 #
-#   tar -xzf databuff-ai-apm-offline-0.1.1-amd64.tar.gz
-#   cd databuff-ai-apm-offline-0.1.1-amd64
+# 全新安装 / 重装：会删除安装目录（含 data/）。
+# 保留数据升级请使用同包内 update.sh。
+#   tar -xzf databuff-ai-apm-offline-0.1.2-amd64.tar.gz
+#   cd databuff-ai-apm-offline-0.1.2-amd64
 #   sudo ./install.sh
 #
 # 环境变量:
@@ -86,6 +88,8 @@ show_summary() {
   echo "    cd ${INSTALL_DIR} && ./start.sh"
   echo -e "  ${DIM}停止${RST}"
   echo "    cd ${INSTALL_DIR} && ./stop.sh"
+  echo -e "  ${DIM}离线升级（保留 data/）${RST}"
+  echo "    解压新版本离线包后在其目录执行: sudo ./update.sh"
   echo ""
   echo -e "${CYN}========================================================${RST}"
   echo ""
@@ -201,7 +205,7 @@ DEPLOY_PKG="$(require_bundle_file "${BUNDLE_ROOT}/databuff-ai-apm-${APM_VERSION}
 echo ""
 echo -e "${CYN}========================================================${RST}"
 echo -e "${BLD} DataBuff AI APM  离线安装 v${APM_VERSION}${RST}"
-echo -e "${DIM} 无需联网，请稍候${RST}"
+echo -e "${DIM} 全新安装（将清理旧安装目录与 data/）${RST}"
 echo -e "${CYN}========================================================${RST}"
 echo ""
 
@@ -224,6 +228,13 @@ else
   fail "离线包缺少 scripts/check-compose.sh"
 fi
 ensure_compose_cli
+if [ -f "${BUNDLE_ROOT}/scripts/check-avx2.sh" ]; then
+  # shellcheck source=/dev/null
+  . "${BUNDLE_ROOT}/scripts/check-avx2.sh"
+else
+  fail "离线包缺少 scripts/check-avx2.sh"
+fi
+ensure_avx2_cpu
 log_done "${BLD}(1/4)${RST} 检查运行环境"
 
 load_bundle_images

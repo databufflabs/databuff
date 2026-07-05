@@ -5,7 +5,7 @@
 export RUNTIME_IMAGE_NAMESPACE="${RUNTIME_IMAGE_NAMESPACE:-databuffhub}"
 
 # APM 应用版本（发版时只改这里）
-export APM_VERSION=0.1.1
+export APM_VERSION=0.1.2
 
 apm_refresh_image_refs() {
   export APM_INGEST_IMAGE="${RUNTIME_IMAGE_NAMESPACE}/ai-apm-ingest:${APM_VERSION}"

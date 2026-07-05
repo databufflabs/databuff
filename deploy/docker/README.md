@@ -8,11 +8,15 @@ ingest、web、Doris 默认从离线镜像包目录按本机架构下载并 `doc
 docker/
 ├── docker-compose.yml    # 主栈（Doris + ingest + web）
 ├── env.sh                # 运行时镜像配置（与 deploy/env.sh 一致）
-├── start.sh / stop.sh
+├── start.sh / stop.sh / update.sh
 ├── demo/                 # demo 造数 Compose 包
 ├── ai-apm-install.sh
+├── ai-apm-update.sh
 ├── ai-apm-offline-install.sh   # 离线包内 install.sh 模板
+├── ai-apm-offline-update.sh    # 离线包内 update.sh 模板
 ├── ai-apm-demo-install.sh
+├── ai-apm-demo-update.sh
+├── ai-apm-offline-demo-install.sh
 ├── build-docker.sh       # 打部署包并 SCP 上传到 databuff-site
 ├── build-docker-offline.sh # 打一体化离线大包（部署包 + 镜像）
 ├── data/                 # Doris 持久化
@@ -26,20 +30,27 @@ docker/
 `start.sh` / 一键安装脚本会按本机架构（amd64/arm64）从 `APM_IMAGES_PKG_BASE` 下载镜像包并 `docker load`：
 
 ```bash
+# 全新安装（删除旧目录与 data/）
 curl -fsSL https://databuff.ai/databuff/ai-apm-install.sh | bash
+
+# 就地升级（保留 data/）
+curl -fsSL https://databuff.ai/databuff/ai-apm-update.sh | bash
+cd /opt/databuff-ai-apm && ./update.sh
 ```
 
 ## 离线安装（一体化大包）
 
-无法访问镜像仓库时，按架构从 `${APM_PKG_BASE}/<version>/offline/` 下载离线包（对外地址示例：`https://openocta.com/pkg/databuff/0.1.1/offline/`），解压后执行 `install.sh`，**全程无需联网**：
+无法访问镜像仓库时，按架构从 `${APM_PKG_BASE}/<version>/offline/` 下载离线包（对外地址示例：`https://openocta.com/pkg/databuff/0.1.2/offline/`），解压后执行 `install.sh`，**全程无需联网**：
 
 ```bash
-tar -zxvf databuff-ai-apm-offline-0.1.1-amd64.tar.gz
-cd databuff-ai-apm-offline-0.1.1-amd64
+tar -zxvf databuff-ai-apm-offline-0.1.2-amd64.tar.gz
+cd databuff-ai-apm-offline-0.1.2-amd64
 
-# 安装平台
+# 全新安装
 sudo ./install.sh
-sudo ./install_demo.sh    # 可选：离线安装 demo 造数
+# 已有安装时升级（保留 data/）
+sudo ./update.sh
+sudo ./install_demo.sh    # 可选：安装或升级 demo（会停掉旧 demo 后替换）
 ```
 
 离线包由 `build-docker-offline.sh` 生成，内含：部署脚本包、`ai-apm-stack` 镜像、`doris-stack` 镜像。用户侧步骤与 [官网安装页](https://databuff.ai/#install) **Docker → 离线安装** 一致。

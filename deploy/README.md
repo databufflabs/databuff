@@ -22,14 +22,14 @@ Demo 源码位于仓库根目录 [`ai-apm-demo/`](../ai-apm-demo/)。
 | [`docker/build-docker-offline.sh`](docker/build-docker-offline.sh) | 打 Docker **一体化离线大包**（部署包 + 镜像，按架构） |
 | [`k8s/build-k8s.sh`](k8s/build-k8s.sh) | 打 Helm / K8s 部署包 + install 脚本 → **SCP 上传到 databuff-site** |
 | [`k8s/download-images.sh`](k8s/download-images.sh) | 按本机架构从镜像包目录下载 K8s 所需镜像并 `docker load` / `ctr import` |
-| [`k8s/download-apm-images.sh`](k8s/download-apm-images.sh) | 仅强制更新 ingest / web 两个镜像包 |
+| [`k8s/download-apm-images.sh`](k8s/download-apm-images.sh) | 仅重新导入 ingest / web 镜像（运维用，非正式升级路径） |
 
 ### 发布地址
 
 | 内容 | 地址 | 脚本 |
 |------|------|------|
 | 离线镜像包（`.tar.gz`，databuffhub/* + infra） | `https://databuff.ai/databuff/<ver>/images/` 与 `.../infra/images/` | `build-images.sh` / `upload-infra-images.sh` |
-| 部署包（tar.gz + install.sh） | `https://databuff.ai/databuff/` | `build-docker.sh` / `build-k8s.sh` |
+| 部署包（tar.gz + install/update.sh） | `https://databuff.ai/databuff/` | `build-docker.sh` / `build-k8s.sh` |
 
 ### 发布流程
 
@@ -65,21 +65,21 @@ Docker / K8s 安装脚本会**自动识别 amd64/arm64**，从镜像包目录下
 curl -fsSL https://databuff.ai/databuff/ai-apm-install.sh | bash
 
 # 安装指定版本
-curl -fsSL https://databuff.ai/databuff/ai-apm-install.sh | bash -s -- --version 0.1.1
-APM_VERSION=0.1.1 curl -fsSL https://databuff.ai/databuff/ai-apm-install.sh | bash
+curl -fsSL https://databuff.ai/databuff/ai-apm-install.sh | bash -s -- --version 0.1.2
+APM_VERSION=0.1.2 curl -fsSL https://databuff.ai/databuff/ai-apm-install.sh | bash
 ```
 
 ```bash
-# Docker 主栈
+# Docker 全新安装（会删除旧安装目录与 data/）
 curl -fsSL https://databuff.ai/databuff/ai-apm-install.sh | bash
 
-# K8s（各节点先导入镜像，再安装）
+# Docker 就地升级（保留 data/）
+curl -fsSL https://databuff.ai/databuff/ai-apm-update.sh | bash
+
+# K8s（换版本 = 卸载后重装，见 docs/运维参考/升级与卸载.md）
 ./download-images.sh          # 部署包内
 curl -fsSL https://databuff.ai/databuff/ai-apm-k8s-download-images.sh | bash
 curl -fsSL https://databuff.ai/databuff/ai-apm-k8s-install.sh | bash
-
-# K8s 仅升级 ingest / web 镜像（各节点强制重新导入）
-curl -fsSL https://databuff.ai/databuff/ai-apm-k8s-download-apm-images.sh | bash
 
 # Demo 造数
 curl -fsSL https://databuff.ai/databuff/ai-apm-demo-install.sh | bash

@@ -28,8 +28,8 @@
 #   DORIS_VERSION       Doris 镜像版本 (默认读安装包 DORIS_VERSION 或 pom.xml 中 doris.version)
 #
 # 指定版本:
-#   curl -fsSL .../ai-apm-k8s-install.sh | bash -s -- --version 0.1.1
-#   APM_VERSION=0.1.1 curl -fsSL .../ai-apm-k8s-install.sh | bash
+#   curl -fsSL .../ai-apm-k8s-install.sh | bash -s -- --version 0.1.2
+#   APM_VERSION=0.1.2 curl -fsSL .../ai-apm-k8s-install.sh | bash
 
 set -euo pipefail
 

@@ -1,0 +1,6 @@
+{
+  "schema_version": 2,
+  "upgrade_type": "A",
+  "min_upgrade_from": "0.1.0",
+  "notes": "Patch release; adds log_dc_record (OTLP logs) and schema_version ledger for upgrades from 0.1.1."
+}

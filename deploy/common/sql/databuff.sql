@@ -1319,3 +1319,15 @@ INSERT INTO config_cockpit (config_key, config_value, updated_at)
 VALUES
   ('errorRateThreshold', '0.05', NOW()),
   ('minRequestCount', '10', NOW());
+
+CREATE TABLE schema_version (
+  `id`         INT      NOT NULL COMMENT 'singleton row id',
+  `version`    INT      NOT NULL COMMENT 'applied migration version',
+  `applied_at` DATETIME NOT NULL COMMENT 'last migration time'
+) ENGINE=OLAP
+UNIQUE KEY(`id`)
+DISTRIBUTED BY HASH(`id`) BUCKETS 1
+PROPERTIES ("replication_num" = "1");
+
+INSERT INTO schema_version (id, version, applied_at)
+VALUES (1, 2, NOW());

@@ -1,11 +1,12 @@
 #!/usr/bin/env bash
 # DataBuff AI APM Demo 离线安装（解压离线包后在本目录执行）
 #
-#   tar -xzf databuff-ai-apm-offline-0.1.1-amd64.tar.gz
-#   cd databuff-ai-apm-offline-0.1.1-amd64
+#   tar -xzf databuff-ai-apm-offline-0.1.2-amd64.tar.gz
+#   cd databuff-ai-apm-offline-0.1.2-amd64
 #   sudo ./install_demo.sh
 #
 # 需先安装主栈（./install.sh），或确保 INGEST_HOST 指向可用的 ingest 地址。
+# 若已有旧 demo，会先停掉容器再替换为新版本（首次安装与升级均用本脚本）。
 #
 # 环境变量:
 #   APM_INSTALL_DIR  安装目录 (默认 /opt/databuff-ai-apm-demo)
@@ -55,18 +56,15 @@ fail() {
   exit 1
 }
 
+if [[ -f "${BUNDLE_ROOT}/scripts/demo-deploy-lib.sh" ]]; then
+  # shellcheck disable=SC1091
+  . "${BUNDLE_ROOT}/scripts/demo-deploy-lib.sh"
+else
+  fail "离线包缺少 scripts/demo-deploy-lib.sh"
+fi
+
 detect_host_ip() {
-  ip=""
-  if command -v ip >/dev/null 2>&1; then
-    ip="$(ip route get 1.1.1.1 2>/dev/null | awk '{for (i=1;i<=NF;i++) if ($i=="src") {print $(i+1); exit}}')"
-  fi
-  if [ -z "$ip" ] && command -v hostname >/dev/null 2>&1; then
-    ip="$(hostname -I 2>/dev/null | awk '{print $1}')"
-  fi
-  if [ -z "$ip" ]; then
-    return 1
-  fi
-  echo "$ip"
+  demo_detect_host_ip
 }
 
 show_summary() {
@@ -106,69 +104,22 @@ stop_old_install() {
   if [ ! -e "$INSTALL_DIR" ]; then
     return 0
   fi
-  if [ -f "${INSTALL_DIR}/docker-compose.yml" ]; then
-    if docker compose version >/dev/null 2>&1; then
-      (cd "$INSTALL_DIR" && COMPOSE_PROJECT_NAME=databuff-apm-demo docker compose down --remove-orphans) >/dev/null 2>&1 || true
-      (cd "$INSTALL_DIR" && COMPOSE_PROJECT_NAME=databuff-ai-apm-demo docker compose down --remove-orphans) >/dev/null 2>&1 || true
-    elif command -v docker-compose >/dev/null 2>&1; then
-      (cd "$INSTALL_DIR" && COMPOSE_PROJECT_NAME=databuff-apm-demo docker-compose down --remove-orphans) >/dev/null 2>&1 || true
-      (cd "$INSTALL_DIR" && COMPOSE_PROJECT_NAME=databuff-ai-apm-demo docker-compose down --remove-orphans) >/dev/null 2>&1 || true
-    fi
-  fi
-  cd /opt 2>/dev/null || cd "${TMPDIR:-/tmp}" 2>/dev/null || true
+  demo_stop_running "$INSTALL_DIR"
   rm -rf "$INSTALL_DIR"
-}
-
-require_bundle_file() {
-  local pattern="$1"
-  local label="$2"
-  local matches=()
-  local f
-
-  shopt -s nullglob
-  matches=(${pattern})
-  shopt -u nullglob
-
-  if [ "${#matches[@]}" -eq 0 ]; then
-    fail "离线包缺少 ${label}（期望 ${pattern}）"
-  fi
-  if [ "${#matches[@]}" -gt 1 ]; then
-    fail "离线包存在多个 ${label}，请保留与目标架构匹配的一个"
-  fi
-  printf '%s\n' "${matches[0]}"
-}
-
-docker_image_exists() {
-  docker image inspect "$1" >/dev/null 2>&1
-}
-
-load_image_tarball() {
-  local tarball="$1"
-  local label="$2"
-
-  echo "[install-demo]   导入 ${label} ..."
-  if [[ "$tarball" == *.gz ]]; then
-    gunzip -c "$tarball" | docker load
-  else
-    docker load -i "$tarball"
-  fi
+  cd /opt 2>/dev/null || cd "${TMPDIR:-/tmp}" 2>/dev/null || true
 }
 
 load_demo_image() {
   local version="$1"
-  local apm_tar demo_ref
 
-  demo_ref="${RUNTIME_IMAGE_NAMESPACE:-databuffhub}/ai-apm-demo:${version}"
-  apm_tar="$(require_bundle_file "${BUNDLE_ROOT}/ai-apm-stack-${version}-"'*.tar.gz' "APM 镜像包")"
-
-  if [ "$FORCE_LOAD_IMAGES" != "1" ] && docker_image_exists "$demo_ref"; then
+  if [ "$FORCE_LOAD_IMAGES" != "1" ] \
+    && demo_docker_image_exists "${RUNTIME_IMAGE_NAMESPACE:-databuffhub}/ai-apm-demo:${version}"; then
     log_skip "${BLD}(2/4)${RST} 加载 demo 镜像（本地已存在，设 FORCE_LOAD_IMAGES=1 可强制重载）"
     return 0
   fi
 
   log "${BLD}(2/4)${RST} 加载 demo 镜像"
-  log_sub "$(basename "$apm_tar")"
-  load_image_tarball "$apm_tar" "APM stack (含 demo)"
+  demo_load_offline_image "$BUNDLE_ROOT" "$version" "$FORCE_LOAD_IMAGES"
   log_done "${BLD}(2/4)${RST} 加载 demo 镜像"
 }
 
@@ -176,7 +127,7 @@ if [ ! -f "${BUNDLE_ROOT}/VERSION" ]; then
   fail "请在离线包解压目录内执行 install_demo.sh"
 fi
 APM_VERSION="$(tr -d '[:space:]' <"${BUNDLE_ROOT}/VERSION")"
-DEMO_PKG="$(require_bundle_file "${BUNDLE_ROOT}/databuff-apm-demo-${APM_VERSION}.tar.gz" "Demo 部署包")"
+DEMO_PKG="$(demo_resolve_bundle_glob "${BUNDLE_ROOT}/databuff-apm-demo-${APM_VERSION}.tar.gz" "Demo 部署包")" || exit 1
 
 INGEST_HOST="${INGEST_HOST:-}"
 if [ -z "$INGEST_HOST" ]; then
@@ -210,11 +161,19 @@ if ! docker compose version >/dev/null 2>&1 && ! command -v docker-compose >/dev
 fi
 log_done "${BLD}(1/4)${RST} 检查运行环境"
 
+if [ -e "$INSTALL_DIR" ]; then
+  log "${BLD}(2/4)${RST} 停止旧 demo"
+  demo_stop_running "$INSTALL_DIR"
+  log_done "${BLD}(2/4)${RST} 停止旧 demo"
+else
+  log_skip "${BLD}(2/4)${RST} 停止旧 demo"
+fi
+
 load_demo_image "$APM_VERSION"
 
-log "${BLD}(3/4)${RST} 清理旧版本"
 if [ -e "$INSTALL_DIR" ]; then
-  stop_old_install
+  log "${BLD}(3/4)${RST} 清理旧版本"
+  rm -rf "$INSTALL_DIR"
   log_done "${BLD}(3/4)${RST} 清理旧版本"
 else
   log_skip "${BLD}(3/4)${RST} 清理旧版本"

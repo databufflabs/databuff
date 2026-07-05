@@ -10,12 +10,6 @@
 
 set -e
 
-# 检查 AVX2 支持
-if ! cat /proc/cpuinfo | grep -q avx2; then
-  echo "Doris uses AVX2 vectorization to accelerate queries. A machine that supports the AVX2 instruction set is recommended. For more information, please visit: https://doris.apache.org/docs/dev/install/preparation/env-checking"
-  exit 1
-fi
-
 ROOT="$(cd "$(dirname "$0")" && pwd)"
 cd "$ROOT"
 

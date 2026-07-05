@@ -1,6 +1,15 @@
 #!/usr/bin/env bash
 # Runtime helpers shared by start/stop scripts in the deploy package.
 
+ensure_vm_max_map_count() {
+  local required=2000000 current
+  current="$(sysctl -n vm.max_map_count 2>/dev/null || echo 0)"
+  if [ "$current" -lt "$required" ]; then
+    echo "[start] raising vm.max_map_count ${current} -> ${required}"
+    sysctl -w "vm.max_map_count=${required}" >/dev/null 2>&1 || true
+  fi
+}
+
 detect_local_ip() {
   ip=""
   if command -v ip >/dev/null 2>&1; then
