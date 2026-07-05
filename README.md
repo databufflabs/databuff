@@ -6,7 +6,7 @@
   <img src="ai-apm-frontend/public/img/logo_wordmark.svg" alt="Databuff" height="32" align="middle" />
 </p>
 
-<h3>国产开源 · AI Native OpenTelemetry APM</h3>
+<h3>AI Native OpenTelemetry APM</h3>
 
 <p align="center">
   <a href="https://demo.databuff.ai">在线演示</a>
