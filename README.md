@@ -18,7 +18,7 @@
   <a href="#交流群">交流群</a>
 </p>
 <p align="center">
-  在线演示 <a href="https://demo.databuff.ai">demo.databuff.ai</a> · 账号 <code>admin</code> / <code>Databuff@123</code> · 亦可扫码加群交流
+  在线演示 Demo，亦可<a href="#交流群">扫码加群交流</a>
 </p>
 
 </div>
