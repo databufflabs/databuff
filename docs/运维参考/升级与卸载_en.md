@@ -50,6 +50,8 @@ sudo ./install_demo.sh
 
 ## Uninstall
 
+### Platform
+
 ```bash
 cd /opt/databuff-ai-apm
 ./stop.sh
@@ -58,6 +60,19 @@ sudo rm -rf /opt/databuff-ai-apm
 ```
 
 Back up `data/` first if you need to keep telemetry data.
+
+### Demo
+
+The demo is installed separately from the platform. Removing it **does not** delete the platform or telemetry under `data/`.
+
+```bash
+cd /opt/databuff-ai-apm-demo
+./stop.sh
+cd ..
+sudo rm -rf /opt/databuff-ai-apm-demo
+```
+
+If you set a custom path via `APM_INSTALL_DIR` at install time, use that directory instead of `/opt/databuff-ai-apm-demo`.
 
 ## See Also
 
