@@ -88,6 +88,7 @@ services:
     ports:
       - "4317:4317"
       - "4318:4318"
+      - "31800:31800"
     depends_on:
       ai-apm-doris-fe:
         condition: service_healthy
@@ -161,6 +162,30 @@ services:
     networks:
       apm:
         ipv4_address: 172.20.80.6
+
+  ai-apm-demo-sw:
+    image: ${OPENJDK_IMAGE}
+    container_name: ai-apm-demo-sw
+    hostname: ai-apm-demo-sw
+    restart: unless-stopped
+    mem_limit: 256m
+    working_dir: /app
+    entrypoint: ["/bin/sh", "/app/start.sh"]
+    environment:
+      TZ: Asia/Shanghai
+      JAVA_TOOL_OPTIONS: -Xms64m -Xmx128m -Duser.timezone=Asia/Shanghai
+      SEED_PROTOCOL: skywalking
+      SKYWALKING_GRPC_TARGET: ai-apm-ingest:31800
+      SEED_INTERVAL_SECONDS: 30
+      JVM_METRIC_INTERVAL_SECONDS: 60
+    volumes:
+      - ./run/demo:/app
+    depends_on:
+      ai-apm-ingest:
+        condition: service_healthy
+    networks:
+      apm:
+        ipv4_address: 172.20.80.7
 
 networks:
   apm:
