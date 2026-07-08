@@ -66,16 +66,6 @@ export default {
   },
 
   /**
-   * 获取服务基本信息
-   */
-  getServiceInfo: (data: any) => {
-    return http.request({
-      url: '/service/services',
-      method: 'post',
-      data
-    })
-  },
-  /**
    * 获取服务详情
    */
   getServiceDetail: (data: any) => {

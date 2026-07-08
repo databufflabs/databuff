@@ -26,10 +26,8 @@
 <script lang="ts">
 import { Vue, Component, Watch } from 'vue-property-decorator';
 import i18n from '@/i18n';
-import dayjs from 'dayjs';
 import { v4 as uuidv4 } from 'uuid';
 import ServiceApi from '@/api/service';
-import ApmApi from '@/api/apm';
 import { toAsyncWait } from '@/utils/common'
 import { FlowChart } from '../flowChart'
 import deepClone from 'lodash/cloneDeep';
@@ -86,7 +84,6 @@ export default class TopoGraph extends Vue {
   private chartLoading = true;
 
   private serviceSource: any = {};
-  private allServicesMapping: any = {};
 
   private backupFlowData: any = {};
 
@@ -261,7 +258,7 @@ export default class TopoGraph extends Vue {
     this.chartLoading = true;
     const { result, error } = await toAsyncWait(ServiceApi.getServiceFlow(params))
     if (!error) {
-      await this.formatResultData(result.data || {}, resetFilter);
+      this.formatResultData(result.data || {}, resetFilter);
     } else {
       if (error.message !== 'interrupt') {
         this.$message.error(error.message || i18n.t('modules.views.appMonitor.serviceFlow.s_e05c1ca3') as string)
@@ -272,7 +269,6 @@ export default class TopoGraph extends Vue {
 
   // 清空服务流数据
   private clearFlowSource () {
-    this.allServicesMapping = {};
     this.srcServiceInstanceList = [];
     this.resourceList = [];
     // 格式化原数据
@@ -282,7 +278,7 @@ export default class TopoGraph extends Vue {
   }
 
   // 处理服务流接口返回的数据
-  private async formatResultData (data: any, resetFilter: boolean = false) {
+  private formatResultData (data: any, resetFilter: boolean = false) {
     const serviceFlows = data.serviceFlows || {}
     const firstSn = this.entryPointServices.map((i: any) => i.label)[0]
     if (!firstSn) {
@@ -304,21 +300,10 @@ export default class TopoGraph extends Vue {
       this.formatFilterChain(serviceFlows[targetServiceName])
     }
     const flowSource = [serviceFlows[targetServiceName] || serviceFlows[firstSn]].filter(t => !!t)
-    // 摊平数据，获取全部服务信息
-    const _ids: string[] = [];
     flowSource.forEach((root: any) => {
-      this.deepServiceIds(root, _ids)
+      this.assignFlowNodeUuid(root)
     })
-    const serviceIds = [...new Set(_ids)]
-    const routeSid = this.$route.query.sid;
-    if (!serviceIds.length && routeSid) {
-      serviceIds.push(decodeURIComponent(String(routeSid)));
-      await this.getFilterItems(serviceIds, decodeURIComponent(String(routeSid)), (flowSource[0] || {}), resetFilter)
-    } else if (serviceIds.length) {
-      await this.getFilterItems(serviceIds, (flowSource[0] || {}).serviceId, (flowSource[0] || {}), resetFilter)
-    } else {
-      this.allServicesMapping = {};
-    }
+    this.applyFlowFilterItems(flowSource[0] || {}, resetFilter)
     // 格式化原数据
     this.formatFlowSource(deepClone(flowSource));
     // 格式化原数据
@@ -366,19 +351,11 @@ export default class TopoGraph extends Vue {
   }
 
   private deepFormat (node: any, links: any[], nodes: any[], durationInfo: any[]) {
-    // 聚合服务信息
-    const serviceInfo = this.allServicesMapping[node.serviceId] || {}
-
     node.id = node.uuid;
     node.key = node.uuid;
     node.label = node.name || node.service;
 
-    for  (const key in serviceInfo) {
-      node[key] = serviceInfo[key]
-    }
-    // 递归
     nodes.push({
-      ...serviceInfo,
       ...node,
       key: node.uuid,
       id: node.uuid,
@@ -404,11 +381,11 @@ export default class TopoGraph extends Vue {
     }
   }
 
-  private deepServiceIds (node: any, container: string[]) {
+  private assignFlowNodeUuid (node: any) {
     node._uuid = uuidv4();
     if (node.children) {
       node.children.forEach((child: any) => {
-        this.deepServiceIds(child, container)
+        this.assignFlowNodeUuid(child)
       })
     }
   }
@@ -502,7 +479,6 @@ export default class TopoGraph extends Vue {
     const {
       service, serviceId, avgCall = 0, outCall = 0, callPct = 0,  avgDuration = 0, call = 0, error = 0, durationCvPct = 0,
       uid, children, resources = [], serviceInstances = [], serviceInstanceMap = {}, pathIds = [] } = source;
-    const serviceData = this.allServicesMapping[serviceId] || {}
     const { service_type, type, language } = (this.getBasicServiceMap || {})[serviceId] || {}
     const _source: any = {
       id: uuidv4(), name: service, key: uid,
@@ -512,15 +488,13 @@ export default class TopoGraph extends Vue {
         contribution: MinNumZore(durationCvPct), // 响应贡献度
         failCnt: MinNumZore(error), // 失败请求数
         outCnt: MinNumZore(outCall), // 外发请求数
-        hostIp: serviceData.hostIp || '', // 主机IP
-        hostName: serviceData.hostName || '', // 主机名称
         avgReq: MinNumZore(avgCall), // n次调用/请求
         callPct: MinNumZore(callPct),
         _uuid: source._uuid || uuidv4(),
       },
       serviceInfo: {
         service, serviceId,
-        serviceType: type || serviceData.type || language || serviceData.language || service_type || serviceData.service_type || 'default',
+        serviceType: type || language || service_type || 'default',
         uid,
         resources,
         serviceInstances,
@@ -564,32 +538,11 @@ export default class TopoGraph extends Vue {
     this.timeParams = { fromTime, toTime }
   }
 
-  private async getFilterItems (serviceIds: string[], rootSid: string, flowData: any, resetFilter: boolean = false) {
-    const { result: sRst, error: sErr } = await toAsyncWait(ApmApi.getServiceInfo({
-      all: true,
-      startTime: this.timeParams.fromTime,
-      endTime: dayjs().format('YYYY-MM-DD HH:mm:ss'),
-      serviceIds,
-    }))
-    if (!sErr && sRst.data && Array.isArray(sRst.data)) {
-      const allServicesMapping: any = {}
-      sRst.data.forEach((serv: any) => {
-        allServicesMapping[serv.serviceId] = serv;
-      })
-      this.allServicesMapping = allServicesMapping;
-    } else {
-      this.allServicesMapping = {}
-    }
-
-    // 服务实例列表 -- v2.8.4版本放在服务流数据中返回
-    // 请求列表 -- v2.8.4版本放在服务流数据中返回
-    if (flowData && Object.keys(flowData) && resetFilter) {
-      const { resources = [], serviceInstances = [] } = flowData || {};
+  private applyFlowFilterItems (flowData: any, resetFilter: boolean = false) {
+    // 服务实例列表、请求列表由服务流接口返回（v2.8.4+）
+    if (flowData && Object.keys(flowData).length && resetFilter) {
+      const { resources = [] } = flowData || {};
       this.resourceList = (resources || []).map((r: any) => ({ label: r, value: r }));
-      // this.srcServiceInstanceList = (serviceInstances || []).map((r: any) => ({ label: r, value: r }));
-    } else {
-      // this.resourceList = [];
-      // this.srcServiceInstanceList = [];
     }
 
     this.$refs.searchGroup.setInitOver()

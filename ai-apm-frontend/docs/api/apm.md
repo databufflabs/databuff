@@ -15,7 +15,6 @@
 | `getServiceList` | `POST` | `/service/list` | 服务列表 |
 | `getServiceGraph` | `POST` | `/service/graph_stats` | 服务图表数据 |
 | `getServiceLatencyGraph` | `POST` | `/service/distribution_stats` | 服务响应时间分布 |
-| `getServiceInfo` | `POST` | `/service/services` | 服务基础信息 |
 | `getServiceDetail` | `POST` | `/service/serviceInfo` | 服务详情 |
 | `getServiceReqTop` | `POST` | `/service/reqTop` | 服务请求贡献 Top |
 | `getReqContributorService` | `POST` | `/service/reqContributorService` | 资源来源服务 |
