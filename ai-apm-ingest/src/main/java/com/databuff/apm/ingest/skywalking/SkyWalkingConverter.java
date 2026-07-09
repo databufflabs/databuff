@@ -91,6 +91,8 @@ public final class SkyWalkingConverter {
         Map<String, String> meta = new LinkedHashMap<>(tags);
         meta.put(TraceDataSources.META_DATA_SOURCE, TraceDataSources.SKY_WALKING);
         normalizeSkyWalkingRpcMeta(span, meta);
+        SkyWalkingMetaNormalizer.normalize(span, meta);
+        applyNormalizedDbResource(dc, meta);
         dc.meta = OtelAttributeMaps.encode(meta);
         OtelAttributeMaps.cache(dc, meta);
         return dc;
@@ -167,6 +169,13 @@ public final class SkyWalkingConverter {
         }
         String url = tags.get("url");
         return url != null && DcSpanUtil.isRpcProtocolUrl(url);
+    }
+
+    private static void applyNormalizedDbResource(DcSpan dc, Map<String, String> meta) {
+        String statement = OtelAttributeMaps.firstNonBlank(meta, "db.statement", "db.sql", "normalized.resource");
+        if (statement != null && !statement.isBlank()) {
+            dc.resource = statement;
+        }
     }
 
     private static void normalizeSkyWalkingRpcMeta(SpanObject span, Map<String, String> meta) {

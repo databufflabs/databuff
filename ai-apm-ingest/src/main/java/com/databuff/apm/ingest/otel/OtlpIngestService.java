@@ -67,14 +67,9 @@ public final class OtlpIngestService {
                 accepted += entry.getValue().size();
             } else {
                 log.warn(
-                        "Trace batch emit failed traceId={} spans={}, fallback to single span events",
+                        "Trace batch emit failed traceId={} spans={}",
                         shortTraceId(entry.getKey()),
                         entry.getValue().size());
-                for (DcSpan span : entry.getValue()) {
-                    if (gateway.emit(entry.getKey(), new TraceEvent(span))) {
-                        accepted++;
-                    }
-                }
             }
         }
         tracesIngested.addAndGet(accepted);

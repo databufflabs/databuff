@@ -15,9 +15,9 @@ management:
 
 ingest:
   pipeline:
-    trace-tasks: ${INGEST_TRACE_TASKS:2}
-    metric-tasks: ${INGEST_METRIC_TASKS:2}
-    aggregate-tasks: ${INGEST_AGGREGATE_TASKS:2}
+    trace-tasks: ${INGEST_TRACE_TASKS:4}
+    metric-tasks: ${INGEST_METRIC_TASKS:4}
+    aggregate-tasks: ${INGEST_AGGREGATE_TASKS:4}
     trace-buffer-size: ${INGEST_TRACE_BUFFER_SIZE:1024}
     metric-buffer-size: ${INGEST_METRIC_BUFFER_SIZE:1024}
     aggregate-buffer-size: ${INGEST_AGGREGATE_BUFFER_SIZE:1024}

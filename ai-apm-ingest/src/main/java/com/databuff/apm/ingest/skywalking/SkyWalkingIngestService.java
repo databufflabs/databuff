@@ -66,11 +66,6 @@ public final class SkyWalkingIngestService {
                 accepted += entry.getValue().size();
             } else {
                 log.warn("SkyWalking trace batch emit failed traceId={} spans={}", entry.getKey(), entry.getValue().size());
-                for (DcSpan span : entry.getValue()) {
-                    if (gateway.emit(entry.getKey(), new TraceEvent(span))) {
-                        accepted++;
-                    }
-                }
             }
         }
         tracesIngested.addAndGet(accepted);

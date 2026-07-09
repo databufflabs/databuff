@@ -212,7 +212,7 @@ public class IngestPipelineConfiguration {
             ClusterPartialForwarder partialForwarder,
             MetaServiceCollector metaServiceCollector,
             @Value("${ingest.metric.trace-minute-late-flush-grace-ms:20000}") long traceMinuteLateFlushGraceMs,
-            @Value("${ingest.pipeline.aggregate-tasks:2}") int aggregateTasks,
+            @Value("${ingest.pipeline.aggregate-tasks:4}") int aggregateTasks,
             @Value("${ingest.pipeline.aggregate-buffer-size:1024}") int aggregateBufferSize) {
         AggregateComponent component = new AggregateComponent(
                 clusterAggregator,
@@ -229,7 +229,7 @@ public class IngestPipelineConfiguration {
     @Bean
     MetricComponent metricComponent(
             AggregateComponent aggregateComponent,
-            @Value("${ingest.pipeline.metric-tasks:2}") int metricTasks,
+            @Value("${ingest.pipeline.metric-tasks:4}") int metricTasks,
             @Value("${ingest.pipeline.metric-buffer-size:1024}") int metricBufferSize) {
         MetricComponent component = new MetricComponent(aggregateComponent, metricBufferSize);
         component.start(Math.max(1, metricTasks));
@@ -249,7 +249,7 @@ public class IngestPipelineConfiguration {
             ClusterPartialForwarder partialForwarder,
             DorisFlushScheduler dorisFlushScheduler,
             @Value("${ingest.trace.assembly-check-interval-ms:2000}") long assemblyCheckIntervalMs,
-            @Value("${ingest.pipeline.trace-tasks:2}") int traceTasks,
+            @Value("${ingest.pipeline.trace-tasks:4}") int traceTasks,
             @Value("${ingest.pipeline.trace-buffer-size:1024}") int traceBufferSize) {
         TraceComponent component = new TraceComponent(
                 aggregateComponent,
