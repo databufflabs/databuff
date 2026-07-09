@@ -209,7 +209,9 @@ export default class SpanDetail extends Vue {
     if (!error) {
       const data = result.data || []
       if (!pid) {
-        this.currentSpan = data.find((item: any) => item.trace_id === tid && item.span_id === spid) || {}
+        const decodedTid = decodeURIComponent(tid as string)
+        const decodedSpid = decodeURIComponent(spid as string)
+        this.currentSpan = data.find((item: any) => item.trace_id === decodedTid && item.span_id === decodedSpid) || {}
       } else {
         this.currentSpan = data[0] || {}
       }

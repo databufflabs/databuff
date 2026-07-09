@@ -38,7 +38,7 @@
                     <i class="db-icon">{{ spanMapping[id].type || spanMapping[id].service_type | DbIconFilter }}</i>
                   </span>
                   <div
-                    @click.stop="nodeClickHandle(id)" :class="{ 'not-match': !matchedIds.includes(id), }" class="trace-tree-node-cont cp">
+                    @click.stop="nodeClickHandle(id)" :class="{ 'not-match': !matchedIds.includes(id), active: id === currentSpanId }" class="trace-tree-node-cont cp">
                     <p
                       :title="spanMapping[id].resource"
                       :class="{
@@ -137,17 +137,28 @@ export default class TreeFlame extends Vue {
   @Prop({ default: 0 }) private totalExectime!: any;
   @Prop({ default: 0 }) private totalDuration!: any;
 
+  @Watch('initSpan', { deep: true })
+  private onInitSpanChange (newVal: any) {
+    if (newVal?.span_id) {
+      this.currentSpanId = newVal.span_id
+      this.ensureSpanVisibleAndScroll()
+    }
+  }
+
   @Watch('source', { deep: true, immediate: true })
   private onSourceChange (newVal: any[]) {
     if (!newVal || !Array.isArray(newVal)) {
       return
     }
-    if (!this.currentSpanId && this.initSpan) {
+    if (this.initSpan?.span_id) {
       this.currentSpanId = this.initSpan.span_id
     }
     if (Array.isArray(newVal)) {
       this.originalData = deepClone(newVal);
       this.initTreeData();
+      this.$nextTick(() => {
+        this.ensureSpanVisibleAndScroll()
+      })
     }
   }
 
@@ -390,16 +401,45 @@ export default class TreeFlame extends Vue {
     this.calChartHeight = this.displayedIds.length * 47 + 40;
   }
 
+  // 展开内部调用并滚动到目标 span
+  private ensureSpanVisibleAndScroll () {
+    const spanId = this.currentSpanId
+    if (!spanId) {
+      return
+    }
+    if (!this.displayedIds.includes(spanId)) {
+      const span = this.spanMapping[spanId]
+      if (span?.pids) {
+        for (const pid of span.pids) {
+          const parent = this.spanMapping[pid]
+          if (parent?.hasInner && !this.innerExpandedIds.includes(pid)) {
+            this.innerExpandedIds.push(pid)
+            this.toggleInnerHandle(false, pid)
+          }
+        }
+      }
+    }
+    this.$nextTick(() => {
+      this.scrollToSpan(spanId)
+    })
+  }
+
+  private scrollToSpan (spanId: string) {
+    const index = this.displayedIds.indexOf(spanId)
+    if (index > -1 && this.$refs.flameCont) {
+      const itemHeight = 47
+      const containerHeight = this.$refs.flameCont.clientHeight
+      const targetScroll = itemHeight * index - containerHeight / 2 + itemHeight / 2
+      this.$refs.flameCont.scrollTop = Math.max(0, targetScroll)
+    }
+  }
+
   // 滚动到第一个搜索到的节点
   private queryNodeHandle () {
     if (!this.localQuery || !this.matchedIds.length) {
       return
     }
-    const id = this.matchedIds[0]
-    const index = this.displayedIds.indexOf(id)
-    if (index > -1 && this.$refs.flameCont) {
-      this.$refs.flameCont.scrollTop = 50 * index + 20
-    }
+    this.scrollToSpan(this.matchedIds[0])
   }
 
   private sliderTraceTreeHandle (e: MouseEvent) {
@@ -577,8 +617,9 @@ $itemHeight: 47px;
 
   &.active {
     padding: 2px 9px;
-    border-width: 2px;
-    border-color: var(--color-text-link);
+    border: 2px solid var(--color-text-link);
+    border-radius: 4px;
+    background-color: rgba(81, 128, 255, 0.08);
   }
   &.not-match {
     opacity: 0.35;

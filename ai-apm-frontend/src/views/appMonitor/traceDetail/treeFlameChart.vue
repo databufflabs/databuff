@@ -265,6 +265,8 @@ export default class TreeFlameChart extends Vue {
         height: params.coordSys.height
       }
     );
+    const isActive = activeIndex > -1 && categoryIndex === activeIndex
+    const linkColor = this.themeVars.colorTextLink || '#5180FF'
     return {
       type: 'group',
       children: [
@@ -272,7 +274,13 @@ export default class TreeFlameChart extends Vue {
           type: 'rect',
           transition: ['shape'],
           shape: rectShape,
-          style: api.style(),
+          style: {
+            ...api.style(),
+            ...(isActive ? {
+              stroke: linkColor,
+              lineWidth: 2,
+            } : {}),
+          },
           textContent: {
             style: {
               text: humanFormat(Number(api.value(3) || 0), { scale: nsFormat }),
