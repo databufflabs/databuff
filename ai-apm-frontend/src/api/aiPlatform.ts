@@ -185,10 +185,10 @@ export default {
     }),
 
   listSessions: (params?: { offset?: number; limit?: number }) =>
-    http.get('/api/v1/ai/sessions', { params }) as Promise<AiSessionListResponse>,
+    http.get('/api/v1/ai/sessions', { params }),
 
   countSessions: () =>
-    http.get('/api/v1/ai/sessions/count') as Promise<AiSessionCountResponse>,
+    http.get('/api/v1/ai/sessions/count'),
 
   sessionTasks: (sessionId: string) =>
     http.get(`/api/v1/ai/sessions/${encodeURIComponent(sessionId)}/tasks`),
