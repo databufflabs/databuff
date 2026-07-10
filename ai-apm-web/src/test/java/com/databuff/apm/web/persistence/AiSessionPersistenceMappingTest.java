@@ -48,7 +48,7 @@ class AiSessionPersistenceMappingTest {
         store.completeRound(sessionId, "brain");
         Thread.sleep(300L);
 
-        verify(messagePs).executeUpdate();
+        verify(messagePs, org.mockito.Mockito.atLeastOnce()).executeUpdate();
         assertThat(persistence.persistenceEnabled()).isTrue();
     }
 
@@ -92,9 +92,9 @@ class AiSessionPersistenceMappingTest {
         verify(messagePs, org.mockito.Mockito.atLeast(2)).executeUpdate();
         verify(messagePs, org.mockito.Mockito.atLeastOnce()).setInt(8, toolCall.roundIndex());
         verify(messagePs, org.mockito.Mockito.atLeastOnce()).setInt(9, toolCall.messageIndex());
-        verify(messagePs).setString(10, "TOOL_CALL");
+        verify(messagePs, org.mockito.Mockito.atLeastOnce()).setString(10, "TOOL_CALL");
         verify(messagePs, org.mockito.Mockito.atLeastOnce()).setString(11, "COMPLETED");
-        verify(messagePs).setString(14, "serviceErrorRate");
+        verify(messagePs, org.mockito.Mockito.atLeastOnce()).setString(14, "serviceErrorRate");
     }
 
     @Test

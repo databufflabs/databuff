@@ -101,4 +101,23 @@ class LogQueryBuilderTest {
         assertThat(sql).contains("service_instance IN ('pod-1')");
         assertThat(sql).contains("severity IN ('ERROR')");
     }
+
+    @Test
+    void countAndDistinctSqlBuilders() {
+        assertThat(LogQueryBuilder.countSql(
+                "databuff", "trace-1", "span-1", "svc-1", List.of(), List.of("checkout"),
+                List.of("inst"), List.of("host"), List.of("ERROR"), "err", 0L, 3_600_000L))
+                .contains("COUNT(*)").contains("span_id = 'span-1'");
+        assertThat(LogQueryBuilder.distinctServicesSql(
+                "databuff", "trace-1", null, List.of("inst"), List.of("host"), List.of("ERROR"), "err", 0L, 3_600_000L))
+                .contains("DISTINCT service");
+        assertThat(LogQueryBuilder.distinctServiceInstancesSql(
+                "databuff", "trace-1", null, List.of("svc"), List.of("host"), List.of(), null, 0L, 3_600_000L))
+                .contains("service_instance");
+        assertThat(LogQueryBuilder.distinctHostsSql(
+                "databuff", null, "span-1", List.of("svc"), List.of("inst"), List.of(), null, 0L, 3_600_000L))
+                .contains("hostname");
+        assertThat(LogQueryBuilder.spanIdsWithLogsSql("databuff", "trace-abc"))
+                .contains("trace_id = 'trace-abc'").contains("span_id");
+    }
 }

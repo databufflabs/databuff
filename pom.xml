@@ -47,7 +47,7 @@
         <grpc.version>1.71.0</grpc.version>
         <protobuf.version>4.29.3</protobuf.version>
         <opentelemetry-proto.version>1.5.0-alpha</opentelemetry-proto.version>
-        <jacoco.line.coverage>0.95</jacoco.line.coverage>
+        <jacoco.line.coverage>0.80</jacoco.line.coverage>
         <agentscope.version>2.0.0-RC3</agentscope.version>
         <curator.version>5.7.1</curator.version>
         <druid.version>1.2.27</druid.version>

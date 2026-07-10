@@ -107,4 +107,20 @@ class TimeSeriesFillUtilTest {
         assertThat(filled.get(0)).containsEntry("epoch_sec", 1_710_000_000L)
                 .containsEntry("reqCount", null);
     }
+
+    @Test
+    void bucketAlignmentHelpersAndEpochMsFill() {
+        assertThat(TimeSeriesFillUtil.bucketSec(45)).isEqualTo(60);
+        assertThat(TimeSeriesFillUtil.alignBucketEpochSec(1_710_000_015_000L, 60))
+                .isEqualTo(1_710_000_000L);
+        assertThat(TimeSeriesFillUtil.alignBucketEpochSecWithStep(1_710_000_015_000L, 60L))
+                .isEqualTo(1_710_000_000L);
+        List<List<Object>> filled = TimeSeriesFillUtil.fillEpochMsValues(
+                java.util.Map.of(1_710_000_000L, 5),
+                1_710_000_000_000L,
+                1_710_000_120_000L,
+                60,
+                v -> v);
+        assertThat(filled).hasSizeGreaterThanOrEqualTo(2);
+    }
 }

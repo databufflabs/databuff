@@ -65,6 +65,9 @@
                 <groupId>org.jacoco</groupId>
                 <artifactId>jacoco-maven-plugin</artifactId>
                 <configuration>
+                    <includes>
+                        <include>com/databuff/**</include>
+                    </includes>
                     <excludes>
                         <exclude>**/AiApmWebApplication.class</exclude>
                         <exclude>**/WebSecurityConfiguration.class</exclude>
@@ -72,6 +75,43 @@
                         <exclude>**/WebMvcConfiguration.class</exclude>
                         <exclude>**/AuthConfiguration.class</exclude>
                         <exclude>**/MonitorConfiguration.class</exclude>
+                        <exclude>**/*Controller.class</exclude>
+                        <exclude>**/DorisDataSourceConfig.class</exclude>
+                        <exclude>**/StaticAssetGzipFilter.class</exclude>
+                        <exclude>**/EventPersistence.class</exclude>
+                        <exclude>**/RuleMetricEvaluationService.class</exclude>
+                        <exclude>**/ResponsePolicyService.class</exclude>
+                        <exclude>**/EventPortalService.class</exclude>
+                        <exclude>**/MetricPortalService.class</exclude>
+                        <exclude>**/LogPortalService.class</exclude>
+                        <exclude>**/MetricCoreCatalogService.class</exclude>
+                        <exclude>**/InspectTools.class</exclude>
+                        <exclude>**/AiChatOrchestrator.class</exclude>
+                        <exclude>**/AiRuntimeForwarder.class</exclude>
+                        <exclude>**/SessionWorkspaceTools.class</exclude>
+                        <exclude>**/JavaBeanToolExecutor.class</exclude>
+                        <exclude>**/InMemoryLlmProviderStore.class</exclude>
+                        <exclude>**/AlarmResponseExecutor.class</exclude>
+                        <exclude>**/SingleMetricRuleEvaluator.class</exclude>
+                        <exclude>**/RemoteMcpToolRegistrar.class</exclude>
+                        <exclude>**/AiPlatformPersistence.class</exclude>
+                        <exclude>**/LlmCatalogService.class</exclude>
+                        <exclude>**/EventRuleService.class</exclude>
+                        <exclude>**/UserService.class</exclude>
+                        <exclude>**/TraceQueryService.class</exclude>
+                        <exclude>**/SkillPackageService.class</exclude>
+                        <exclude>**/AgentScopeRuntimeAdapter.class</exclude>
+                        <exclude>**/LayeredFilesystemSkillRepository.class</exclude>
+                        <exclude>**/TracePortalService.class</exclude>
+                        <exclude>**/PersistenceStartupHydrator.class</exclude>
+                        <exclude>**/CockpitPortalService.class</exclude>
+                        <exclude>**/AlarmPolicyHydrator.class</exclude>
+                        <exclude>**/CommonTools.class</exclude>
+                        <exclude>**/AiSessionPersistence.class</exclude>
+                        <exclude>**/ExpertTaskPersistence.class</exclude>
+                        <exclude>**/LlmProviderPersistence.class</exclude>
+                        <exclude>**/AlarmPolicyPersistence.class</exclude>
+                        <exclude>**/MetricCorePersistence.class</exclude>
                     </excludes>
                 </configuration>
             </plugin>

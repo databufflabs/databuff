@@ -38,4 +38,13 @@ class HttpSqlStandardizerTest {
         assertThat(HttpSqlStandardizer.standardizeSql(sql, 1))
                 .isEqualTo("SELECT id FROM t WHERE status IN (?)");
     }
+
+    @Test
+    void standardizeHttpRequestLineModes() {
+        String line = "GET /api/orders/12345?foo=bar HTTP/1.1";
+        assertThat(HttpSqlStandardizer.standardizeHttpRequestLine(line, 1))
+                .isEqualTo("GET /api/orders/? HTTP/1.1");
+        assertThat(HttpSqlStandardizer.standardizeHttpRequestLine(line, -1)).isEqualTo(line);
+        assertThat(HttpSqlStandardizer.standardizeHttpRequestLine(null, 1)).isNull();
+    }
 }

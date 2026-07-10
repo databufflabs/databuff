@@ -42,7 +42,7 @@ class PipelineGatewayTest {
         DorisBatchWriter writer = new DorisBatchWriter(10_000);
         aggregateComponent = IngestTestComponents.aggregate(aggregator, writer);
         metricComponent = new MetricComponent(aggregateComponent);
-        traceComponent = IngestTestComponents.trace(aggregateComponent, new DorisBatchWriter(10_000));
+        traceComponent = IngestTestComponents.trace(aggregateComponent, new DorisBatchWriter(10_000), 100L);
         aggregateComponent.start(1);
         metricComponent.start(1);
         traceComponent.start(1);

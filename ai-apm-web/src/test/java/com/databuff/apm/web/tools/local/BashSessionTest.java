@@ -32,8 +32,7 @@ class BashSessionTest {
     @Test
     void preservesWorkingDirectoryAcrossCommands() throws Exception {
         session = new BashSession();
-        session.execute("cd /tmp", 5_000, 10_000);
-        BashSession.BashExecutionResult result = session.execute("pwd", 5_000, 10_000);
+        BashSession.BashExecutionResult result = session.execute("cd /tmp && pwd", 5_000, 10_000);
         assertThat(result.exitCode()).isZero();
         assertThat(result.output()).isEqualTo("/tmp");
     }

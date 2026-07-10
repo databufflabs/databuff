@@ -27,4 +27,14 @@ class ServiceTypeClassifierTest {
         assertThat(classification.serviceType()).isEqualTo("web");
         assertThat(classification.type()).isEqualTo("web");
     }
+
+    @Test
+    void classifiesMqCacheAndRemote() {
+        assertThat(ServiceTypeClassifier.classify("[kafka]events").serviceType()).isEqualTo("mq");
+        assertThat(ServiceTypeClassifier.classify("[redis]cache").serviceType()).isEqualTo("cache");
+        assertThat(ServiceTypeClassifier.classify("payment-gateway").serviceType()).isEqualTo("custom");
+        assertThat(ServiceTypeClassifier.classify("  ").serviceType()).isEqualTo("web");
+        ServiceTypeClassifier.classify("cached-svc");
+        assertThat(ServiceTypeClassifier.classify("cached-svc")).isNotNull();
+    }
 }

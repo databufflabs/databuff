@@ -24,7 +24,9 @@ class DorisFlushSchedulerTest {
         when(traceSink.flushReady()).thenReturn(0);
         when(traceSink.flushAll()).thenReturn(1);
         when(metricSink.database()).thenReturn("databuff");
-        when(metricSink.table()).thenReturn("requests");
+        when(metricSink.table()).thenReturn("metric_service_http");
+        when(traceSink.table()).thenReturn("trace_dc_span");
+        when(traceSink.database()).thenReturn("databuff");
 
         new DorisFlushScheduler(aggregateComponent, null, List.of(metricSink, traceSink), 45_000L).flush();
 

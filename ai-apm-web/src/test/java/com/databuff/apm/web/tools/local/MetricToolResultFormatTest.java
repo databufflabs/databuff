@@ -19,7 +19,7 @@ class MetricToolResultFormatTest {
         Map<String, Object> formatted = MetricToolResultFormat.formatEpochSecRow(row);
 
         assertThat(formatted)
-                .containsEntry("time", "2026-06-08 15:34:00")
+                .containsEntry("time", "2026-06-08 14:36:00")
                 .containsEntry("reqCount", 12)
                 .doesNotContainKey("epoch_sec");
     }

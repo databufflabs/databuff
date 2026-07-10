@@ -18,7 +18,7 @@ class SkillManagementServiceTest {
         assertThat(service.find("skill.data.metrics")).get()
                 .extracting(AiSkillDefinition::contentUri)
                 .asString()
-                .startsWith("classpath:");
+                .startsWith("deploy-common:");
         assertThat(service.delete("skill.data.metrics")).isFalse();
     }
 

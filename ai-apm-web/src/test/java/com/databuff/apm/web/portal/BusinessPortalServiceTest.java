@@ -26,8 +26,8 @@ class BusinessPortalServiceTest {
         when(topology.listTopologyEdges(anyLong(), anyLong(), anyInt())).thenReturn(List.of(
                 new TopologyEdge("demo-order", "demo-pay", 10, 1)));
         when(reader.queryServiceSummaries(anyString())).thenReturn(List.of(
-                new ServiceSummaryPoint("demo-order", null, 10, 0, 50_000_000, 0),
-                new ServiceSummaryPoint("demo-pay", null, 8, 0, 40_000_000, 0)));
+                new ServiceSummaryPoint("demo-order", "demo-order", 10, 0, 50_000_000, 0),
+                new ServiceSummaryPoint("demo-pay", "demo-pay", 8, 0, 40_000_000, 0)));
 
         BusinessPortalService service = new BusinessPortalService(reader, TestStorageSupport.storage(), topology);
         Map<String, Object> info = service.callInfo(Map.of(

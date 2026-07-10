@@ -63,4 +63,28 @@ class MetricSchemaRegistryTest {
         assertThat(row.get("sumDuration")).isEqualTo(98_000_000L);
         assertThat(row.get("cpuTime")).isEqualTo(0);
     }
+
+    @Test
+    void exposesOtlpAndTraceDerivedFlags() {
+        assertThat(MetricSchemaRegistry.isTraceDerived("service.trace")).isTrue();
+        assertThat(MetricSchemaRegistry.isOtlpMeasurement("jvm.memory")).isTrue();
+        assertThat(MetricSchemaRegistry.isOtlpMeasurement("service.http")).isFalse();
+        assertThat(MetricSchemaRegistry.isOtlpMeasurement(null)).isFalse();
+        assertThat(MetricSchemaRegistry.allMeasurements()).contains("service.http");
+    }
+
+    @Test
+    void mapsColumnsTagsAndUnknownMeasurements() {
+        assertThat(MetricSchemaRegistry.toColumnName("serviceId")).isEqualTo("service_id");
+        assertThat(MetricSchemaRegistry.streamLoadJsonKey("service.instance")).isEqualTo("service_instance");
+        java.util.Map<String, Object> unknownTags = new java.util.LinkedHashMap<>();
+        MetricSchemaRegistry.applyTagValues(unknownTags, "unknown.measurement", new String[] {"a", "b"});
+        assertThat(unknownTags).containsEntry("tag0", "a");
+        java.util.Map<String, Object> unknownFields = new java.util.LinkedHashMap<>();
+        MetricSchemaRegistry.applyFieldValues(unknownFields, "unknown.measurement", new long[] {1, 2});
+        assertThat(unknownFields).containsEntry("field0", 1L);
+        assertThat(MetricSchemaRegistry.tagValuesFromMap(
+                "service.http", java.util.Map.of("service", "checkout", "url", "/api")))
+                .isNotEmpty();
+    }
 }

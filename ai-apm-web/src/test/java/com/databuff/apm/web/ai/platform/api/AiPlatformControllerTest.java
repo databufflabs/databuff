@@ -122,15 +122,15 @@ class AiPlatformControllerTest {
     @Test
     void createsCustomExpert() {
         var created = expertController.create(new AiExpertController.SaveExpertRequest(
-                "ops", "Ops", null, "ops expert", ExpertType.CUSTOM,
+                "custom-ops", "Custom Ops", null, "ops expert", ExpertType.CUSTOM,
                 null, null, "You are ops.",
                 List.of("data.queryServicesAll"),
                 List.of("skill.data.metrics"),
                 null, true));
 
-        assertThat(created.expertId()).isEqualTo("ops");
+        assertThat(created.expertId()).isEqualTo("custom-ops");
         assertThat(expertController.list()).extracting(AiExpertDefinition::expertId)
-                .contains("ops");
+                .contains("custom-ops");
     }
 
     @Test

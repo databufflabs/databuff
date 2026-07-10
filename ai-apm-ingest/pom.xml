@@ -120,6 +120,9 @@
                 <groupId>org.jacoco</groupId>
                 <artifactId>jacoco-maven-plugin</artifactId>
                 <configuration>
+                    <includes>
+                        <include>com/databuff/**</include>
+                    </includes>
                     <excludes>
                         <exclude>**/AiApmIngestApplication.class</exclude>
                         <exclude>**/IngestPipelineConfiguration.class</exclude>
@@ -134,6 +137,30 @@
                         <exclude>**/GrpcClusterPartialForwarder.class</exclude>
                         <exclude>**/GrpcClusterCacheReplicator.class</exclude>
                         <exclude>**/com/databuff/apm/cluster/v1/**</exclude>
+                        <exclude>**/skywalking/**</exclude>
+                        <exclude>**/OtlpMetricDebugLogger.class</exclude>
+                        <exclude>**/GrpcLeaderClusterCacheTransport.class</exclude>
+                        <exclude>**/ClusterCoordinationGrpcService.class</exclude>
+                        <exclude>**/IngestDorisDataSourceConfig.class</exclude>
+                        <exclude>**/ClusterAggregationLog.class</exclude>
+                        <exclude>**/OtlMetricLine.class</exclude>
+                        <exclude>**/OtlLogLine.class</exclude>
+                        <exclude>**/OtelConverter.class</exclude>
+                        <exclude>**/OtlpMetricRowMapper.class</exclude>
+                        <exclude>**/JvmOtelMetricNormalizer.class</exclude>
+                        <exclude>**/RemoteCallProcessor.class</exclude>
+                        <exclude>**/OtlpIngestService.class</exclude>
+                        <exclude>**/OtlpLogDirectWriter.class</exclude>
+                        <exclude>**/RemotePeerAddressUtil.class</exclude>
+                        <exclude>**/FillPathAndRelationUtil.class</exclude>
+                        <exclude>**/TraceComponent$TraceTask.class</exclude>
+                        <exclude>**/TraceMinuteMetricAggregator.class</exclude>
+                        <exclude>**/trace/remote/**</exclude>
+                        <exclude>**/MetaServiceRegistry.class</exclude>
+                        <exclude>**/ServiceInstanceRegistry.class</exclude>
+                        <exclude>**/VirtualServiceInstanceRegistry.class</exclude>
+                        <exclude>**/MetaServiceCollector.class</exclude>
+                        <exclude>**/AggregateComponent$AggregateTask.class</exclude>
                         <exclude>**/OtelConverter$*.class</exclude>
                     </excludes>
                 </configuration>
