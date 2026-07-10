@@ -49,7 +49,7 @@ class AgentBrainServiceTest {
         AgentBrainService.ChatResponse first = service.chat(
                 new AgentBrainService.ChatRequest(null, "trace"));
         service.chat(new AgentBrainService.ChatRequest(first.sessionId(), "help"));
-        assertThat(service.listSessions()).hasSize(1);
+        assertThat(service.countSessions()).isEqualTo(1);
         assertThat(service.sessionMessages(first.sessionId())).hasSize(4);
     }
 

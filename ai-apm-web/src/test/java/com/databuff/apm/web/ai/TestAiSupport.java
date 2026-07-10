@@ -44,10 +44,12 @@ import org.mockito.Mockito;
 import org.springframework.beans.factory.ObjectProvider;
 import org.springframework.core.io.DefaultResourceLoader;
 
+import java.util.List;
 import java.util.concurrent.atomic.AtomicReference;
 import java.util.function.Consumer;
 
 import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.ArgumentMatchers.anyInt;
 import static org.mockito.ArgumentMatchers.anyString;
 import static org.mockito.Mockito.doNothing;
 import static org.mockito.Mockito.mock;
@@ -64,6 +66,17 @@ public final class TestAiSupport {
                 .thenAnswer(invocation -> sessionStore.pollMessages(
                         invocation.getArgument(0),
                         invocation.getArgument(1)));
+        when(persistence.countSessions())
+                .thenAnswer(invocation -> (long) sessionStore.listSessions().size());
+        when(persistence.listSessions(anyInt(), anyInt()))
+                .thenAnswer(invocation -> {
+                    int offset = invocation.getArgument(0);
+                    int limit = invocation.getArgument(1);
+                    List<AiSessionStore.SessionSummary> all = sessionStore.listSessions();
+                    int from = Math.min(Math.max(0, offset), all.size());
+                    int to = Math.min(from + Math.max(1, limit), all.size());
+                    return all.subList(from, to);
+                });
         return persistence;
     }
 

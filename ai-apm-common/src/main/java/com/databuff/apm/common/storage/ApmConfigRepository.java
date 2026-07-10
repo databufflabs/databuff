@@ -259,13 +259,19 @@ public class ApmConfigRepository {
     }
 
     public List<AiSessionSummaryRow> loadRecentAiSessions(int limit) throws SQLException {
+        return loadRecentAiSessions(limit, 0);
+    }
+
+    public List<AiSessionSummaryRow> loadRecentAiSessions(int limit, int offset) throws SQLException {
+        int safeLimit = Math.max(1, limit);
+        int safeOffset = Math.max(0, offset);
         String sql = "SELECT session_id, user_id, user_name, MAX(agent) AS agent,"
                 + " MIN(created_at) AS created_at, MAX(updated_at) AS updated_at,"
                 + " COUNT(*) AS message_count"
                 + " FROM " + qualified(DorisTableNames.CONFIG_AI_MESSAGE)
                 + " WHERE session_type = 'USER'"
                 + " GROUP BY session_id, user_id, user_name"
-                + " ORDER BY updated_at DESC LIMIT " + limit;
+                + " ORDER BY updated_at DESC LIMIT " + safeLimit + " OFFSET " + safeOffset;
         List<AiSessionSummaryRow> rows = new ArrayList<>();
         try (Connection connection = reader.connection();
              Statement statement = connection.createStatement();
@@ -282,6 +288,22 @@ public class ApmConfigRepository {
             }
         }
         return rows;
+    }
+
+    public long countAiSessions() throws SQLException {
+        String sql = "SELECT COUNT(*) AS total FROM ("
+                + "SELECT session_id FROM " + qualified(DorisTableNames.CONFIG_AI_MESSAGE)
+                + " WHERE session_type = 'USER'"
+                + " GROUP BY session_id, user_id, user_name"
+                + ") sessions";
+        try (Connection connection = reader.connection();
+             Statement statement = connection.createStatement();
+             ResultSet rs = statement.executeQuery(sql)) {
+            if (rs.next()) {
+                return rs.getLong("total");
+            }
+        }
+        return 0L;
     }
 
     /** @deprecated use {@link #loadRecentAiSessions(int)} */

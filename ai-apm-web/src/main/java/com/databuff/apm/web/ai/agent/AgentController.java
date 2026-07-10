@@ -15,6 +15,7 @@ import org.springframework.web.bind.annotation.RestController;
 import jakarta.servlet.http.HttpServletRequest;
 
 import java.util.List;
+import java.util.LinkedHashMap;
 import java.util.Map;
 
 @RestController
@@ -52,9 +53,20 @@ public class AgentController {
         return agentBrainService.submitChat(chatRequestContextResolver.enrich(request, body));
     }
 
+    @GetMapping("/sessions/count")
+    public Map<String, Object> sessionCount() {
+        Map<String, Object> response = new LinkedHashMap<>();
+        response.put("total", agentBrainService.countSessions());
+        response.put("status", 200);
+        response.put("message", "SUCCESS");
+        return response;
+    }
+
     @GetMapping("/sessions")
-    public List<AiSessionStore.SessionSummary> sessions() {
-        return agentBrainService.listSessions();
+    public Map<String, Object> sessions(
+            @RequestParam(defaultValue = "0") int offset,
+            @RequestParam(defaultValue = "20") int limit) {
+        return agentBrainService.listSessions(offset, limit);
     }
 
     @GetMapping("/sessions/{sessionId}/messages")

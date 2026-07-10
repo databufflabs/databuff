@@ -8,6 +8,7 @@ import org.springframework.stereotype.Service;
 import org.springframework.web.servlet.mvc.method.annotation.SseEmitter;
 
 import java.util.List;
+import java.util.LinkedHashMap;
 import java.util.Map;
 
 /**
@@ -52,8 +53,18 @@ public class AgentBrainService {
         return chatOrchestrator.abortChat(sessionId);
     }
 
-    public List<AiSessionStore.SessionSummary> listSessions() {
-        return sessionStore.listSessions();
+    public long countSessions() {
+        return aiSessionPersistence.countSessions();
+    }
+
+    public Map<String, Object> listSessions(int offset, int limit) {
+        long total = aiSessionPersistence.countSessions();
+        List<AiSessionStore.SessionSummary> rows = aiSessionPersistence.listSessions(offset, limit);
+        return com.databuff.apm.web.config.common.CommonResponse.listPage(
+                rows,
+                total,
+                offset,
+                rows.size());
     }
 
     public List<AiSessionStore.ChatMessage> sessionMessages(String sessionId) {

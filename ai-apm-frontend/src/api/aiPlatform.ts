@@ -35,6 +35,21 @@ export interface AiSessionSummary {
   updatedAt?: string;
 }
 
+export interface AiSessionListResponse {
+  data: AiSessionSummary[];
+  total: number;
+  offset: number;
+  size: number;
+  status?: number;
+  message?: string;
+}
+
+export interface AiSessionCountResponse {
+  total: number;
+  status?: number;
+  message?: string;
+}
+
 export interface AiChatMessage {
   messageId?: string;
   role: string;
@@ -169,7 +184,11 @@ export default {
       responseType: 'blob',
     }),
 
-  listSessions: () => http.get('/api/v1/ai/sessions'),
+  listSessions: (params?: { offset?: number; limit?: number }) =>
+    http.get('/api/v1/ai/sessions', { params }) as Promise<AiSessionListResponse>,
+
+  countSessions: () =>
+    http.get('/api/v1/ai/sessions/count') as Promise<AiSessionCountResponse>,
 
   sessionTasks: (sessionId: string) =>
     http.get(`/api/v1/ai/sessions/${encodeURIComponent(sessionId)}/tasks`),

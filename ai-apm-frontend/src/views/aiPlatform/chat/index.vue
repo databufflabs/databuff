@@ -33,7 +33,7 @@
               <div class="welcome-text">{{ greetingText }}</div>
               <div class="service-stats">
                 {{ $t('modules.views.aiPlatform.chat.s_cd72989a') }}
-                <span class="service-count">{{ sessions.length }}</span>
+                <span class="service-count">{{ sessionTotal }}</span>
                 {{ $t('modules.views.aiPlatform.chat.s_fca1902e') }}
                 <template v-if="tasks.length">
                   {{ $t('modules.views.aiPlatform.chat.s_3b1b39eb') }}
@@ -395,7 +395,13 @@
         <el-button type="primary" size="small" icon="el-icon-plus" @click="handleNewSessionFromDrawer">{{ $t('modules.views.aiPlatform.chat.s_611f2696') }}</el-button>
         <el-button size="small" icon="el-icon-refresh" @click="reloadSessions">{{ $t('modules.views.aiPlatform.chat.s_694fc5ef') }}</el-button>
       </div>
-      <div class="session-list">
+      <div
+        v-loading="sessionListLoading && !sessions.length"
+        class="session-list"
+        v-infinite-scroll="() => loadMoreSessions()"
+        :infinite-scroll-disabled="sessionListNoMore || sessionListLoading"
+        :infinite-scroll-distance="50"
+      >
         <div
           v-for="item in sessions"
           :key="item.sessionId"
@@ -405,7 +411,7 @@
           <div class="session-title">{{ item.title || $t('modules.views.aiPlatform.chat.s_1ac07a4b') }}</div>
           <div class="session-meta">{{ expertDisplayName(item.expertId || expertId) }}</div>
         </div>
-        <div v-if="!sessions.length" class="empty-tip">{{ $t('modules.views.aiPlatform.chat.s_2bc4c0ed') }}</div>
+        <div v-if="!sessions.length && !sessionListLoading" class="empty-tip">{{ $t('modules.views.aiPlatform.chat.s_2bc4c0ed') }}</div>
       </div>
     </el-drawer>
 
@@ -448,12 +454,12 @@
         class="tool-detail-charts"
       />
       <div v-else-if="selectedToolTerminalDisplay" class="tool-detail-terminal">
-        <div class="tool-detail-terminal-meta">{{ selectedToolTerminalDisplay.meta }}</div>
+        <div v-if="selectedToolTerminalDisplay.meta" class="tool-detail-terminal-meta is-prefix">{{ selectedToolTerminalDisplay.meta }}</div>
         <pre class="tool-detail-content is-terminal">{{ selectedToolTerminalDisplay.body }}</pre>
       </div>
       <div v-else-if="selectedToolBashParamsDisplay" class="tool-detail-terminal">
-        <div v-if="selectedToolBashParamsDisplay.meta" class="tool-detail-terminal-meta">{{ selectedToolBashParamsDisplay.meta }}</div>
         <pre class="tool-detail-content is-terminal">{{ selectedToolBashParamsDisplay.command }}</pre>
+        <div v-if="selectedToolBashParamsDisplay.meta" class="tool-detail-terminal-meta">{{ selectedToolBashParamsDisplay.meta }}</div>
       </div>
       <pre v-else :class="['tool-detail-content', { 'is-terminal': selectedToolIsTerminal }]">{{ selectedToolDetail }}</pre>
     </el-dialog>
@@ -600,6 +606,10 @@ export default class AiPlatformChat extends Vue {
   private chatTextarea: HTMLTextAreaElement | null = null
 
   private sessions: AiSessionSummary[] = []
+  private sessionTotal = 0
+  private sessionListOffset = 0
+  private sessionListLoading = false
+  private readonly sessionPageSize = 20
   private experts: AiExpertDefinition[] = []
   private messages: AiChatMessage[] = []
   private displayContent: Record<string, string> = {}
@@ -611,6 +621,10 @@ export default class AiPlatformChat extends Vue {
   private selectedModelKey = ''
   private showExpertOverflowPopover = false
   private expertOverflowKeyword = ''
+
+  private get sessionListNoMore (): boolean {
+    return this.sessions.length >= this.sessionTotal
+  }
 
   private get quickExpertGroups () {
     return groupQuickExperts(this.experts)
@@ -809,6 +823,9 @@ export default class AiPlatformChat extends Vue {
     if (this.selectedToolBashParamsDisplay) {
       return this.selectedToolBashParamsDisplay.command
     }
+    if (this.selectedToolTerminalDisplay) {
+      return this.selectedToolTerminalDisplay.body
+    }
     return this.selectedToolDetail
   }
 
@@ -904,7 +921,7 @@ export default class AiPlatformChat extends Vue {
 
   private async created () {
     this.bootLoading = true
-    await Promise.all([this.loadExperts(), this.reloadSessions(), this.loadLlmStatus(), this.loadModelOptions()])
+    await Promise.all([this.loadExperts(), this.loadSessionTotal(), this.reloadSessions(), this.loadLlmStatus(), this.loadModelOptions()])
     const sessionId = this.routeSessionId()
     if (sessionId) {
       await this.selectSession(sessionId, false)
@@ -1263,10 +1280,49 @@ export default class AiPlatformChat extends Vue {
     }
   }
 
+  private async loadSessionTotal () {
+    const { result, error } = await toAsyncWait(AiPlatformApi.countSessions(), false)
+    if (!error && result) {
+      this.sessionTotal = Number(result.total || 0)
+    }
+  }
+
   private async reloadSessions () {
-    const { result, error } = await toAsyncWait(AiPlatformApi.listSessions(), false)
-    if (!error) {
-      this.sessions = result || []
+    this.sessionListOffset = 0
+    this.sessions = []
+    await Promise.all([this.loadSessionTotal(), this.loadMoreSessions(true)])
+  }
+
+  private async loadMoreSessions (reset = false) {
+    if (this.sessionListLoading) {
+      return
+    }
+    if (!reset && this.sessionListNoMore) {
+      return
+    }
+    this.sessionListLoading = true
+    const offset = reset ? 0 : this.sessionListOffset
+    const { result, error } = await toAsyncWait(
+      AiPlatformApi.listSessions({ offset, limit: this.sessionPageSize }),
+      false,
+    )
+    this.sessionListLoading = false
+    if (error || !result) {
+      return
+    }
+    const items = Array.isArray(result.data) ? result.data : []
+    if (reset) {
+      this.sessions = items
+    } else if (items.length) {
+      const existing = new Set(this.sessions.map(item => item.sessionId))
+      this.sessions = [
+        ...this.sessions,
+        ...items.filter(item => item.sessionId && !existing.has(item.sessionId)),
+      ]
+    }
+    this.sessionListOffset = Number(result.offset ?? offset + items.length)
+    if (result.total != null) {
+      this.sessionTotal = Number(result.total)
     }
   }
 
@@ -2920,6 +2976,8 @@ export default class AiPlatformChat extends Vue {
 }
 
 .session-list {
+  flex: 1;
+  min-height: 0;
   padding: 0 16px 16px;
   overflow-y: auto;
 }
@@ -3019,19 +3077,21 @@ export default class AiPlatformChat extends Vue {
 .tool-detail-terminal {
   display: flex;
   flex-direction: column;
-  gap: 8px;
+  gap: 6px;
 }
 
 .tool-detail-terminal-meta {
-  padding: 10px 14px;
-  border: 1px solid #dbeafe;
-  border-radius: 8px;
-  color: #1e40af;
-  background: #eff6ff;
-  font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace;
-  font-size: 12px;
-  line-height: 1.6;
+  padding: 0 4px;
+  color: #94a3b8;
+  background: transparent;
+  font-size: 11px;
+  line-height: 1.5;
   white-space: pre-wrap;
+  word-break: break-word;
+
+  &.is-prefix {
+    margin-bottom: 2px;
+  }
 }
 
 .tool-detail-content {

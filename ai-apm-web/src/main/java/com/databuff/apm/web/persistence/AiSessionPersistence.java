@@ -16,6 +16,8 @@ import java.util.ArrayList;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
+import java.util.Set;
+import java.util.concurrent.ConcurrentHashMap;
 
 @Component
 public class AiSessionPersistence {
@@ -25,11 +27,13 @@ public class AiSessionPersistence {
     private static final TypeReference<Map<String, Object>> MAP_TYPE = new TypeReference<>() {
     };
     private static final int HYDRATE_LIMIT = 50;
+    private static final int MAX_PAGE_SIZE = 100;
 
     private final ApmReadRepository readRepository;
     private final AiSessionStore sessionStore;
     private final AiMessagePersistenceQueue persistenceQueue;
     private final String configDatabase;
+    private final Set<String> persistedSessionIds = ConcurrentHashMap.newKeySet();
     private volatile boolean persistenceEnabled;
 
     public AiSessionPersistence(
@@ -56,6 +60,7 @@ public class AiSessionPersistence {
         try {
             List<ApmConfigRepository.AiSessionSummaryRow> sessions = repository.loadRecentAiSessions(HYDRATE_LIMIT);
             for (ApmConfigRepository.AiSessionSummaryRow session : sessions) {
+                persistedSessionIds.add(session.sessionId());
                 List<ApmConfigRepository.AiMessageRow> messages = repository.loadAiMessages(session.sessionId());
                 String title = deriveTitle(messages);
                 sessionStore.hydrateSession(
@@ -74,6 +79,51 @@ public class AiSessionPersistence {
         }
     }
 
+    public long countSessions() {
+        if (!ensurePersistenceReady()) {
+            return sessionStore.listSessions().size();
+        }
+        try {
+            ApmConfigRepository repository = new ApmConfigRepository(readRepository, configDatabase);
+            return repository.countAiSessions() + memoryOnlySessions().size();
+        } catch (Exception e) {
+            log.debug("Failed to count AI sessions from store: {}", e.getMessage());
+            return sessionStore.listSessions().size();
+        }
+    }
+
+    public List<AiSessionStore.SessionSummary> listSessions(int offset, int limit) {
+        int safeOffset = Math.max(0, offset);
+        int safeLimit = Math.max(1, Math.min(limit <= 0 ? 20 : limit, MAX_PAGE_SIZE));
+        if (!ensurePersistenceReady()) {
+            return paginateMemorySessions(safeOffset, safeLimit);
+        }
+        try {
+            List<AiSessionStore.SessionSummary> memoryOnly = memoryOnlySessions();
+            int memoryCount = memoryOnly.size();
+            if (safeOffset == 0) {
+                int dbLimit = Math.max(0, safeLimit - memoryCount);
+                List<AiSessionStore.SessionSummary> page = new ArrayList<>(memoryOnly.subList(
+                        0, Math.min(memoryCount, safeLimit)));
+                if (dbLimit > 0) {
+                    ApmConfigRepository repository = new ApmConfigRepository(readRepository, configDatabase);
+                    for (ApmConfigRepository.AiSessionSummaryRow row : repository.loadRecentAiSessions(dbLimit, 0)) {
+                        page.add(toSummary(row));
+                    }
+                }
+                return page;
+            }
+            int dbOffset = Math.max(0, safeOffset - memoryCount);
+            ApmConfigRepository repository = new ApmConfigRepository(readRepository, configDatabase);
+            return repository.loadRecentAiSessions(safeLimit, dbOffset).stream()
+                    .map(this::toSummary)
+                    .toList();
+        } catch (Exception e) {
+            log.debug("Failed to list AI sessions from store: {}", e.getMessage());
+            return paginateMemorySessions(safeOffset, safeLimit);
+        }
+    }
+
     public AiSessionStore.MessagePollResponse pollMergedMessages(String sessionId, String afterMessageId) {
         ensureSessionHydrated(sessionId);
         return sessionStore.pollMessages(sessionId, afterMessageId);
@@ -83,6 +133,7 @@ public class AiSessionPersistence {
         if (!ensurePersistenceReady() || messages == null || messages.isEmpty()) {
             return;
         }
+        persistedSessionIds.add(sessionId);
         AiSessionStore.SessionSummary summary = sessionStore.getSession(sessionId);
         List<ApmConfigRepository.AiMessageRow> rows = new ArrayList<>(messages.size());
         for (AiSessionStore.ChatMessage message : messages) {
@@ -105,6 +156,7 @@ public class AiSessionPersistence {
         if (!ensurePersistenceReady() || message == null) {
             return;
         }
+        persistedSessionIds.add(sessionId);
         AiSessionStore.SessionSummary summary = sessionStore.getSession(sessionId);
         persistenceQueue.enqueueRound(sessionId, List.of(toMessageRow(sessionId, message, summary)));
     }
@@ -154,6 +206,7 @@ public class AiSessionPersistence {
             if (rows.isEmpty()) {
                 return;
             }
+            persistedSessionIds.add(sessionId);
             sessionStore.hydrateSession(
                     sessionId,
                     rows.get(rows.size() - 1).agent(),
@@ -181,6 +234,36 @@ public class AiSessionPersistence {
             log.debug("AI message schema check failed: {}", e.getMessage());
         }
         return false;
+    }
+
+    private List<AiSessionStore.SessionSummary> memoryOnlySessions() {
+        return sessionStore.listSessions().stream()
+                .filter(summary -> !persistedSessionIds.contains(summary.sessionId()))
+                .toList();
+    }
+
+    private List<AiSessionStore.SessionSummary> paginateMemorySessions(int offset, int limit) {
+        List<AiSessionStore.SessionSummary> all = sessionStore.listSessions();
+        int from = Math.min(offset, all.size());
+        int to = Math.min(from + limit, all.size());
+        return all.subList(from, to);
+    }
+
+    private AiSessionStore.SessionSummary toSummary(ApmConfigRepository.AiSessionSummaryRow row) {
+        AiSessionStore.SessionSummary memory = sessionStore.getSession(row.sessionId());
+        if (memory != null) {
+            return memory;
+        }
+        return new AiSessionStore.SessionSummary(
+                row.sessionId(),
+                row.agent(),
+                "USER",
+                null,
+                null,
+                null,
+                row.userName(),
+                row.updatedAt(),
+                row.messageCount());
     }
 
     private ApmConfigRepository.AiMessageRow toMessageRow(

@@ -67,8 +67,8 @@ class AiChatOrchestratorTest {
                 null, "inspection", "hello", false, java.util.Map.of(), null));
 
         assertThat(response.expertId()).isEqualTo("inspection");
-        assertThat(service.listSessions()).singleElement()
-                .satisfies(summary -> assertThat(summary.expertId()).isEqualTo("inspection"));
+        assertThat(service.listSessions(0, 20).get("data")).asList().singleElement()
+                .satisfies(summary -> assertThat(((AiSessionStore.SessionSummary) summary).expertId()).isEqualTo("inspection"));
     }
 
     @Test

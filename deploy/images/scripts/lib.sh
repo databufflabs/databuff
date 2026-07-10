@@ -99,26 +99,22 @@ demo_image_ref() {
   runtime_image_ref ai-apm-demo "${1:-$(resolve_release_version)}"
 }
 
-openjdk_pull_image() {
-  if [[ -n "${OPENJDK_REGISTRY:-}" ]]; then
-    printf '%s/eclipse-temurin:17-jdk-jammy\n' "${OPENJDK_REGISTRY%/}"
+jdk_pull_image() {
+  if [[ -n "${JDK_REGISTRY:-}" ]]; then
+    printf '%s/eclipse-temurin:17-jdk-jammy\n' "${JDK_REGISTRY%/}"
     return 0
   fi
-  printf '%s\n' "${OPENJDK_IMAGE:?set OPENJDK_IMAGE in deploy/env.sh}"
+  printf '%s\n' "${JDK_IMAGE:?set JDK_IMAGE in deploy/env.sh}"
 }
 
-openjdk_dockerfile_from() {
-  openjdk_pull_image
-}
-
-openjdk_image_for_platform() {
+jdk_image_for_platform() {
   local platform="$1"
 
-  if [[ -n "${OPENJDK_REGISTRY:-}" ]]; then
-    printf '%s/eclipse-temurin:17-jdk-jammy\n' "${OPENJDK_REGISTRY%/}"
+  if [[ -n "${JDK_REGISTRY:-}" ]]; then
+    printf '%s/eclipse-temurin:17-jdk-jammy\n' "${JDK_REGISTRY%/}"
     return 0
   fi
-  printf '%s\n' "${OPENJDK_IMAGE:?set OPENJDK_IMAGE in deploy/env.sh}"
+  printf '%s\n' "${JDK_IMAGE:?set JDK_IMAGE in deploy/env.sh}"
 }
 
 prepare_demo_build_context() {
@@ -778,8 +774,8 @@ buildx_image() {
   local ctx="$2"
   local platform="$3"
   shift 3
-  local openjdk_image
-  openjdk_image="$(openjdk_image_for_platform "$platform")"
+  local jdk_image
+  jdk_image="$(jdk_image_for_platform "$platform")"
 
   docker buildx build \
     --pull \
@@ -787,7 +783,7 @@ buildx_image() {
     --sbom=false \
     --progress="${BUILDX_PROGRESS:-auto}" \
     --platform "$platform" \
-    --build-arg "OPENJDK_IMAGE=${openjdk_image}" \
+    --build-arg "JDK_IMAGE=${jdk_image}" \
     -t "$image_ref" \
     "$@" \
     "$ctx"
@@ -799,8 +795,8 @@ buildx_export_image_tarball() {
   local ctx="$2"
   local platform="$3"
   local dest="$4"
-  local openjdk_image
-  openjdk_image="$(openjdk_image_for_platform "$platform")"
+  local jdk_image
+  jdk_image="$(jdk_image_for_platform "$platform")"
 
   docker buildx build \
     --pull \
@@ -808,7 +804,7 @@ buildx_export_image_tarball() {
     --sbom=false \
     --progress="${BUILDX_PROGRESS:-auto}" \
     --platform "$platform" \
-    --build-arg "OPENJDK_IMAGE=${openjdk_image}" \
+    --build-arg "JDK_IMAGE=${jdk_image}" \
     -t "$image_ref" \
     --output "type=docker,dest=${dest}" \
     "$ctx"

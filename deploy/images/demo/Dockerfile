@@ -1,5 +1,5 @@
-ARG OPENJDK_IMAGE=eclipse-temurin:17-jdk-jammy
-FROM ${OPENJDK_IMAGE}
+ARG JDK_IMAGE=eclipse-temurin:17-jdk-jammy
+FROM ${JDK_IMAGE}
 WORKDIR /app
 
 COPY start.sh ./

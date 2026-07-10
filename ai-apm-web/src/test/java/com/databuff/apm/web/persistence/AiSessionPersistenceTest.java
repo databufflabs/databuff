@@ -24,6 +24,20 @@ import static org.mockito.Mockito.when;
 class AiSessionPersistenceTest {
 
     @Test
+    void listsAndCountsInMemoryWhenPersistenceDisabled() throws Exception {
+        ApmReadRepository reader = mock(ApmReadRepository.class);
+        when(reader.connection()).thenThrow(new SQLException("down"));
+        AiSessionStore store = new AiSessionStore();
+        store.ensureSession("s1", "brain", null, null, "admin");
+        store.ensureSession("s2", "brain", null, null, "admin");
+        AiSessionPersistence persistence = new AiSessionPersistence(
+                reader, store, new AiMessagePersistenceQueue(reader, TestStorageSupport.storage()), TestStorageSupport.storage());
+        assertThat(persistence.countSessions()).isEqualTo(2);
+        assertThat(persistence.listSessions(0, 1)).hasSize(1);
+        assertThat(persistence.listSessions(1, 1)).hasSize(1);
+    }
+
+    @Test
     void skipsWhenSchemaNotReady() throws Exception {
         ApmReadRepository reader = mock(ApmReadRepository.class);
         when(reader.connection()).thenThrow(new SQLException("down"));

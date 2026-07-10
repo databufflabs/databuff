@@ -1,5 +1,5 @@
-ARG OPENJDK_IMAGE=eclipse-temurin:17-jdk-jammy
-FROM ${OPENJDK_IMAGE}
+ARG JDK_IMAGE=eclipse-temurin:17-jdk-jammy
+FROM ${JDK_IMAGE}
 
 RUN printf 'Acquire::Retries "5";\nAcquire::http::Timeout "120";\n' > /etc/apt/apt.conf.d/80-retries \
     && apt-get update \

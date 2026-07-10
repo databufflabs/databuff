@@ -61,7 +61,7 @@ export function formatBashToolParamsDisplay(value: unknown): BashToolParamsDispl
   }
 
   return {
-    meta: metaLines.join('\n'),
+    meta: metaLines.join(' · '),
     command,
   };
 }
@@ -100,7 +100,7 @@ export function formatTerminalToolDisplay(text: string): TerminalToolDisplay | n
     }
     const body = (backgroundMatch[5] || '').trimEnd();
     return {
-      meta: metaLines.join('\n'),
+      meta: metaLines.join(' · '),
       body: body || '(no new output)',
     };
   }

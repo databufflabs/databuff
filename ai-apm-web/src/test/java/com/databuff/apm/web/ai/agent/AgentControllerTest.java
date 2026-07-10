@@ -21,7 +21,8 @@ class AgentControllerTest {
         AgentBrainService.ChatResponse chat = brain.chat(
                 new AgentBrainService.ChatRequest(null, "帮助"));
         assertThat(chat.reply()).contains("DataBuff APM 助手");
-        assertThat(controller.sessions()).hasSize(1);
+        assertThat(controller.sessionCount().get("total")).isEqualTo(1L);
+        assertThat(controller.sessions(0, 20).get("data")).asList().hasSize(1);
         assertThat(controller.messages(chat.sessionId(), null).messages()).isNotEmpty();
     }
 }
