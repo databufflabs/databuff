@@ -214,7 +214,7 @@ export default class HealthComp extends Vue {
     this.ruleDetail = row;
   }
   private deleteRule(row: any) {
-    this.$confirm(`<p>{{ $t('modules.views.sysManage.org.s_bafb9cb6') }}</p>`, i18n.t('common.hint') as string, { type: 'warning', dangerouslyUseHTMLString: true })
+    this.$confirm(i18n.t('modules.views.sysManage.org.s_bafb9cb6') as string, i18n.t('common.hint') as string, { type: 'warning' })
       .then(async () => {
         this.tableLoading = true
         const { result, error } = await toAsyncWait(HealthApi.deleteRule({ id: row.id }));

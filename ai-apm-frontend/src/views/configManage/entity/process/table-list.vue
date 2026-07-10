@@ -110,7 +110,7 @@ export default class TableList extends Vue {
     if (row.loading) {
       return;
     }
-    this.$confirm(`<p>{{ $t('modules.views.sysManage.org.s_bafb9cb6') }}</p>`, i18n.t('common.hint') as string, { type: 'warning', dangerouslyUseHTMLString: true })
+    this.$confirm(i18n.t('modules.views.sysManage.org.s_bafb9cb6') as string, i18n.t('common.hint') as string, { type: 'warning' })
       .then(async () => {
         const fetchUrl = this.isRecognition ? 'deleteIdentifyRule' : 'deleteCollectRule'
         this.$set(row, 'loading', true);
