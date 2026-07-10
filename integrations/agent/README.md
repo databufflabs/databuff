@@ -43,8 +43,15 @@ cp -r integrations/agent/skills/* ~/.cursor/skills/
 
 复制 `mcp/` 下的示例配置，填入你的 DataBuff 地址即可（无需 Authorization 头）：
 
-- Cursor：`mcp/cursor-mcp.json.example` → `.cursor/mcp.json`
+- **Cursor（推荐）**：`mcp/cursor-mcp-example.json` → `.cursor/mcp.json`（含默认 `localhost:27403`、工具列表与注释说明）
+- Cursor（精简版）：`mcp/cursor-mcp.json.example` → `.cursor/mcp.json`
 - Claude Desktop：`mcp/claude-desktop-config.example.json`
+
+```bash
+# 示例：项目级 MCP 配置（本地 Docker 默认端口）
+mkdir -p .cursor
+cp integrations/agent/mcp/cursor-mcp-example.json .cursor/mcp.json
+```
 
 标准 MCP 端点（Streamable HTTP，实现后）：
 
@@ -72,7 +79,8 @@ integrations/agent/
 │   ├── skill.data.metrics/
 │   └── skill.inspection.health/
 └── mcp/                      # MCP 客户端配置示例
-    ├── cursor-mcp.json.example
+    ├── cursor-mcp-example.json          # Cursor 完整示例（推荐）
+    ├── cursor-mcp.json.example          # Cursor 精简示例
     ├── claude-desktop-config.example.json
     └── openclaw-amc-config.example.json
 ```

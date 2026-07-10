@@ -388,7 +388,11 @@ export default {
     },
     autoEmitRefresh: {
       type: Boolean,
-      default: true
+      default: false
+    },
+    queryParamsDebounceWait: {
+      type: Number,
+      default: 300
     },
     tableSortable: {
       type: Boolean,
@@ -501,6 +505,8 @@ export default {
       queryInited: false,
       queryLoading: false,
       tableSortableKey: 0,
+      queryParamsSnapshot: '',
+      queryParamsDebounceTimer: null,
     }
   },
   computed: {
@@ -518,13 +524,12 @@ export default {
     }
   },
   watch: {
-    // TODO 输入框类参数会一直触发，暂时通过外部手动调用
-    // queryParams: {
-    //   handler (newVal) {
-    //     this.fetchTableSource(true)
-    //   },
-    //   deep: true,
-    // },
+    queryParams: {
+      handler (newVal, oldVal) {
+        this.handleQueryParamsChange(newVal, oldVal)
+      },
+      deep: true,
+    },
     '$store.state.globalState.globalTime': {
       handler (newVal) {
         if (this.autoRefresh) {
@@ -723,6 +728,62 @@ export default {
       if (!this.queryInited) {
         this.queryInited = true
       }
+      this.syncQueryParamsSnapshot()
+      this.fetchTableSource(true)
+    },
+    syncQueryParamsSnapshot () {
+      this.queryParamsSnapshot = JSON.stringify(this.queryParams || {})
+    },
+    isSameQueryParams (params) {
+      return JSON.stringify(params || {}) === this.queryParamsSnapshot
+    },
+    hasStringValueChange (newVal, oldVal) {
+      const newP = newVal || {}
+      const oldP = oldVal || {}
+      const keys = new Set([...Object.keys(newP), ...Object.keys(oldP)])
+      for (const key of keys) {
+        const nextValue = newP[key]
+        const prevValue = oldP[key]
+        if (nextValue !== prevValue && (typeof nextValue === 'string' || typeof prevValue === 'string')) {
+          return true
+        }
+      }
+      return false
+    },
+    handleQueryParamsChange (newVal, oldVal) {
+      if (!this.autoEmitRefresh) {
+        return
+      }
+      if (!this.queryInited) {
+        return
+      }
+      if (typeof this.queryApi !== 'function') {
+        return
+      }
+      if (this.isSameQueryParams(newVal)) {
+        return
+      }
+      const debounceMs = this.hasStringValueChange(newVal, oldVal) ? this.queryParamsDebounceWait : 0
+      window.clearTimeout(this.queryParamsDebounceTimer)
+      if (debounceMs > 0) {
+        this.queryParamsDebounceTimer = window.setTimeout(() => {
+          this.triggerQueryParamsRefresh()
+        }, debounceMs)
+      } else {
+        this.triggerQueryParamsRefresh()
+      }
+    },
+    triggerQueryParamsRefresh () {
+      if (!this.autoEmitRefresh || !this.queryInited) {
+        return
+      }
+      if (typeof this.queryApi !== 'function') {
+        return
+      }
+      if (this.isSameQueryParams(this.queryParams)) {
+        return
+      }
+      this.syncQueryParamsSnapshot()
       this.fetchTableSource(true)
     },
     // 如果传入了queryApi，则滚动加载调用
@@ -958,6 +1019,10 @@ export default {
     if (this.timer) {
       window.clearTimeout(this.timer);
       this.timer = null;
+    }
+    if (this.queryParamsDebounceTimer) {
+      window.clearTimeout(this.queryParamsDebounceTimer);
+      this.queryParamsDebounceTimer = null;
     }
     if (this.scrollContainer) {
       this.scrollContainer.removeEventListener('scroll', this.scrollHandle)

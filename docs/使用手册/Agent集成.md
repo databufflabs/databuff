@@ -29,11 +29,20 @@
 
 ### Cursor
 
-将 `integrations/agent/mcp/cursor-mcp.json.example` 复制为项目 `.cursor/mcp.json` 或用户级 MCP 配置，填入：
+将 `integrations/agent/mcp/cursor-mcp-example.json`（推荐，含默认端口与工具说明）或 `cursor-mcp.json.example`（精简版）复制为项目 `.cursor/mcp.json` 或用户级 MCP 配置：
+
+```bash
+mkdir -p .cursor
+cp integrations/agent/mcp/cursor-mcp-example.json .cursor/mcp.json
+```
+
+默认本地地址（Docker 安装）：
 
 ```
-http://<your-databuff-host>:<port>/mcp
+http://localhost:27403/mcp
 ```
+
+远程或非默认端口时，将 `url` 改为 `http://<your-databuff-host>:<port>/mcp`。
 
 **Cursor → Settings → MCP** 中应出现 `databuff-apm` 服务且状态为已连接；确认 `url` 为 `http://<host>:<port>/mcp`（无 `Authorization` 头）。
 

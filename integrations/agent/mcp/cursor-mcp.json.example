@@ -1,7 +1,7 @@
 {
   "mcpServers": {
     "databuff-apm": {
-      "url": "http://YOUR_DATABUFF_HOST:PORT/mcp"
+      "url": "http://localhost:27403/mcp"
     }
   }
 }

@@ -1,0 +1,42 @@
+{
+  // ---------------------------------------------------------------------------
+  // DataBuff APM — Cursor MCP configuration example
+  // ---------------------------------------------------------------------------
+  //
+  // Quick start
+  //   1. Copy this file to your project:  .cursor/mcp.json
+  //      Or install globally:             ~/.cursor/mcp.json
+  //   2. Change the url below if DataBuff is not on localhost:27403
+  //   3. Restart Cursor (or reload MCP under Settings → MCP)
+  //   4. Install Skills from integrations/agent/skills/ (see integrations/agent/README.md)
+  //
+  // Endpoint (Streamable HTTP, MCP standard path /mcp)
+  //   Local Docker default:  http://localhost:27403/mcp
+  //   Remote / custom port:  http://<your-databuff-host>:<port>/mcp
+  //
+  // Authentication
+  //   MVP has no dedicated MCP API token — same as the platform AI APIs.
+  //   Use on intranet/VPN; add your own gateway or firewall for public exposure.
+  //   If you add a gateway later, use the optional headers block below.
+  //
+  // Available MCP tools (15 — discovered automatically via tools/list after connect)
+  //   General:    getCurrentTimeRange, getTimeRangeAroundTime, drawTrendCharts
+  //   Query:      queryServicesAll, queryServicesByServiceType, queryServiceTopology,
+  //               queryTraceListByCondition, queryTraceDetail, queryServiceAlarms,
+  //               queryMetricData
+  //   Logs:       queryLogTrend, queryLogDetail, queryLogsByTraceId, queryLogsBySpanId
+  //   Inspection: inspectService
+  //
+  // Verify
+  //   Cursor → Settings → MCP → databuff-apm should show as connected.
+  //   Try: "List services in the last hour" or "Inspect order-service health".
+  //
+  // Optional headers (uncomment when your deployment requires auth at the gateway):
+  //   "headers": { "Authorization": "Bearer YOUR_TOKEN" }
+
+  "mcpServers": {
+    "databuff-apm": {
+      "url": "http://localhost:27403/mcp"
+    }
+  }
+}

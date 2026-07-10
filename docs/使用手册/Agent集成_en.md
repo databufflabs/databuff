@@ -29,11 +29,20 @@ Copy an example config, replace `YOUR_DATABUFF_HOST:PORT` with your host — **n
 
 ### Cursor
 
-Copy `integrations/agent/mcp/cursor-mcp.json.example` to project `.cursor/mcp.json` or user-level MCP config:
+Copy `integrations/agent/mcp/cursor-mcp-example.json` (recommended — default port, tool list, inline comments) or `cursor-mcp.json.example` (minimal) to project `.cursor/mcp.json` or user-level MCP config:
+
+```bash
+mkdir -p .cursor
+cp integrations/agent/mcp/cursor-mcp-example.json .cursor/mcp.json
+```
+
+Default local address (Docker install):
 
 ```
-http://<your-databuff-host>:<port>/mcp
+http://localhost:27403/mcp
 ```
+
+For remote or non-default ports, set `url` to `http://<your-databuff-host>:<port>/mcp`.
 
 In **Cursor → Settings → MCP**, `databuff-apm` should appear connected; confirm `url` is `http://<host>:<port>/mcp` with no `Authorization` header.
 

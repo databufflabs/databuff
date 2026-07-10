@@ -30,6 +30,7 @@ Online docs: [databuff.ai/docs](https://databuff.ai/docs/en/)
 ### Getting Started
 
 - [OpenTelemetry OTLP Ingestion](opentelemetry-otlp-ingestion_en.md)
+- [Spring Boot OTLP Integration](快速入门/spring-boot-otlp-integration_en.md)
 - [Docker Installation](快速入门/docker安装部署_en.md)
 - [Kubernetes Installation](快速入门/k8s安装部署_en.md)
 
