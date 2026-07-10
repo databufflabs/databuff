@@ -155,7 +155,7 @@ export default class GroupTableList extends Vue {
   }
 
   private async batchDeleteHandle () {
-    this.$confirm(`<p>{{ $t('modules.views.sysManage.org.s_bafb9cb6') }}</p>`, i18n.t('common.hint') as string, { type: 'warning', dangerouslyUseHTMLString: true })
+    this.$confirm(i18n.t('modules.views.sysManage.org.s_bafb9cb6') as string, i18n.t('common.hint') as string, { type: 'warning' })
       .then(async () => {
         const ids = this.selection.map((i) => i.id)
         if (ids.length) {

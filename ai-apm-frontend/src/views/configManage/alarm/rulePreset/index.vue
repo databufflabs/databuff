@@ -138,7 +138,7 @@ export default class TemplateList extends Vue {
 
   // 删除规则
   private deleteHandle(row: any) {
-    this.$confirm(`<p>{{ $t('modules.views.sysManage.org.s_bafb9cb6') }}</p>`, i18n.t('common.hint') as string, { type: 'warning', dangerouslyUseHTMLString: true })
+    this.$confirm(i18n.t('modules.views.sysManage.org.s_bafb9cb6') as string, i18n.t('common.hint') as string, { type: 'warning' })
       .then(async () => {
         row.switchLoading = true
         const params = row.monitorIds.map((id: number) => ({ id }))
