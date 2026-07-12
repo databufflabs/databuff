@@ -271,6 +271,28 @@ def _sort_span_rows(items: list[Any]) -> list[Any]:
     return sorted(items, key=sort_key)
 
 
+def _is_service_flow_children_list(items: list[Any]) -> bool:
+    if not items:
+        return True
+    return all(
+        isinstance(item, dict)
+        and "service" in item
+        and "children" in item
+        and "call" in item
+        for item in items
+    )
+
+
+def _sort_service_flow_children(items: list[Any]) -> list[Any]:
+    return sorted(
+        items,
+        key=lambda item: (
+            -(int(item.get("call") or 0)),
+            str(item.get("service") or ""),
+        ),
+    )
+
+
 def _is_service_flow_edge_list(items: list[Any]) -> bool:
     if not items:
         return True
@@ -307,6 +329,9 @@ def _match_list(actual: list[Any], expected: list[Any], path: str) -> None:
     elif _is_span_row_list(actual) and _is_span_row_list(expected):
         actual = _sort_span_rows(actual)
         expected = _sort_span_rows(expected)
+    elif _is_service_flow_children_list(actual) and _is_service_flow_children_list(expected):
+        actual = _sort_service_flow_children(actual)
+        expected = _sort_service_flow_children(expected)
     elif _is_service_flow_edge_list(actual) and _is_service_flow_edge_list(expected):
         actual = _sort_service_flow_edges(actual)
         expected = _sort_service_flow_edges(expected)

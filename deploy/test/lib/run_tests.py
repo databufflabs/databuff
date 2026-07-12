@@ -21,7 +21,6 @@ sys.path.insert(0, str(LIB_ROOT))
 
 from cases import ApiCase, build_cases  # noqa: E402
 from cases.common import DEMO_CHECKOUT_RESOURCE, DEMO_SERVICE_A, trace_spans_body  # noqa: E402
-from snapshot_expected import snapshot_cases  # noqa: E402
 from ai_chat_integration import (  # noqa: E402
     AI_CHAT_QUESTIONS,
     GROUP_DATA_EXPERT,
@@ -426,11 +425,6 @@ def main() -> int:
     parser.add_argument("--service", default=os.environ.get("TEST_DEMO_SERVICE", "service-a"))
     parser.add_argument("--report-dir", default=str(LIB_ROOT / "reports"))
     parser.add_argument(
-        "--snapshot",
-        action="store_true",
-        help="record live API responses into expected/*.json (maintainer mode)",
-    )
-    parser.add_argument(
         "--skip-ai-chat",
         action="store_true",
         default=os.environ.get("TEST_SKIP_AI_CHAT", "0") == "1",
@@ -451,9 +445,7 @@ def main() -> int:
     args = parser.parse_args()
 
     min_warmup = int(os.environ.get("TEST_MIN_WARMUP_SECONDS", str(MIN_WARMUP_SECONDS)))
-    if args.snapshot and "TEST_WARMUP_SECONDS" not in os.environ and "--warmup" not in sys.argv:
-        warmup = 0
-    elif args.warmup <= 0:
+    if args.warmup <= 0:
         warmup = 0
     else:
         warmup = max(args.warmup, min_warmup)
@@ -463,16 +455,6 @@ def main() -> int:
 
     print(f"[test] login {base} ...")
     token = login(base, args.username, args.password, args.timeout)
-
-    if args.snapshot:
-        wait_for_ingest_warmup(warmup)
-        return snapshot_cases(
-            base,
-            token,
-            service=args.service,
-            timeout=args.timeout,
-            warmup=warmup,
-        )
 
     ingest_uptime, warmup_waited = wait_for_ingest_warmup(warmup)
 

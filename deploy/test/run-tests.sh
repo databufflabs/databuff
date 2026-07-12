@@ -1,9 +1,8 @@
 #!/usr/bin/env bash
-# 应用性能集成测试（默认）或录制 expected 基线（--snapshot，维护者用）
+# 应用性能集成测试
 #
 # Usage:
 #   ./run-tests.sh                  # 跑接口 + AI chat（已配置 API Key 时）
-#   ./run-tests.sh --snapshot       # 将当前 API 响应写入 expected/*.json
 #   TEST_SKIP_AI_CHAT=1 ./run-tests.sh
 set -euo pipefail
 
@@ -17,11 +16,9 @@ TEST_LIB_DIR="${TEST_DIR}/lib"
 REPORT_DIR="${TEST_LIB_DIR}/reports"
 
 if [[ "${1:-}" == "--snapshot" || "${1:-}" == "snapshot" ]]; then
-  shift || true
-  export TEST_WARMUP_SECONDS="${TEST_WARMUP_SECONDS:-0}"
-  echo "[run-tests] snapshot mode base=${TEST_BASE_URL}"
-  python3 "${TEST_LIB_DIR}/run_tests.py" --snapshot "$@"
-  exit $?
+  echo "[run-tests] ERROR: --snapshot is disabled; expected/*.json must not be auto-overwritten." >&2
+  echo "[run-tests] Edit expected files manually (use json_assert matchers like \$range)." >&2
+  exit 1
 fi
 
 export TEST_WARMUP_SECONDS="${TEST_WARMUP_SECONDS:-240}"
