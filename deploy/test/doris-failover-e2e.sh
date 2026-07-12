@@ -49,7 +49,7 @@ REINSTALL_DIR="${REINSTALL_DIR:-${APM_INSTALL_DIR}-reinstall}"
 APM_PKG_BASE="${APM_PKG_BASE:-http://192.168.50.140/databuff}"
 BUNDLE_ROOT="${BUNDLE_ROOT:-}"
 INSTALL_MODE="${INSTALL_MODE:-}"
-BE_MEM_LIMIT="${BE_MEM_LIMIT:-256m}"
+BE_MEM_LIMIT="${BE_MEM_LIMIT:-6m}"
 SIMULATE_OFFLINE="${SIMULATE_OFFLINE:-0}"
 STOP_AFTER="${STOP_AFTER:-all}"
 
@@ -149,12 +149,16 @@ step_inject_failure() {
     log "skip inject (SKIP_INJECT=1)"
     return 0
   fi
-  log "inject BE mem_limit=${BE_MEM_LIMIT} → ${OVERRIDE_FILE}"
-  cat >"$OVERRIDE_FILE" <<EOF
-services:
-  ai-apm-doris-be:
-    mem_limit: ${BE_MEM_LIMIT}
-EOF
+  local compose_yml="${APM_INSTALL_DIR}/docker-compose.yml"
+  local compose_bak="${APM_INSTALL_DIR}/docker-compose.yml.bak"
+  if [[ ! -f "$compose_yml" ]]; then
+    fail "missing ${compose_yml}"
+  fi
+  log "inject BE mem_limit=${BE_MEM_LIMIT} → ${compose_yml}"
+  cp "$compose_yml" "$compose_bak"
+  # Replace mem_limit only within the doris-be section
+  sed -i '/^  ai-apm-doris-be:/,/^  ai-apm-/ s/^    mem_limit:.*$/    mem_limit: '"${BE_MEM_LIMIT}"'/' "$compose_yml"
+  log "injected mem_limit=${BE_MEM_LIMIT} into ${compose_yml} (backup: ${compose_bak})"
   maybe_stop inject
 }
 
@@ -170,6 +174,10 @@ apply_offline_firewall() {
   iptables-save >"$IPTABLES_BACKUP"
   iptables -A OUTPUT -o lo -j ACCEPT
   iptables -A OUTPUT -m conntrack --ctstate ESTABLISHED,RELATED -j ACCEPT
+  # Allow Docker bridge & container networks (local container communication)
+  for iface in docker0 br-+; do
+    iptables -A OUTPUT -o "$iface" -j ACCEPT 2>/dev/null || true
+  done
   iptables -A OUTPUT -j DROP
 }
 
@@ -296,8 +304,14 @@ step_recovery() {
     log "skip recovery (SKIP_RECOVERY=1)"
     return 0
   fi
-  log "recovery: remove override and restart"
+  local compose_bak="${APM_INSTALL_DIR}/docker-compose.yml.bak"
+  if [[ -f "$compose_bak" ]]; then
+    log "recovery: restore docker-compose.yml from backup"
+    cp "$compose_bak" "${APM_INSTALL_DIR}/docker-compose.yml"
+    rm -f "$compose_bak"
+  fi
   rm -f "$OVERRIDE_FILE"
+  log "recovery: restart full stack without injection"
   stop_stack_quiet
   (
     cd "$APM_INSTALL_DIR"
