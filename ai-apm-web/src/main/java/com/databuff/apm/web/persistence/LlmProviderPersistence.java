@@ -64,7 +64,9 @@ public class LlmProviderPersistence {
     }
 
     public void persistDetail(SaveLlmProviderRequest request, LlmProviderView view) {
-        requirePersistence();
+        if (!ensurePersistence()) {
+            return;
+        }
         try {
             ApmConfigRepository repository = new ApmConfigRepository(readRepository, configDatabase);
             String cipher = request.apiKey() != null && !request.apiKey().isBlank()
@@ -86,7 +88,9 @@ public class LlmProviderPersistence {
     }
 
     public void persistUpdate(String providerCode, UpdateLlmProviderRequest request, LlmProviderView view) {
-        requirePersistence();
+        if (!ensurePersistence()) {
+            return;
+        }
         try {
             ApmConfigRepository repository = new ApmConfigRepository(readRepository, configDatabase);
             String cipher = request.apiKey() != null && !request.apiKey().isBlank()
@@ -108,7 +112,9 @@ public class LlmProviderPersistence {
     }
 
     public void persistCreate(CreateLlmProviderRequest request, LlmProviderView view) {
-        requirePersistence();
+        if (!ensurePersistence()) {
+            return;
+        }
         try {
             ApmConfigRepository repository = new ApmConfigRepository(readRepository, configDatabase);
             String cipher = request.apiKey() != null && !request.apiKey().isBlank()
@@ -129,14 +135,15 @@ public class LlmProviderPersistence {
         }
     }
 
-    private synchronized void requirePersistence() {
+    private synchronized boolean ensurePersistence() {
         if (!persistenceEnabled) {
             reloadFromStore();
         }
         if (!persistenceEnabled) {
-            throw new IllegalStateException(
-                    "模型配置库不可用，请检查 Doris 连接及 config_llm_provider / config_llm_model 表");
+            log.warn("LLM provider config saved in memory only; Doris store unavailable");
+            return false;
         }
+        return true;
     }
 
     boolean persistenceEnabled() {

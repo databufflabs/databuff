@@ -52,12 +52,12 @@ prepare_compose_start
 
 if doris_has_data; then
   echo "[start] doris data exists, starting all services"
-  compose_up_wait "$DORIS_FE_SERVICE" "$DORIS_BE_SERVICE"
+  compose_up_wait "$DORIS_FE_SERVICE" "$DORIS_BE_SERVICE" || { bootstrap_web_for_troubleshooting; exit 1; }
   compose_up "$INGEST_SERVICE" "$WEB_SERVICE"
 else
   echo "[start] initializing doris"
   mkdir -p "$DORIS_DATA_FE" "$DORIS_DATA_BE"
-  compose_up_wait "$DORIS_FE_SERVICE" "$DORIS_BE_SERVICE"
+  compose_up_wait "$DORIS_FE_SERVICE" "$DORIS_BE_SERVICE" || { bootstrap_web_for_troubleshooting; exit 1; }
   "${ROOT}/scripts/init-doris.sh"
   compose_up "$INGEST_SERVICE" "$WEB_SERVICE"
 fi

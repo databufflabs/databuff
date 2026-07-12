@@ -271,6 +271,29 @@ def _sort_span_rows(items: list[Any]) -> list[Any]:
     return sorted(items, key=sort_key)
 
 
+def _is_service_flow_edge_list(items: list[Any]) -> bool:
+    if not items:
+        return True
+    return all(
+        isinstance(item, dict)
+        and "srcService" in item
+        and "dstService" in item
+        and "callCount" in item
+        for item in items
+    )
+
+
+def _sort_service_flow_edges(items: list[Any]) -> list[Any]:
+    return sorted(
+        items,
+        key=lambda item: (
+            str(item.get("srcService") or ""),
+            -(int(item.get("callCount") or 0)),
+            str(item.get("dstService") or ""),
+        ),
+    )
+
+
 def _match_list(actual: list[Any], expected: list[Any], path: str) -> None:
     if _is_service_metric_point_list(actual) and _is_service_metric_point_list(expected):
         actual = _sort_service_metric_points(actual)
@@ -284,6 +307,9 @@ def _match_list(actual: list[Any], expected: list[Any], path: str) -> None:
     elif _is_span_row_list(actual) and _is_span_row_list(expected):
         actual = _sort_span_rows(actual)
         expected = _sort_span_rows(expected)
+    elif _is_service_flow_edge_list(actual) and _is_service_flow_edge_list(expected):
+        actual = _sort_service_flow_edges(actual)
+        expected = _sort_service_flow_edges(expected)
     if len(actual) != len(expected):
         raise JsonAssertError(path, f"expected list length {len(expected)}, got {len(actual)}")
     for idx, (act_item, exp_item) in enumerate(zip(actual, expected)):

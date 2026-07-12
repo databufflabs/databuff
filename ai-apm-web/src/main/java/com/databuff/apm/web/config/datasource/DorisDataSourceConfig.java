@@ -32,7 +32,7 @@ public class DorisDataSourceConfig {
         dataSource.setQueryTimeout(300);
         dataSource.setValidationQuery("show status;");
         dataSource.setMaxActive(20);
-        dataSource.setInitialSize(1);
+        dataSource.setInitialSize(0);
         dataSource.setMaxWait(60_000);
         dataSource.setMinIdle(1);
         dataSource.setTestWhileIdle(true);

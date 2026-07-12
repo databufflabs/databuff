@@ -1,5 +1,6 @@
 #!/usr/bin/env bash
 # 本地 Doris 重装：停止服务 → 删除历史数据 → 重新初始化并启动全栈
+# 首次使用前需执行 ./build-jdk-images.sh 构建 JDK 开发镜像
 #
 # Usage:
 #   ./install.sh

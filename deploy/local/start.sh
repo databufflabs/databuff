@@ -1,5 +1,6 @@
 #!/usr/bin/env bash
 # 本地一键启动：编译 ingest / web / demo → 挂载 JAR 启动 Doris（含初始化 SQL）+ ingest + web + demo
+# 首次使用前需执行 ./build-jdk-images.sh 构建 JDK 开发镜像
 #
 # Usage:
 #   ./start.sh [ingest|web|demo|doris ...]
@@ -18,8 +19,7 @@ chmod +x "${ROOT}/scripts/"*.sh 2>/dev/null || true
 # shellcheck source=scripts/lib.sh
 . "${ROOT}/scripts/lib.sh"
 load_local_env
-ensure_jdk_image
-ensure_local_web_image
+ensure_local_jdk_image
 
 # shellcheck source=scripts/compose-env.sh
 . "${ROOT}/scripts/compose-env.sh"
@@ -93,6 +93,23 @@ for _svc in "${UP_SERVICES[@]}"; do
   esac
 done
 
+_up_services_include_web() {
+  local _svc
+  for _svc in "${UP_SERVICES[@]}"; do
+    if [ "$_svc" = "$WEB_SERVICE" ]; then
+      return 0
+    fi
+  done
+  return 1
+}
+
+_handle_doris_start_failure() {
+  if _up_services_include_web; then
+    bootstrap_web_for_troubleshooting
+  fi
+  exit 1
+}
+
 if doris_has_data; then
   echo "[start] doris data exists, starting selected services"
   _up_doris=()
@@ -102,7 +119,7 @@ if doris_has_data; then
     esac
   done
   if [ ${#_up_doris[@]} -gt 0 ]; then
-    compose_up_wait "${_up_doris[@]}"
+    compose_up_wait "${_up_doris[@]}" || _handle_doris_start_failure
   fi
   if [ ${#_up_apps[@]} -gt 0 ]; then
     compose_up "${_up_apps[@]}"
@@ -110,7 +127,7 @@ if doris_has_data; then
 else
   echo "[start] initializing doris"
   mkdir -p "${ROOT}/data/fe-meta" "${ROOT}/data/be-storage"
-  compose_up_wait "$DORIS_FE_SERVICE" "$DORIS_BE_SERVICE"
+  compose_up_wait "$DORIS_FE_SERVICE" "$DORIS_BE_SERVICE" || _handle_doris_start_failure
   "${ROOT}/scripts/init-doris.sh"
   if [ ${#_up_apps[@]} -gt 0 ]; then
     compose_up "${_up_apps[@]}"

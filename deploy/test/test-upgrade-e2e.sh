@@ -1,27 +1,19 @@
 #!/usr/bin/env bash
 # DataBuff Docker upgrade E2E skeleton (CI / local manual runs).
 #
-# Flow: install (FROM_VERSION) → seed demo → update (TO_VERSION) → verify
+# Flow: install (FROM) → seed demo → snapshot data → update (TO) → verify → data retention verify
 #
 # Usage:
 #   FROM_VERSION=0.1.2 TO_VERSION=0.1.3 ./test-upgrade-e2e.sh
-#   INSTALL_DIR=/tmp/databuff-upgrade-test FROM_VERSION=0.1.2 TO_VERSION=0.1.3 ./test-upgrade-e2e.sh
-#   RUN_API_TESTS=1 FROM_VERSION=0.1.2 TO_VERSION=0.1.3 ./test-upgrade-e2e.sh
+#   RUN_DATA_RETENTION=1 FROM_VERSION=0.1.2 TO_VERSION=0.1.3 ./test-upgrade-e2e.sh
 #
 # Environment:
-#   FROM_VERSION       Source release to install (required)
-#   TO_VERSION         Target release to upgrade to (required)
-#   INSTALL_DIR        Install path (default: /tmp/databuff-upgrade-e2e)
-#   APM_PKG_BASE       Package download base (default from deploy/env.sh)
-#   SKIP_INSTALL       1 = reuse existing INSTALL_DIR (must match FROM_VERSION)
-#   SKIP_SEED          1 = skip demo install / telemetry seed
-#   SKIP_UPDATE        1 = skip update step (verify only)
-#   SKIP_VERIFY        1 = skip verify-upgrade.sh
-#   RUN_API_TESTS      1 = run deploy/test/run-tests.sh after verify
-#   TEST_BASE_URL      Base URL for API tests (default http://127.0.0.1:27403)
-#
-# Prerequisites: root, Docker, curl, python3; network or offline bundles for both versions.
-# Full CI wiring is environment-specific — this script documents the intended sequence.
+#   RUN_DATA_RETENTION   1 = snapshot before update + verify after verify-upgrade (default 1)
+#   RUN_API_TESTS        0 = 升级后不跑 108/108（默认）；API 回归属 KR3，非 KR4
+#   SKIP_DATA_RETENTION  1 = skip data retention checks
+#   SEED_WARMUP_SECONDS  demo 预热秒数，snapshot 前等待（default 300）
+#   SNAPSHOT_FILE        快照路径（default /tmp/upgrade-data-snapshot.json）
+#   ... (see header below)
 #
 set -euo pipefail
 
@@ -37,6 +29,10 @@ SKIP_SEED="${SKIP_SEED:-0}"
 SKIP_UPDATE="${SKIP_UPDATE:-0}"
 SKIP_VERIFY="${SKIP_VERIFY:-0}"
 RUN_API_TESTS="${RUN_API_TESTS:-0}"
+RUN_DATA_RETENTION="${RUN_DATA_RETENTION:-1}"
+SKIP_DATA_RETENTION="${SKIP_DATA_RETENTION:-0}"
+SEED_WARMUP_SECONDS="${SEED_WARMUP_SECONDS:-300}"
+SNAPSHOT_FILE="${SNAPSHOT_FILE:-/tmp/upgrade-data-snapshot.json}"
 
 log() { echo "[test-upgrade-e2e] $*"; }
 fail() { echo "[test-upgrade-e2e] ERROR: $*" >&2; exit 1; }
@@ -53,6 +49,7 @@ export APM_INSTALL_DIR="$INSTALL_DIR"
 
 verify_script="${INSTALL_DIR}/scripts/verify-upgrade.sh"
 run_tests="${SCRIPT_DIR}/run-tests.sh"
+data_retention="${SCRIPT_DIR}/verify-upgrade-data-retention.sh"
 
 step_install() {
   if [[ "$SKIP_INSTALL" == "1" ]]; then
@@ -113,6 +110,28 @@ step_verify() {
   )
 }
 
+step_data_snapshot() {
+  if [[ "$SKIP_DATA_RETENTION" == "1" || "$RUN_DATA_RETENTION" != "1" ]]; then
+    log "skip data snapshot (SKIP_DATA_RETENTION=${SKIP_DATA_RETENTION}, RUN_DATA_RETENTION=${RUN_DATA_RETENTION})"
+    return 0
+  fi
+  [[ -f "$data_retention" ]] || fail "missing: ${data_retention}"
+  log "snapshot pre-upgrade telemetry → ${SNAPSHOT_FILE} (warmup ${SEED_WARMUP_SECONDS}s)"
+  SEED_WARMUP_SECONDS="$SEED_WARMUP_SECONDS" SNAPSHOT_FILE="$SNAPSHOT_FILE" \
+    TEST_BASE_URL="${TEST_BASE_URL:-http://127.0.0.1:27403}" \
+    bash "$data_retention" snapshot
+}
+
+step_data_verify() {
+  if [[ "$SKIP_DATA_RETENTION" == "1" || "$RUN_DATA_RETENTION" != "1" ]]; then
+    return 0
+  fi
+  [[ -f "$data_retention" ]] || fail "missing: ${data_retention}"
+  log "verify pre-upgrade data still queryable after upgrade"
+  SNAPSHOT_FILE="$SNAPSHOT_FILE" TEST_BASE_URL="${TEST_BASE_URL:-http://127.0.0.1:27403}" \
+    bash "$data_retention" verify
+}
+
 step_api_tests() {
   if [[ "$RUN_API_TESTS" != "1" ]]; then
     return 0
@@ -128,8 +147,10 @@ main() {
   log "FROM=${FROM_VERSION} TO=${TO_VERSION} INSTALL_DIR=${INSTALL_DIR}"
   step_install
   step_seed
+  step_data_snapshot
   step_update
   step_verify
+  step_data_verify
   step_api_tests
   log "done"
 }

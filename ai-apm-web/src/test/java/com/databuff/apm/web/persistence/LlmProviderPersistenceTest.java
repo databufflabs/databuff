@@ -25,7 +25,7 @@ import static org.mockito.Mockito.when;
 class LlmProviderPersistenceTest {
 
     @Test
-    void rejectsPersistWhenStoreUnavailable() throws Exception {
+    void skipsPersistWhenStoreUnavailable() throws Exception {
         ApmReadRepository reader = mock(ApmReadRepository.class);
         when(reader.connection()).thenThrow(new SQLException("down"));
         InMemoryLlmProviderStore store = TestBeanSupport.llmProviderStore();
@@ -33,10 +33,8 @@ class LlmProviderPersistenceTest {
         sync.reloadFromStore();
         LlmProviderView view = store.updateProvider("openai", new UpdateLlmProviderRequest(null, "sk", null, true));
         assertThat(sync.persistenceEnabled()).isFalse();
-        assertThatThrownBy(() -> sync.persistUpdate(
-                "openai", new UpdateLlmProviderRequest(null, "sk", null, true), view))
-                .isInstanceOf(IllegalStateException.class)
-                .hasMessageContaining("模型配置库不可用");
+        sync.persistUpdate("openai", new UpdateLlmProviderRequest(null, "sk", null, true), view);
+        assertThat(sync.persistenceEnabled()).isFalse();
     }
 
     @Test

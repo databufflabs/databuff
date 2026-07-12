@@ -115,7 +115,7 @@ load_local_env() {
     set +a
   fi
   export JDK_IMAGE="${JDK_IMAGE:-eclipse-temurin:17-jdk-jammy}"
-  export LOCAL_WEB_IMAGE="${LOCAL_WEB_IMAGE:-databuff-local/web-dev:17-jdk-jammy}"
+  export LOCAL_JDK_IMAGE="${LOCAL_JDK_IMAGE:-databuff-local/jdk-dev:17-jammy}"
 }
 
 local_image_arch() {
@@ -159,14 +159,20 @@ ensure_jdk_image() {
   fi
 }
 
-ensure_local_web_image() {
-  if docker image inspect "${LOCAL_WEB_IMAGE}" >/dev/null 2>&1; then
-    echo "[local] using local web dev image ${LOCAL_WEB_IMAGE}"
+build_local_jdk_image() {
+  echo "[local] building JDK dev image ${LOCAL_JDK_IMAGE} (FROM ${JDK_IMAGE})"
+  docker build -t "${LOCAL_JDK_IMAGE}" \
+    --build-arg "JDK_IMAGE=${JDK_IMAGE}" \
+    -f "${LOCAL_ROOT}/Dockerfile.jdk-dev" \
+    "${LOCAL_ROOT}"
+}
+
+ensure_local_jdk_image() {
+  if docker image inspect "${LOCAL_JDK_IMAGE}" >/dev/null 2>&1; then
+    echo "[local] using local JDK dev image ${LOCAL_JDK_IMAGE}"
     return 0
   fi
-  echo "[local] building web dev image ${LOCAL_WEB_IMAGE} (FROM ${JDK_IMAGE})"
-  docker build -t "${LOCAL_WEB_IMAGE}" \
-    --build-arg "JDK_IMAGE=${JDK_IMAGE}" \
-    -f "${LOCAL_ROOT}/Dockerfile.web-dev" \
-    "${LOCAL_ROOT}"
+  echo "[local] missing JDK dev image ${LOCAL_JDK_IMAGE}" >&2
+  echo "[local] run once: ${LOCAL_ROOT}/build-jdk-images.sh" >&2
+  exit 1
 }

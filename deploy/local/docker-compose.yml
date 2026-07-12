@@ -70,7 +70,7 @@ services:
       start_period: 120s
 
   ai-apm-ingest:
-    image: ${JDK_IMAGE:-eclipse-temurin:17-jdk-jammy}
+    image: ${LOCAL_JDK_IMAGE:-databuff-local/jdk-dev:17-jammy}
     container_name: ai-apm-ingest
     hostname: ai-apm-ingest
     restart: unless-stopped
@@ -105,12 +105,7 @@ services:
         ipv4_address: 172.20.80.3
 
   ai-apm-web:
-    image: ${LOCAL_WEB_IMAGE:-databuff-local/web-dev:17-jdk-jammy}
-    build:
-      context: .
-      dockerfile: Dockerfile.web-dev
-      args:
-        JDK_IMAGE: ${JDK_IMAGE:-eclipse-temurin:17-jdk-jammy}
+    image: ${LOCAL_JDK_IMAGE:-databuff-local/jdk-dev:17-jammy}
     container_name: ai-apm-web
     hostname: ai-apm-web
     restart: unless-stopped
@@ -144,7 +139,7 @@ services:
         ipv4_address: 172.20.80.4
 
   ai-apm-demo:
-    image: ${JDK_IMAGE:-eclipse-temurin:17-jdk-jammy}
+    image: ${LOCAL_JDK_IMAGE:-databuff-local/jdk-dev:17-jammy}
     container_name: ai-apm-demo
     hostname: ai-apm-demo
     restart: unless-stopped
@@ -169,7 +164,7 @@ services:
         ipv4_address: 172.20.80.6
 
   ai-apm-demo-sw:
-    image: ${JDK_IMAGE:-eclipse-temurin:17-jdk-jammy}
+    image: ${LOCAL_JDK_IMAGE:-databuff-local/jdk-dev:17-jammy}
     container_name: ai-apm-demo-sw
     hostname: ai-apm-demo-sw
     restart: unless-stopped

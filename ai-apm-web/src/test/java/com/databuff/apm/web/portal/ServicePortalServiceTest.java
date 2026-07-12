@@ -301,7 +301,7 @@ class ServicePortalServiceTest {
         assertThat(String.valueOf(info.get("technology"))).contains("jvm");
         @SuppressWarnings("unchecked")
         List<String> componentTypes = (List<String>) info.get("componentTypes");
-        assertThat(componentTypes).contains("service.jvm");
+        assertThat(componentTypes).doesNotContain("service.jvm");
     }
 
     @Test

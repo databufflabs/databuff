@@ -19,7 +19,7 @@ apm_refresh_image_pkg_bases() {
 apm_refresh_image_refs
 
 export JDK_IMAGE="eclipse-temurin:17-jdk-jammy"
-export LOCAL_WEB_IMAGE="${LOCAL_WEB_IMAGE:-databuff-local/web-dev:17-jdk-jammy}"
+export LOCAL_JDK_IMAGE="${LOCAL_JDK_IMAGE:-databuff-local/jdk-dev:17-jammy}"
 # 构建 / local 拉取 JDK 基础镜像的 registry 前缀（如 test.xxx.com/databuff，建议写入 shell profile）。
 # 设置后从 ${JDK_REGISTRY}/eclipse-temurin:17-jdk-jammy 拉取并 tag 为 eclipse-temurin:17-jdk-jammy；未设置则直接 pull 短名。
 export JDK_REGISTRY="${JDK_REGISTRY:-}"

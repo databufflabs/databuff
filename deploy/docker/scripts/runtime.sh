@@ -115,3 +115,46 @@ print_apm_ready_summary() {
   echo -e "${CYN}========================================================${RST}"
   echo ""
 }
+
+bootstrap_web_for_troubleshooting() {
+  web_service="${WEB_SERVICE:-ai-apm-web}"
+  timeout="${APM_READY_TIMEOUT:-300}"
+
+  echo "[start] Doris not ready; starting ${web_service} for troubleshooting" >&2
+  compose_cmd up -d --no-deps "$web_service"
+
+  if [ "${START_SKIP_READY:-0}" != "1" ]; then
+    wait_for_http_ready "http://127.0.0.1:27403/health" "web" "$timeout" || true
+  fi
+
+  if [ "${START_SKIP_SUMMARY:-0}" != "1" ]; then
+    print_web_bootstrap_summary
+  fi
+}
+
+print_web_bootstrap_summary() {
+  host_ip="$(detect_local_ip)"
+  CYN='\033[36m'
+  YLW='\033[33m'
+  BLD='\033[1m'
+  RST='\033[0m'
+
+  echo ""
+  echo -e "${CYN}========================================================${RST}"
+  echo -e "${YLW}${BLD} Doris 未就绪 — Web 排障模式${RST}"
+  echo -e "${CYN}========================================================${RST}"
+  echo ""
+  echo -e "  ${CYN}Web UI${RST}"
+  echo "    http://${host_ip}:27403"
+  echo -e "  ${CYN}登录账号${RST}"
+  echo -e "    用户名: ${BLD}admin${RST}"
+  echo -e "    密码:   ${YLW}Databuff@123${RST}"
+  echo ""
+  echo -e "  ${CYN}下一步${RST}"
+  echo "    1. 打开「配置 → 大模型」，填写 API Key 并保存"
+  echo "    2. 打开「AI 平台」，选择运维专家"
+  echo "    3. 提供机器 SSH 信息（地址、用户名、密码或密钥），由专家登录排查"
+  echo ""
+  echo -e "${CYN}========================================================${RST}"
+  echo ""
+}

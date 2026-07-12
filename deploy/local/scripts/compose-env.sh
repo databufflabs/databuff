@@ -16,8 +16,7 @@ set -a
 set +a
 
 export JDK_IMAGE="${JDK_IMAGE:-eclipse-temurin:17-jdk-jammy}"
-export LOCAL_WEB_IMAGE="${LOCAL_WEB_IMAGE:-databuff-local/web-dev:17-jdk-jammy}"
-export LOCAL_WEB_IMAGE="${LOCAL_WEB_IMAGE:-databuff-local/web-dev:17-jdk-jammy}"
+export LOCAL_JDK_IMAGE="${LOCAL_JDK_IMAGE:-databuff-local/jdk-dev:17-jammy}"
 
 DORIS_FE_SERVICE="ai-apm-doris-fe"
 DORIS_BE_SERVICE="ai-apm-doris-be"

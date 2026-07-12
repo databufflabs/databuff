@@ -25,8 +25,8 @@
       "service.http",
       "service.db",
       "service.rpc",
-      "service.trace",
-      "service.jvm"
+      "service.mq",
+      "service.redis"
     ],
     "bizEvents": [],
     "domainManager": {},

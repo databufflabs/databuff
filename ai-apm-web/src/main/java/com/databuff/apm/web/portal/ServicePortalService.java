@@ -54,15 +54,15 @@ public class ServicePortalService {
     private static final Pattern REMOTE_PATTERN = Pattern.compile(
             "gateway|external|third|remote|openapi|feign|dubbo",
             Pattern.CASE_INSENSITIVE);
+    /** Portal 调用分析 RequestTypeMapping 可下钻的组件；不含 trace/flow/jvm 等。 */
     private static final List<String> SERVICE_COMPONENT_TYPES = List.of(
             "service.http",
             "service.db",
             "service.rpc",
-            "service.trace",
-            "service.flow",
-            "service.exception",
-            "service.thread.pool",
-            "service.jvm");
+            "service.mq",
+            "service.redis",
+            "service.config",
+            "service.remote");
 
     private final ApmReadRepository readRepository;
     private final String metricDatabase;
