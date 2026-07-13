@@ -167,6 +167,17 @@ export default class TableList extends Vue {
   ];
   get columns () {
     return this.columnsFullLabels.filter((item) => {
+      // 动态隐藏 RPC 调用详情中始终为空的「线程名」列：
+      // 当前列表所有行的 threadName 均为空时不展示该列
+      if (item.value === 'client.threadName' || item.value === 'server.threadName') {
+        const hasValue = this.tableList.some((row: any) => {
+          const v = row[item.value]
+          return v !== undefined && v !== null && v !== ''
+        })
+        if (!hasValue) {
+          return false
+        }
+      }
       if (Array.isArray(item.type)) {
         return item.type.includes(this.componentType)
       } else {
