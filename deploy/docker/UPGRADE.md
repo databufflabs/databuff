@@ -80,7 +80,7 @@ Set `SKIP_VERIFY=1` on `update.sh` if you will verify only after the manual star
 
 ## Schema migration failure
 
-Step 6 order: start Doris → `migrate-schema` → start ingest/web. If migration fails, **Web troubleshooting mode** still starts (`ai-apm-web` only; ingest stays down to avoid writing into a broken schema). Web probes Doris once at startup; when unreachable, Doris-backed APIs fail fast so the AI chat page loads quickly for ops expert troubleshooting. Restart web after Doris is fixed to exit troubleshooting mode. Check `GET /health` for `"doris":"UNAVAILABLE"`. Same pattern as `start.sh` when Doris is unavailable.
+Step 6 order: start Doris → `migrate-schema` → start ingest/web. On migration/start failure, `update.sh` restores the pre-upgrade `data/` backup and retries (default 3 attempts). Intermediate failures only log a short message and retry — they do **not** start Web troubleshooting mode. Only after all attempts fail does **Web troubleshooting mode** start (`ai-apm-web` only; ingest stays down to avoid writing into a broken schema). Web probes Doris once at startup; when unreachable, Doris-backed APIs fail fast so the AI chat page loads quickly for ops expert troubleshooting. Restart web after Doris is fixed to exit troubleshooting mode. Check `GET /health` for `"doris":"UNAVAILABLE"`. `start.sh` has no retry loop: Doris failure there enters troubleshooting mode immediately (single attempt).
 
 ### One-command recovery (recommended)
 

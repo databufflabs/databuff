@@ -1,5 +1,7 @@
 -- 0.1.x -> next: metric tables daily dynamic partition (30-day retention).
 -- Adds metric_time (DATETIME) partition key; backfills from existing ts (epoch millis).
+-- Requires create_history_partition so Doris materializes [today+start, today+end] before INSERT.
+-- INSERT keeps only the last 30 days (matches dynamic_partition.start retention).
 
 USE databuff;
 
@@ -58,10 +60,11 @@ PROPERTIES (
   "dynamic_partition.time_unit" = "DAY",
   "dynamic_partition.start" = "-30",
   "dynamic_partition.end" = "3",
-  "dynamic_partition.prefix" = "p"
+  "dynamic_partition.prefix" = "p",
+  "dynamic_partition.create_history_partition" = "true"
 );
 INSERT INTO metric_jvm__v3 (`metric_time`, `ts`, `instance`, `service`, `service_id`, `service_instance`, `tag_host`, `thread_count`, `cpu_load_process`, `cpu_load_system`, `gc_eden_size`, `gc_major_collection_count`, `gc_major_collection_time`, `gc_metaspace_size`, `gc_minor_collection_count`, `gc_minor_collection_time`, `gc_old_gen_size`, `gc_survivor_size`, `buffer_pool_direct_capacity`, `buffer_pool_direct_count`, `buffer_pool_direct_used`, `buffer_pool_mapped_capacity`, `buffer_pool_mapped_count`, `buffer_pool_mapped_used`, `loaded_classes_count`, `memory_heap_committed`, `memory_heap_init`, `memory_heap_max`, `memory_heap_used`, `memory_heap_free`, `memory_heap_pct`, `memory_noheap_committed`, `memory_noheap_init`, `memory_noheap_max`, `memory_noheap_used`)
-SELECT FROM_UNIXTIME(FLOOR(`ts` / 1000)) AS `metric_time`, `ts`, `instance`, `service`, `service_id`, `service_instance`, `tag_host`, `thread_count`, `cpu_load_process`, `cpu_load_system`, `gc_eden_size`, `gc_major_collection_count`, `gc_major_collection_time`, `gc_metaspace_size`, `gc_minor_collection_count`, `gc_minor_collection_time`, `gc_old_gen_size`, `gc_survivor_size`, `buffer_pool_direct_capacity`, `buffer_pool_direct_count`, `buffer_pool_direct_used`, `buffer_pool_mapped_capacity`, `buffer_pool_mapped_count`, `buffer_pool_mapped_used`, `loaded_classes_count`, `memory_heap_committed`, `memory_heap_init`, `memory_heap_max`, `memory_heap_used`, `memory_heap_free`, `memory_heap_pct`, `memory_noheap_committed`, `memory_noheap_init`, `memory_noheap_max`, `memory_noheap_used` FROM metric_jvm;
+SELECT FROM_UNIXTIME(FLOOR(`ts` / 1000)) AS `metric_time`, `ts`, `instance`, `service`, `service_id`, `service_instance`, `tag_host`, `thread_count`, `cpu_load_process`, `cpu_load_system`, `gc_eden_size`, `gc_major_collection_count`, `gc_major_collection_time`, `gc_metaspace_size`, `gc_minor_collection_count`, `gc_minor_collection_time`, `gc_old_gen_size`, `gc_survivor_size`, `buffer_pool_direct_capacity`, `buffer_pool_direct_count`, `buffer_pool_direct_used`, `buffer_pool_mapped_capacity`, `buffer_pool_mapped_count`, `buffer_pool_mapped_used`, `loaded_classes_count`, `memory_heap_committed`, `memory_heap_init`, `memory_heap_max`, `memory_heap_used`, `memory_heap_free`, `memory_heap_pct`, `memory_noheap_committed`, `memory_noheap_init`, `memory_noheap_max`, `memory_noheap_used` FROM metric_jvm WHERE FROM_UNIXTIME(FLOOR(`ts` / 1000)) >= DATE_SUB(CURRENT_DATE(), INTERVAL 30 DAY);
 DROP TABLE metric_jvm;
 ALTER TABLE metric_jvm__v3 RENAME metric_jvm;
 
@@ -102,10 +105,11 @@ PROPERTIES (
   "dynamic_partition.time_unit" = "DAY",
   "dynamic_partition.start" = "-30",
   "dynamic_partition.end" = "3",
-  "dynamic_partition.prefix" = "p"
+  "dynamic_partition.prefix" = "p",
+  "dynamic_partition.create_history_partition" = "true"
 );
 INSERT INTO metric_service__v3 (`metric_time`, `ts`, `errorType`, `service`, `service_id`, `service_instance`, `apdex`, `cnt`, `error`, `healthStatus`, `histogramCount`, `histogramMax`, `maxDuration`, `minDuration`, `reqBodyLength`, `respBodyLength`, `slowCnt`, `sumCpuTime`, `sumDuration`, `verySlowCnt`)
-SELECT FROM_UNIXTIME(FLOOR(`ts` / 1000)) AS `metric_time`, `ts`, `errorType`, `service`, `service_id`, `service_instance`, `apdex`, `cnt`, `error`, `healthStatus`, `histogramCount`, `histogramMax`, `maxDuration`, `minDuration`, `reqBodyLength`, `respBodyLength`, `slowCnt`, `sumCpuTime`, `sumDuration`, `verySlowCnt` FROM metric_service;
+SELECT FROM_UNIXTIME(FLOOR(`ts` / 1000)) AS `metric_time`, `ts`, `errorType`, `service`, `service_id`, `service_instance`, `apdex`, `cnt`, `error`, `healthStatus`, `histogramCount`, `histogramMax`, `maxDuration`, `minDuration`, `reqBodyLength`, `respBodyLength`, `slowCnt`, `sumCpuTime`, `sumDuration`, `verySlowCnt` FROM metric_service WHERE FROM_UNIXTIME(FLOOR(`ts` / 1000)) >= DATE_SUB(CURRENT_DATE(), INTERVAL 30 DAY);
 DROP TABLE metric_service;
 ALTER TABLE metric_service__v3 RENAME metric_service;
 
@@ -160,10 +164,11 @@ PROPERTIES (
   "dynamic_partition.time_unit" = "DAY",
   "dynamic_partition.start" = "-30",
   "dynamic_partition.end" = "3",
-  "dynamic_partition.prefix" = "p"
+  "dynamic_partition.prefix" = "p",
+  "dynamic_partition.create_history_partition" = "true"
 );
 INSERT INTO metric_service_config__v3 (`metric_time`, `ts`, `config.type`, `durationRange`, `isIn`, `isOut`, `operation`, `resource`, `rootComponentType`, `rootResource`, `service`, `service_id`, `service_instance`, `srcService`, `srcServiceId`, `srcServiceInstance`, `cnt`, `error`, `histogramCount`, `histogramMax`, `maxDuration`, `minDuration`, `slow`, `sumDuration`)
-SELECT FROM_UNIXTIME(FLOOR(`ts` / 1000)) AS `metric_time`, `ts`, `config.type`, `durationRange`, `isIn`, `isOut`, `operation`, `resource`, `rootComponentType`, `rootResource`, `service`, `service_id`, `service_instance`, `srcService`, `srcServiceId`, `srcServiceInstance`, `cnt`, `error`, `histogramCount`, `histogramMax`, `maxDuration`, `minDuration`, `slow`, `sumDuration` FROM metric_service_config;
+SELECT FROM_UNIXTIME(FLOOR(`ts` / 1000)) AS `metric_time`, `ts`, `config.type`, `durationRange`, `isIn`, `isOut`, `operation`, `resource`, `rootComponentType`, `rootResource`, `service`, `service_id`, `service_instance`, `srcService`, `srcServiceId`, `srcServiceInstance`, `cnt`, `error`, `histogramCount`, `histogramMax`, `maxDuration`, `minDuration`, `slow`, `sumDuration` FROM metric_service_config WHERE FROM_UNIXTIME(FLOOR(`ts` / 1000)) >= DATE_SUB(CURRENT_DATE(), INTERVAL 30 DAY);
 DROP TABLE metric_service_config;
 ALTER TABLE metric_service_config__v3 RENAME metric_service_config;
 
@@ -191,10 +196,11 @@ PROPERTIES (
   "dynamic_partition.time_unit" = "DAY",
   "dynamic_partition.start" = "-30",
   "dynamic_partition.end" = "3",
-  "dynamic_partition.prefix" = "p"
+  "dynamic_partition.prefix" = "p",
+  "dynamic_partition.create_history_partition" = "true"
 );
 INSERT INTO metric_service_cpu__v3 (`metric_time`, `ts`, `service`, `serviceCode`, `service_id`, `service_instance`, `usage_pct`)
-SELECT FROM_UNIXTIME(FLOOR(`ts` / 1000)) AS `metric_time`, `ts`, `service`, `serviceCode`, `service_id`, `service_instance`, `usage_pct` FROM metric_service_cpu;
+SELECT FROM_UNIXTIME(FLOOR(`ts` / 1000)) AS `metric_time`, `ts`, `service`, `serviceCode`, `service_id`, `service_instance`, `usage_pct` FROM metric_service_cpu WHERE FROM_UNIXTIME(FLOOR(`ts` / 1000)) >= DATE_SUB(CURRENT_DATE(), INTERVAL 30 DAY);
 DROP TABLE metric_service_cpu;
 ALTER TABLE metric_service_cpu__v3 RENAME metric_service_cpu;
 
@@ -260,10 +266,11 @@ PROPERTIES (
   "dynamic_partition.time_unit" = "DAY",
   "dynamic_partition.start" = "-30",
   "dynamic_partition.end" = "3",
-  "dynamic_partition.prefix" = "p"
+  "dynamic_partition.prefix" = "p",
+  "dynamic_partition.create_history_partition" = "true"
 );
 INSERT INTO metric_service_db__v3 (`metric_time`, `ts`, `dbType`, `durationRange`, `isIn`, `isOut`, `isSlow`, `resource`, `rootComponentType`, `rootResource`, `service`, `service_id`, `service_instance`, `sqlContent`, `sqlDatabase`, `sqlOperation`, `srcService`, `srcServiceId`, `srcServiceInstance`, `cnt`, `error`, `histogramCount`, `histogramMax`, `maxDuration`, `minDuration`, `readRows`, `readRowsCnt`, `slow`, `slowCnt`, `sumDuration`, `updateRows`, `updateRowsCnt`)
-SELECT FROM_UNIXTIME(FLOOR(`ts` / 1000)) AS `metric_time`, `ts`, `dbType`, `durationRange`, `isIn`, `isOut`, `isSlow`, `resource`, `rootComponentType`, `rootResource`, `service`, `service_id`, `service_instance`, `sqlContent`, `sqlDatabase`, `sqlOperation`, `srcService`, `srcServiceId`, `srcServiceInstance`, `cnt`, `error`, `histogramCount`, `histogramMax`, `maxDuration`, `minDuration`, `readRows`, `readRowsCnt`, `slow`, `slowCnt`, `sumDuration`, `updateRows`, `updateRowsCnt` FROM metric_service_db;
+SELECT FROM_UNIXTIME(FLOOR(`ts` / 1000)) AS `metric_time`, `ts`, `dbType`, `durationRange`, `isIn`, `isOut`, `isSlow`, `resource`, `rootComponentType`, `rootResource`, `service`, `service_id`, `service_instance`, `sqlContent`, `sqlDatabase`, `sqlOperation`, `srcService`, `srcServiceId`, `srcServiceInstance`, `cnt`, `error`, `histogramCount`, `histogramMax`, `maxDuration`, `minDuration`, `readRows`, `readRowsCnt`, `slow`, `slowCnt`, `sumDuration`, `updateRows`, `updateRowsCnt` FROM metric_service_db WHERE FROM_UNIXTIME(FLOOR(`ts` / 1000)) >= DATE_SUB(CURRENT_DATE(), INTERVAL 30 DAY);
 DROP TABLE metric_service_db;
 ALTER TABLE metric_service_db__v3 RENAME metric_service_db;
 
@@ -304,10 +311,11 @@ PROPERTIES (
   "dynamic_partition.time_unit" = "DAY",
   "dynamic_partition.start" = "-30",
   "dynamic_partition.end" = "3",
-  "dynamic_partition.prefix" = "p"
+  "dynamic_partition.prefix" = "p",
+  "dynamic_partition.create_history_partition" = "true"
 );
 INSERT INTO metric_service_db_connection_pool__v3 (`metric_time`, `ts`, `connectionPoolDbType`, `connectionPoolName`, `connectionPoolType`, `connectionPoolUrl`, `connectionPoolUsername`, `driverClassName`, `service`, `service_id`, `service_instance`, `activeSize`, `idleSize`, `maxSize`, `waiterNum`)
-SELECT FROM_UNIXTIME(FLOOR(`ts` / 1000)) AS `metric_time`, `ts`, `connectionPoolDbType`, `connectionPoolName`, `connectionPoolType`, `connectionPoolUrl`, `connectionPoolUsername`, `driverClassName`, `service`, `service_id`, `service_instance`, `activeSize`, `idleSize`, `maxSize`, `waiterNum` FROM metric_service_db_connection_pool;
+SELECT FROM_UNIXTIME(FLOOR(`ts` / 1000)) AS `metric_time`, `ts`, `connectionPoolDbType`, `connectionPoolName`, `connectionPoolType`, `connectionPoolUrl`, `connectionPoolUsername`, `driverClassName`, `service`, `service_id`, `service_instance`, `activeSize`, `idleSize`, `maxSize`, `waiterNum` FROM metric_service_db_connection_pool WHERE FROM_UNIXTIME(FLOOR(`ts` / 1000)) >= DATE_SUB(CURRENT_DATE(), INTERVAL 30 DAY);
 DROP TABLE metric_service_db_connection_pool;
 ALTER TABLE metric_service_db_connection_pool__v3 RENAME metric_service_db_connection_pool;
 
@@ -336,10 +344,11 @@ PROPERTIES (
   "dynamic_partition.time_unit" = "DAY",
   "dynamic_partition.start" = "-30",
   "dynamic_partition.end" = "3",
-  "dynamic_partition.prefix" = "p"
+  "dynamic_partition.prefix" = "p",
+  "dynamic_partition.create_history_partition" = "true"
 );
 INSERT INTO metric_service_db_connection_pool_get__v3 (`metric_time`, `ts`, `connectionPoolName`, `service`, `service_id`, `service_instance`, `waitTime`, `count`)
-SELECT FROM_UNIXTIME(FLOOR(`ts` / 1000)) AS `metric_time`, `ts`, `connectionPoolName`, `service`, `service_id`, `service_instance`, `waitTime`, `count` FROM metric_service_db_connection_pool_get;
+SELECT FROM_UNIXTIME(FLOOR(`ts` / 1000)) AS `metric_time`, `ts`, `connectionPoolName`, `service`, `service_id`, `service_instance`, `waitTime`, `count` FROM metric_service_db_connection_pool_get WHERE FROM_UNIXTIME(FLOOR(`ts` / 1000)) >= DATE_SUB(CURRENT_DATE(), INTERVAL 30 DAY);
 DROP TABLE metric_service_db_connection_pool_get;
 ALTER TABLE metric_service_db_connection_pool_get__v3 RENAME metric_service_db_connection_pool_get;
 
@@ -386,10 +395,11 @@ PROPERTIES (
   "dynamic_partition.time_unit" = "DAY",
   "dynamic_partition.start" = "-30",
   "dynamic_partition.end" = "3",
-  "dynamic_partition.prefix" = "p"
+  "dynamic_partition.prefix" = "p",
+  "dynamic_partition.create_history_partition" = "true"
 );
 INSERT INTO metric_service_exception__v3 (`metric_time`, `ts`, `componentService`, `componentServiceId`, `componentServiceInstance`, `exceptionCode`, `exceptionName`, `isIn`, `isOut`, `resource`, `rootComponentType`, `rootResource`, `service`, `service_id`, `service_instance`, `cnt`, `error`)
-SELECT FROM_UNIXTIME(FLOOR(`ts` / 1000)) AS `metric_time`, `ts`, `componentService`, `componentServiceId`, `componentServiceInstance`, `exceptionCode`, `exceptionName`, `isIn`, `isOut`, `resource`, `rootComponentType`, `rootResource`, `service`, `service_id`, `service_instance`, `cnt`, `error` FROM metric_service_exception;
+SELECT FROM_UNIXTIME(FLOOR(`ts` / 1000)) AS `metric_time`, `ts`, `componentService`, `componentServiceId`, `componentServiceInstance`, `exceptionCode`, `exceptionName`, `isIn`, `isOut`, `resource`, `rootComponentType`, `rootResource`, `service`, `service_id`, `service_instance`, `cnt`, `error` FROM metric_service_exception WHERE FROM_UNIXTIME(FLOOR(`ts` / 1000)) >= DATE_SUB(CURRENT_DATE(), INTERVAL 30 DAY);
 DROP TABLE metric_service_exception;
 ALTER TABLE metric_service_exception__v3 RENAME metric_service_exception;
 
@@ -439,10 +449,11 @@ PROPERTIES (
   "dynamic_partition.time_unit" = "DAY",
   "dynamic_partition.start" = "-30",
   "dynamic_partition.end" = "3",
-  "dynamic_partition.prefix" = "p"
+  "dynamic_partition.prefix" = "p",
+  "dynamic_partition.create_history_partition" = "true"
 );
 INSERT INTO metric_service_flow__v3 (`metric_time`, `ts`, `entryInterfacePathId`, `entryPathId`, `interfacePathId`, `isIn`, `parentInterfacePathId`, `parentPathId`, `parentResource`, `parentService`, `parentServiceId`, `pathId`, `resource`, `service`, `service_id`, `cnt`, `error`, `slow`, `srcCall`, `sumDuration`)
-SELECT FROM_UNIXTIME(FLOOR(`ts` / 1000)) AS `metric_time`, `ts`, `entryInterfacePathId`, `entryPathId`, `interfacePathId`, `isIn`, `parentInterfacePathId`, `parentPathId`, `parentResource`, `parentService`, `parentServiceId`, `pathId`, `resource`, `service`, `service_id`, `cnt`, `error`, `slow`, `srcCall`, `sumDuration` FROM metric_service_flow;
+SELECT FROM_UNIXTIME(FLOOR(`ts` / 1000)) AS `metric_time`, `ts`, `entryInterfacePathId`, `entryPathId`, `interfacePathId`, `isIn`, `parentInterfacePathId`, `parentPathId`, `parentResource`, `parentService`, `parentServiceId`, `pathId`, `resource`, `service`, `service_id`, `cnt`, `error`, `slow`, `srcCall`, `sumDuration` FROM metric_service_flow WHERE FROM_UNIXTIME(FLOOR(`ts` / 1000)) >= DATE_SUB(CURRENT_DATE(), INTERVAL 30 DAY);
 DROP TABLE metric_service_flow;
 ALTER TABLE metric_service_flow__v3 RENAME metric_service_flow;
 
@@ -482,10 +493,11 @@ PROPERTIES (
   "dynamic_partition.time_unit" = "DAY",
   "dynamic_partition.start" = "-30",
   "dynamic_partition.end" = "3",
-  "dynamic_partition.prefix" = "p"
+  "dynamic_partition.prefix" = "p",
+  "dynamic_partition.create_history_partition" = "true"
 );
 INSERT INTO metric_service_health_status__v3 (`metric_time`, `ts`, `convergenceType`, `gid`, `host`, `level`, `policyId`, `policyName`, `problemId`, `service`, `service_id`, `service_instance`, `metricsVal`)
-SELECT FROM_UNIXTIME(FLOOR(`ts` / 1000)) AS `metric_time`, `ts`, `convergenceType`, `gid`, `host`, `level`, `policyId`, `policyName`, `problemId`, `service`, `service_id`, `service_instance`, `metricsVal` FROM metric_service_health_status;
+SELECT FROM_UNIXTIME(FLOOR(`ts` / 1000)) AS `metric_time`, `ts`, `convergenceType`, `gid`, `host`, `level`, `policyId`, `policyName`, `problemId`, `service`, `service_id`, `service_instance`, `metricsVal` FROM metric_service_health_status WHERE FROM_UNIXTIME(FLOOR(`ts` / 1000)) >= DATE_SUB(CURRENT_DATE(), INTERVAL 30 DAY);
 DROP TABLE metric_service_health_status;
 ALTER TABLE metric_service_health_status__v3 RENAME metric_service_health_status;
 
@@ -547,10 +559,11 @@ PROPERTIES (
   "dynamic_partition.time_unit" = "DAY",
   "dynamic_partition.start" = "-30",
   "dynamic_partition.end" = "3",
-  "dynamic_partition.prefix" = "p"
+  "dynamic_partition.prefix" = "p",
+  "dynamic_partition.create_history_partition" = "true"
 );
 INSERT INTO metric_service_http__v3 (`metric_time`, `ts`, `durationRange`, `httpCode`, `httpMethod`, `isIn`, `isOut`, `resource`, `rootComponentType`, `rootResource`, `service`, `service_id`, `service_instance`, `srcService`, `srcServiceId`, `srcServiceInstance`, `url`, `cnt`, `cpuTime`, `error`, `histogramCount`, `histogramMax`, `maxDuration`, `minDuration`, `reqBodyLength`, `respBodyLength`, `slow`, `slowCnt`, `sumDuration`, `verySlowCnt`)
-SELECT FROM_UNIXTIME(FLOOR(`ts` / 1000)) AS `metric_time`, `ts`, `durationRange`, `httpCode`, `httpMethod`, `isIn`, `isOut`, `resource`, `rootComponentType`, `rootResource`, `service`, `service_id`, `service_instance`, `srcService`, `srcServiceId`, `srcServiceInstance`, `url`, `cnt`, `cpuTime`, `error`, `histogramCount`, `histogramMax`, `maxDuration`, `minDuration`, `reqBodyLength`, `respBodyLength`, `slow`, `slowCnt`, `sumDuration`, `verySlowCnt` FROM metric_service_http;
+SELECT FROM_UNIXTIME(FLOOR(`ts` / 1000)) AS `metric_time`, `ts`, `durationRange`, `httpCode`, `httpMethod`, `isIn`, `isOut`, `resource`, `rootComponentType`, `rootResource`, `service`, `service_id`, `service_instance`, `srcService`, `srcServiceId`, `srcServiceInstance`, `url`, `cnt`, `cpuTime`, `error`, `histogramCount`, `histogramMax`, `maxDuration`, `minDuration`, `reqBodyLength`, `respBodyLength`, `slow`, `slowCnt`, `sumDuration`, `verySlowCnt` FROM metric_service_http WHERE FROM_UNIXTIME(FLOOR(`ts` / 1000)) >= DATE_SUB(CURRENT_DATE(), INTERVAL 30 DAY);
 DROP TABLE metric_service_http;
 ALTER TABLE metric_service_http__v3 RENAME metric_service_http;
 
@@ -581,10 +594,11 @@ PROPERTIES (
   "dynamic_partition.time_unit" = "DAY",
   "dynamic_partition.start" = "-30",
   "dynamic_partition.end" = "3",
-  "dynamic_partition.prefix" = "p"
+  "dynamic_partition.prefix" = "p",
+  "dynamic_partition.create_history_partition" = "true"
 );
 INSERT INTO metric_service_http_connection_pool__v3 (`metric_time`, `ts`, `httpConnectionPoolName`, `service`, `service_id`, `service_instance`, `activeSize`, `idleSize`, `maxSize`, `waiterNum`)
-SELECT FROM_UNIXTIME(FLOOR(`ts` / 1000)) AS `metric_time`, `ts`, `httpConnectionPoolName`, `service`, `service_id`, `service_instance`, `activeSize`, `idleSize`, `maxSize`, `waiterNum` FROM metric_service_http_connection_pool;
+SELECT FROM_UNIXTIME(FLOOR(`ts` / 1000)) AS `metric_time`, `ts`, `httpConnectionPoolName`, `service`, `service_id`, `service_instance`, `activeSize`, `idleSize`, `maxSize`, `waiterNum` FROM metric_service_http_connection_pool WHERE FROM_UNIXTIME(FLOOR(`ts` / 1000)) >= DATE_SUB(CURRENT_DATE(), INTERVAL 30 DAY);
 DROP TABLE metric_service_http_connection_pool;
 ALTER TABLE metric_service_http_connection_pool__v3 RENAME metric_service_http_connection_pool;
 
@@ -613,10 +627,11 @@ PROPERTIES (
   "dynamic_partition.time_unit" = "DAY",
   "dynamic_partition.start" = "-30",
   "dynamic_partition.end" = "3",
-  "dynamic_partition.prefix" = "p"
+  "dynamic_partition.prefix" = "p",
+  "dynamic_partition.create_history_partition" = "true"
 );
 INSERT INTO metric_service_http_connection_pool_get__v3 (`metric_time`, `ts`, `httpConnectionPoolName`, `service`, `service_id`, `service_instance`, `waitTime`, `count`)
-SELECT FROM_UNIXTIME(FLOOR(`ts` / 1000)) AS `metric_time`, `ts`, `httpConnectionPoolName`, `service`, `service_id`, `service_instance`, `waitTime`, `count` FROM metric_service_http_connection_pool_get;
+SELECT FROM_UNIXTIME(FLOOR(`ts` / 1000)) AS `metric_time`, `ts`, `httpConnectionPoolName`, `service`, `service_id`, `service_instance`, `waitTime`, `count` FROM metric_service_http_connection_pool_get WHERE FROM_UNIXTIME(FLOOR(`ts` / 1000)) >= DATE_SUB(CURRENT_DATE(), INTERVAL 30 DAY);
 DROP TABLE metric_service_http_connection_pool_get;
 ALTER TABLE metric_service_http_connection_pool_get__v3 RENAME metric_service_http_connection_pool_get;
 
@@ -674,10 +689,11 @@ PROPERTIES (
   "dynamic_partition.time_unit" = "DAY",
   "dynamic_partition.start" = "-30",
   "dynamic_partition.end" = "3",
-  "dynamic_partition.prefix" = "p"
+  "dynamic_partition.prefix" = "p",
+  "dynamic_partition.create_history_partition" = "true"
 );
 INSERT INTO metric_service_instance__v3 (`metric_time`, `ts`, `biz_pid_id`, `containerId`, `containerName`, `hostIp`, `hostname`, `javaVendor`, `javaVersion`, `k8sClusterId`, `k8sContainerId`, `k8sNamespace`, `k8sPodName`, `pid`, `pname`, `ports`, `service`, `service_id`, `service_instance`, `service_type`, `virtualService`, `metricsVal`)
-SELECT FROM_UNIXTIME(FLOOR(`ts` / 1000)) AS `metric_time`, `ts`, `biz_pid_id`, `containerId`, `containerName`, `hostIp`, `hostname`, `javaVendor`, `javaVersion`, `k8sClusterId`, `k8sContainerId`, `k8sNamespace`, `k8sPodName`, `pid`, `pname`, `ports`, `service`, `service_id`, `service_instance`, `service_type`, `virtualService`, `metricsVal` FROM metric_service_instance;
+SELECT FROM_UNIXTIME(FLOOR(`ts` / 1000)) AS `metric_time`, `ts`, `biz_pid_id`, `containerId`, `containerName`, `hostIp`, `hostname`, `javaVendor`, `javaVersion`, `k8sClusterId`, `k8sContainerId`, `k8sNamespace`, `k8sPodName`, `pid`, `pname`, `ports`, `service`, `service_id`, `service_instance`, `service_type`, `virtualService`, `metricsVal` FROM metric_service_instance WHERE FROM_UNIXTIME(FLOOR(`ts` / 1000)) >= DATE_SUB(CURRENT_DATE(), INTERVAL 30 DAY);
 DROP TABLE metric_service_instance;
 ALTER TABLE metric_service_instance__v3 RENAME metric_service_instance;
 
@@ -706,10 +722,11 @@ PROPERTIES (
   "dynamic_partition.time_unit" = "DAY",
   "dynamic_partition.start" = "-30",
   "dynamic_partition.end" = "3",
-  "dynamic_partition.prefix" = "p"
+  "dynamic_partition.prefix" = "p",
+  "dynamic_partition.create_history_partition" = "true"
 );
 INSERT INTO metric_service_io__v3 (`metric_time`, `ts`, `service`, `serviceCode`, `service_id`, `service_instance`, `read.rate`, `write.rate`)
-SELECT FROM_UNIXTIME(FLOOR(`ts` / 1000)) AS `metric_time`, `ts`, `service`, `serviceCode`, `service_id`, `service_instance`, `read.rate`, `write.rate` FROM metric_service_io;
+SELECT FROM_UNIXTIME(FLOOR(`ts` / 1000)) AS `metric_time`, `ts`, `service`, `serviceCode`, `service_id`, `service_instance`, `read.rate`, `write.rate` FROM metric_service_io WHERE FROM_UNIXTIME(FLOOR(`ts` / 1000)) >= DATE_SUB(CURRENT_DATE(), INTERVAL 30 DAY);
 DROP TABLE metric_service_io;
 ALTER TABLE metric_service_io__v3 RENAME metric_service_io;
 
@@ -739,10 +756,11 @@ PROPERTIES (
   "dynamic_partition.time_unit" = "DAY",
   "dynamic_partition.start" = "-30",
   "dynamic_partition.end" = "3",
-  "dynamic_partition.prefix" = "p"
+  "dynamic_partition.prefix" = "p",
+  "dynamic_partition.create_history_partition" = "true"
 );
 INSERT INTO metric_service_mem__v3 (`metric_time`, `ts`, `service`, `serviceCode`, `service_id`, `service_instance`, `size`, `usage_pct`, `used`)
-SELECT FROM_UNIXTIME(FLOOR(`ts` / 1000)) AS `metric_time`, `ts`, `service`, `serviceCode`, `service_id`, `service_instance`, `size`, `usage_pct`, `used` FROM metric_service_mem;
+SELECT FROM_UNIXTIME(FLOOR(`ts` / 1000)) AS `metric_time`, `ts`, `service`, `serviceCode`, `service_id`, `service_instance`, `size`, `usage_pct`, `used` FROM metric_service_mem WHERE FROM_UNIXTIME(FLOOR(`ts` / 1000)) >= DATE_SUB(CURRENT_DATE(), INTERVAL 30 DAY);
 DROP TABLE metric_service_mem;
 ALTER TABLE metric_service_mem__v3 RENAME metric_service_mem;
 
@@ -808,10 +826,11 @@ PROPERTIES (
   "dynamic_partition.time_unit" = "DAY",
   "dynamic_partition.start" = "-30",
   "dynamic_partition.end" = "3",
-  "dynamic_partition.prefix" = "p"
+  "dynamic_partition.prefix" = "p",
+  "dynamic_partition.create_history_partition" = "true"
 );
 INSERT INTO metric_service_mq__v3 (`metric_time`, `ts`, `broker`, `durationRange`, `group`, `isConsume`, `isIn`, `isOut`, `partition`, `resource`, `rootComponentType`, `rootResource`, `service`, `service_id`, `service_instance`, `srcService`, `srcServiceId`, `srcServiceInstance`, `topic`, `type`, `cnt`, `cpuTime`, `delay`, `error`, `histogramCount`, `histogramMax`, `maxDuration`, `minDuration`, `mqBodyLength`, `slow`, `sumDuration`)
-SELECT FROM_UNIXTIME(FLOOR(`ts` / 1000)) AS `metric_time`, `ts`, `broker`, `durationRange`, `group`, `isConsume`, `isIn`, `isOut`, `partition`, `resource`, `rootComponentType`, `rootResource`, `service`, `service_id`, `service_instance`, `srcService`, `srcServiceId`, `srcServiceInstance`, `topic`, `type`, `cnt`, `cpuTime`, `delay`, `error`, `histogramCount`, `histogramMax`, `maxDuration`, `minDuration`, `mqBodyLength`, `slow`, `sumDuration` FROM metric_service_mq;
+SELECT FROM_UNIXTIME(FLOOR(`ts` / 1000)) AS `metric_time`, `ts`, `broker`, `durationRange`, `group`, `isConsume`, `isIn`, `isOut`, `partition`, `resource`, `rootComponentType`, `rootResource`, `service`, `service_id`, `service_instance`, `srcService`, `srcServiceId`, `srcServiceInstance`, `topic`, `type`, `cnt`, `cpuTime`, `delay`, `error`, `histogramCount`, `histogramMax`, `maxDuration`, `minDuration`, `mqBodyLength`, `slow`, `sumDuration` FROM metric_service_mq WHERE FROM_UNIXTIME(FLOOR(`ts` / 1000)) >= DATE_SUB(CURRENT_DATE(), INTERVAL 30 DAY);
 DROP TABLE metric_service_mq;
 ALTER TABLE metric_service_mq__v3 RENAME metric_service_mq;
 
@@ -840,10 +859,11 @@ PROPERTIES (
   "dynamic_partition.time_unit" = "DAY",
   "dynamic_partition.start" = "-30",
   "dynamic_partition.end" = "3",
-  "dynamic_partition.prefix" = "p"
+  "dynamic_partition.prefix" = "p",
+  "dynamic_partition.create_history_partition" = "true"
 );
 INSERT INTO metric_service_net__v3 (`metric_time`, `ts`, `service`, `serviceCode`, `service_id`, `service_instance`, `bytes_rcvd`, `bytes_sent`)
-SELECT FROM_UNIXTIME(FLOOR(`ts` / 1000)) AS `metric_time`, `ts`, `service`, `serviceCode`, `service_id`, `service_instance`, `bytes_rcvd`, `bytes_sent` FROM metric_service_net;
+SELECT FROM_UNIXTIME(FLOOR(`ts` / 1000)) AS `metric_time`, `ts`, `service`, `serviceCode`, `service_id`, `service_instance`, `bytes_rcvd`, `bytes_sent` FROM metric_service_net WHERE FROM_UNIXTIME(FLOOR(`ts` / 1000)) >= DATE_SUB(CURRENT_DATE(), INTERVAL 30 DAY);
 DROP TABLE metric_service_net;
 ALTER TABLE metric_service_net__v3 RENAME metric_service_net;
 
@@ -877,10 +897,11 @@ PROPERTIES (
   "dynamic_partition.time_unit" = "DAY",
   "dynamic_partition.start" = "-30",
   "dynamic_partition.end" = "3",
-  "dynamic_partition.prefix" = "p"
+  "dynamic_partition.prefix" = "p",
+  "dynamic_partition.create_history_partition" = "true"
 );
 INSERT INTO metric_service_object_pool__v3 (`metric_time`, `ts`, `objectPoolFairness`, `objectPoolName`, `objectPoolObjectClass`, `service`, `service_id`, `service_instance`, `activeSize`, `idleSize`, `maxSize`)
-SELECT FROM_UNIXTIME(FLOOR(`ts` / 1000)) AS `metric_time`, `ts`, `objectPoolFairness`, `objectPoolName`, `objectPoolObjectClass`, `service`, `service_id`, `service_instance`, `activeSize`, `idleSize`, `maxSize` FROM metric_service_object_pool;
+SELECT FROM_UNIXTIME(FLOOR(`ts` / 1000)) AS `metric_time`, `ts`, `objectPoolFairness`, `objectPoolName`, `objectPoolObjectClass`, `service`, `service_id`, `service_instance`, `activeSize`, `idleSize`, `maxSize` FROM metric_service_object_pool WHERE FROM_UNIXTIME(FLOOR(`ts` / 1000)) >= DATE_SUB(CURRENT_DATE(), INTERVAL 30 DAY);
 DROP TABLE metric_service_object_pool;
 ALTER TABLE metric_service_object_pool__v3 RENAME metric_service_object_pool;
 
@@ -909,10 +930,11 @@ PROPERTIES (
   "dynamic_partition.time_unit" = "DAY",
   "dynamic_partition.start" = "-30",
   "dynamic_partition.end" = "3",
-  "dynamic_partition.prefix" = "p"
+  "dynamic_partition.prefix" = "p",
+  "dynamic_partition.create_history_partition" = "true"
 );
 INSERT INTO metric_service_object_pool_get__v3 (`metric_time`, `ts`, `objectPoolName`, `service`, `service_id`, `service_instance`, `waitTime`, `count`)
-SELECT FROM_UNIXTIME(FLOOR(`ts` / 1000)) AS `metric_time`, `ts`, `objectPoolName`, `service`, `service_id`, `service_instance`, `waitTime`, `count` FROM metric_service_object_pool_get;
+SELECT FROM_UNIXTIME(FLOOR(`ts` / 1000)) AS `metric_time`, `ts`, `objectPoolName`, `service`, `service_id`, `service_instance`, `waitTime`, `count` FROM metric_service_object_pool_get WHERE FROM_UNIXTIME(FLOOR(`ts` / 1000)) >= DATE_SUB(CURRENT_DATE(), INTERVAL 30 DAY);
 DROP TABLE metric_service_object_pool_get;
 ALTER TABLE metric_service_object_pool_get__v3 RENAME metric_service_object_pool_get;
 
@@ -967,10 +989,11 @@ PROPERTIES (
   "dynamic_partition.time_unit" = "DAY",
   "dynamic_partition.start" = "-30",
   "dynamic_partition.end" = "3",
-  "dynamic_partition.prefix" = "p"
+  "dynamic_partition.prefix" = "p",
+  "dynamic_partition.create_history_partition" = "true"
 );
 INSERT INTO metric_service_redis__v3 (`metric_time`, `ts`, `command`, `durationRange`, `isIn`, `isOut`, `resource`, `rootComponentType`, `rootResource`, `service`, `service_id`, `service_instance`, `srcService`, `srcServiceId`, `srcServiceInstance`, `cnt`, `error`, `histogramCount`, `histogramMax`, `maxDuration`, `minDuration`, `reqBodyLength`, `respBodyLength`, `slow`, `sumDuration`)
-SELECT FROM_UNIXTIME(FLOOR(`ts` / 1000)) AS `metric_time`, `ts`, `command`, `durationRange`, `isIn`, `isOut`, `resource`, `rootComponentType`, `rootResource`, `service`, `service_id`, `service_instance`, `srcService`, `srcServiceId`, `srcServiceInstance`, `cnt`, `error`, `histogramCount`, `histogramMax`, `maxDuration`, `minDuration`, `reqBodyLength`, `respBodyLength`, `slow`, `sumDuration` FROM metric_service_redis;
+SELECT FROM_UNIXTIME(FLOOR(`ts` / 1000)) AS `metric_time`, `ts`, `command`, `durationRange`, `isIn`, `isOut`, `resource`, `rootComponentType`, `rootResource`, `service`, `service_id`, `service_instance`, `srcService`, `srcServiceId`, `srcServiceInstance`, `cnt`, `error`, `histogramCount`, `histogramMax`, `maxDuration`, `minDuration`, `reqBodyLength`, `respBodyLength`, `slow`, `sumDuration` FROM metric_service_redis WHERE FROM_UNIXTIME(FLOOR(`ts` / 1000)) >= DATE_SUB(CURRENT_DATE(), INTERVAL 30 DAY);
 DROP TABLE metric_service_redis;
 ALTER TABLE metric_service_redis__v3 RENAME metric_service_redis;
 
@@ -1030,10 +1053,11 @@ PROPERTIES (
   "dynamic_partition.time_unit" = "DAY",
   "dynamic_partition.start" = "-30",
   "dynamic_partition.end" = "3",
-  "dynamic_partition.prefix" = "p"
+  "dynamic_partition.prefix" = "p",
+  "dynamic_partition.create_history_partition" = "true"
 );
 INSERT INTO metric_service_rpc__v3 (`metric_time`, `ts`, `durationRange`, `isIn`, `isOut`, `resource`, `rootComponentType`, `rootResource`, `service`, `service_id`, `service_instance`, `srcService`, `srcServiceId`, `srcServiceInstance`, `statusCode`, `type`, `cnt`, `cpuTime`, `error`, `histogramCount`, `histogramMax`, `maxDuration`, `minDuration`, `reqBodyLength`, `respBodyLength`, `slow`, `slowCnt`, `sumDuration`, `verySlowCnt`)
-SELECT FROM_UNIXTIME(FLOOR(`ts` / 1000)) AS `metric_time`, `ts`, `durationRange`, `isIn`, `isOut`, `resource`, `rootComponentType`, `rootResource`, `service`, `service_id`, `service_instance`, `srcService`, `srcServiceId`, `srcServiceInstance`, `statusCode`, `type`, `cnt`, `cpuTime`, `error`, `histogramCount`, `histogramMax`, `maxDuration`, `minDuration`, `reqBodyLength`, `respBodyLength`, `slow`, `slowCnt`, `sumDuration`, `verySlowCnt` FROM metric_service_rpc;
+SELECT FROM_UNIXTIME(FLOOR(`ts` / 1000)) AS `metric_time`, `ts`, `durationRange`, `isIn`, `isOut`, `resource`, `rootComponentType`, `rootResource`, `service`, `service_id`, `service_instance`, `srcService`, `srcServiceId`, `srcServiceInstance`, `statusCode`, `type`, `cnt`, `cpuTime`, `error`, `histogramCount`, `histogramMax`, `maxDuration`, `minDuration`, `reqBodyLength`, `respBodyLength`, `slow`, `slowCnt`, `sumDuration`, `verySlowCnt` FROM metric_service_rpc WHERE FROM_UNIXTIME(FLOOR(`ts` / 1000)) >= DATE_SUB(CURRENT_DATE(), INTERVAL 30 DAY);
 DROP TABLE metric_service_rpc;
 ALTER TABLE metric_service_rpc__v3 RENAME metric_service_rpc;
 
@@ -1091,10 +1115,11 @@ PROPERTIES (
   "dynamic_partition.time_unit" = "DAY",
   "dynamic_partition.start" = "-30",
   "dynamic_partition.end" = "3",
-  "dynamic_partition.prefix" = "p"
+  "dynamic_partition.prefix" = "p",
+  "dynamic_partition.create_history_partition" = "true"
 );
 INSERT INTO metric_service_remote__v3 (`metric_time`, `ts`, `durationRange`, `isIn`, `isOut`, `resource`, `rootComponentType`, `rootResource`, `service`, `service_id`, `service_instance`, `srcService`, `srcServiceId`, `srcServiceInstance`, `remoteType`, `cnt`, `cpuTime`, `error`, `histogramCount`, `histogramMax`, `maxDuration`, `minDuration`, `reqBodyLength`, `respBodyLength`, `slow`, `slowCnt`, `sumDuration`, `verySlowCnt`)
-SELECT FROM_UNIXTIME(FLOOR(`ts` / 1000)) AS `metric_time`, `ts`, `durationRange`, `isIn`, `isOut`, `resource`, `rootComponentType`, `rootResource`, `service`, `service_id`, `service_instance`, `srcService`, `srcServiceId`, `srcServiceInstance`, `remoteType`, `cnt`, `cpuTime`, `error`, `histogramCount`, `histogramMax`, `maxDuration`, `minDuration`, `reqBodyLength`, `respBodyLength`, `slow`, `slowCnt`, `sumDuration`, `verySlowCnt` FROM metric_service_remote;
+SELECT FROM_UNIXTIME(FLOOR(`ts` / 1000)) AS `metric_time`, `ts`, `durationRange`, `isIn`, `isOut`, `resource`, `rootComponentType`, `rootResource`, `service`, `service_id`, `service_instance`, `srcService`, `srcServiceId`, `srcServiceInstance`, `remoteType`, `cnt`, `cpuTime`, `error`, `histogramCount`, `histogramMax`, `maxDuration`, `minDuration`, `reqBodyLength`, `respBodyLength`, `slow`, `slowCnt`, `sumDuration`, `verySlowCnt` FROM metric_service_remote WHERE FROM_UNIXTIME(FLOOR(`ts` / 1000)) >= DATE_SUB(CURRENT_DATE(), INTERVAL 30 DAY);
 DROP TABLE metric_service_remote;
 ALTER TABLE metric_service_remote__v3 RENAME metric_service_remote;
 
@@ -1123,10 +1148,11 @@ PROPERTIES (
   "dynamic_partition.time_unit" = "DAY",
   "dynamic_partition.start" = "-30",
   "dynamic_partition.end" = "3",
-  "dynamic_partition.prefix" = "p"
+  "dynamic_partition.prefix" = "p",
+  "dynamic_partition.create_history_partition" = "true"
 );
 INSERT INTO metric_service_tcp__v3 (`metric_time`, `ts`, `service`, `serviceCode`, `service_id`, `service_instance`, `conns_established`, `retransmit`)
-SELECT FROM_UNIXTIME(FLOOR(`ts` / 1000)) AS `metric_time`, `ts`, `service`, `serviceCode`, `service_id`, `service_instance`, `conns_established`, `retransmit` FROM metric_service_tcp;
+SELECT FROM_UNIXTIME(FLOOR(`ts` / 1000)) AS `metric_time`, `ts`, `service`, `serviceCode`, `service_id`, `service_instance`, `conns_established`, `retransmit` FROM metric_service_tcp WHERE FROM_UNIXTIME(FLOOR(`ts` / 1000)) >= DATE_SUB(CURRENT_DATE(), INTERVAL 30 DAY);
 DROP TABLE metric_service_tcp;
 ALTER TABLE metric_service_tcp__v3 RENAME metric_service_tcp;
 
@@ -1162,10 +1188,11 @@ PROPERTIES (
   "dynamic_partition.time_unit" = "DAY",
   "dynamic_partition.start" = "-30",
   "dynamic_partition.end" = "3",
-  "dynamic_partition.prefix" = "p"
+  "dynamic_partition.prefix" = "p",
+  "dynamic_partition.create_history_partition" = "true"
 );
 INSERT INTO metric_service_thread_pool__v3 (`metric_time`, `ts`, `service`, `service_id`, `service_instance`, `threadPoolName`, `activeCount`, `completedTaskCount`, `corePoolSize`, `largestPoolSize`, `maximumPoolSize`, `poolSize`, `queueRemainingCapacity`, `queueSize`, `taskCount`)
-SELECT FROM_UNIXTIME(FLOOR(`ts` / 1000)) AS `metric_time`, `ts`, `service`, `service_id`, `service_instance`, `threadPoolName`, `activeCount`, `completedTaskCount`, `corePoolSize`, `largestPoolSize`, `maximumPoolSize`, `poolSize`, `queueRemainingCapacity`, `queueSize`, `taskCount` FROM metric_service_thread_pool;
+SELECT FROM_UNIXTIME(FLOOR(`ts` / 1000)) AS `metric_time`, `ts`, `service`, `service_id`, `service_instance`, `threadPoolName`, `activeCount`, `completedTaskCount`, `corePoolSize`, `largestPoolSize`, `maximumPoolSize`, `poolSize`, `queueRemainingCapacity`, `queueSize`, `taskCount` FROM metric_service_thread_pool WHERE FROM_UNIXTIME(FLOOR(`ts` / 1000)) >= DATE_SUB(CURRENT_DATE(), INTERVAL 30 DAY);
 DROP TABLE metric_service_thread_pool;
 ALTER TABLE metric_service_thread_pool__v3 RENAME metric_service_thread_pool;
 
@@ -1200,10 +1227,11 @@ PROPERTIES (
   "dynamic_partition.time_unit" = "DAY",
   "dynamic_partition.start" = "-30",
   "dynamic_partition.end" = "3",
-  "dynamic_partition.prefix" = "p"
+  "dynamic_partition.prefix" = "p",
+  "dynamic_partition.create_history_partition" = "true"
 );
 INSERT INTO metric_service_thread_pool_cost__v3 (`metric_time`, `ts`, `rootResource`, `service`, `service_id`, `service_instance`, `threadPoolName`, `type`, `cnt`, `maxDuration`, `minDuration`, `sumDuration`)
-SELECT FROM_UNIXTIME(FLOOR(`ts` / 1000)) AS `metric_time`, `ts`, `rootResource`, `service`, `service_id`, `service_instance`, `threadPoolName`, `type`, `cnt`, `maxDuration`, `minDuration`, `sumDuration` FROM metric_service_thread_pool_cost;
+SELECT FROM_UNIXTIME(FLOOR(`ts` / 1000)) AS `metric_time`, `ts`, `rootResource`, `service`, `service_id`, `service_instance`, `threadPoolName`, `type`, `cnt`, `maxDuration`, `minDuration`, `sumDuration` FROM metric_service_thread_pool_cost WHERE FROM_UNIXTIME(FLOOR(`ts` / 1000)) >= DATE_SUB(CURRENT_DATE(), INTERVAL 30 DAY);
 DROP TABLE metric_service_thread_pool_cost;
 ALTER TABLE metric_service_thread_pool_cost__v3 RENAME metric_service_thread_pool_cost;
 
@@ -1245,10 +1273,11 @@ PROPERTIES (
   "dynamic_partition.time_unit" = "DAY",
   "dynamic_partition.start" = "-30",
   "dynamic_partition.end" = "3",
-  "dynamic_partition.prefix" = "p"
+  "dynamic_partition.prefix" = "p",
+  "dynamic_partition.create_history_partition" = "true"
 );
 INSERT INTO metric_service_trace__v3 (`metric_time`, `ts`, `errorType`, `hostName`, `httpMethod`, `httpStatusCode`, `resource`, `service`, `service_id`, `service_instance`, `cnt`, `error`, `histogramCount`, `histogramMax`, `maxDuration`, `minDuration`, `sumDuration`)
-SELECT FROM_UNIXTIME(FLOOR(`ts` / 1000)) AS `metric_time`, `ts`, `errorType`, `hostName`, `httpMethod`, `httpStatusCode`, `resource`, `service`, `service_id`, `service_instance`, `cnt`, `error`, `histogramCount`, `histogramMax`, `maxDuration`, `minDuration`, `sumDuration` FROM metric_service_trace;
+SELECT FROM_UNIXTIME(FLOOR(`ts` / 1000)) AS `metric_time`, `ts`, `errorType`, `hostName`, `httpMethod`, `httpStatusCode`, `resource`, `service`, `service_id`, `service_instance`, `cnt`, `error`, `histogramCount`, `histogramMax`, `maxDuration`, `minDuration`, `sumDuration` FROM metric_service_trace WHERE FROM_UNIXTIME(FLOOR(`ts` / 1000)) >= DATE_SUB(CURRENT_DATE(), INTERVAL 30 DAY);
 DROP TABLE metric_service_trace;
 ALTER TABLE metric_service_trace__v3 RENAME metric_service_trace;
 

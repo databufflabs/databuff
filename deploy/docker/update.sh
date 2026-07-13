@@ -118,8 +118,7 @@ upgrade_finalize() {
   prepare_compose_start
   compose_up_wait ai-apm-doris-fe ai-apm-doris-be
   if ! "${INSTALL_DIR}/scripts/migrate-schema.sh"; then
-    log "${YLW}Schema 迁移失败，启动 Web 排障模式（ingest 保持停止，避免写入异常表结构）${RST}"
-    bootstrap_web_for_troubleshooting "Schema 迁移失败"
+    log "${YLW}Schema 迁移失败（ingest 未启动，避免写入异常表结构）${RST}"
     return 1
   fi
   compose_up ai-apm-ingest ai-apm-web
