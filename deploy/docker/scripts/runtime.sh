@@ -124,7 +124,8 @@ bootstrap_web_for_troubleshooting() {
   compose_cmd up -d --no-deps "$web_service"
 
   if [ "${START_SKIP_READY:-0}" != "1" ]; then
-    wait_for_http_ready "http://127.0.0.1:27403/health" "web" "$timeout" || true
+    host_ip="$(detect_local_ip)"
+    wait_for_http_ready "http://${host_ip}:27403/health" "web" "$timeout" || true
   fi
 
   if [ "${START_SKIP_SUMMARY:-0}" != "1" ]; then

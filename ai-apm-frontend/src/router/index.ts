@@ -263,8 +263,9 @@ router.beforeEach(async (to: any, from, next) => {
     if (getToken()) {
       if (!store.getters['User/getUserInfo'] || !store.getters['User/getUserInfo'].loaded) {
         await store.dispatch('User/getUserInfo');
-        const groupEnabled =         await store.dispatch('User/getGroupEnabled');
-        await store.dispatch('Service/GET_BASIC_SERVICE');
+        await store.dispatch('User/getGroupEnabled');
+        // Do not block route navigation on Doris-backed service catalog (may hang ~60s when BE is down).
+        store.dispatch('Service/GET_BASIC_SERVICE');
       }
       if (!store.getters['User/getMenus'] || store.getters['User/getMenus'].length === 0) {
         // 判断是否有过期限制 - 过期仍可使用非分析功能模块

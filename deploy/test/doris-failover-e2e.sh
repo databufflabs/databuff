@@ -49,7 +49,7 @@ REINSTALL_DIR="${REINSTALL_DIR:-${APM_INSTALL_DIR}-reinstall}"
 APM_PKG_BASE="${APM_PKG_BASE:-http://192.168.50.140/databuff}"
 BUNDLE_ROOT="${BUNDLE_ROOT:-}"
 INSTALL_MODE="${INSTALL_MODE:-}"
-BE_MEM_LIMIT="${BE_MEM_LIMIT:-6m}"
+BE_MEM_LIMIT="${BE_MEM_LIMIT:-256m}"
 SIMULATE_OFFLINE="${SIMULATE_OFFLINE:-0}"
 STOP_AFTER="${STOP_AFTER:-all}"
 
@@ -107,10 +107,23 @@ resolve_version() {
 }
 
 stop_stack_quiet() {
-  if [[ -f "${APM_INSTALL_DIR}/stop.sh" ]]; then
-    (cd "$APM_INSTALL_DIR" && ./stop.sh) >/dev/null 2>&1 || true
-  fi
+  for dir in "${APM_INSTALL_DIR}" /opt/databuff-ai-apm "${REINSTALL_DIR}"; do
+    if [[ -f "${dir}/stop.sh" ]]; then
+      (cd "$dir" && ./stop.sh) >/dev/null 2>&1 || true
+    fi
+  done
   docker rm -f ai-apm-web ai-apm-ingest ai-apm-doris-fe ai-apm-doris-be >/dev/null 2>&1 || true
+}
+
+step_sync_deploy_scripts() {
+  local target="${1:-${APM_INSTALL_DIR}}"
+  local src="${DEPLOY_DIR}/docker"
+  [[ -f "${src}/start.sh" && -f "${src}/scripts/runtime.sh" ]] \
+    || fail "missing deploy scripts under ${src} (sync repo to test host)"
+  log "sync bootstrap scripts from repo → ${target}"
+  cp -f "${src}/start.sh" "${target}/start.sh"
+  cp -f "${src}/scripts/runtime.sh" "${target}/scripts/runtime.sh"
+  chmod +x "${target}/start.sh" "${target}/scripts/runtime.sh"
 }
 
 step_install() {
@@ -140,6 +153,7 @@ step_install() {
   fi
 
   [[ -f "${APM_INSTALL_DIR}/start.sh" ]] || fail "install did not materialize ${APM_INSTALL_DIR}/start.sh"
+  step_sync_deploy_scripts
   log "install OK (SKIP_START=1)"
   maybe_stop install
 }
@@ -192,8 +206,23 @@ restore_offline_firewall() {
 }
 
 assert_web_health() {
-  curl -sf --max-time 10 "http://127.0.0.1:27403/health" >/dev/null \
-    || fail "Web /health not ready (expected troubleshooting bootstrap)"
+  local host_ip
+  host_ip="$(hostname -I 2>/dev/null | awk '{print $1}')"
+  [[ -n "$host_ip" ]] || host_ip="127.0.0.1"
+  if curl -sf --max-time 10 "http://127.0.0.1:27403/health" >/dev/null 2>&1 \
+    || curl -sf --max-time 10 "http://${host_ip}:27403/health" >/dev/null 2>&1; then
+    return 0
+  fi
+  fail "Web /health not ready (expected troubleshooting bootstrap)"
+}
+
+assert_web_login_page() {
+  local host_ip code
+  host_ip="$(hostname -I 2>/dev/null | awk '{print $1}')"
+  [[ -n "$host_ip" ]] || host_ip="127.0.0.1"
+  code="$(curl -sf -o /dev/null -w '%{http_code}' --max-time 10 "http://${host_ip}:27403/databuff/login" || echo 000)"
+  [[ "$code" == "200" ]] || fail "Web login page HTTP ${code} (expected 200 in troubleshooting mode)"
+  log "web login page OK (HTTP 200)"
 }
 
 assert_ingest_down() {
@@ -233,6 +262,7 @@ step_failure_start() {
 
   assert_web_container_running
   assert_web_health
+  assert_web_login_page
   assert_ingest_down
   log "failure assertions PASS (Web bootstrap, ingest down)"
   maybe_stop failure
@@ -337,14 +367,19 @@ step_reinstall_smoke() {
     [[ -n "$BUNDLE_ROOT" && -d "$BUNDLE_ROOT" ]] || fail "BUNDLE_ROOT required for offline reinstall"
     (
       cd "$BUNDLE_ROOT"
-      export APM_INSTALL_DIR="$REINSTALL_DIR" FORCE_LOAD_IMAGES=0
+      export APM_INSTALL_DIR="$REINSTALL_DIR" FORCE_LOAD_IMAGES=0 SKIP_START=1
       ./install.sh
     )
   else
-    export APM_PKG_BASE APM_INSTALL_DIR="$REINSTALL_DIR" FORCE_PULL_IMAGES="${FORCE_PULL_IMAGES:-0}"
+    export APM_PKG_BASE APM_INSTALL_DIR="$REINSTALL_DIR" FORCE_PULL_IMAGES="${FORCE_PULL_IMAGES:-0}" SKIP_START=1
     bash "${DEPLOY_DIR}/docker/ai-apm-install.sh" --version "$APM_VERSION"
   fi
 
+  step_sync_deploy_scripts "$REINSTALL_DIR"
+  (
+    cd "$REINSTALL_DIR"
+    SKIP_PULL_IMAGES=1 ./start.sh
+  )
   assert_full_stack "reinstall"
   maybe_stop reinstall
 }
