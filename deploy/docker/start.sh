@@ -44,9 +44,6 @@ fi
 . "${ROOT}/scripts/compose-env.sh"
 # shellcheck source=scripts/runtime.sh
 . "${ROOT}/scripts/runtime.sh"
-if [ "${SKIP_PULL_IMAGES:-0}" != "1" ]; then
-  "${ROOT}/scripts/pull-images.sh"
-fi
 ensure_vm_max_map_count
 prepare_compose_start
 

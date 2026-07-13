@@ -1,9 +1,12 @@
 package com.databuff.apm.web.persistence;
 
+import com.databuff.apm.web.storage.DorisAvailability;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.boot.web.context.WebServerInitializedEvent;
 import org.springframework.context.event.EventListener;
+import org.springframework.core.Ordered;
+import org.springframework.core.annotation.Order;
 import org.springframework.stereotype.Component;
 
 /**
@@ -26,6 +29,7 @@ public class PersistenceStartupHydrator {
     private final AlarmPolicyHydrator alarmPolicyHydrator;
     private final ExpertTaskPersistence expertTaskPersistence;
     private final MetricCorePersistence metricCorePersistence;
+    private final DorisAvailability dorisAvailability;
 
     public PersistenceStartupHydrator(
             LlmProviderPersistence llmProviderPersistence,
@@ -39,7 +43,8 @@ public class PersistenceStartupHydrator {
             ExpertTaskPersistence expertTaskPersistence,
             EventPersistence eventPersistence,
             AlarmPolicyHydrator alarmPolicyHydrator,
-            MetricCorePersistence metricCorePersistence) {
+            MetricCorePersistence metricCorePersistence,
+            DorisAvailability dorisAvailability) {
         this.llmProviderPersistence = llmProviderPersistence;
         this.eventRuleStore = eventRuleStore;
         this.alarmPersistence = alarmPersistence;
@@ -52,14 +57,24 @@ public class PersistenceStartupHydrator {
         this.eventPersistence = eventPersistence;
         this.alarmPolicyHydrator = alarmPolicyHydrator;
         this.metricCorePersistence = metricCorePersistence;
+        this.dorisAvailability = dorisAvailability;
     }
 
+    @Order(Ordered.LOWEST_PRECEDENCE)
     @EventListener(WebServerInitializedEvent.class)
     public void hydrateAsync(WebServerInitializedEvent event) {
-        Thread worker = new Thread(this::hydrateAll, "persistence-hydrator");
+        if (dorisAvailability.isUnavailable()) {
+            log.info("Skip persistence hydrate while Doris unavailable (web port {})", event.getWebServer().getPort());
+            return;
+        }
+        scheduleHydrate("persistence-hydrator");
+        log.info("Persistence hydrate scheduled (web port {})", event.getWebServer().getPort());
+    }
+
+    private void scheduleHydrate(String threadName) {
+        Thread worker = new Thread(this::hydrateAll, threadName);
         worker.setDaemon(true);
         worker.start();
-        log.info("Persistence hydrate scheduled (web port {})", event.getWebServer().getPort());
     }
 
     void hydrateAll() {

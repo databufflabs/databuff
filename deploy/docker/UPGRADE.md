@@ -80,16 +80,38 @@ Set `SKIP_VERIFY=1` on `update.sh` if you will verify only after the manual star
 
 ## Schema migration failure
 
-Step 6 (start Doris, `migrate-schema`, start ingest/web, verify) is retried automatically up to **3** times (`UPDATE_MAX_ATTEMPTS`, default 3). On each retry, `update.sh` stops containers, restores the `data/` backup from step 3/6, and runs step 6 again. Deploy files and images from steps 4–5 are not re-downloaded.
+Step 6 order: start Doris → `migrate-schema` → start ingest/web. If migration fails, **Web troubleshooting mode** still starts (`ai-apm-web` only; ingest stays down to avoid writing into a broken schema). Web probes Doris once at startup; when unreachable, Doris-backed APIs fail fast so the AI chat page loads quickly for ops expert troubleshooting. Restart web after Doris is fixed to exit troubleshooting mode. Check `GET /health` for `"doris":"UNAVAILABLE"`. Same pattern as `start.sh` when Doris is unavailable.
 
-Requires a pre-upgrade backup: do **not** set `SKIP_BACKUP=1` if you want auto-recovery.
+### One-command recovery (recommended)
+
+If the current `data/` directory is untrusted (for example migration stopped halfway), restore from `backups/` and continue — even when `VERSION` already shows the target release:
 
 ```bash
-# optional: change retry count (default 3)
-UPDATE_MAX_ATTEMPTS=3 ./update.sh --version 0.1.3
+cd /opt/databuff-ai-apm
+curl -fsSL https://databuff.ai/databuff/ai-apm-update.sh | bash -s -- --restore-backup
 ```
 
-If all attempts fail, `data/` is restored to the pre-upgrade backup and the script exits with an error. Manual recovery:
+Use the latest `backups/data-backup-*.tar.gz` by default. To pick a specific file:
+
+```bash
+curl -fsSL https://databuff.ai/databuff/ai-apm-update.sh | bash -s -- \
+  --restore-backup=data-backup-20260713-110220.tar.gz
+```
+
+Offline / in install dir:
+
+```bash
+cd /opt/databuff-ai-apm
+./update.sh --restore-backup --version 0.1.3
+```
+
+What it does: stop services → restore trusted backup → sync deploy files/images → migrate + start (with auto-retry). It does **not** run `install.sh`.
+
+Requires a pre-upgrade backup under `backups/`. Do not set `SKIP_BACKUP=1` on the original upgrade if you may need this path.
+
+### Manual recovery
+
+If all automatic attempts fail, `data/` is restored to the backup used for recovery and the script exits with an error. You can retry `--restore-backup` again or restore manually:
 
 ```bash
 cd /opt/databuff-ai-apm
@@ -97,10 +119,10 @@ cd /opt/databuff-ai-apm
 ls -lt backups/data-backup-*.tar.gz
 rm -rf data/
 tar -xzf backups/data-backup-YYYYMMDD-HHMMSS.tar.gz -C .
-./update.sh --version 0.1.3
+./update.sh --restore-backup --version 0.1.3
 ```
 
-Do not hand-edit `schema_version` or drop Doris tables unless you know the exact partial state. Use `update.sh`, not `install.sh`, to retry after restore.
+Do not hand-edit `schema_version` or drop Doris tables unless you know the exact partial state.
 
 ## Rollback
 

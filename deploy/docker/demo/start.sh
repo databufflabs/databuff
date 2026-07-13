@@ -73,12 +73,8 @@ if [ -z "${APM_DEMO_IMAGE:-}" ]; then
   exit 1
 fi
 
-if [ "${SKIP_PULL_IMAGES:-0}" != "1" ] && [ -f "${ROOT}/scripts/image-pkg.sh" ]; then
-  # shellcheck source=scripts/image-pkg.sh
-  . "${ROOT}/scripts/image-pkg.sh"
-  load_demo_image_from_pkg
-elif ! docker image inspect "$APM_DEMO_IMAGE" >/dev/null 2>&1; then
-  echo "[start] missing image ${APM_DEMO_IMAGE}; load offline package or build locally first" >&2
+if ! docker image inspect "$APM_DEMO_IMAGE" >/dev/null 2>&1; then
+  echo "[start] missing image ${APM_DEMO_IMAGE}; run install/update or ./scripts/pull-images.sh first" >&2
   exit 1
 fi
 

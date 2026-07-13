@@ -182,6 +182,85 @@ apm_restore_data_dir() {
   tar -xzf "$archive" -C "$install_dir"
 }
 
+# Resolve a data-backup-*.tar.gz under install_dir/backups/ (or an explicit path).
+apm_resolve_data_backup_archive() {
+  local install_dir="$1"
+  local hint="${2:-}"
+  local backup_dir="${install_dir}/backups"
+  local candidate latest
+
+  if [[ -n "$hint" ]]; then
+    if [[ -f "$hint" ]]; then
+      printf '%s\n' "$(cd "$(dirname "$hint")" && pwd)/$(basename "$hint")"
+      return 0
+    fi
+    if [[ -f "${backup_dir}/${hint}" ]]; then
+      printf '%s\n' "${backup_dir}/${hint}"
+      return 0
+    fi
+    if [[ -f "${install_dir}/${hint}" ]]; then
+      printf '%s\n' "${install_dir}/${hint}"
+      return 0
+    fi
+    return 1
+  fi
+
+  shopt -s nullglob
+  local files=("${backup_dir}"/data-backup-*.tar.gz)
+  shopt -u nullglob
+  if [[ ${#files[@]} -eq 0 ]]; then
+    return 1
+  fi
+  latest="${files[0]}"
+  for candidate in "${files[@]}"; do
+    if [[ "$candidate" -nt "$latest" ]]; then
+      latest="$candidate"
+    fi
+  done
+  printf '%s\n' "$latest"
+}
+
+# Refresh update.sh + scripts/ from target release bundle (online wrapper uses this before exec).
+apm_bootstrap_update_runner() {
+  local install_dir="$1"
+  local version="$2"
+  local tmp_pkg staging docker_pkg pkg_url
+
+  [[ -d "$install_dir" ]] || return 1
+  docker_pkg="databuff-ai-apm-${version}.tar.gz"
+  pkg_url="$(apm_docker_pkg_download_url "$docker_pkg")"
+  tmp_pkg="$(mktemp "${TMPDIR:-/tmp}/apm-update-bootstrap.XXXXXX.tar.gz")"
+  staging="$(mktemp -d "${TMPDIR:-/tmp}/apm-update-bootstrap-stage.XXXXXX")"
+
+  if ! curl -fsSL "$pkg_url" -o "$tmp_pkg"; then
+    rm -f "$tmp_pkg"
+    rm -rf "$staging"
+    return 1
+  fi
+  tar -xzf "$tmp_pkg" -C "$staging" --strip-components=1
+  rm -f "$tmp_pkg"
+
+  mkdir -p "${install_dir}/scripts"
+  if [[ -f "${staging}/update.sh" ]]; then
+    cp -f "${staging}/update.sh" "${install_dir}/update.sh"
+    chmod +x "${install_dir}/update.sh"
+  fi
+  if [[ -d "${staging}/scripts" ]]; then
+    cp -Rf "${staging}/scripts/." "${install_dir}/scripts/"
+    chmod +x "${install_dir}/scripts/"*.sh 2>/dev/null || true
+  fi
+  if [[ -d "${staging}/sql" ]]; then
+    mkdir -p "${install_dir}/sql"
+    cp -Rf "${staging}/sql/." "${install_dir}/sql/"
+  fi
+  if [[ -f "${staging}/upgrade-manifest.json" ]]; then
+    cp -f "${staging}/upgrade-manifest.json" "${install_dir}/upgrade-manifest.json"
+  fi
+
+  rm -rf "$staging"
+  [[ -x "${install_dir}/update.sh" ]]
+}
+
 apm_resolve_bundle_glob() {
   local pattern="$1"
   local label="$2"

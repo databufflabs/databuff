@@ -5,17 +5,21 @@
 #   cd /opt/databuff-ai-apm && ./update.sh
 #   ./update.sh --version 0.1.3
 #   ./update.sh --pull-images
+#   ./update.sh --restore-backup
+#   ./update.sh --restore-backup=data-backup-20260713-110220.tar.gz
 #
 # 环境变量:
-#   APM_PKG_BASE         部署包下载地址
-#   APM_INSTALL_DIR      安装目录 (默认 /opt/databuff-ai-apm)
-#   UPDATE_BUNDLE_ROOT   离线包解压目录（内网升级时设置，无需 curl）
-#   FORCE_PULL_IMAGES    1=强制重新下载镜像
-#   FORCE_LOAD_IMAGES    1=离线包强制 docker load
-#   SKIP_BACKUP          1=跳过 data/ 备份（禁用失败自动恢复）
-#   SKIP_START           1=仅更新文件与镜像，不启动
-#   SKIP_VERIFY          1=跳过升级后校验 (verify-upgrade.sh)
-#   UPDATE_MAX_ATTEMPTS  启动/迁移失败时自动恢复备份并重试的次数 (默认 3)
+#   APM_PKG_BASE              部署包下载地址
+#   APM_INSTALL_DIR           安装目录 (默认 /opt/databuff-ai-apm)
+#   UPDATE_BUNDLE_ROOT        离线包解压目录（内网升级时设置，无需 curl）
+#   FORCE_PULL_IMAGES         1=强制重新下载镜像
+#   FORCE_LOAD_IMAGES         1=离线包强制 docker load
+#   SKIP_BACKUP               1=跳过 data/ 备份（禁用失败自动恢复）
+#   SKIP_START                1=仅更新文件与镜像，不启动
+#   SKIP_VERIFY               1=跳过升级后校验 (verify-upgrade.sh)
+#   UPDATE_MAX_ATTEMPTS       启动/迁移失败时自动恢复备份并重试的次数 (默认 3)
+#   RESTORE_BACKUP         1=当前 data/ 不可信，先从 backups/ 恢复后再继续
+#   BACKUP_FILE            指定备份文件（默认取 backups/ 下最新 data-backup-*.tar.gz）
 
 set -e
 
@@ -41,8 +45,11 @@ SKIP_BACKUP="${SKIP_BACKUP:-0}"
 SKIP_START="${SKIP_START:-0}"
 SKIP_VERIFY="${SKIP_VERIFY:-0}"
 UPDATE_MAX_ATTEMPTS="${UPDATE_MAX_ATTEMPTS:-3}"
+RESTORE_BACKUP="${RESTORE_BACKUP:-0}"
+BACKUP_FILE="${BACKUP_FILE:-}"
 UPDATE_BUNDLE_ROOT="${UPDATE_BUNDLE_ROOT:-}"
 backup_archive=""
+restore_source_archive=""
 
 while [[ $# -gt 0 ]]; do
   case "$1" in
@@ -71,9 +78,21 @@ while [[ $# -gt 0 ]]; do
       SKIP_START=1
       shift
       ;;
+    --restore-backup)
+      RESTORE_BACKUP=1
+      shift
+      ;;
+    --restore-backup=*)
+      RESTORE_BACKUP=1
+      BACKUP_FILE="${1#--restore-backup=}"
+      shift
+      ;;
+    *)
+      shift
+      ;;
   esac
 done
-export FORCE_PULL_IMAGES FORCE_LOAD_IMAGES
+export FORCE_PULL_IMAGES FORCE_LOAD_IMAGES RESTORE_BACKUP
 
 CYN='\033[36m'
 GRN='\033[32m'
@@ -98,7 +117,11 @@ upgrade_finalize() {
   ensure_vm_max_map_count
   prepare_compose_start
   compose_up_wait ai-apm-doris-fe ai-apm-doris-be
-  "${INSTALL_DIR}/scripts/migrate-schema.sh"
+  if ! "${INSTALL_DIR}/scripts/migrate-schema.sh"; then
+    log "${YLW}Schema 迁移失败，启动 Web 排障模式（ingest 保持停止，避免写入异常表结构）${RST}"
+    bootstrap_web_for_troubleshooting "Schema 迁移失败"
+    return 1
+  fi
   compose_up ai-apm-ingest ai-apm-web
   wait_for_apm_services_ready
   if [[ "$SKIP_VERIFY" == "1" ]]; then
@@ -177,17 +200,25 @@ export_apm_pkg_download_env
 TARGET_VERSION="$APM_VERSION"
 DOCKER_PKG="databuff-ai-apm-${TARGET_VERSION}.tar.gz"
 
-if [[ "$CURRENT_VERSION" == "$TARGET_VERSION" ]]; then
+if [[ "$CURRENT_VERSION" == "$TARGET_VERSION" && "$RESTORE_BACKUP" != "1" ]]; then
   log "已在版本 ${CURRENT_VERSION}，无需升级"
   exit 0
 fi
-if ! apm_version_gte "$TARGET_VERSION" "$CURRENT_VERSION"; then
+if [[ "$RESTORE_BACKUP" != "1" ]] && ! apm_version_gte "$TARGET_VERSION" "$CURRENT_VERSION"; then
   fail "目标版本 ${TARGET_VERSION} 低于当前版本 ${CURRENT_VERSION}，不支持降级"
 fi
 
 echo ""
 echo -e "${CYN}========================================================${RST}"
-echo -e "${BLD} DataBuff AI APM  升级 ${CURRENT_VERSION} → ${TARGET_VERSION}${RST}"
+if [[ "$RESTORE_BACKUP" == "1" && "$CURRENT_VERSION" == "$TARGET_VERSION" ]]; then
+  echo -e "${BLD} DataBuff AI APM  修复升级 ${TARGET_VERSION}${RST}"
+  echo -e "${DIM} 从 backups/ 恢复 data/ 后重新迁移${RST}"
+elif [[ "$RESTORE_BACKUP" == "1" ]]; then
+  echo -e "${BLD} DataBuff AI APM  升级 ${CURRENT_VERSION} → ${TARGET_VERSION}${RST}"
+  echo -e "${DIM} 当前 data/ 不可信，将先从 backups/ 恢复${RST}"
+else
+  echo -e "${BLD} DataBuff AI APM  升级 ${CURRENT_VERSION} → ${TARGET_VERSION}${RST}"
+fi
 echo -e "${CYN}========================================================${RST}"
 echo ""
 
@@ -209,8 +240,20 @@ source_compose_env
 (cd "$INSTALL_DIR" && compose_down) >/dev/null 2>&1 || true
 log_done "${BLD}(2/6)${RST} 停止服务"
 
+if [[ "$RESTORE_BACKUP" == "1" ]]; then
+  log "当前 data/ 不可信，从备份恢复"
+  restore_source_archive="$(apm_resolve_data_backup_archive "$INSTALL_DIR" "$BACKUP_FILE")" \
+    || fail "未找到可用的 data/ 备份（请确认 backups/data-backup-*.tar.gz 存在，或用 --restore-backup=文件 指定）"
+  apm_restore_data_dir "$INSTALL_DIR" "$restore_source_archive" \
+    || fail "恢复 data/ 失败: ${restore_source_archive}"
+  backup_archive="$restore_source_archive"
+  log_done "已恢复 data/ ← ${restore_source_archive}"
+fi
+
 log "${BLD}(3/6)${RST} 备份 data/"
-if [[ "$SKIP_BACKUP" == "1" ]]; then
+if [[ "$RESTORE_BACKUP" == "1" ]]; then
+  log_skip "${BLD}(3/6)${RST} 备份 data/（已从可信备份恢复，跳过）"
+elif [[ "$SKIP_BACKUP" == "1" ]]; then
   log_skip "${BLD}(3/6)${RST} 备份 data/ (SKIP_BACKUP=1)"
 else
   backup_archive="$(apm_backup_data_dir "$INSTALL_DIR")"
@@ -300,6 +343,15 @@ else
         source_compose_env
         (cd "$INSTALL_DIR" && compose_down) >/dev/null 2>&1 || true
         apm_restore_data_dir "$INSTALL_DIR" "$backup_archive" || true
+      fi
+      log "${YLW}升级失败（已尝试 ${UPDATE_MAX_ATTEMPTS} 次），启动 Web 排障模式${RST}"
+      cd "$INSTALL_DIR"
+      source_compose_env
+      # shellcheck disable=SC1091
+      . "${INSTALL_DIR}/scripts/runtime.sh"
+      compose_up_wait ai-apm-doris-fe ai-apm-doris-be || true
+      bootstrap_web_for_troubleshooting "升级失败"
+      if [[ -n "$backup_archive" && -f "$backup_archive" ]]; then
         fail "升级失败（已尝试 ${UPDATE_MAX_ATTEMPTS} 次）。data/ 已恢复为升级前备份: ${backup_archive}"
       fi
       fail "升级失败（已尝试 ${UPDATE_MAX_ATTEMPTS} 次）"

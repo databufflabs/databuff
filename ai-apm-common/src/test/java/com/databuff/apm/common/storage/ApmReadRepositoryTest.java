@@ -22,6 +22,19 @@ class ApmReadRepositoryTest {
     }
 
     @Test
+    void accessGateRunsBeforeBorrowingConnection() throws Exception {
+        DataSource dataSource = mock(DataSource.class);
+        DorisAccessGate gate = () -> {
+            throw new java.sql.SQLException("blocked");
+        };
+        ApmReadRepository reader = new ApmReadRepository(dataSource, gate);
+
+        Assertions.assertThatThrownBy(reader::connection)
+                .isInstanceOf(java.sql.SQLException.class)
+                .hasMessage("blocked");
+    }
+
+    @Test
     void parsesTrafficLightRows() throws Exception {
         ApmReadRepository reader = new ApmReadRepository(mockDataSource()) {
             @Override

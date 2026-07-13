@@ -39,7 +39,7 @@ docker compose restart ai-apm-web
 docker compose restart ai-apm-ingest
 ```
 
-`start.sh` 会按本机架构拉取离线镜像包（本地已有可跳过）、检查 `vm.max_map_count`，等待 Doris 就绪后启动 ingest 与 web，并探测健康检查端点。
+`start.sh` 仅启动服务：检查 `vm.max_map_count`，等待 Doris 就绪后启动 ingest 与 web，并探测健康检查端点。镜像加载由 `install.sh` / `update.sh` 或手动执行 `scripts/pull-images.sh` 完成。
 
 ## 服务与端口
 

@@ -192,7 +192,7 @@ else
   log "启动 demo 造数"
   log_sub "OTLP http://${INGEST_HOST}:${INGEST_PORT}/v1/traces"
   cd "$INSTALL_DIR"
-  SKIP_PULL_IMAGES=1 START_SKIP_READY=1 \
+  START_SKIP_READY=1 \
     INGEST_HOST="$INGEST_HOST" INGEST_PORT="$INGEST_PORT" ./start.sh
   log_done "启动 demo 造数"
 fi

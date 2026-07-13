@@ -265,6 +265,6 @@ if [ "$SKIP_START" = "1" ]; then
   log_skip "启动服务 (SKIP_START=1)"
 else
   cd "$INSTALL_DIR"
-  SKIP_PULL_IMAGES=1 START_SKIP_SUMMARY=1 ./start.sh
+  START_SKIP_SUMMARY=1 ./start.sh
   log_done "启动服务"
 fi

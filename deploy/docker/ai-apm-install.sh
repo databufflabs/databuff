@@ -7,8 +7,8 @@
 #   curl -fsSL https://databuff.ai/databuff/ai-apm-install.sh | bash
 #   curl -fsSL https://databuff.ai/databuff/ai-apm-install.sh | bash -s -- --pull-images
 #
-# start.sh 会按本机架构从 ${APM_PKG_BASE}/${APM_VERSION}/images 与 infra/images 下载镜像包并 docker load。
-# 本地已有对应版本镜像时默认跳过下载；加 --pull-images 强制重新下载。
+# 安装过程会按本机架构从 ${APM_PKG_BASE}/${APM_VERSION}/images 与 infra/images 下载镜像包并 docker load。
+# 本地已有对应版本镜像时默认跳过下载；加 --pull-images 强制重新下载。start.sh 仅负责启动服务。
 #
 # 环境变量:
 #   APM_PKG_BASE       部署包地址 (默认 https://databuff.ai/databuff)
@@ -299,6 +299,6 @@ if [ "$SKIP_START" = "1" ]; then
   log_skip "启动服务 (SKIP_START=1)"
 else
   cd "$INSTALL_DIR"
-  SKIP_PULL_IMAGES=1 START_SKIP_SUMMARY=1 ./start.sh
+  START_SKIP_SUMMARY=1 ./start.sh
   log_done "启动服务"
 fi

@@ -18,6 +18,8 @@
 #   SKIP_START         1=仅更新文件与镜像，不启动
 #   SKIP_PULL_IMAGES   1=不下载镜像（使用本地已 load 的镜像）
 #   SKIP_VERIFY        1=跳过升级后校验
+#   RESTORE_BACKUP       1=当前 data/ 不可信，先从 backups/ 恢复后再继续
+#   BACKUP_FILE          指定备份文件（默认取最新 data-backup-*.tar.gz）
 
 set -e
 
@@ -33,6 +35,8 @@ SKIP_BACKUP="${SKIP_BACKUP:-0}"
 SKIP_START="${SKIP_START:-0}"
 SKIP_PULL_IMAGES="${SKIP_PULL_IMAGES:-0}"
 SKIP_VERIFY="${SKIP_VERIFY:-0}"
+RESTORE_BACKUP="${RESTORE_BACKUP:-0}"
+BACKUP_FILE="${BACKUP_FILE:-}"
 
 while [[ $# -gt 0 ]]; do
   case "$1" in
@@ -60,6 +64,15 @@ while [[ $# -gt 0 ]]; do
       SKIP_START=1
       shift
       ;;
+    --restore-backup)
+      RESTORE_BACKUP=1
+      shift
+      ;;
+    --restore-backup=*)
+      RESTORE_BACKUP=1
+      BACKUP_FILE="${1#--restore-backup=}"
+      shift
+      ;;
     *)
       shift
       ;;
@@ -67,9 +80,11 @@ while [[ $# -gt 0 ]]; do
 done
 
 export FORCE_PULL_IMAGES SKIP_BACKUP SKIP_START SKIP_PULL_IMAGES SKIP_VERIFY
+export RESTORE_BACKUP BACKUP_FILE
 
 CYN='\033[36m'
 RED='\033[31m'
+YLW='\033[33m'
 BLD='\033[1m'
 DIM='\033[2m'
 RST='\033[0m'
@@ -115,17 +130,14 @@ if ! apm_install_dir_ready "$INSTALL_DIR"; then
 fi
 
 UPDATE_SCRIPT="${INSTALL_DIR}/update.sh"
-if [[ ! -x "$UPDATE_SCRIPT" ]]; then
-  echo -e "${CYN}[update]${RST} 安装目录缺少 update.sh，从目标版本部署包引导升级 ..."
-  TMP_PKG="$(mktemp "${TMPDIR:-/tmp}/apm-update-bootstrap.XXXXXX.tar.gz")"
-  DOCKER_PKG="databuff-ai-apm-${APM_VERSION}.tar.gz"
-  PKG_URL="$(apm_docker_pkg_download_url "$DOCKER_PKG")"
-  curl -fsSL "$PKG_URL" -o "$TMP_PKG"
-  STAGING="$(mktemp -d "${TMPDIR:-/tmp}/apm-update-bootstrap-stage.XXXXXX")"
-  tar -xzf "$TMP_PKG" -C "$STAGING" --strip-components=1
-  rm -f "$TMP_PKG"
-  chmod +x "${STAGING}/update.sh" "${STAGING}/scripts/"*.sh 2>/dev/null || true
-  UPDATE_SCRIPT="${STAGING}/update.sh"
+echo -e "${CYN}[update]${RST} 刷新本机 update.sh 与 scripts/ ..."
+if ! apm_bootstrap_update_runner "$INSTALL_DIR" "$APM_VERSION"; then
+  if [[ ! -x "$UPDATE_SCRIPT" ]]; then
+    fail "无法刷新 update.sh，且安装目录缺少可执行 update.sh"
+  fi
+  echo -e "${CYN}[update]${RST} ${YLW}刷新失败，使用本机已有 update.sh（可能不支持新参数）${RST}"
+else
+  UPDATE_SCRIPT="${INSTALL_DIR}/update.sh"
 fi
 
 exec env \
@@ -137,7 +149,11 @@ exec env \
   SKIP_START="$SKIP_START" \
   SKIP_PULL_IMAGES="$SKIP_PULL_IMAGES" \
   SKIP_VERIFY="$SKIP_VERIFY" \
+  RESTORE_BACKUP="$RESTORE_BACKUP" \
+  BACKUP_FILE="$BACKUP_FILE" \
   "$UPDATE_SCRIPT" --version "$APM_VERSION" \
   $([[ "$FORCE_PULL_IMAGES" == "1" ]] && echo --pull-images) \
   $([[ "$SKIP_BACKUP" == "1" ]] && echo --skip-backup) \
-  $([[ "$SKIP_START" == "1" ]] && echo --skip-start)
+  $([[ "$SKIP_START" == "1" ]] && echo --skip-start) \
+  $([[ "$RESTORE_BACKUP" == "1" && -z "$BACKUP_FILE" ]] && echo --restore-backup) \
+  $([[ "$RESTORE_BACKUP" == "1" && -n "$BACKUP_FILE" ]] && echo --restore-backup="$BACKUP_FILE")

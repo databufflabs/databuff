@@ -117,11 +117,12 @@ print_apm_ready_summary() {
 }
 
 bootstrap_web_for_troubleshooting() {
+  local reason="${1:-Doris 未就绪}"
   web_service="${WEB_SERVICE:-ai-apm-web}"
   timeout="${APM_READY_TIMEOUT:-300}"
 
-  echo "[start] Doris not ready; starting ${web_service} for troubleshooting" >&2
-  compose_cmd up -d --no-deps "$web_service"
+  echo "[start] ${reason}; starting ${web_service} for troubleshooting" >&2
+  compose_cmd up -d --no-deps --force-recreate "$web_service"
 
   if [ "${START_SKIP_READY:-0}" != "1" ]; then
     host_ip="$(detect_local_ip)"
@@ -129,11 +130,12 @@ bootstrap_web_for_troubleshooting() {
   fi
 
   if [ "${START_SKIP_SUMMARY:-0}" != "1" ]; then
-    print_web_bootstrap_summary
+    print_web_bootstrap_summary "$reason"
   fi
 }
 
 print_web_bootstrap_summary() {
+  local reason="${1:-Doris 未就绪}"
   host_ip="$(detect_local_ip)"
   CYN='\033[36m'
   YLW='\033[33m'
@@ -142,7 +144,7 @@ print_web_bootstrap_summary() {
 
   echo ""
   echo -e "${CYN}========================================================${RST}"
-  echo -e "${YLW}${BLD} Doris 未就绪 — Web 排障模式${RST}"
+  echo -e "${YLW}${BLD} ${reason} — Web 排障模式${RST}"
   echo -e "${CYN}========================================================${RST}"
   echo ""
   echo -e "  ${CYN}Web UI${RST}"

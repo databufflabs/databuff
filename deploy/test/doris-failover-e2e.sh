@@ -249,7 +249,7 @@ step_failure_start() {
   set +e
   (
     cd "$APM_INSTALL_DIR"
-    SKIP_PULL_IMAGES=1 START_SKIP_SUMMARY=0 ./start.sh
+    START_SKIP_SUMMARY=0 ./start.sh
   )
   START_FAIL_RC=$?
   set -e
@@ -345,7 +345,7 @@ step_recovery() {
   stop_stack_quiet
   (
     cd "$APM_INSTALL_DIR"
-    SKIP_PULL_IMAGES=1 ./start.sh
+    ./start.sh
   )
   assert_full_stack "recovery"
   maybe_stop recovery
@@ -378,7 +378,7 @@ step_reinstall_smoke() {
   step_sync_deploy_scripts "$REINSTALL_DIR"
   (
     cd "$REINSTALL_DIR"
-    SKIP_PULL_IMAGES=1 ./start.sh
+    ./start.sh
   )
   assert_full_stack "reinstall"
   maybe_stop reinstall

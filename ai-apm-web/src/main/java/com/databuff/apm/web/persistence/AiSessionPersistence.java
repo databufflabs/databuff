@@ -5,6 +5,7 @@ import com.databuff.apm.common.storage.ApmReadRepository;
 import com.databuff.apm.web.ai.agent.AiMessageType;
 import com.databuff.apm.web.ai.agent.AiSessionStore;
 import com.databuff.apm.web.config.ApmStorageProperties;
+import com.databuff.apm.web.storage.DorisAvailability;
 import com.fasterxml.jackson.core.type.TypeReference;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import org.slf4j.Logger;
@@ -30,6 +31,7 @@ public class AiSessionPersistence {
     private static final int MAX_PAGE_SIZE = 100;
 
     private final ApmReadRepository readRepository;
+    private final DorisAvailability dorisAvailability;
     private final AiSessionStore sessionStore;
     private final AiMessagePersistenceQueue persistenceQueue;
     private final String configDatabase;
@@ -38,10 +40,12 @@ public class AiSessionPersistence {
 
     public AiSessionPersistence(
             ApmReadRepository readRepository,
+            DorisAvailability dorisAvailability,
             AiSessionStore sessionStore,
             AiMessagePersistenceQueue persistenceQueue,
             ApmStorageProperties storageProperties) {
         this.readRepository = readRepository;
+        this.dorisAvailability = dorisAvailability;
         this.sessionStore = sessionStore;
         this.persistenceQueue = persistenceQueue;
         this.configDatabase = storageProperties.configDatabase();
@@ -51,6 +55,10 @@ public class AiSessionPersistence {
     }
 
     void reloadFromStore() {
+        if (dorisAvailability.isUnavailable()) {
+            log.info("Skip AI session hydrate while Doris unavailable");
+            return;
+        }
         ApmConfigRepository repository = new ApmConfigRepository(readRepository, configDatabase);
         if (!repository.aiMessageSchemaReady()) {
             log.info("AI message store not ready; AI sessions stay in-memory only");
@@ -222,6 +230,9 @@ public class AiSessionPersistence {
     }
 
     private boolean ensurePersistenceReady() {
+        if (dorisAvailability.isUnavailable()) {
+            return false;
+        }
         if (persistenceEnabled) {
             return true;
         }

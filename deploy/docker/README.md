@@ -27,7 +27,7 @@ docker/
 
 ## 目标机安装
 
-`start.sh` / 一键安装脚本会按本机架构（amd64/arm64）从 `APM_IMAGES_PKG_BASE` 下载镜像包并 `docker load`：
+一键安装 / 升级脚本会按本机架构（amd64/arm64）从 `APM_IMAGES_PKG_BASE` 下载镜像包并 `docker load`；`start.sh` 仅负责启动：
 
 ```bash
 # 全新安装（删除旧目录与 data/）

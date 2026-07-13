@@ -39,7 +39,7 @@ docker compose restart ai-apm-web
 docker compose restart ai-apm-ingest
 ```
 
-`start.sh` downloads offline image bundles for the host architecture (skips if images exist), checks `vm.max_map_count`, waits for Doris, then starts ingest and web and probes health endpoints.
+`start.sh` only starts services: checks `vm.max_map_count`, waits for Doris, then starts ingest and web and probes health endpoints. Image loading is handled by `install.sh` / `update.sh` or by running `scripts/pull-images.sh` manually.
 
 ## Services and Ports
 

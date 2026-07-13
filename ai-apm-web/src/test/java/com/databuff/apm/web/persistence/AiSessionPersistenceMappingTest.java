@@ -5,6 +5,7 @@ import com.databuff.apm.web.TestStorageSupport;
 import com.databuff.apm.web.ai.agent.AiMessageStatus;
 import com.databuff.apm.web.ai.agent.AiMessageType;
 import com.databuff.apm.web.ai.agent.AiSessionStore;
+import com.databuff.apm.web.storage.DorisAvailability;
 import org.junit.jupiter.api.Test;
 import org.mockito.ArgumentCaptor;
 
@@ -38,9 +39,11 @@ class AiSessionPersistenceMappingTest {
         when(statement.executeQuery(anyString())).thenReturn(schemaRs);
         when(schemaRs.next()).thenReturn(true);
 
+        DorisAvailability availability = new DorisAvailability();
+        availability.markAvailable();
         AiSessionStore store = new AiSessionStore();
         AiMessagePersistenceQueue queue = new AiMessagePersistenceQueue(reader, TestStorageSupport.storage());
-        AiSessionPersistence persistence = new AiSessionPersistence(reader, store, queue, TestStorageSupport.storage());
+        AiSessionPersistence persistence = new AiSessionPersistence(reader, availability, store, queue, TestStorageSupport.storage());
         assertThat(persistence.persistenceEnabled()).isFalse();
 
         String sessionId = store.ensureSession(null, "brain", "rk", "web-1", "alice");
@@ -65,9 +68,11 @@ class AiSessionPersistenceMappingTest {
         when(statement.executeQuery(anyString())).thenReturn(schemaRs);
         when(schemaRs.next()).thenReturn(true);
 
+        DorisAvailability availability = new DorisAvailability();
+        availability.markAvailable();
         AiSessionStore store = new AiSessionStore();
         AiMessagePersistenceQueue queue = new AiMessagePersistenceQueue(reader, TestStorageSupport.storage());
-        AiSessionPersistence persistence = new AiSessionPersistence(reader, store, queue, TestStorageSupport.storage());
+        AiSessionPersistence persistence = new AiSessionPersistence(reader, availability, store, queue, TestStorageSupport.storage());
         String sessionId = store.ensureSession(null, "brain", "rk", "web-1", "alice");
         store.appendUserMessage(sessionId, "hello", "brain", "alice", Map.of());
         store.appendTraceMessage(
@@ -111,8 +116,11 @@ class AiSessionPersistenceMappingTest {
         when(schemaRs.next()).thenReturn(true);
 
         AiSessionStore store = new AiSessionStore();
+        DorisAvailability availability = new DorisAvailability();
+        availability.markAvailable();
         new AiSessionPersistence(
                 reader,
+                availability,
                 store,
                 new AiMessagePersistenceQueue(reader, TestStorageSupport.storage()),
                 TestStorageSupport.storage());
@@ -155,8 +163,10 @@ class AiSessionPersistenceMappingTest {
         });
         when(schemaRs.next()).thenReturn(true);
 
+        DorisAvailability availability = new DorisAvailability();
+        availability.markAvailable();
         AiMessagePersistenceQueue queue = new AiMessagePersistenceQueue(reader, TestStorageSupport.storage());
-        AiSessionPersistence persistence = new AiSessionPersistence(reader, new AiSessionStore(), queue, TestStorageSupport.storage());
+        AiSessionPersistence persistence = new AiSessionPersistence(reader, availability, new AiSessionStore(), queue, TestStorageSupport.storage());
         persistence.reloadFromStore();
         assertThat(persistence.persistenceEnabled()).isTrue();
     }

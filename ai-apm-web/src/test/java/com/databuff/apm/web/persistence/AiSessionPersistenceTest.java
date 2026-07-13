@@ -3,6 +3,7 @@ package com.databuff.apm.web.persistence;
 import com.databuff.apm.web.TestStorageSupport;
 import com.databuff.apm.common.storage.ApmReadRepository;
 import com.databuff.apm.web.ai.agent.AiSessionStore;
+import com.databuff.apm.web.storage.DorisAvailability;
 import org.junit.jupiter.api.Test;
 
 import java.sql.Connection;
@@ -31,7 +32,7 @@ class AiSessionPersistenceTest {
         store.ensureSession("s1", "brain", null, null, "admin");
         store.ensureSession("s2", "brain", null, null, "admin");
         AiSessionPersistence persistence = new AiSessionPersistence(
-                reader, store, new AiMessagePersistenceQueue(reader, TestStorageSupport.storage()), TestStorageSupport.storage());
+                reader, new DorisAvailability(), store, new AiMessagePersistenceQueue(reader, TestStorageSupport.storage()), TestStorageSupport.storage());
         assertThat(persistence.countSessions()).isEqualTo(2);
         assertThat(persistence.listSessions(0, 1)).hasSize(1);
         assertThat(persistence.listSessions(1, 1)).hasSize(1);
@@ -42,7 +43,7 @@ class AiSessionPersistenceTest {
         ApmReadRepository reader = mock(ApmReadRepository.class);
         when(reader.connection()).thenThrow(new SQLException("down"));
         AiSessionPersistence sync = new AiSessionPersistence(
-                reader, new AiSessionStore(), new AiMessagePersistenceQueue(reader, TestStorageSupport.storage()), TestStorageSupport.storage());
+                reader, new DorisAvailability(), new AiSessionStore(), new AiMessagePersistenceQueue(reader, TestStorageSupport.storage()), TestStorageSupport.storage());
         sync.reloadFromStore();
         assertThat(sync.persistenceEnabled()).isFalse();
     }
@@ -100,9 +101,11 @@ class AiSessionPersistenceTest {
         when(messagesRs.getTimestamp("created_at")).thenReturn(Timestamp.from(now));
         when(messagesRs.getTimestamp("updated_at")).thenReturn(Timestamp.from(now));
 
+        DorisAvailability availability = new DorisAvailability();
+        availability.markAvailable();
         AiSessionStore store = new AiSessionStore();
         AiSessionPersistence sync = new AiSessionPersistence(
-                reader, store, new AiMessagePersistenceQueue(reader, TestStorageSupport.storage()), TestStorageSupport.storage());
+                reader, availability, store, new AiMessagePersistenceQueue(reader, TestStorageSupport.storage()), TestStorageSupport.storage());
         sync.reloadFromStore();
         assertThat(sync.persistenceEnabled()).isTrue();
         assertThat(store.messages("s1")).hasSize(1);
@@ -132,8 +135,10 @@ class AiSessionPersistenceTest {
         });
         when(schemaRs.next()).thenReturn(true);
 
+        DorisAvailability availability = new DorisAvailability();
+        availability.markAvailable();
         AiSessionPersistence sync = new AiSessionPersistence(
-                reader, new AiSessionStore(), new AiMessagePersistenceQueue(reader, TestStorageSupport.storage()), TestStorageSupport.storage());
+                reader, availability, new AiSessionStore(), new AiMessagePersistenceQueue(reader, TestStorageSupport.storage()), TestStorageSupport.storage());
         sync.reloadFromStore();
         assertThat(sync.persistenceEnabled()).isTrue();
     }

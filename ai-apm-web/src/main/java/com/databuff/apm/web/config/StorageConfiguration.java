@@ -2,6 +2,7 @@ package com.databuff.apm.web.config;
 
 import com.databuff.apm.common.storage.ApmReadRepository;
 import com.databuff.apm.common.storage.DorisConnectionConfig;
+import com.databuff.apm.web.storage.DorisAvailability;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.boot.context.properties.EnableConfigurationProperties;
 import org.springframework.context.annotation.Bean;
@@ -22,7 +23,7 @@ public class StorageConfiguration {
     }
 
     @Bean
-    ApmReadRepository apmReadRepository(DataSource dorisDataSource) {
-        return new ApmReadRepository(dorisDataSource);
+    ApmReadRepository apmReadRepository(DataSource dorisDataSource, DorisAvailability dorisAvailability) {
+        return new ApmReadRepository(dorisDataSource, dorisAvailability);
     }
 }

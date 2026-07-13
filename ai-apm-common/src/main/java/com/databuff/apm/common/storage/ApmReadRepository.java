@@ -17,13 +17,20 @@ import java.util.Objects;
 public class ApmReadRepository implements AutoCloseable {
 
     private final DataSource dataSource;
+    private final DorisAccessGate gate;
 
     public ApmReadRepository(DataSource dataSource) {
+        this(dataSource, DorisAccessGate.alwaysAvailable());
+    }
+
+    public ApmReadRepository(DataSource dataSource, DorisAccessGate gate) {
         this.dataSource = Objects.requireNonNull(dataSource);
+        this.gate = Objects.requireNonNull(gate);
     }
 
     /** Borrow a pooled connection; caller must close it (try-with-resources). */
     public Connection connection() throws SQLException {
+        gate.beforeConnection();
         return dataSource.getConnection();
     }
 
