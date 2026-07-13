@@ -78,6 +78,30 @@ compose_up ai-apm-ingest ai-apm-web
 
 Set `SKIP_VERIFY=1` on `update.sh` if you will verify only after the manual start/migrate steps above.
 
+## Schema migration failure
+
+Step 6 (start Doris, `migrate-schema`, start ingest/web, verify) is retried automatically up to **3** times (`UPDATE_MAX_ATTEMPTS`, default 3). On each retry, `update.sh` stops containers, restores the `data/` backup from step 3/6, and runs step 6 again. Deploy files and images from steps 4–5 are not re-downloaded.
+
+Requires a pre-upgrade backup: do **not** set `SKIP_BACKUP=1` if you want auto-recovery.
+
+```bash
+# optional: change retry count (default 3)
+UPDATE_MAX_ATTEMPTS=3 ./update.sh --version 0.1.3
+```
+
+If all attempts fail, `data/` is restored to the pre-upgrade backup and the script exits with an error. Manual recovery:
+
+```bash
+cd /opt/databuff-ai-apm
+./stop.sh
+ls -lt backups/data-backup-*.tar.gz
+rm -rf data/
+tar -xzf backups/data-backup-YYYYMMDD-HHMMSS.tar.gz -C .
+./update.sh --version 0.1.3
+```
+
+Do not hand-edit `schema_version` or drop Doris tables unless you know the exact partial state. Use `update.sh`, not `install.sh`, to retry after restore.
+
 ## Rollback
 
 Each upgrade creates `backups/data-backup-<timestamp>.tar.gz` under the install directory (unless `SKIP_BACKUP=1`).

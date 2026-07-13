@@ -111,7 +111,8 @@ schema_apply_migrations() {
       continue
     fi
     echo "${log_prefix} applying $(basename "$f") ..." >&2
-    apply_doris_sql_file "$f" || return 1
+    # Migrations are not idempotent: never retry the whole file (partial DDL + retry => "already exists").
+    apply_doris_sql_file "$f" 1 || return 1
     schema_upsert_version_row "$file_ver" || {
       echo "${log_prefix} failed to record schema version ${file_ver}" >&2
       return 1

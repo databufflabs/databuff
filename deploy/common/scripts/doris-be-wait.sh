@@ -146,13 +146,15 @@ wait_for_be_avail_stable() {
 }
 
 # Transient Doris DDL errors when BE disks/replication are not fully registered yet.
+# Do not treat all ERROR 1105 as retryable ("already exists" is 1105 too).
 doris_sql_retryable_error() {
   local err="$1"
   case "$err" in
     *"Failed to find enough backend"*) return 0 ;;
-    *"ERROR 1105"*) return 0 ;;
     *"Create failed replications"*) return 0 ;;
     *"hdd disks count={}"*) return 0 ;;
+    *"already exists"*) return 1 ;;
+    *"Duplicate"*) return 1 ;;
   esac
   return 1
 }

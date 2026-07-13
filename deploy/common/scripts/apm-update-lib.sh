@@ -172,6 +172,16 @@ apm_backup_data_dir() {
   printf '%s\n' "$archive"
 }
 
+# Restore data/ from an apm_backup_data_dir archive (used by update.sh auto-retry).
+apm_restore_data_dir() {
+  local install_dir="$1"
+  local archive="$2"
+
+  [[ -f "$archive" ]] || return 1
+  rm -rf "${install_dir}/data"
+  tar -xzf "$archive" -C "$install_dir"
+}
+
 apm_resolve_bundle_glob() {
   local pattern="$1"
   local label="$2"

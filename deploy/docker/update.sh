@@ -12,9 +12,10 @@
 #   UPDATE_BUNDLE_ROOT   离线包解压目录（内网升级时设置，无需 curl）
 #   FORCE_PULL_IMAGES    1=强制重新下载镜像
 #   FORCE_LOAD_IMAGES    1=离线包强制 docker load
-#   SKIP_BACKUP          1=跳过 data/ 备份
+#   SKIP_BACKUP          1=跳过 data/ 备份（禁用失败自动恢复）
 #   SKIP_START           1=仅更新文件与镜像，不启动
 #   SKIP_VERIFY          1=跳过升级后校验 (verify-upgrade.sh)
+#   UPDATE_MAX_ATTEMPTS  启动/迁移失败时自动恢复备份并重试的次数 (默认 3)
 
 set -e
 
@@ -39,7 +40,9 @@ FORCE_LOAD_IMAGES="${FORCE_LOAD_IMAGES:-0}"
 SKIP_BACKUP="${SKIP_BACKUP:-0}"
 SKIP_START="${SKIP_START:-0}"
 SKIP_VERIFY="${SKIP_VERIFY:-0}"
+UPDATE_MAX_ATTEMPTS="${UPDATE_MAX_ATTEMPTS:-3}"
 UPDATE_BUNDLE_ROOT="${UPDATE_BUNDLE_ROOT:-}"
+backup_archive=""
 
 while [[ $# -gt 0 ]]; do
   case "$1" in
@@ -84,6 +87,28 @@ log() { echo -e "${CYN}[update]${RST} $*"; }
 log_done() { echo -e "${CYN}[update]${RST} $1 ${GRN}... 完成${RST}"; }
 log_skip() { echo -e "${CYN}[update]${RST} $1 ${YLW}... 跳过${RST}"; }
 fail() { echo -e "${RED}[update] ERROR:${RST} $*" >&2; exit 1; }
+
+upgrade_finalize() {
+  local attempt="$1"
+  log "${BLD}(6/6)${RST} 启动服务并迁移 Schema ${DIM}(第 ${attempt}/${UPDATE_MAX_ATTEMPTS} 次)${RST}"
+  cd "$INSTALL_DIR"
+  source_compose_env
+  # shellcheck disable=SC1091
+  . "${INSTALL_DIR}/scripts/runtime.sh"
+  ensure_vm_max_map_count
+  prepare_compose_start
+  compose_up_wait ai-apm-doris-fe ai-apm-doris-be
+  "${INSTALL_DIR}/scripts/migrate-schema.sh"
+  compose_up ai-apm-ingest ai-apm-web
+  wait_for_apm_services_ready
+  if [[ "$SKIP_VERIFY" == "1" ]]; then
+    log_skip "升级后校验 (SKIP_VERIFY=1)"
+  else
+    log "升级后校验"
+    "${INSTALL_DIR}/scripts/verify-upgrade.sh" --expected-version="$TARGET_VERSION"
+    log_done "升级后校验"
+  fi
+}
 
 source_compose_env() {
   # compose-env.sh reloads install-dir env.sh/VERSION and would clobber target APM_VERSION
@@ -251,25 +276,38 @@ log_done "${BLD}(5/6)${RST} 加载镜像"
 if [[ "$SKIP_START" == "1" ]]; then
   log_skip "${BLD}(6/6)${RST} 启动与迁移 (SKIP_START=1)"
 else
-  log "${BLD}(6/6)${RST} 启动服务并迁移 Schema"
-  cd "$INSTALL_DIR"
-  source_compose_env
-  # shellcheck disable=SC1091
-  . "${INSTALL_DIR}/scripts/runtime.sh"
-  ensure_vm_max_map_count
-  prepare_compose_start
-  compose_up_wait ai-apm-doris-fe ai-apm-doris-be
-  "${INSTALL_DIR}/scripts/migrate-schema.sh"
-  compose_up ai-apm-ingest ai-apm-web
-  wait_for_apm_services_ready
-  if [[ "$SKIP_VERIFY" == "1" ]]; then
-    log_skip "升级后校验 (SKIP_VERIFY=1)"
-  else
-    log "升级后校验"
-    "${INSTALL_DIR}/scripts/verify-upgrade.sh" --expected-version="$TARGET_VERSION"
-    log_done "升级后校验"
-  fi
-  log_done "${BLD}(6/6)${RST} 启动与迁移"
+  attempt=1
+  while [[ "$attempt" -le "$UPDATE_MAX_ATTEMPTS" ]]; do
+    if [[ "$attempt" -gt 1 ]]; then
+      log "${YLW}第 ${attempt}/${UPDATE_MAX_ATTEMPTS} 次尝试：恢复升级前 data/ 备份后重试${RST}"
+      if [[ -z "$backup_archive" || ! -f "$backup_archive" ]]; then
+        fail "无法自动重试：缺少 data/ 备份（请勿设置 SKIP_BACKUP=1）"
+      fi
+      source_compose_env
+      (cd "$INSTALL_DIR" && compose_down) >/dev/null 2>&1 || true
+      apm_restore_data_dir "$INSTALL_DIR" "$backup_archive" \
+        || fail "恢复 data/ 备份失败: ${backup_archive}"
+      log_done "已恢复 data/ ← ${backup_archive}"
+    fi
+
+    if upgrade_finalize "$attempt"; then
+      log_done "${BLD}(6/6)${RST} 启动与迁移"
+      break
+    fi
+
+    if [[ "$attempt" -ge "$UPDATE_MAX_ATTEMPTS" ]]; then
+      if [[ -n "$backup_archive" && -f "$backup_archive" ]]; then
+        source_compose_env
+        (cd "$INSTALL_DIR" && compose_down) >/dev/null 2>&1 || true
+        apm_restore_data_dir "$INSTALL_DIR" "$backup_archive" || true
+        fail "升级失败（已尝试 ${UPDATE_MAX_ATTEMPTS} 次）。data/ 已恢复为升级前备份: ${backup_archive}"
+      fi
+      fail "升级失败（已尝试 ${UPDATE_MAX_ATTEMPTS} 次）"
+    fi
+
+    log "${YLW}(6/6) 启动或迁移失败，将恢复备份并重试${RST}"
+    attempt=$((attempt + 1))
+  done
 fi
 
 echo ""
