@@ -418,8 +418,9 @@
     <el-dialog
       :visible.sync="showToolDetailDialog"
       append-to-body
-      width="680px"
+      width="920px"
       custom-class="tool-detail-dialog"
+      top="6vh"
     >
       <template slot="title">
         <div class="drawer-title tool-detail-title">
@@ -427,7 +428,7 @@
             {{ selectedToolDetailTitle }}
             <template v-if="selectedToolName">
               <span class="tool-detail-sep">|</span>
-              <span class="tool-detail-name">{{ selectedToolName }}</span>
+              <span class="tool-detail-name" :title="selectedToolName">{{ selectedToolName }}</span>
             </template>
             <template v-if="selectedToolDurationText">
               <span class="tool-detail-sep">|</span>
@@ -458,7 +459,10 @@
         <pre class="tool-detail-content is-terminal">{{ selectedToolTerminalDisplay.body }}</pre>
       </div>
       <div v-else-if="selectedToolBashParamsDisplay" class="tool-detail-terminal">
-        <pre class="tool-detail-content is-terminal">{{ selectedToolBashParamsDisplay.command }}</pre>
+        <pre
+          class="tool-detail-content is-terminal is-bash-command"
+          v-html="selectedToolBashCommandHtml"
+        ></pre>
         <div v-if="selectedToolBashParamsDisplay.meta" class="tool-detail-terminal-meta">{{ selectedToolBashParamsDisplay.meta }}</div>
       </div>
       <pre v-else :class="['tool-detail-content', { 'is-terminal': selectedToolIsTerminal }]">{{ selectedToolDetail }}</pre>
@@ -471,6 +475,8 @@ import dayjs from 'dayjs';
 import i18n from '@/i18n';
 import { Vue, Component, Watch } from 'vue-property-decorator';
 import { v4 as uuidv4 } from 'uuid';
+import hljs from 'highlight.js/lib/core';
+import bash from 'highlight.js/lib/languages/bash';
 import MarkedView from '@/components/marked-view.vue';
 import ChatUploadPreview from './ChatUploadPreview.vue';
 import ThinkingProcess from './components/ThinkingProcess.vue';
@@ -479,10 +485,13 @@ import { buildThinkingDetailItems, formatToolDurationText } from './utils/thinki
 import {
   formatTerminalToolDisplay,
   formatBashToolParamsDisplay,
+  formatToolCallDisplayName,
   isTerminalToolName,
   normalizeToolValue,
   stringifyToolValue,
 } from './utils/tool-detail-format';
+
+hljs.registerLanguage('bash', bash);
 import {
   allUserRoundsHaveFinalAnswer,
   hasVisibleAssistantAnswerForRound,
@@ -786,7 +795,13 @@ export default class AiPlatformChat extends Vue {
     if (!this.selectedToolMessage) {
       return ''
     }
-    return this.processToolName(this.selectedToolMessage)
+    const toolName = this.processToolName(this.selectedToolMessage)
+    if (!isTerminalToolName(toolName)) {
+      return toolName
+    }
+    const metadata = this.selectedToolMessage.metadata || {}
+    const callId = String(metadata.toolCallId || metadata.callId || '').trim()
+    return formatToolCallDisplayName(toolName, this.toolInputOf(metadata, callId))
   }
 
   private get selectedToolDetail (): string {
@@ -819,9 +834,24 @@ export default class AiPlatformChat extends Vue {
     return formatBashToolParamsDisplay(this.toolInputOf(metadata, callId))
   }
 
+  private get selectedToolBashCommandHtml (): string {
+    const display = this.selectedToolBashParamsDisplay
+    if (!display?.command) {
+      return ''
+    }
+    try {
+      return hljs.highlight(display.command, { language: 'bash', ignoreIllegals: true }).value
+    } catch {
+      return display.command
+        .replace(/&/g, '&amp;')
+        .replace(/</g, '&lt;')
+        .replace(/>/g, '&gt;')
+    }
+  }
+
   private get selectedToolDetailCopyText (): string {
     if (this.selectedToolBashParamsDisplay) {
-      return this.selectedToolBashParamsDisplay.command
+      return this.selectedToolBashParamsDisplay.rawCommand || this.selectedToolBashParamsDisplay.command
     }
     if (this.selectedToolTerminalDisplay) {
       return this.selectedToolTerminalDisplay.body
@@ -3024,6 +3054,8 @@ export default class AiPlatformChat extends Vue {
 :deep(.tool-detail-dialog) {
   border-radius: 16px;
   overflow: hidden;
+  margin-bottom: 0;
+  max-width: calc(100vw - 48px);
 
   .el-dialog__header {
     padding: 18px 20px 14px;
@@ -3034,6 +3066,8 @@ export default class AiPlatformChat extends Vue {
   .el-dialog__body {
     padding: 16px 20px 20px;
     background: #f8fafc;
+    max-height: calc(88vh - 72px);
+    overflow: auto;
   }
 
   .el-dialog__headerbtn {
@@ -3052,7 +3086,11 @@ export default class AiPlatformChat extends Vue {
   font-weight: 500;
   color: #475569;
   font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace;
-  font-size: 14px;
+  font-size: 13px;
+  max-width: min(560px, 52vw);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
 }
 
 .tool-detail-status {
@@ -3095,7 +3133,7 @@ export default class AiPlatformChat extends Vue {
 }
 
 .tool-detail-content {
-  max-height: 520px;
+  max-height: min(640px, calc(88vh - 160px));
   margin: 0;
   padding: 16px;
   overflow: auto;
@@ -3111,10 +3149,46 @@ export default class AiPlatformChat extends Vue {
   box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.04);
 
   &.is-terminal {
-    max-height: 460px;
+    max-height: min(600px, calc(88vh - 180px));
     white-space: pre;
     word-break: normal;
     overflow-x: auto;
+  }
+
+  &.is-bash-command {
+    font-size: 13px;
+    line-height: 1.7;
+    color: #e2e8f0;
+
+    :deep(.hljs-keyword),
+    :deep(.hljs-built_in),
+    :deep(.hljs-literal) {
+      color: #7dd3fc;
+    }
+
+    :deep(.hljs-string),
+    :deep(.hljs-subst) {
+      color: #86efac;
+    }
+
+    :deep(.hljs-variable),
+    :deep(.hljs-template-variable) {
+      color: #fcd34d;
+    }
+
+    :deep(.hljs-number) {
+      color: #fda4af;
+    }
+
+    :deep(.hljs-comment) {
+      color: #94a3b8;
+      font-style: italic;
+    }
+
+    :deep(.hljs-meta),
+    :deep(.hljs-meta-keyword) {
+      color: #c4b5fd;
+    }
   }
 
   &::-webkit-scrollbar {
@@ -3129,7 +3203,7 @@ export default class AiPlatformChat extends Vue {
 }
 
 .tool-detail-charts {
-  max-height: 560px;
+  max-height: min(680px, calc(88vh - 140px));
   overflow: auto;
   padding-right: 4px;
 }

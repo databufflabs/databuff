@@ -87,7 +87,7 @@
                     </span>
                     <span class="tool-call-status">{{ $t('modules.views.aiPlatform.chat.s_6fa6500b') }}</span>
                     <span class="tool-call-divider"></span>
-                    <span class="tool-call-name ell">{{ entry.tool.nameKey ? $t(entry.tool.nameKey) : entry.tool.name }}</span>
+                    <span class="tool-call-name ell" :title="formatToolDisplayName(entry.tool)">{{ formatToolDisplayName(entry.tool) }}</span>
                     <span class="tool-call-duration" aria-hidden="true"></span>
                     <span class="tool-call-arrow">
                       <i class="el-icon-arrow-right"></i>
@@ -104,7 +104,7 @@
                     </span>
                     <span class="tool-call-status">{{ formatToolCallSummary(entry.tool) }}</span>
                     <span class="tool-call-divider"></span>
-                    <span class="tool-call-name ell">{{ entry.tool.nameKey ? $t(entry.tool.nameKey) : entry.tool.name }}</span>
+                    <span class="tool-call-name ell" :title="formatToolDisplayName(entry.tool)">{{ formatToolDisplayName(entry.tool) }}</span>
                     <span class="tool-call-duration">
                       {{ formatToolDurationText(entry.tool.durationMs) || '' }}
                     </span>
@@ -123,7 +123,7 @@
                     </span>
                     <span class="tool-call-status">{{ formatRunningToolSummary(entry.tool, resolveFlatIndex(segmentIndex, index)) }}</span>
                     <span class="tool-call-divider"></span>
-                    <span class="tool-call-name ell">{{ entry.tool.nameKey ? $t(entry.tool.nameKey) : entry.tool.name }}</span>
+                    <span class="tool-call-name ell" :title="formatToolDisplayName(entry.tool)">{{ formatToolDisplayName(entry.tool) }}</span>
                     <span class="tool-call-duration" aria-hidden="true"></span>
                     <span class="tool-call-arrow">
                       <i v-if="getToolDisplayStatus(entry.tool, resolveFlatIndex(segmentIndex, index)) === 'running'" class="el-icon-loading"></i>
@@ -146,6 +146,7 @@ import i18n from '@/i18n';
 import MarkedView from '@/components/marked-view.vue';
 import type { ThinkingDetailItem, ToolCallItem } from '../types/thinking';
 import { buildThinkingExpertSegments, type ThinkingExpertSegment } from '../utils/expert-segments';
+import { formatToolCallDisplayName } from '../utils/tool-detail-format';
 import { formatToolDurationText } from '../utils/thinking-detail';
 
 type ToolDisplayStatus = 'running' | 'view' | 'success' | 'failed';
@@ -326,6 +327,26 @@ export default class ThinkingProcess extends Vue {
   private formatRunningToolSummary (tool: ToolCallItem, index: number): string {
     const status = this.getToolDisplayStatus(tool, index);
     return this.formatStatus(status);
+  }
+
+  private resolveToolInput (tool: ToolCallItem): unknown {
+    const callMeta = tool?.callMessage?.metadata || {};
+    if (callMeta.toolInput !== undefined && String(callMeta.toolInput).trim()) {
+      return callMeta.toolInput;
+    }
+    const resultMeta = tool?.resultMessage?.metadata || {};
+    if (resultMeta.toolInput !== undefined && String(resultMeta.toolInput).trim()) {
+      return resultMeta.toolInput;
+    }
+    const sourceMeta = tool?.sourceMessage?.metadata || {};
+    if (sourceMeta.toolInput !== undefined && String(sourceMeta.toolInput).trim()) {
+      return sourceMeta.toolInput;
+    }
+    return null;
+  }
+
+  private formatToolDisplayName (tool: ToolCallItem): string {
+    return formatToolCallDisplayName(String(tool?.name || 'tool'), this.resolveToolInput(tool));
   }
 
   private formatToolDurationText = formatToolDurationText;
@@ -838,7 +859,9 @@ export default class ThinkingProcess extends Vue {
   white-space: nowrap;
   font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace;
   font-size: 12px;
-  color: #334155;
+  font-weight: 500;
+  letter-spacing: 0.01em;
+  color: #1e293b;
 }
 
 .tool-call-arrow {
