@@ -160,59 +160,75 @@ apm_upgrade_preflight() {
   return 0
 }
 
+# Copy data/ to backups/data-backup-<ts>/ (directory copy — faster than tar.gz).
 apm_backup_data_dir() {
   local install_dir="$1"
   local backup_dir="${2:-${install_dir}/backups}"
-  local ts archive
+  local ts dest
 
+  [[ -d "${install_dir}/data" ]] || return 1
   mkdir -p "$backup_dir"
   ts="$(date +%Y%m%d-%H%M%S)"
-  archive="${backup_dir}/data-backup-${ts}.tar.gz"
-  tar -czf "$archive" -C "$install_dir" data
-  printf '%s\n' "$archive"
+  dest="${backup_dir}/data-backup-${ts}"
+  rm -rf "$dest"
+  cp -a "${install_dir}/data" "$dest"
+  printf '%s\n' "$dest"
 }
 
-# Restore data/ from an apm_backup_data_dir archive (used by update.sh auto-retry).
+# Restore data/ from a directory backup (or legacy data-backup-*.tar.gz).
 apm_restore_data_dir() {
   local install_dir="$1"
-  local archive="$2"
+  local backup="$2"
 
-  [[ -f "$archive" ]] || return 1
-  rm -rf "${install_dir}/data"
-  tar -xzf "$archive" -C "$install_dir"
+  if [[ -d "$backup" ]]; then
+    rm -rf "${install_dir}/data"
+    cp -a "$backup" "${install_dir}/data"
+    return 0
+  fi
+  if [[ -f "$backup" ]]; then
+    # Legacy upgrade backups were tar.gz archives with a top-level data/ entry.
+    rm -rf "${install_dir}/data"
+    tar -xzf "$backup" -C "$install_dir"
+    return 0
+  fi
+  return 1
 }
 
-# Resolve a data-backup-*.tar.gz under install_dir/backups/ (or an explicit path).
+# Resolve backups/data-backup-* (directory) or legacy *.tar.gz under install_dir (or an explicit path).
 apm_resolve_data_backup_archive() {
   local install_dir="$1"
   local hint="${2:-}"
   local backup_dir="${install_dir}/backups"
-  local candidate latest
+  local candidate latest path
 
   if [[ -n "$hint" ]]; then
-    if [[ -f "$hint" ]]; then
-      printf '%s\n' "$(cd "$(dirname "$hint")" && pwd)/$(basename "$hint")"
-      return 0
-    fi
-    if [[ -f "${backup_dir}/${hint}" ]]; then
-      printf '%s\n' "${backup_dir}/${hint}"
-      return 0
-    fi
-    if [[ -f "${install_dir}/${hint}" ]]; then
-      printf '%s\n' "${install_dir}/${hint}"
-      return 0
-    fi
+    for path in "$hint" "${backup_dir}/${hint}" "${install_dir}/${hint}"; do
+      if [[ -d "$path" ]] || [[ -f "$path" && "$path" == *.tar.gz ]]; then
+        if [[ -d "$path" ]]; then
+          printf '%s\n' "$(cd "$path" && pwd)"
+        else
+          printf '%s\n' "$(cd "$(dirname "$path")" && pwd)/$(basename "$path")"
+        fi
+        return 0
+      fi
+    done
     return 1
   fi
 
   shopt -s nullglob
-  local files=("${backup_dir}"/data-backup-*.tar.gz)
+  local files=("${backup_dir}"/data-backup-*)
   shopt -u nullglob
-  if [[ ${#files[@]} -eq 0 ]]; then
+  local candidates=()
+  for candidate in "${files[@]}"; do
+    if [[ -d "$candidate" ]] || [[ -f "$candidate" && "$candidate" == *.tar.gz ]]; then
+      candidates+=("$candidate")
+    fi
+  done
+  if [[ ${#candidates[@]} -eq 0 ]]; then
     return 1
   fi
-  latest="${files[0]}"
-  for candidate in "${files[@]}"; do
+  latest="${candidates[0]}"
+  for candidate in "${candidates[@]}"; do
     if [[ "$candidate" -nt "$latest" ]]; then
       latest="$candidate"
     fi

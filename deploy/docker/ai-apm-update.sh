@@ -19,7 +19,7 @@
 #   SKIP_PULL_IMAGES   1=不下载镜像（使用本地已 load 的镜像）
 #   SKIP_VERIFY        1=跳过升级后校验
 #   RESTORE_BACKUP       1=当前 data/ 不可信，先从 backups/ 恢复后再继续
-#   BACKUP_FILE          指定备份文件（默认取最新 data-backup-*.tar.gz）
+#   BACKUP_FILE          指定备份目录名（默认取最新 data-backup-*；亦兼容旧版 *.tar.gz）
 
 set -e
 

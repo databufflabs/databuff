@@ -6,7 +6,7 @@
 #   ./update.sh --version 0.1.4
 #   ./update.sh --pull-images
 #   ./update.sh --restore-backup
-#   ./update.sh --restore-backup=data-backup-20260713-110220.tar.gz
+#   ./update.sh --restore-backup=data-backup-20260713-110220
 #
 # 环境变量:
 #   APM_PKG_BASE              部署包下载地址
@@ -19,7 +19,7 @@
 #   SKIP_VERIFY               1=跳过升级后校验 (verify-upgrade.sh)
 #   UPDATE_MAX_ATTEMPTS       启动/迁移失败时自动恢复备份并重试的次数 (默认 3)
 #   RESTORE_BACKUP         1=当前 data/ 不可信，先从 backups/ 恢复后再继续
-#   BACKUP_FILE            指定备份文件（默认取 backups/ 下最新 data-backup-*.tar.gz）
+#   BACKUP_FILE            指定备份目录名（默认取 backups/ 下最新 data-backup-*；亦兼容旧版 *.tar.gz）
 
 set -e
 
@@ -242,7 +242,7 @@ log_done "${BLD}(2/6)${RST} 停止服务"
 if [[ "$RESTORE_BACKUP" == "1" ]]; then
   log "当前 data/ 不可信，从备份恢复"
   restore_source_archive="$(apm_resolve_data_backup_archive "$INSTALL_DIR" "$BACKUP_FILE")" \
-    || fail "未找到可用的 data/ 备份（请确认 backups/data-backup-*.tar.gz 存在，或用 --restore-backup=文件 指定）"
+    || fail "未找到可用的 data/ 备份（请确认 backups/data-backup-* 存在，或用 --restore-backup=目录名 指定）"
   apm_restore_data_dir "$INSTALL_DIR" "$restore_source_archive" \
     || fail "恢复 data/ 失败: ${restore_source_archive}"
   backup_archive="$restore_source_archive"
@@ -255,7 +255,8 @@ if [[ "$RESTORE_BACKUP" == "1" ]]; then
 elif [[ "$SKIP_BACKUP" == "1" ]]; then
   log_skip "${BLD}(3/6)${RST} 备份 data/ (SKIP_BACKUP=1)"
 else
-  backup_archive="$(apm_backup_data_dir "$INSTALL_DIR")"
+  backup_archive="$(apm_backup_data_dir "$INSTALL_DIR")" \
+    || fail "备份 data/ 失败（请确认 ${INSTALL_DIR}/data 存在）"
   log_done "${BLD}(3/6)${RST} 备份 → ${backup_archive}"
 fi
 
@@ -322,7 +323,7 @@ else
   while [[ "$attempt" -le "$UPDATE_MAX_ATTEMPTS" ]]; do
     if [[ "$attempt" -gt 1 ]]; then
       log "${YLW}第 ${attempt}/${UPDATE_MAX_ATTEMPTS} 次尝试：恢复升级前 data/ 备份后重试${RST}"
-      if [[ -z "$backup_archive" || ! -f "$backup_archive" ]]; then
+      if [[ -z "$backup_archive" || ! -e "$backup_archive" ]]; then
         fail "无法自动重试：缺少 data/ 备份（请勿设置 SKIP_BACKUP=1）"
       fi
       source_compose_env
@@ -338,7 +339,7 @@ else
     fi
 
     if [[ "$attempt" -ge "$UPDATE_MAX_ATTEMPTS" ]]; then
-      if [[ -n "$backup_archive" && -f "$backup_archive" ]]; then
+      if [[ -n "$backup_archive" && -e "$backup_archive" ]]; then
         source_compose_env
         (cd "$INSTALL_DIR" && compose_down) >/dev/null 2>&1 || true
         apm_restore_data_dir "$INSTALL_DIR" "$backup_archive" || true
@@ -350,7 +351,7 @@ else
       . "${INSTALL_DIR}/scripts/runtime.sh"
       compose_up_wait ai-apm-doris-fe ai-apm-doris-be || true
       bootstrap_web_for_troubleshooting "升级失败"
-      if [[ -n "$backup_archive" && -f "$backup_archive" ]]; then
+      if [[ -n "$backup_archive" && -e "$backup_archive" ]]; then
         fail "升级失败（已尝试 ${UPDATE_MAX_ATTEMPTS} 次）。data/ 已恢复为升级前备份: ${backup_archive}"
       fi
       fail "升级失败（已尝试 ${UPDATE_MAX_ATTEMPTS} 次）"

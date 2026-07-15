@@ -1,6 +1,6 @@
 {
-  "schema_version": 3,
+  "schema_version": 4,
   "upgrade_type": "A",
   "min_upgrade_from": "0.1.0",
-  "notes": "Adds daily dynamic partition (30-day retention) to metric_* tables via metric_time column."
+  "notes": "V004 expands long-text VARCHAR limits for span/log attributes; prior V003 adds metric_* daily dynamic partitions."
 }

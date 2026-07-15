@@ -4,8 +4,8 @@
 
 | Field | Value |
 |-------|-------|
-| Schema version | 1 |
-| Upgrade type | A (patch — adds `log_dc_record` + `schema_version` ledger) |
+| Schema version | 4 |
+| Upgrade type | A (patch — V004 expands long-text VARCHAR limits; prior V003 metric dynamic partitions) |
 | Minimum upgrade from | 0.1.0 |
 
 ## Docker
@@ -100,11 +100,11 @@ cd /opt/databuff-ai-apm
 curl -fsSL https://databuff.ai/databuff/ai-apm-update.sh | bash -s -- --restore-backup
 ```
 
-Use the latest `backups/data-backup-*.tar.gz` by default. To pick a specific file:
+Use the latest `backups/data-backup-*` directory by default. To pick a specific backup:
 
 ```bash
 curl -fsSL https://databuff.ai/databuff/ai-apm-update.sh | bash -s -- \
-  --restore-backup=data-backup-20260713-110220.tar.gz
+  --restore-backup=data-backup-20260713-110220
 ```
 
 Offline / in install dir:
@@ -125,9 +125,9 @@ If all automatic attempts fail, `data/` is restored to the backup used for recov
 ```bash
 cd /opt/databuff-ai-apm
 ./stop.sh
-ls -lt backups/data-backup-*.tar.gz
+ls -lt backups/data-backup-*
 rm -rf data/
-tar -xzf backups/data-backup-YYYYMMDD-HHMMSS.tar.gz -C .
+cp -a backups/data-backup-YYYYMMDD-HHMMSS data
 ./update.sh --restore-backup --version 0.1.4
 ```
 
@@ -135,16 +135,16 @@ Do not hand-edit `schema_version` or drop Doris tables unless you know the exact
 
 ## Rollback
 
-Each upgrade creates `backups/data-backup-<timestamp>.tar.gz` under the install directory (unless `SKIP_BACKUP=1`).
+Each upgrade creates `backups/data-backup-<timestamp>/` (a directory copy of `data/`) under the install directory (unless `SKIP_BACKUP=1`). Legacy `.tar.gz` backups are still accepted for restore.
 
 **Data rollback (restore pre-upgrade `data/`):**
 
 ```bash
 cd /opt/databuff-ai-apm
 ./stop.sh
-ls -lt backups/data-backup-*.tar.gz   # pick the backup from before the failed upgrade
+ls -lt backups/data-backup-*   # pick the backup from before the failed upgrade
 rm -rf data/
-tar -xzf backups/data-backup-YYYYMMDD-HHMMSS.tar.gz -C .
+cp -a backups/data-backup-YYYYMMDD-HHMMSS data
 ```
 
 To run the **previous application version** with restored data, re-apply that release bundle (offline `UPDATE_BUNDLE_ROOT` or `update.sh --version <old>`), then `./start.sh` and `./scripts/verify-upgrade.sh`.
