@@ -286,7 +286,7 @@ class OtelConverterTest {
     }
 
     @Test
-    void capturesDbAttributesAndPeerHostname() throws Exception {
+    void capturesDbAttributesAndPeerHostname() {
         ExportTraceServiceRequest request = ExportTraceServiceRequest.newBuilder()
                 .addResourceSpans(ResourceSpans.newBuilder()
                         .setResource(Resource.newBuilder()

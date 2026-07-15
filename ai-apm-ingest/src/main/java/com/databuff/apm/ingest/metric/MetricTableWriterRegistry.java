@@ -25,7 +25,7 @@ public final class MetricTableWriterRegistry {
         Map<String, DorisBatchWriter> writers = new LinkedHashMap<>();
         List<DorisStreamLoadSink> sinkList = new ArrayList<>();
         for (String table : MetricSchemaRegistry.allTableNames()) {
-            DorisBatchWriter writer = new DorisBatchWriter(256);
+            DorisBatchWriter writer = new DorisBatchWriter(1024);
             writers.put(table, writer);
             sinkList.add(new DorisStreamLoadSink(writer, loader, database, table));
         }

@@ -52,7 +52,11 @@ public final class MetricWriteRouter {
 
     void offerMappedRow(OtlpMetricRowMapper.MappedRow mapped) {
         DorisBatchWriter writer = writersByTable.getOrDefault(mapped.table(), defaultWriter);
-        writer.offer(mapped.row());
+        try {
+            writer.offer(mapped.rowBytes());
+        } catch (JsonProcessingException e) {
+            throw new IllegalStateException("serialize mapped metric row failed", e);
+        }
     }
 
     void offerJvmRow(byte[] row) {

@@ -69,12 +69,18 @@ public final class OtlpMetricDebugLogger {
         if (!log.isDebugEnabled() || line == null || mapped == null) {
             return;
         }
+        String dorisRow;
+        try {
+            dorisRow = truncate(new String(mapped.rowBytes()), 500);
+        } catch (Exception e) {
+            dorisRow = String.valueOf(mapped.fields());
+        }
         log.debug(
                 "OTLP mapped row service={} rawMetric={} table={} dorisRow={}",
                 line.service(),
                 line.metric(),
                 mapped.table(),
-                truncate(new String(mapped.row()), 500));
+                dorisRow);
     }
 
     public static void mapSkipped(OtlMetricLine line, String reason) {

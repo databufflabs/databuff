@@ -15,10 +15,10 @@ management:
 
 ingest:
   pipeline:
-    trace-tasks: ${INGEST_TRACE_TASKS:4}
+    trace-tasks: ${INGEST_TRACE_TASKS:16}
     metric-tasks: ${INGEST_METRIC_TASKS:4}
     aggregate-tasks: ${INGEST_AGGREGATE_TASKS:4}
-    trace-buffer-size: ${INGEST_TRACE_BUFFER_SIZE:1024}
+    trace-buffer-size: ${INGEST_TRACE_BUFFER_SIZE:8192}
     metric-buffer-size: ${INGEST_METRIC_BUFFER_SIZE:1024}
     aggregate-buffer-size: ${INGEST_AGGREGATE_BUFFER_SIZE:1024}
   trace:
@@ -52,7 +52,7 @@ ingest:
     metric-table: service
     trace-database: databuff
     trace-table: trace_dc_span
-    flush-interval-ms: 5000
-    flush-timeout-ms: 45000
+    flush-interval-ms: ${INGEST_DORIS_FLUSH_INTERVAL_MS:8000}
+    flush-timeout-ms: ${INGEST_DORIS_FLUSH_TIMEOUT_MS:45000}
     username: ${DORIS_USER:root}
     password: ${DORIS_PASSWORD:}

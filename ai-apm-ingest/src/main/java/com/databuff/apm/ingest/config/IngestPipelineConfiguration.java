@@ -84,17 +84,17 @@ public class IngestPipelineConfiguration {
 
     @Bean
     DorisBatchWriter traceBatchWriter() {
-        return new DorisBatchWriter(128);
+        return new DorisBatchWriter(2048);
     }
 
     @Bean
     DorisBatchWriter logBatchWriter() {
-        return new DorisBatchWriter(256);
+        return new DorisBatchWriter(1024);
     }
 
     @Bean
     DorisBatchWriter metaServiceBatchWriter() {
-        return new DorisBatchWriter(64);
+        return new DorisBatchWriter(256);
     }
 
     @Bean

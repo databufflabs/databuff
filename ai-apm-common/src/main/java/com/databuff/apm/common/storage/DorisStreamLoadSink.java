@@ -67,8 +67,14 @@ public final class DorisStreamLoadSink {
     }
 
     static byte[] joinJsonLines(List<byte[]> rows) {
-        int size = rows.stream().mapToInt(r -> r.length + 1).sum();
-        byte[] out = new byte[Math.max(0, size - 1)];
+        if (rows.isEmpty()) {
+            return new byte[0];
+        }
+        int size = 0;
+        for (byte[] row : rows) {
+            size += row.length + 1;
+        }
+        byte[] out = new byte[size - 1];
         int pos = 0;
         for (int i = 0; i < rows.size(); i++) {
             byte[] row = rows.get(i);

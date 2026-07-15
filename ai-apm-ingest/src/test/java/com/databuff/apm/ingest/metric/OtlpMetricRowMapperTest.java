@@ -24,7 +24,7 @@ class OtlpMetricRowMapperTest {
 
         OtlpMetricRowMapper.MappedRow mapped = OtlpMetricRowMapper.map(raw).orElseThrow();
         assertThat(mapped.table()).isEqualTo("metric_jvm");
-        assertThat(new String(mapped.row())).contains("\"thread_count\":42");
+        assertThat(new String(mapped.rowBytes())).contains("\"thread_count\":42");
     }
 
     @Test
@@ -38,11 +38,11 @@ class OtlpMetricRowMapperTest {
                 "value", 1024));
 
         OtlpMetricRowMapper.MappedRow mapped = OtlpMetricRowMapper.map(raw).orElseThrow();
-        assertThat(new String(mapped.row())).contains("\"memory_heap_used\":1024");
+        assertThat(new String(mapped.rowBytes())).contains("\"memory_heap_used\":1024");
     }
 
     @Test
-    void mapsJvmGcMetricFromOtlpLine() {
+    void mapsJvmGcMetricFromOtlpLine() throws Exception {
         OtlMetricLine line = new OtlMetricLine(
                 1_700_000_000_000L,
                 "service-a",
@@ -59,7 +59,7 @@ class OtlpMetricRowMapperTest {
                 null);
         OtlpMetricRowMapper.MappedRow mapped = OtlpMetricRowMapper.map(line).orElseThrow();
         assertThat(mapped.table()).isEqualTo("metric_jvm");
-        assertThat(new String(mapped.row())).contains("\"gc_minor_collection_count\":3");
+        assertThat(new String(mapped.rowBytes())).contains("\"gc_minor_collection_count\":3");
     }
 
     @Test
@@ -74,7 +74,7 @@ class OtlpMetricRowMapperTest {
 
         OtlpMetricRowMapper.MappedRow mapped = OtlpMetricRowMapper.map(raw).orElseThrow();
         assertThat(mapped.table()).isEqualTo("metric_jvm");
-        assertThat(new String(mapped.row())).contains("\"gc_major_collection_count\":9");
+        assertThat(new String(mapped.rowBytes())).contains("\"gc_major_collection_count\":9");
     }
 
     @Test
@@ -90,7 +90,7 @@ class OtlpMetricRowMapperTest {
 
         OtlpMetricRowMapper.MappedRow mapped = OtlpMetricRowMapper.map(raw).orElseThrow();
         assertThat(mapped.table()).isEqualTo("metric_jvm");
-        assertThat(new String(mapped.row())).contains("\"thread_count\":42");
+        assertThat(new String(mapped.rowBytes())).contains("\"thread_count\":42");
     }
 
     @Test
@@ -105,7 +105,7 @@ class OtlpMetricRowMapperTest {
 
         OtlpMetricRowMapper.MappedRow mapped = OtlpMetricRowMapper.map(raw).orElseThrow();
         assertThat(mapped.table()).isEqualTo("metric_service_thread_pool");
-        assertThat(new String(mapped.row())).contains("http-worker");
+        assertThat(new String(mapped.rowBytes())).contains("http-worker");
     }
 
     @Test
@@ -120,7 +120,7 @@ class OtlpMetricRowMapperTest {
 
         OtlpMetricRowMapper.MappedRow mapped = OtlpMetricRowMapper.map(raw).orElseThrow();
         assertThat(mapped.table()).isEqualTo("metric_service_http_connection_pool");
-        assertThat(new String(mapped.row())).contains("\"maxSize\":100");
+        assertThat(new String(mapped.rowBytes())).contains("\"maxSize\":100");
     }
 
     @Test

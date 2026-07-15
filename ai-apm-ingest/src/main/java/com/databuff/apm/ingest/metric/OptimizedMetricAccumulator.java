@@ -3,6 +3,7 @@ package com.databuff.apm.ingest.metric;
 import com.databuff.apm.common.metric.MetricSchemaRegistry;
 import com.databuff.apm.common.model.OptimizedMetric;
 import com.databuff.apm.common.serde.OptimizedMetricUtil;
+import com.databuff.apm.common.serde.ReusableJson;
 import com.databuff.apm.common.storage.MetricRowTimeUtil;
 import com.fasterxml.jackson.core.JsonProcessingException;
 import com.fasterxml.jackson.databind.ObjectMapper;
@@ -59,8 +60,8 @@ public final class OptimizedMetricAccumulator {
     static byte[] toDorisRow(OptimizedMetric metric) throws JsonProcessingException {
         Map<String, Object> row = new HashMap<>();
         MetricRowTimeUtil.putTsAndMetricTime(row, metric.timestamp() / 1_000_000L);
-        MetricSchemaRegistry.applyTagValues(row, metric.measurement(), metric.tagValues());
-        MetricSchemaRegistry.applyFieldValues(row, metric.measurement(), metric.fieldValues());
-        return JSON.writeValueAsBytes(row);
+        MetricSchemaRegistry.applyTagValues(row, metric.measurement(), metric.tagValuesRef());
+        MetricSchemaRegistry.applyFieldValues(row, metric.measurement(), metric.fieldValuesRef());
+        return ReusableJson.writeValueAsBytes(JSON, row);
     }
 }

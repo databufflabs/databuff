@@ -393,19 +393,22 @@ public final class OtelConverter {
         long end = span.getEndTimeUnixNano();
         long duration = Math.max(0, end - start);
         boolean errored = span.getStatus().getCode() == io.opentelemetry.proto.trace.v1.Status.StatusCode.STATUS_CODE_ERROR;
+
+        // Single merged attribute map: resource attributes first, span attributes overlay.
+        // Span-level keys win, which matches the previous spanAttributes + metaAttributes semantics.
+        Map<String, String> metaAttributes = new LinkedHashMap<>();
+        collectAttributes(metaAttributes, resourceAttributes);
+        collectAttributes(metaAttributes, span.getAttributesList());
+
         DcSpan dc = new DcSpan();
         dc.minutes = toMinutesBucket(start);
         dc.hours = toHoursBucket(start);
         dc.serviceId = serviceKey;
         dc.service = serviceName;
-        dc.serviceInstance = firstNonBlank(
-                attribute(span.getAttributesList(), "service.instance.id"),
-                attribute(resourceAttributes, "service.instance.id"));
+        dc.serviceInstance = metaAttributes.get("service.instance.id");
         String otelName = span.getName();
-        Map<String, String> spanAttributes = new LinkedHashMap<>();
-        collectAttributes(spanAttributes, span.getAttributesList());
         dc.resource = otelName;
-        dc.name = TraceSpanNames.normalizeOtelName(otelName, spanAttributes);
+        dc.name = TraceSpanNames.normalizeOtelName(otelName, metaAttributes);
         dc.trace_id = hex(span.getTraceId());
         dc.span_id = hex(span.getSpanId());
         if (isEmptyParentSpanId(span.getParentSpanId())) {
@@ -425,18 +428,50 @@ public final class OtelConverter {
         dc.type = span.getKind().name();
         dc.isIn = 0;
         dc.isOut = 0;
-        dc.metaErrorType = attribute(span.getAttributesList(), "error.type");
-        boolean elasticsearchSpan = TraceSpanNames.isElasticsearchMeta(spanAttributes);
+        dc.metaErrorType = metaAttributes.get("error.type");
+        boolean elasticsearchSpan = TraceSpanNames.isElasticsearchMeta(metaAttributes);
         if (!elasticsearchSpan) {
-            applyHttpAttributes(dc, span.getAttributesList());
+            applyHttpAttributes(dc, metaAttributes);
         }
-        Map<String, String> metaAttributes = buildAttributeMap(resourceAttributes, span.getAttributesList());
+        // meta is materialized here once via Jackson (native MapSerializer); DCSpanJsonEncoder
+        // re-escapes it via Jackson's optimized UTF8 string writer at flush time.
         dc.meta = OtelAttributeMaps.encode(metaAttributes);
         OtelAttributeMaps.cache(dc, metaAttributes);
         dc.metaPeerHostname = firstNonBlank(
-                attribute(span.getAttributesList(), "server.address"),
-                attribute(span.getAttributesList(), "net.peer.name"));
+                metaAttributes.get("server.address"),
+                metaAttributes.get("net.peer.name"));
         return dc;
+    }
+
+    private static void applyHttpAttributes(DcSpan dc, Map<String, String> attributes) {
+        dc.metaHttpMethod = firstNonBlank(
+                attributes.get("http.method"),
+                attributes.get("http.request.method"));
+        dc.metaHttpStatusCode = firstIntFromMap(
+                attributes, "http.status_code", "http.response.status_code");
+        String httpUrl = firstNonBlank(
+                attributes.get("url.full"),
+                attributes.get("http.url"),
+                attributes.get("http.route"),
+                attributes.get("url.path"));
+        if (httpUrl != null && !DcSpanUtil.isRpcProtocolUrl(httpUrl)) {
+            dc.metaHttpUrl = httpUrl;
+        }
+    }
+
+    private static Integer firstIntFromMap(Map<String, String> attributes, String... keys) {
+        for (String key : keys) {
+            String value = attributes.get(key);
+            if (value == null || value.isBlank()) {
+                continue;
+            }
+            try {
+                return Integer.parseInt(value.trim());
+            } catch (NumberFormatException ignored) {
+                // try next key
+            }
+        }
+        return null;
     }
 
     private static String buildAttributeMeta(List<KeyValue> resourceAttributes, List<KeyValue> spanAttributes) {
@@ -503,49 +538,6 @@ public final class OtelConverter {
         for (KeyValue kv : attributes) {
             if (key.equals(kv.getKey())) {
                 return anyValue(kv.getValue());
-            }
-        }
-        return null;
-    }
-
-    private static Integer intAttribute(List<KeyValue> attributes, String key) {
-        String value = attribute(attributes, key);
-        if (value == null) {
-            return null;
-        }
-        try {
-            return Integer.parseInt(value);
-        } catch (NumberFormatException e) {
-            return null;
-        }
-    }
-
-    /**
-     * Map legacy and stable HTTP semconv (v1.21+) onto {@link DcSpan} materialized fields so
-     * {@link DcSpanUtil#isHttpSpan} and service.http extraction work
-     * for SERVER inbound spans that only carry {@code http.request.method}/{@code http.route}.
-     */
-    private static void applyHttpAttributes(DcSpan dc, List<KeyValue> attributes) {
-        dc.metaHttpMethod = firstNonBlank(
-                attribute(attributes, "http.method"),
-                attribute(attributes, "http.request.method"));
-        dc.metaHttpStatusCode = firstIntAttribute(
-                attributes, "http.status_code", "http.response.status_code");
-        String httpUrl = firstNonBlank(
-                attribute(attributes, "url.full"),
-                attribute(attributes, "http.url"),
-                attribute(attributes, "http.route"),
-                attribute(attributes, "url.path"));
-        if (httpUrl != null && !DcSpanUtil.isRpcProtocolUrl(httpUrl)) {
-            dc.metaHttpUrl = httpUrl;
-        }
-    }
-
-    private static Integer firstIntAttribute(List<KeyValue> attributes, String... keys) {
-        for (String key : keys) {
-            Integer value = intAttribute(attributes, key);
-            if (value != null) {
-                return value;
             }
         }
         return null;

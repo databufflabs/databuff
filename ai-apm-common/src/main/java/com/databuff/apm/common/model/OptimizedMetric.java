@@ -30,8 +30,18 @@ public final class OptimizedMetric {
         return tagValues.clone();
     }
 
+    /** Uncloned view for encode/merge hot paths; caller must not mutate. */
+    public String[] tagValuesRef() {
+        return tagValues;
+    }
+
     public long[] fieldValues() {
         return fieldValues.clone();
+    }
+
+    /** Uncloned view for encode/merge hot paths; caller must not mutate. */
+    public long[] fieldValuesRef() {
+        return fieldValues;
     }
 
     public OptimizedMetric withTsId(int tsId) {
@@ -78,10 +88,13 @@ public final class OptimizedMetric {
             throw new IllegalArgumentException("field cardinality mismatch");
         }
         long[] merged = fieldValues.clone();
+        long[] otherFields = other.fieldValues;
         for (int i = 0; i < merged.length; i++) {
-            merged[i] += other.fieldValues[i];
+            merged[i] += otherFields[i];
         }
-        return withFieldValues(merged);
+        OptimizedMetric copy = copy();
+        copy.fieldValues = merged;
+        return copy;
     }
 
     /** Legacy trace metrics use (cnt, error, sumDuration[, maxDuration]). */

@@ -1,16 +1,15 @@
 package com.databuff.apm.ingest.metric;
 
+import com.databuff.apm.common.serde.ReusableJson;
 import com.databuff.apm.common.storage.DorisTableNames;
 import com.databuff.apm.ingest.meta.MetaServiceCollector;
 import com.databuff.apm.ingest.otel.OtlMetricLine;
 import com.databuff.apm.ingest.otel.OtlpMetricDebugLogger;
 import com.fasterxml.jackson.core.JsonProcessingException;
-import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
-import java.io.IOException;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
@@ -61,11 +60,12 @@ public final class OtlpMetricDirectWriter {
             }
             OtlpMetricRowMapper.MappedRow row = mapped.get();
             if (DorisTableNames.METRIC_JVM.equals(row.table())) {
-                try {
-                    mergeJvmRow(jvmRows, jvmPartialCounts, row.row());
-                } catch (IOException e) {
-                    log.warn("Failed to merge JVM OTLP row for {}: {}", line.service(), e.getMessage());
+                Map<String, Object> fields = row.fields();
+                if (fields == null) {
+                    skippedMap++;
+                    continue;
                 }
+                mergeJvmRow(jvmRows, jvmPartialCounts, fields);
                 continue;
             }
             metricWriteRouter.offerMappedRow(row);
@@ -88,7 +88,7 @@ public final class OtlpMetricDirectWriter {
                     jvmPartialCounts.getOrDefault(entry.getKey(), 0),
                     metricFields);
             try {
-                byte[] bytes = JSON.writeValueAsBytes(row);
+                byte[] bytes = ReusableJson.writeValueAsBytes(JSON, row);
                 metricWriteRouter.offerJvmRow(bytes);
             } catch (JsonProcessingException e) {
                 log.warn("Failed to serialize merged JVM row: {}", e.getMessage());
@@ -99,17 +99,16 @@ public final class OtlpMetricDirectWriter {
     private static void mergeJvmRow(
             Map<String, Map<String, Object>> pending,
             Map<String, Integer> partialCounts,
-            byte[] rowBytes) throws IOException {
-        JsonNode node = JSON.readTree(rowBytes);
-        String key = aggregateKey(node);
+            Map<String, Object> fields) {
+        String key = aggregateKey(fields);
         partialCounts.merge(key, 1, Integer::sum);
         Map<String, Object> merged = pending.computeIfAbsent(key, ignored -> new LinkedHashMap<>());
-        node.fields().forEachRemaining(entry -> {
-            JsonNode value = entry.getValue();
-            if (value != null && !value.isNull()) {
-                merged.put(entry.getKey(), JSON.convertValue(value, Object.class));
+        for (Map.Entry<String, Object> entry : fields.entrySet()) {
+            Object value = entry.getValue();
+            if (value != null) {
+                merged.put(entry.getKey(), value);
             }
-        });
+        }
     }
 
     private static Set<String> metricFieldNames(Map<String, Object> row) {
@@ -122,13 +121,14 @@ public final class OtlpMetricDirectWriter {
         return fields;
     }
 
-    private static String aggregateKey(JsonNode node) {
+    private static String aggregateKey(Map<String, Object> row) {
         StringBuilder key = new StringBuilder();
         for (String column : JVM_KEY_COLUMNS) {
             if (!key.isEmpty()) {
                 key.append('\u0001');
             }
-            key.append(column).append('=').append(node.path(column).asText(""));
+            Object value = row.get(column);
+            key.append(column).append('=').append(value == null ? "" : value);
         }
         return key.toString();
     }

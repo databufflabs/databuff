@@ -1,5 +1,6 @@
 package com.databuff.apm.ingest.otel;
 
+import com.databuff.apm.common.serde.ReusableJson;
 import com.fasterxml.jackson.core.JsonProcessingException;
 import com.fasterxml.jackson.databind.ObjectMapper;
 
@@ -41,7 +42,7 @@ public record OtlLogLine(
         putIfPresent(row, "resource_json", resourceJson);
         row.put("time_ns", timeNs);
         row.put("observed_time_ns", observedTimeNs);
-        return JSON.writeValueAsBytes(row);
+        return ReusableJson.writeValueAsBytes(JSON, row);
     }
 
     private static void putIfPresent(Map<String, Object> row, String key, String value) {
