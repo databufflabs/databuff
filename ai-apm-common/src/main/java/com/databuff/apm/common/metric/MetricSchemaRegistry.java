@@ -1,5 +1,6 @@
 package com.databuff.apm.common.metric;
 
+import com.databuff.apm.common.storage.DorisVarcharLimits;
 import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
 
@@ -135,7 +136,8 @@ public final class MetricSchemaRegistry {
         }
         List<String> columns = schema.tagColumns();
         for (int i = 0; i < columns.size(); i++) {
-            row.put(columns.get(i), tagAt(tagValues, i));
+            String column = columns.get(i);
+            row.put(column, DorisVarcharLimits.truncateMetricTag(column, tagAt(tagValues, i)));
         }
     }
 

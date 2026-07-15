@@ -2,6 +2,7 @@ package com.databuff.apm.common.serde;
 
 import com.databuff.apm.common.meta.OtelAttributeMaps;
 import com.databuff.apm.common.model.DcSpan;
+import com.databuff.apm.common.storage.DorisVarcharLimits;
 import com.fasterxml.jackson.core.JsonFactory;
 import com.fasterxml.jackson.core.JsonGenerator;
 
@@ -35,7 +36,7 @@ public final class DCSpanJsonEncoder {
             gen.writeStartObject();
             gen.writeNumberField("minutes", span.minutes);
             writeString(gen, "serviceId", span.serviceId);
-            writeString(gen, "resource", span.resource);
+            writeString(gen, "resource", DorisVarcharLimits.truncate(span.resource, DorisVarcharLimits.SPAN_RESOURCE));
             gen.writeNumberField("error", span.error);
             gen.writeNumberField("slow", span.slow);
             gen.writeNumberField("hours", span.hours);
@@ -59,17 +60,18 @@ public final class DCSpanJsonEncoder {
             gen.writeNumberField("duration", span.duration);
             gen.writeNumberField("start", span.start);
             writeString(gen, "host_id", span.host_id);
-            writeString(gen, "meta", span.meta);
+            writeString(gen, "meta", DorisVarcharLimits.truncate(span.meta, DorisVarcharLimits.SPAN_META));
             writeString(gen, "name", span.name);
             gen.writeNumberField("isOut", span.isOut);
-            writeString(gen, "metrics", span.metrics);
+            writeString(gen, "metrics", DorisVarcharLimits.truncate(span.metrics, DorisVarcharLimits.SPAN_METRICS));
             if (span.metaHttpStatusCode != null) {
                 gen.writeNumberField("meta.http.status_code", span.metaHttpStatusCode);
             }
             writeString(gen, "meta.error.type", span.metaErrorType);
             writeString(gen, "meta.peer.hostname", span.metaPeerHostname);
             writeString(gen, "meta.http.method", span.metaHttpMethod);
-            writeString(gen, "meta.http.url", span.metaHttpUrl);
+            writeString(gen, "meta.http.url",
+                    DorisVarcharLimits.truncate(span.metaHttpUrl, DorisVarcharLimits.URL));
             gen.writeEndObject();
         }
         return buffer.toByteArray();

@@ -1,6 +1,7 @@
 package com.databuff.apm.ingest.otel;
 
 import com.databuff.apm.common.serde.ReusableJson;
+import com.databuff.apm.common.storage.DorisVarcharLimits;
 import com.fasterxml.jackson.core.JsonProcessingException;
 import com.fasterxml.jackson.databind.ObjectMapper;
 
@@ -37,9 +38,11 @@ public record OtlLogLine(
         row.put("hostname", hostname == null ? "" : hostname);
         row.put("severity", severity == null ? "UNSPECIFIED" : severity);
         row.put("severity_number", severityNumber);
-        row.put("body", body == null ? "" : body);
-        putIfPresent(row, "attributes_json", attributesJson);
-        putIfPresent(row, "resource_json", resourceJson);
+        row.put("body", DorisVarcharLimits.truncate(body == null ? "" : body, DorisVarcharLimits.LOG_BODY));
+        putIfPresent(row, "attributes_json",
+                DorisVarcharLimits.truncate(attributesJson, DorisVarcharLimits.JSON_BLOB));
+        putIfPresent(row, "resource_json",
+                DorisVarcharLimits.truncate(resourceJson, DorisVarcharLimits.JSON_BLOB));
         row.put("time_ns", timeNs);
         row.put("observed_time_ns", observedTimeNs);
         return ReusableJson.writeValueAsBytes(JSON, row);
