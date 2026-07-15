@@ -1,12 +1,11 @@
 
-Lists of 181 third-party dependencies.
+Lists of 180 third-party dependencies.
      (Eclipse Public License - v 2.0) (GNU Lesser General Public License) Logback Classic Module (ch.qos.logback:logback-classic:1.5.32 - http://logback.qos.ch/logback-classic)
      (Eclipse Public License - v 2.0) (GNU Lesser General Public License) Logback Core Module (ch.qos.logback:logback-core:1.5.32 - http://logback.qos.ch/logback-core)
      (Apache 2) druid (com.alibaba:druid:1.2.27 - https://github.com/alibaba/druid)
      (MIT) Anthropic API + fast-mode (com.anthropic:anthropic-java:2.14.0 - https://docs.anthropic.com/claude/reference/)
      (MIT) Anthropic API + fast-mode (com.anthropic:anthropic-java-client-okhttp:2.14.0 - https://docs.anthropic.com/claude/reference/)
      (MIT) Anthropic API + fast-mode (com.anthropic:anthropic-java-core:2.14.0 - https://docs.anthropic.com/claude/reference/)
-     (Apache License, Version 2.0) ai-apm-common (com.databuff.apm:ai-apm-common:0.1.4-SNAPSHOT - https://github.com/databufflabs/databuff)
      (Apache License, Version 2.0) Internet Time Utility (com.ethlo.time:itu:1.14.0 - https://github.com/ethlo/itu)
      (Apache License, Version 2.0) ClassMate (com.fasterxml:classmate:1.7.3 - https://github.com/FasterXML/java-classmate)
      (The Apache Software License, Version 2.0) Jackson-annotations (com.fasterxml.jackson.core:jackson-annotations:2.21 - https://github.com/FasterXML/jackson)

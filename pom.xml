@@ -36,7 +36,7 @@
 
     <properties>
         <!-- 项目版本：子模块通过 ${revision} 引用，发版时只改此处 -->
-        <revision>0.1.4-SNAPSHOT</revision>
+        <revision>0.1.4</revision>
         <!-- 编译与运行统一使用 JDK 17 -->
         <java.version>17</java.version>
         <maven.compiler.release>17</maven.compiler.release>
@@ -167,6 +167,8 @@
                 <configuration>
                     <outputDirectory>${project.build.directory}/generated-sources/license</outputDirectory>
                     <thirdPartyFilename>THIRD-PARTY.txt</thirdPartyFilename>
+                    <!-- 排除本仓模块，避免发版改 revision 时还要改 THIRD-PARTY-NOTICES -->
+                    <excludedGroups>com.databuff.apm</excludedGroups>
                 </configuration>
                 <executions>
                     <execution>
