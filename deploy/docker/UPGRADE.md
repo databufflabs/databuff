@@ -57,6 +57,15 @@ Checks typically include: `VERSION` file, `schema_version` in Doris, ingest/web 
 
 Optional API regression: from the repo, `deploy/test/run-tests.sh` (requires demo telemetry).
 
+**Open-source release gates** (A/B/C — complementary; none substitutes for another; see `docs/运维参考/Docker运维.md` 「发布验收 / Release gate」):
+
+| Gate | Script | Notes |
+|------|--------|-------|
+| A | `deploy/test/doris-failover-e2e.sh` | Install-time Doris failure troubleshooting |
+| B | `deploy/test/doris-runtime-failover-e2e.sh` | Runtime outage → ops expert chat; **main evidence = session**; needs LLM Key; no in-script `docker start` faking recovery |
+| C | `deploy/test/run-tests.sh` | API regression |
+
+`verify-upgrade.sh` above is post-upgrade smoke — it does **not** replace A/B/C.
 ## Staged upgrade (`SKIP_START=1`)
 
 Use when you want to refresh bundle/images first, then start and migrate manually:
@@ -80,7 +89,7 @@ Set `SKIP_VERIFY=1` on `update.sh` if you will verify only after the manual star
 
 ## Schema migration failure
 
-Step 6 order: start Doris → `migrate-schema` → start ingest/web. On migration/start failure, `update.sh` restores the pre-upgrade `data/` backup and retries (default 3 attempts). Intermediate failures only log a short message and retry — they do **not** start Web troubleshooting mode. Only after all attempts fail does **Web troubleshooting mode** start (`ai-apm-web` only; ingest stays down to avoid writing into a broken schema). Web probes Doris once at startup; when unreachable, Doris-backed APIs fail fast so the AI chat page loads quickly for ops expert troubleshooting. Restart web after Doris is fixed to exit troubleshooting mode. Check `GET /health` for `"doris":"UNAVAILABLE"`. `start.sh` has no retry loop: Doris failure there enters troubleshooting mode immediately (single attempt).
+Step 6 order: start Doris → `migrate-schema` → start ingest/web. On migration/start failure, `update.sh` restores the pre-upgrade `data/` backup and retries (default 3 attempts). Intermediate failures only log a short message and retry — they do **not** start Web troubleshooting mode. Only after all attempts fail does **Web troubleshooting mode** start (`ai-apm-web` only; ingest stays down to avoid writing into a broken schema). Web probes Doris at startup and about every minute afterward; when unreachable, Doris-backed APIs fail fast so the AI chat page loads quickly for ops expert troubleshooting. After Doris is fixed, the next successful probe clears troubleshooting mode and re-hydrates persistence (web restart is optional). Check `GET /health` for `"doris":"UNAVAILABLE"`. `start.sh` has no retry loop: Doris failure there enters troubleshooting mode immediately (single attempt).
 
 ### One-command recovery (recommended)
 

@@ -1,5 +1,11 @@
 #!/usr/bin/env bash
-# 应用性能集成测试
+# 应用性能集成测试 — open-source release gate C (API regression).
+#
+# Release gates A/B/C are complementary; none substitutes for another:
+#   A: deploy/test/doris-failover-e2e.sh          — install-time Doris failure
+#   B: deploy/test/doris-runtime-failover-e2e.sh — runtime outage → ops expert
+#   C (this script): API regression
+# Ops docs: docs/运维参考/Docker运维.md 「发布验收 / Release gate」
 #
 # Usage:
 #   ./run-tests.sh                  # 跑接口 + AI chat（已配置 API Key 时）

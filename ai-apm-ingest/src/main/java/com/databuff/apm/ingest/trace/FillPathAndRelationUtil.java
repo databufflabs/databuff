@@ -82,8 +82,8 @@ public final class FillPathAndRelationUtil {
                     parent.isOut = 1;
                 }
             }
-            // CLIENT span（DB/HTTP/RPC 等出站调用）标记 isOut，供组件指标按方向聚合
-            if ("SPAN_KIND_CLIENT".equals(span.type)) {
+            // CLIENT / PRODUCER（DB/HTTP/RPC/MQ 等出站）标记 isOut，供组件指标与虚拟服务提取
+            if ("SPAN_KIND_CLIENT".equals(span.type) || "SPAN_KIND_PRODUCER".equals(span.type)) {
                 span.isOut = 1;
                 // DB 出站：dst=下游 DB，src=发起应用，isIn/isOut 均为 1（与 legacy service.db 口径一致）
                 if (DcSpanUtil.isDbSpan(span)) {

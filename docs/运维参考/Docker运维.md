@@ -85,6 +85,40 @@ docker compose logs ai-apm-doris-fe ai-apm-doris-be
 
 数据持久化在 `data/`。停止服务不会删除数据；彻底清理见 [升级与卸载](升级与卸载.md)。
 
+## 发布验收 / Release gate
+
+开源发版前请在仓库根目录跑通下列三项（**互不替代**；任一 PASS 不能证明另外两门）。矩阵与勾选项见 Epic 交付物 `self-ops-release-test-matrix.html`（G-OPS*）。
+
+| 门禁 | 脚本 | 覆盖什么 | 主证据 / 前提 |
+|------|------|----------|----------------|
+| **A** | `deploy/test/doris-failover-e2e.sh` | 安装期 Doris 起不来 → Web 排障 / bootstrap → 恢复 | 安装失败路径 e2e PASS |
+| **B** | `deploy/test/doris-runtime-failover-e2e.sh` | 稳态运行时 Doris 宕机 → **运维专家（ops）对话恢复** | **主证据 = ops 会话**（chat/submit + 消息/tool）；`/health` 仅辅助。需已配置 LLM API Key。**禁止**脚本 `docker start` FE/BE 冒充专家恢复。`SKIP_OPS_EXPERT=1` **不是**有效发版门禁 |
+| **C** | `deploy/test/run-tests.sh` | API / 接口回归 | 报告 PASS（通常需 demo 遥测） |
+
+发版 checklist（建议原样勾选）：
+
+```text
+□ A  ./deploy/test/doris-failover-e2e.sh
+□ B  ./deploy/test/doris-runtime-failover-e2e.sh
+     （未设 SKIP_OPS_EXPERT；会话证据默认 /tmp/doris-runtime-ops-evidence.json；勾满 G-OPS0～G-OPS3）
+□ C  ./deploy/test/run-tests.sh
+```
+
+常用命令：
+
+```bash
+# A — 安装失败排障（详见脚本头注释；离线常需 BUNDLE_ROOT / APM_INSTALL_DIR）
+./deploy/test/doris-failover-e2e.sh
+
+# B — 运行时宕机 → 运维专家恢复（栈已起且 Web 已配大模型 Key）
+./deploy/test/doris-runtime-failover-e2e.sh
+
+# C — API 回归
+./deploy/test/run-tests.sh
+```
+
+升级后的冒烟仍见 `deploy/docker/UPGRADE.md` 的 `verify-upgrade.sh`；**不能**替代上述 A/B/C 发版门禁。
+
 ## 相关文档
 
 - [升级与卸载](升级与卸载.md)

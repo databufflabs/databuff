@@ -37,6 +37,10 @@ apm:
     trace-database: databuff
     username: ${DORIS_USER:root}
     password: ${DORIS_PASSWORD:}
+    availability:
+      probe-interval-ms: ${DORIS_AVAILABILITY_PROBE_INTERVAL_MS:60000}
+      connect-timeout-ms: ${DORIS_AVAILABILITY_CONNECT_TIMEOUT_MS:3000}
+      socket-timeout-ms: ${DORIS_AVAILABILITY_SOCKET_TIMEOUT_MS:3000}
   security:
     seed-username: admin
     seed-password: Databuff@123

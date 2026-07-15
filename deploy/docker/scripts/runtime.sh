@@ -157,6 +157,7 @@ print_web_bootstrap_summary() {
   echo "    1. 打开「配置 → 大模型」，填写 API Key 并保存"
   echo "    2. 打开「AI 平台」，选择运维专家"
   echo "    3. 提供机器 SSH 信息（地址、用户名、密码或密钥），由专家登录排查"
+  echo "    4. Doris 修复后 Web 约每分钟自动重探；GET /health 中 doris 变为 UP 即退出排障模式（无需重启 Web）"
   echo ""
   echo -e "${CYN}========================================================${RST}"
   echo ""

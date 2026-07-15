@@ -71,6 +71,16 @@ public class PersistenceStartupHydrator {
         log.info("Persistence hydrate scheduled (web port {})", event.getWebServer().getPort());
     }
 
+    /** Called when periodic Doris probe recovers from unavailable → available. */
+    public void scheduleRecoveryHydrate() {
+        if (dorisAvailability.isUnavailable()) {
+            log.info("Skip persistence recovery hydrate while Doris still unavailable");
+            return;
+        }
+        scheduleHydrate("persistence-hydrator-recovery");
+        log.info("Persistence recovery hydrate scheduled");
+    }
+
     private void scheduleHydrate(String threadName) {
         Thread worker = new Thread(this::hydrateAll, threadName);
         worker.setDaemon(true);

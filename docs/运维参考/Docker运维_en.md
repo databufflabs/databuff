@@ -85,6 +85,38 @@ If readiness times out, `start.sh` suggests checking ingest / web logs.
 
 Data lives under `data/`. Stopping services does not remove data; see [Upgrade and Uninstall](升级与卸载_en.md) for full removal.
 
+## Release gate / 发布验收
+
+Before an open-source release, run all three gates from the repo root (**complementary — none substitutes for another**). Checklist detail: Epic deliverable `self-ops-release-test-matrix.html` (G-OPS*).
+
+| Gate | Script | Covers | Primary evidence / prerequisites |
+|------|--------|--------|----------------------------------|
+| **A** | `deploy/test/doris-failover-e2e.sh` | Install-time Doris failure → Web troubleshooting / bootstrap → recovery | Install-failure e2e PASS |
+| **B** | `deploy/test/doris-runtime-failover-e2e.sh` | Runtime Doris outage → **ops expert chat recovery** | **Primary evidence = ops session** (chat/submit + messages/tools); `/health` is auxiliary. Requires LLM API Key. **Do not** `docker start` FE/BE in-script to fake expert recovery. `SKIP_OPS_EXPERT=1` is **not** a valid release gate |
+| **C** | `deploy/test/run-tests.sh` | API regression | Report PASS (usually needs demo telemetry) |
+
+Release checklist (copy as-is):
+
+```text
+□ A  ./deploy/test/doris-failover-e2e.sh
+□ B  ./deploy/test/doris-runtime-failover-e2e.sh
+     (SKIP_OPS_EXPERT unset; session evidence default /tmp/doris-runtime-ops-evidence.json; G-OPS0–G-OPS3)
+□ C  ./deploy/test/run-tests.sh
+```
+
+```bash
+# A — install-time failure (see script header; offline often needs BUNDLE_ROOT / APM_INSTALL_DIR)
+./deploy/test/doris-failover-e2e.sh
+
+# B — runtime outage → ops expert (stack up + LLM Key configured in Web)
+./deploy/test/doris-runtime-failover-e2e.sh
+
+# C — API regression
+./deploy/test/run-tests.sh
+```
+
+Post-upgrade smoke (`verify-upgrade.sh` in `deploy/docker/UPGRADE.md`) does **not** replace gates A/B/C.
+
 ## See Also
 
 - [Upgrade and Uninstall](升级与卸载_en.md)

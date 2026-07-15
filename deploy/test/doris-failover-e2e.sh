@@ -1,5 +1,16 @@
 #!/usr/bin/env bash
-# Doris install failure → Web troubleshooting bootstrap → recovery E2E (KR8).
+# Doris install failure → Web troubleshooting bootstrap → recovery E2E.
+# Open-source release gate A (install-time Doris failure → Web troubleshooting).
+#
+# ## Release gates (A / B / C — complementary; none substitutes for another)
+#   A (this script):  deploy/test/doris-failover-e2e.sh
+#                     install-time Doris failure → Web bootstrap / troubleshooting
+#   B:                deploy/test/doris-runtime-failover-e2e.sh
+#                     runtime outage → 运维专家 (ops) chat recovery
+#                     Main evidence = ops session; /health is auxiliary.
+#                     Requires LLM API Key. Do NOT docker start FE/BE to fake recovery.
+#   C:                deploy/test/run-tests.sh — API regression
+# Ops docs: docs/运维参考/Docker运维.md 「发布验收 / Release gate」
 #
 # Simulates Doris FE/BE healthcheck failure via docker-compose.override.yml (BE mem_limit),
 # asserts Web bootstrap mode, then removes override and verifies full stack recovery.

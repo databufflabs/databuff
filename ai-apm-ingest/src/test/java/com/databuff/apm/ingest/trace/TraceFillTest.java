@@ -423,6 +423,35 @@ class TraceFillTest {
     }
 
     @Test
+    void otelKafkaProducerVirtualizesLikeRedisOutbound() throws Exception {
+        DcSpan httpServer = span("trace-mq-prod", "http-server", "", "service-f");
+        httpServer.type = "SPAN_KIND_SERVER";
+        httpServer.name = "GET /methodB1";
+        httpServer.resource = httpServer.name;
+        httpServer.metaHttpMethod = "GET";
+        httpServer.metaHttpStatusCode = 200;
+
+        DcSpan kafkaPublish = span("trace-mq-prod", "kafka-publish", "http-server", "service-f");
+        kafkaPublish.type = "SPAN_KIND_PRODUCER";
+        kafkaPublish.resource = "kafka_topic2 publish";
+        kafkaPublish.name = "kafka_topic2 publish";
+        kafkaPublish.meta = "{\"messaging.system\":\"kafka\",\"messaging.destination.name\":\"kafka_topic2\","
+                + "\"messaging.operation\":\"publish\",\"net.peer.name\":\"kafka.test\"}";
+
+        VirtualServiceExtractor extractor = new VirtualServiceExtractor(new VirtualServiceInstanceRegistry(
+                new MetricWriteRouter(Map.of(
+                        DorisTableNames.METRIC_SERVICE_INSTANCE, new DorisBatchWriter(16))),
+                60_000L));
+        new TraceFillProcessor(extractor).processTrace(List.of(httpServer, kafkaPublish));
+
+        assertThat(kafkaPublish.service).isEqualTo("[kafka]kafka_topic2");
+        assertThat(kafkaPublish.srcService).isEqualTo("service-f");
+        assertThat(kafkaPublish.isIn).isEqualTo(1);
+        assertThat(kafkaPublish.isOut).isEqualTo(1);
+        assertThat(kafkaPublish.dstService).isEqualTo("[kafka]kafka_topic2");
+    }
+
+    @Test
     void isolatedElasticsearchErrorSpanDoesNotUseSpanResourceAsRootResource() throws Exception {
         DcSpan esClient = span("trace-es", "es-client", "", "order-service");
         esClient.type = "SPAN_KIND_CLIENT";

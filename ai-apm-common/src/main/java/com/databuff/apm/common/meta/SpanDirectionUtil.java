@@ -48,7 +48,8 @@ public final class SpanDirectionUtil {
             if (isMqConsume(span)) {
                 return new Direction(1, 1);
             }
-            if (isClientKind(span)) {
+            // PRODUCER (OTel) and CLIENT Exit (SkyWalking) publishers; Callbacks stay NONE.
+            if (isClientKind(span) || isProducerKind(span) || isMqPublish(span)) {
                 return new Direction(0, 1);
             }
         }
@@ -105,6 +106,10 @@ public final class SpanDirectionUtil {
         return "SPAN_KIND_CLIENT".equals(span.type);
     }
 
+    private static boolean isProducerKind(DcSpan span) {
+        return "SPAN_KIND_PRODUCER".equals(span.type);
+    }
+
     private static boolean isHttpSpan(DcSpan span) {
         return !DcSpanUtil.hasDbSystem(span) && DcSpanUtil.isHttpSpan(span);
     }
@@ -137,8 +142,21 @@ public final class SpanDirectionUtil {
         return lower.contains("receive") || lower.contains("process");
     }
 
+    private static boolean isMqPublish(java.util.Map<String, String> meta) {
+        String operation = OtelAttributeMaps.firstNonBlank(meta, "messaging.operation");
+        if (operation == null) {
+            return false;
+        }
+        String lower = operation.toLowerCase();
+        return lower.contains("publish") || lower.equals("send") || lower.endsWith(".send");
+    }
+
     private static boolean isMqConsume(DcSpan span) {
         return isMqConsume(OtelAttributeMaps.parse(span));
+    }
+
+    private static boolean isMqPublish(DcSpan span) {
+        return isMqPublish(OtelAttributeMaps.parse(span));
     }
 
     private static String spanName(DcSpan span) {

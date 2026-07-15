@@ -61,9 +61,13 @@ public final class VirtualServiceResolver {
         if (DcSpanUtil.isMqSpan(span)) {
             String mqType = OtelAttributeMaps.firstNonBlank(meta, "messaging.system");
             String topic = OtelAttributeMaps.firstNonBlank(
-                    meta, "messaging.destination.name", "messaging.kafka.destination");
+                    meta,
+                    "messaging.destination.name",
+                    "messaging.kafka.destination",
+                    "mq.topic",
+                    "mq.queue");
             String broker = OtelAttributeMaps.firstNonBlank(
-                    meta, "net.peer.name", "server.address", "messaging.kafka.broker");
+                    meta, "net.peer.name", "server.address", "messaging.kafka.broker", "mq.broker");
             return VirtualComponentNaming.mq(mqType, topic, broker);
         }
         if (DcSpanUtil.isDbSpan(span) || DcSpanUtil.isRedisSpan(span) || DcSpanUtil.isEsSpan(span) || DcSpanUtil.isConfigSpan(span)) {

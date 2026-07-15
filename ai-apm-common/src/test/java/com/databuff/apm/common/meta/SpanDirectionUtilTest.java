@@ -36,6 +36,41 @@ class SpanDirectionUtilTest {
         assertThat(span.isOut).isZero();
     }
 
+    @Test
+    void mqProducerKindMarksOutbound() {
+        DcSpan span = new DcSpan();
+        span.type = "SPAN_KIND_PRODUCER";
+        span.meta = "{\"messaging.system\":\"kafka\",\"messaging.destination.name\":\"kafka_topic2\","
+                + "\"messaging.operation\":\"publish\"}";
+        assertThat(SpanDirectionUtil.resolve(span)).isEqualTo(new SpanDirectionUtil.Direction(0, 1));
+    }
+
+    @Test
+    void mqPublishOperationMarksOutboundWithoutClientKind() {
+        DcSpan span = new DcSpan();
+        span.type = "SPAN_KIND_INTERNAL";
+        span.meta = "{\"messaging.system\":\"kafka\",\"messaging.destination.name\":\"orders\","
+                + "\"messaging.operation\":\"publish\"}";
+        assertThat(SpanDirectionUtil.resolve(span)).isEqualTo(new SpanDirectionUtil.Direction(0, 1));
+    }
+
+    @Test
+    void mqConsumeMarksInboundAndOutbound() {
+        DcSpan span = new DcSpan();
+        span.type = "SPAN_KIND_CONSUMER";
+        span.meta = "{\"messaging.system\":\"kafka\",\"messaging.destination.name\":\"orders\","
+                + "\"messaging.operation\":\"process\"}";
+        assertThat(SpanDirectionUtil.resolve(span)).isEqualTo(new SpanDirectionUtil.Direction(1, 1));
+    }
+
+    @Test
+    void mqCallbackWithoutOperationStaysNone() {
+        DcSpan span = new DcSpan();
+        span.type = "SPAN_KIND_INTERNAL";
+        span.meta = "{\"messaging.system\":\"kafka\",\"messaging.destination.name\":\"kafka_topic1\"}";
+        assertThat(SpanDirectionUtil.resolve(span)).isEqualTo(SpanDirectionUtil.Direction.NONE);
+    }
+
     private static DcSpan httpSpan(String name, String kind) {
         DcSpan span = new DcSpan();
         span.name = name;

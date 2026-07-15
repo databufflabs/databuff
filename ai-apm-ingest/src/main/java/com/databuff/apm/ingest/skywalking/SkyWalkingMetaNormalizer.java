@@ -15,6 +15,8 @@ import java.util.Set;
  * <p>
  * Legacy SkyWalking JDBC plugins often report {@code db.type=sql}; this maps them to concrete {@code db.system}
  * values (e.g. {@code mysql}) using component id and peer hints so virtual services become {@code [mysql]host:port}.
+ * MQ plugins report {@code mq.topic}/{@code mq.broker}; this maps them to {@code messaging.*} so virtual services
+ * become {@code [kafka]topic} the same way OTel producers do.
  */
 public final class SkyWalkingMetaNormalizer {
 
@@ -32,6 +34,126 @@ public final class SkyWalkingMetaNormalizer {
             return;
         }
         normalizeDatabaseTags(span, meta);
+        normalizeMessagingTags(span, meta);
+    }
+
+    private static void normalizeMessagingTags(SpanObject span, Map<String, String> meta) {
+        if (!isMessagingSpan(span, meta)) {
+            return;
+        }
+        String messagingSystem = OtelAttributeMaps.firstNonBlank(meta, "messaging.system");
+        if (messagingSystem == null || messagingSystem.isBlank()) {
+            String resolved = mqSystemFromSkyWalkingComponentId(span.getComponentId());
+            if (resolved == null) {
+                resolved = mqSystemFromOperationName(span.getOperationName());
+            }
+            if (resolved != null && !resolved.isBlank()) {
+                meta.put("messaging.system", resolved);
+            }
+        }
+        // SkyWalking RabbitMQ producers often set mq.queue with an empty mq.topic.
+        String topic = OtelAttributeMaps.firstNonBlank(
+                meta,
+                "messaging.destination.name",
+                "messaging.kafka.destination",
+                "mq.topic",
+                "mq.queue");
+        if (topic != null && !topic.isBlank()
+                && OtelAttributeMaps.firstNonBlank(meta, "messaging.destination.name") == null) {
+            meta.put("messaging.destination.name", topic.trim());
+        }
+        String broker = OtelAttributeMaps.firstNonBlank(
+                meta, "mq.broker", "net.peer.name", "server.address", "messaging.kafka.broker");
+        if (broker != null && !broker.isBlank()) {
+            if (OtelAttributeMaps.firstNonBlank(meta, "net.peer.name") == null) {
+                meta.put("net.peer.name", broker.trim());
+            }
+            if (OtelAttributeMaps.firstNonBlank(meta, "server.address") == null) {
+                String host = broker.trim();
+                int colon = host.lastIndexOf(':');
+                if (colon > 0 && colon < host.length() - 1
+                        && host.substring(colon + 1).chars().allMatch(Character::isDigit)) {
+                    meta.put("server.address", host.substring(0, colon));
+                    if (OtelAttributeMaps.firstNonBlank(meta, "server.port") == null) {
+                        meta.put("server.port", host.substring(colon + 1));
+                    }
+                } else {
+                    meta.put("server.address", host);
+                }
+            }
+        }
+        if (OtelAttributeMaps.firstNonBlank(meta, "messaging.operation") == null) {
+            String operation = mqOperationFromOperationName(span.getOperationName());
+            if (operation != null) {
+                meta.put("messaging.operation", operation);
+            }
+        }
+    }
+
+    private static boolean isMessagingSpan(SpanObject span, Map<String, String> meta) {
+        if (span.getSpanLayer() == SpanLayer.MQ) {
+            return true;
+        }
+        if (OtelAttributeMaps.firstNonBlank(
+                meta, "messaging.system", "mq.topic", "mq.broker", "messaging.destination.name") != null) {
+            return true;
+        }
+        return mqSystemFromSkyWalkingComponentId(span.getComponentId()) != null;
+    }
+
+    static String mqSystemFromSkyWalkingComponentId(int componentId) {
+        return switch (componentId) {
+            case 27, 40, 41 -> "kafka";
+            case 25, 38, 39 -> "rocketmq";
+            case 51, 52, 53 -> "rabbitmq";
+            case 45, 46 -> "activemq";
+            case 73, 74 -> "pulsar";
+            default -> null;
+        };
+    }
+
+    private static String mqSystemFromOperationName(String operationName) {
+        if (operationName == null || operationName.isBlank()) {
+            return null;
+        }
+        String lower = operationName.toLowerCase(Locale.ROOT);
+        if (lower.startsWith("kafka/")) {
+            return "kafka";
+        }
+        if (lower.startsWith("rocketmq/")) {
+            return "rocketmq";
+        }
+        if (lower.startsWith("rabbitmq/")) {
+            return "rabbitmq";
+        }
+        if (lower.startsWith("activemq/")) {
+            return "activemq";
+        }
+        if (lower.startsWith("pulsar/")) {
+            return "pulsar";
+        }
+        return null;
+    }
+
+    /**
+     * Map SkyWalking MQ operation names such as {@code Kafka/topic/Producer} to OTel
+     * {@code messaging.operation}. Callbacks are left unset so they are not treated as publish/consume.
+     */
+    static String mqOperationFromOperationName(String operationName) {
+        if (operationName == null || operationName.isBlank()) {
+            return null;
+        }
+        String lower = operationName.toLowerCase(Locale.ROOT);
+        if (lower.contains("callback")) {
+            return null;
+        }
+        if (lower.contains("producer") || lower.endsWith("/publish") || lower.contains("/publish")) {
+            return "publish";
+        }
+        if (lower.contains("consumer") || lower.contains("/process") || lower.contains("receive")) {
+            return "process";
+        }
+        return null;
     }
 
     private static void normalizeDatabaseTags(SpanObject span, Map<String, String> meta) {

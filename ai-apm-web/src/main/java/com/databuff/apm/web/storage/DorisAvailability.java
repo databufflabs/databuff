@@ -10,6 +10,7 @@ import java.util.concurrent.atomic.AtomicReference;
 /**
  * Tracks Doris reachability for Web troubleshooting mode.
  * When marked unavailable, JDBC reads fail immediately instead of waiting on the pool.
+ * Updated by {@link DorisAvailabilityMonitor} at startup and about once per minute.
  */
 @Component
 public class DorisAvailability implements DorisAccessGate {
