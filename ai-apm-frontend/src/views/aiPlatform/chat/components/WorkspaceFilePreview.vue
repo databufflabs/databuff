@@ -6,7 +6,7 @@
     direction="rtl"
     :with-header="false"
     :wrapper-closable="true"
-    custom-class="workspace-file-preview-drawer"
+    :custom-class="'workspace-file-preview-drawer' + (expanded ? ' is-expanded' : '')"
     @closed="onClosed"
   >
     <div class="preview-shell">
@@ -69,8 +69,8 @@ export default class WorkspaceFilePreview extends Vue {
   }
 
   private get drawerSize (): string {
-    // 默认约五分之四屏宽；放大后接近全屏，内容区更完整
-    return this.expanded ? '96%' : '82%'
+    // 默认约半屏偏宽，聊天区仍可见；放大后接近原先较宽预览尺寸
+    return this.expanded ? '82%' : '64%'
   }
 
   private get previewKind (): 'html' | 'text' | 'other' {
@@ -159,6 +159,10 @@ export default class WorkspaceFilePreview extends Vue {
 <style lang="scss">
 .workspace-file-preview-drawer {
   &.el-drawer {
+    max-width: min(1100px, 100vw);
+  }
+
+  &.is-expanded.el-drawer {
     max-width: 100vw;
   }
 

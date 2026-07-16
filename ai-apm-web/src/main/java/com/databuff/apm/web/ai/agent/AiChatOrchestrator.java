@@ -346,11 +346,6 @@ public class AiChatOrchestrator implements BrainRoundContinuer {
             if (!expertResultContinuation && hasBrainRoundFinalText(sessionId, roundIndex)) {
                 return;
             }
-            if (!expertResultContinuation && hasBrainSubtasksInRound(sessionId, roundIndex)) {
-                deferBrainDispatchPhaseReply(sessionId, expertId, roundIndex, assistantMessageId,
-                        normalizedReply, metadata, "defer-dispatch-phase");
-                return;
-            }
             if (normalizedReply.isEmpty()) {
                 if (brainRoundStillInProgress(sessionId)) {
                     return;
@@ -993,10 +988,9 @@ public class AiChatOrchestrator implements BrainRoundContinuer {
         if (hasBrainRoundFinalText(sessionId, roundIndex)) {
             return false;
         }
-        if (brainAnswerMustWaitForSubExperts(sessionId, roundIndex)) {
-            return true;
-        }
-        return hasBrainSubtasksInRound(sessionId, roundIndex);
+        // Subtasks are in-progress only while pending callback to brain is outstanding (not merely
+        // because a historical task record exists for this round).
+        return brainAnswerMustWaitForSubExperts(sessionId, roundIndex);
     }
 
     private boolean brainAnswerMustWaitForSubExperts(String sessionId, int roundIndex) {
@@ -1047,29 +1041,6 @@ public class AiChatOrchestrator implements BrainRoundContinuer {
                         && "brain".equals(message.expertId())
                         && message.roundIndex() == roundIndex
                         && Boolean.TRUE.equals(message.metadata().get(ExpertMessageConstants.META_IS_ROUND_FINAL)));
-    }
-
-    private boolean hasBrainSubtasksInRound(String sessionId, int roundIndex) {
-        return expertTaskService.listBySession(sessionId).stream()
-                .anyMatch(task -> "brain".equals(task.sourceExpertId())
-                        && taskRoundIndex(task, sessionId) == roundIndex);
-    }
-
-    private static int taskRoundIndex(ExpertTask task, String sessionId) {
-        if (task.metadata() != null) {
-            Object value = task.metadata().get(ExpertMessageConstants.META_ROUND_INDEX);
-            if (value instanceof Number number) {
-                return number.intValue();
-            }
-            if (value != null) {
-                try {
-                    return Integer.parseInt(String.valueOf(value));
-                } catch (NumberFormatException ignored) {
-                    // fall through
-                }
-            }
-        }
-        return 1;
     }
 
     private static void putIfNotBlank(Map<String, Object> map, String key, String value) {

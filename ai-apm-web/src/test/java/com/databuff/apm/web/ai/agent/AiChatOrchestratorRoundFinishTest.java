@@ -161,23 +161,14 @@ class AiChatOrchestratorRoundFinishTest {
     }
 
     @Test
-    void brainDefersInterimTextAfterTaskNotifiedBeforeInitialStreamEnds() {
+    void brainFinalizesWhenPendingAlreadyClearedEvenIfTaskRecordRemains() {
+        // After pending callback is cleared, Subtasks are done — historical task records must not
+        // keep the round open or demote brain text (old hasBrainSubtasksInRound behavior).
         String sessionId = store.ensureSession(null, "brain", "rk", "web-1", "admin");
         store.appendUserMessage(sessionId, "hello", "brain", "admin", Map.of());
         String assistantId = store.reserveAssistantMessageId(sessionId, "brain");
         ExpertTask task = registerTask(sessionId, 1, "task-1");
         pendingRegistry.removePending(sessionId, task.taskId());
-
-        RoundFinishHelper.finish(store, taskService, sessionId, "brain", assistantId,
-                "已派发，请稍候", Map.of());
-
-        assertThat(store.messages(sessionId))
-                .noneMatch(message -> "TEXT".equals(message.messageType())
-                        && Boolean.TRUE.equals(message.metadata().get(ExpertMessageConstants.META_IS_ROUND_FINAL)));
-        assertThat(store.messages(sessionId))
-                .anyMatch(message -> "REASONING".equals(message.messageType())
-                        && "brain".equals(message.expertId())
-                        && message.content().contains("请稍候"));
 
         RoundFinishHelper.finish(store, taskService, sessionId, "brain", assistantId,
                 "最终答复", Map.of(ExpertMessageConstants.META_TRIGGER_SOURCE,
@@ -188,6 +179,7 @@ class AiChatOrchestratorRoundFinishTest {
                         && "brain".equals(message.expertId())
                         && Boolean.TRUE.equals(message.metadata().get(ExpertMessageConstants.META_IS_ROUND_FINAL))
                         && "最终答复".equals(message.content()));
+        assertThat(taskService.awaitingBrainTaskCompletionNotifications(sessionId, 1)).isFalse();
     }
 
     @Test
@@ -284,10 +276,6 @@ class AiChatOrchestratorRoundFinishTest {
                 if (!expertResultContinuation && hasBrainRoundFinalText(store, sessionId, roundIndex)) {
                     return;
                 }
-                if (!expertResultContinuation && hasBrainSubtasksInRound(taskService, sessionId, roundIndex)) {
-                    deferBrain(store, sessionId, expertId, roundIndex, normalizedReply, metadata);
-                    return;
-                }
                 if (normalizedReply.isEmpty()) {
                     if (brainRoundStillInProgress(store, taskService, sessionId, roundIndex)) {
                         return;
@@ -323,15 +311,6 @@ class AiChatOrchestratorRoundFinishTest {
                             && Boolean.TRUE.equals(message.metadata().get(ExpertMessageConstants.META_IS_ROUND_FINAL)));
         }
 
-        private static boolean hasBrainSubtasksInRound(
-                ExpertTaskService taskService,
-                String sessionId,
-                int roundIndex) {
-            return taskService.listBySession(sessionId).stream()
-                    .anyMatch(task -> "brain".equals(task.sourceExpertId())
-                            && taskRoundIndex(task) == roundIndex);
-        }
-
         private static String triggerSource(Map<String, Object> metadata) {
             if (metadata == null) {
                 return null;
@@ -359,20 +338,7 @@ class AiChatOrchestratorRoundFinishTest {
                             && Boolean.TRUE.equals(message.metadata().get(ExpertMessageConstants.META_IS_ROUND_FINAL)))) {
                 return false;
             }
-            if (brainAnswerMustWaitForSubExperts(taskService, sessionId, roundIndex)) {
-                return true;
-            }
-            return taskService.listBySession(sessionId).stream()
-                    .anyMatch(task -> "brain".equals(task.sourceExpertId())
-                            && taskRoundIndex(task) == roundIndex);
-        }
-
-        private static int taskRoundIndex(ExpertTask task) {
-            Object value = task.metadata().get(ExpertMessageConstants.META_ROUND_INDEX);
-            if (value instanceof Number number) {
-                return number.intValue();
-            }
-            return 1;
+            return brainAnswerMustWaitForSubExperts(taskService, sessionId, roundIndex);
         }
 
         private static int resolveRoundIndex(
