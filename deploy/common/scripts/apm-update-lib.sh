@@ -73,8 +73,13 @@ apm_sync_deploy_bundle() {
 
   for script in start.sh stop.sh reset-table.sh update.sh; do
     if [[ -f "${src}/${script}" ]]; then
-      cp -f "${src}/${script}" "${dest}/${script}"
-      chmod +x "${dest}/${script}"
+      # 原子替换：先 cp 到同目录临时文件再 mv（rename），避免覆盖正在运行的
+      # update.sh 时 bash 跨块重读到「半新半旧」内容报语法错（self-overwrite bug）。
+      # rename(2) 保留旧 inode 给已打开它的 bash，目录项原子指向新文件。
+      _apm_sync_tmp="${dest}/${script}.apm-sync.$$"
+      cp -f "${src}/${script}" "$_apm_sync_tmp"
+      chmod +x "$_apm_sync_tmp"
+      mv -f "$_apm_sync_tmp" "${dest}/${script}"
     fi
   done
 
@@ -329,8 +334,14 @@ apm_load_offline_bundle_images() {
     # shellcheck disable=SC1091
     . "${bundle_root}/env.sh"
   elif [[ -n "${APM_INSTALL_DIR:-}" && -f "${APM_INSTALL_DIR}/env.sh" ]]; then
+    # 安装目录的 env.sh 是旧版本（APM_VERSION=旧），不能让它覆盖调用方已设好的
+    # 目标版本 APM_VERSION，否则后续 apm_resolve_update_executable 会按旧版本
+    # 找部署包（如 0.1.3 找 databuff-ai-apm-0.1.3.tar.gz）而失败。只取镜像相关
+    # 变量，保留 APM_VERSION。
+    _apm_load_saved_ver="${APM_VERSION:-}"
     # shellcheck disable=SC1091
     . "${APM_INSTALL_DIR}/env.sh"
+    APM_VERSION="$_apm_load_saved_ver"
   fi
 
   apm_stack="${RUNTIME_IMAGE_NAMESPACE:-databuffhub}/ai-apm-ingest:${version}"
@@ -348,22 +359,34 @@ apm_load_offline_bundle_images() {
   return 0
 }
 
-# Return path to update.sh (install dir or bootstrap from offline bundle deploy pkg).
+# Return path to update.sh to exec for the upgrade.
+#
+# When a bundle_root is provided (offline upgrade), ALWAYS prefer the bundle's
+# update.sh (target version, with the latest self-protection + lib fixes) over
+# the install dir's possibly-older update.sh. Running the OLD install dir
+# update.sh would hit the self-overwrite bug (apm_sync_deploy_bundle cp -f
+# overwrites the running script) on versions that predate the re-exec fix.
+# The bundle's update.sh re-execs from a temp copy and sources the bundle's
+# fixed lib, so it survives apm_sync_deploy_bundle overwriting install dir.
 apm_resolve_update_executable() {
   local install_dir="$1"
   local bundle_root="$2"
   local version="$3"
   local deploy_pkg staging
 
+  if [[ -n "$bundle_root" ]]; then
+    deploy_pkg="$(apm_resolve_bundle_glob "${bundle_root}/databuff-ai-apm-${version}.tar.gz" "部署包")" || return 1
+    staging="$(mktemp -d "${TMPDIR:-/tmp}/apm-update-bootstrap.XXXXXX")"
+    tar -xzf "$deploy_pkg" -C "$staging" --strip-components=1
+    chmod +x "${staging}/update.sh" "${staging}/scripts/"*.sh 2>/dev/null || true
+    printf '%s\n' "${staging}/update.sh"
+    return 0
+  fi
+
   if [[ -x "${install_dir}/update.sh" ]]; then
     printf '%s\n' "${install_dir}/update.sh"
     return 0
   fi
 
-  [[ -n "$bundle_root" ]] || return 1
-  deploy_pkg="$(apm_resolve_bundle_glob "${bundle_root}/databuff-ai-apm-${version}.tar.gz" "部署包")" || return 1
-  staging="$(mktemp -d "${TMPDIR:-/tmp}/apm-update-bootstrap.XXXXXX")"
-  tar -xzf "$deploy_pkg" -C "$staging" --strip-components=1
-  chmod +x "${staging}/update.sh" "${staging}/scripts/"*.sh 2>/dev/null || true
-  printf '%s\n' "${staging}/update.sh"
+  return 1
 }
