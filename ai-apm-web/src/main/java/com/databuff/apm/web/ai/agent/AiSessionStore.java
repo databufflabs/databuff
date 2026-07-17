@@ -1,6 +1,8 @@
 package com.databuff.apm.web.ai.agent;
 
 import com.databuff.apm.web.ai.platform.task.ExpertMessageConstants;
+import org.springframework.beans.factory.annotation.Value;
+import org.springframework.scheduling.annotation.Scheduled;
 import org.springframework.stereotype.Component;
 
 import java.time.Instant;
@@ -22,6 +24,26 @@ public class AiSessionStore {
     private final Map<String, String> streamingMessageIds = new ConcurrentHashMap<>();
     private BiConsumer<String, List<ChatMessage>> roundFlushListener;
     private BiConsumer<String, ChatMessage> messageAppendListener;
+
+    @Value("${apm.ai.session.ttl-seconds:86400}")
+    private long sessionTtlSeconds;
+
+    @Value("${apm.ai.session.max-sessions:500}")
+    private int maxSessions;
+
+    /**
+     * Periodically evict idle in-memory sessions whose updatedAt is older than the TTL.
+     * Running sessions are spared so active chat turns are never dropped mid-flight.
+     * Evicted sessions are recoverable from Doris via lazy hydration.
+     */
+    @Scheduled(fixedDelayString = "${apm.ai.session.cleanup-interval-ms:600000}")
+    public void evictIdleSessions() {
+        if (sessionTtlSeconds <= 0) {
+            return;
+        }
+        Instant cutoff = Instant.now().minusSeconds(sessionTtlSeconds);
+        sessions.values().removeIf(state -> !state.running.get() && state.updatedAt.isBefore(cutoff));
+    }
 
     public void setRoundFlushListener(BiConsumer<String, List<ChatMessage>> roundFlushListener) {
         this.roundFlushListener = roundFlushListener;
@@ -83,6 +105,7 @@ public class AiSessionStore {
         state.ownerNodeId = ownerNodeId;
         state.userName = userName == null || userName.isBlank() ? "admin" : userName;
         sessions.put(id, state);
+        enforceSessionCap();
         return id;
     }
 
@@ -819,6 +842,7 @@ public class AiSessionStore {
             }
         }
         sessions.put(sessionId, state);
+        enforceSessionCap();
     }
 
     public void updateSessionMeta(String sessionId, String title, String routeKey) {
@@ -835,6 +859,30 @@ public class AiSessionStore {
     public void removeSession(String sessionId) {
         sessions.remove(sessionId);
         clearStreamingMessageIds(sessionId);
+    }
+
+    /**
+     * Keep the in-memory session map bounded. When over the cap, evict the
+     * non-running session with the oldest updatedAt (LRU by activity time).
+     * Evicted sessions remain in Doris and are re-hydrated on next access.
+     */
+    private void enforceSessionCap() {
+        if (maxSessions <= 0 || sessions.size() <= maxSessions) {
+            return;
+        }
+        SessionState oldest = null;
+        for (SessionState state : sessions.values()) {
+            if (state.running.get()) {
+                continue;
+            }
+            if (oldest == null || state.updatedAt.isBefore(oldest.updatedAt)) {
+                oldest = state;
+            }
+        }
+        if (oldest != null) {
+            sessions.remove(oldest.id);
+            clearStreamingMessageIds(oldest.id);
+        }
     }
 
     private void clearStreamingMessageIds(String sessionId) {
