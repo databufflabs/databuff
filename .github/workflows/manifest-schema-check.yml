@@ -1,0 +1,17 @@
+name: manifest-schema-check
+on:
+  pull_request:
+    paths:
+      - 'deploy/common/upgrade-manifest.json'
+      - 'deploy/common/sql/migrations/**'
+  push:
+    branches: [master, main]
+    paths:
+      - 'deploy/common/upgrade-manifest.json'
+      - 'deploy/common/sql/migrations/**'
+jobs:
+  check:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - run: bash deploy/test/check-manifest-schema.sh

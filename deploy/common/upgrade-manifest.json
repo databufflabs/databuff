@@ -2,5 +2,5 @@
   "schema_version": 4,
   "upgrade_type": "A",
   "min_upgrade_from": "0.1.0",
-  "notes": "V004 expands long-text VARCHAR limits for span/log attributes; prior V003 adds metric_* daily dynamic partitions."
+  "notes": "V004 expands long-text VARCHAR limits for span/log attributes and folds in #39 log_dc_record.body -> STRING; prior V003 adds metric_* daily dynamic partitions."
 }
