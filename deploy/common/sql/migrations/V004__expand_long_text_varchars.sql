@@ -1,6 +1,7 @@
 -- Expand VARCHAR lengths for URL / SQL / JSON / resource fields that overflow in production
 -- and fail Stream Load / JDBC writes (GitHub #38 and related tables).
 -- Also folds in GitHub #39: log_dc_record.body VARCHAR(65533) -> STRING for CJK-heavy bodies.
+-- Also seeds built-in entry-overview detection rules (avgDuration >1s, error.pct >10%, enabled).
 -- Fresh installs take the new sizes (and STRING body) from databuff.sql; this migration upgrades existing DBs.
 
 USE databuff;
@@ -57,3 +58,16 @@ ALTER TABLE metric_service_trace MODIFY COLUMN `resource` VARCHAR(1024);
 -- Heavyweight schema change: rewrites tablets; monitor with SHOW ALTER TABLE COLUMN.
 -- Fresh installs take STRING from databuff.sql; this upgrades existing DBs.
 ALTER TABLE log_dc_record MODIFY COLUMN `body` STRING COMMENT 'log message text (STRING; ingest truncates by Java String.length)';
+
+-- 6. Built-in detection rules (all services entry overview, enabled by default).
+-- Fresh installs get the same rows from databuff.sql (id 1/2).
+-- High ids avoid colliding with user-created rules on existing DBs.
+INSERT INTO config_event_rule
+  (id, rule_name, classify, detection_way, service, metric, threshold, comparator, enabled, query_json, updated_at)
+VALUES
+  (900001, '服务入口平均耗时过高', 'singleMetric', 'threshold', '*', 'service.avgDuration', 1000, 'gt', 1,
+   '{"1":{"way":"threshold","period":60,"unit":"ms","view_unit":"ms","_scale":1,"time_aggregator":"avg","comparison":">","thresholds":{"critical":1000,"warning":null},"A":{"metric":"service.avgDuration","aggs":"avg","by":["service"],"from":[]}}}',
+   NOW()),
+  (900002, '服务入口错误率过高', 'singleMetric', 'threshold', '*', 'service.error.pct', 10, 'gt', 1,
+   '{"1":{"way":"threshold","period":60,"unit":"%","view_unit":"%","_scale":1,"time_aggregator":"avg","comparison":">","thresholds":{"critical":10,"warning":null},"A":{"metric":"service.error.pct","aggs":"avg","by":["service"],"from":[]}}}',
+   NOW());

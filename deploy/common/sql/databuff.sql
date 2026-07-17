@@ -1272,6 +1272,17 @@ UNIQUE KEY(`id`)
 DISTRIBUTED BY HASH(`id`) BUCKETS 8
 PROPERTIES ("replication_num" = "1");
 
+-- Built-in detection rules (all services entry overview, enabled by default).
+INSERT INTO config_event_rule
+  (id, rule_name, classify, detection_way, service, metric, threshold, comparator, enabled, query_json, updated_at)
+VALUES
+  (1, '服务入口平均耗时过高', 'singleMetric', 'threshold', '*', 'service.avgDuration', 1000, 'gt', 1,
+   '{"1":{"way":"threshold","period":60,"unit":"ms","view_unit":"ms","_scale":1,"time_aggregator":"avg","comparison":">","thresholds":{"critical":1000,"warning":null},"A":{"metric":"service.avgDuration","aggs":"avg","by":["service"],"from":[]}}}',
+   NOW()),
+  (2, '服务入口错误率过高', 'singleMetric', 'threshold', '*', 'service.error.pct', 10, 'gt', 1,
+   '{"1":{"way":"threshold","period":60,"unit":"%","view_unit":"%","_scale":1,"time_aggregator":"avg","comparison":">","thresholds":{"critical":10,"warning":null},"A":{"metric":"service.error.pct","aggs":"avg","by":["service"],"from":[]}}}',
+   NOW());
+
 CREATE TABLE config_event (
   `id`            VARCHAR(64)  NOT NULL,
   `rule_id`       BIGINT       NOT NULL,
