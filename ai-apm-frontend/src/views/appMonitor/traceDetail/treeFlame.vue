@@ -260,8 +260,11 @@ export default class TreeFlame extends Vue {
 
         item.pids = [...pids]
         
-        // 计算span的执行占比
-        this.excutePctMap[item.span_id] = PercentFilter(item.exectime / this.totalExectime, true);
+        // 执行占比 = 自身耗时 / 总耗时
+        this.excutePctMap[item.span_id] = PercentFilter(
+          this.totalDuration ? (Number(item.exectime) || 0) / this.totalDuration : 0,
+          true,
+        );
 
         this.spanMapping[item.span_id] = {
           ...item,

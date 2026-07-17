@@ -83,15 +83,19 @@ public final class DcSpanUtil {
         return metrics;
     }
 
+    /**
+     * Whether this span should write {@code metric_service} as a service request.
+     * Only inbound entry spans ({@code isIn=1}) qualify; root / outbound-only spans do not.
+     */
     public static boolean isServiceEntrySpan(DcSpan span) {
+        if (span == null) {
+            return false;
+        }
         if (isVirtualInboundComponent(span)) {
             return false;
         }
         if (isDbSpan(span) || isRedisSpan(span) || isMqSpan(span)) {
             return false;
-        }
-        if (span.parent_id == null || span.parent_id.isBlank()) {
-            return true;
         }
         return span.isIn == 1;
     }

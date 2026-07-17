@@ -13,6 +13,7 @@
       <div class="span-header-info">
         <span>{{ $t('modules.views.appMonitor.traceDetail.s_d8dc9309') }}<span>{{ currentSpan.duration | NsFilter }}</span></span>
         <span>{{ $t('modules.views.appMonitor.traceDetail.s_0f6f5c0f') }} <span>{{ durationPct | PercentFilter }}</span></span>
+        <span class="ml-8">{{ $t('modules.views.alarmCenter.alarm.s_f782779e') }}：{{ spanEndMillis | TimesToDateFilter('YYYY-MM-DD HH:mm:ss.SSS') }}</span>
       </div>
       <div class="tl mt-5">
         <span
@@ -68,13 +69,17 @@ export default class SpanAside extends Vue {
   }
 
   get excutePct () {
-    const _excutePct = this.currentSpan?.exectime / this.totalExectime;
-    return !isNaN(_excutePct) && isFinite(_excutePct) ? _excutePct : '-';
+    const total = Number(this.totalDuration) || 0
+    const selfTime = Number(this.currentSpan?.exectime)
+    const duration = Number(this.currentSpan?.duration) || 0
+    const self = Number.isFinite(selfTime) ? selfTime : duration
+    const _excutePct = total ? self / total : NaN
+    return !isNaN(_excutePct) && isFinite(_excutePct) ? _excutePct : '-'
   }
 
   get durationPct () {
-    const _durationPct = this.currentSpan?.duration / this.totalDuration;
-    return !isNaN(_durationPct) && isFinite(_durationPct) ? _durationPct : '-';
+    // 页面展示的占比：自身 / 总耗时
+    return this.excutePct
   }
 
   get getSeriviceMapInfo () {
@@ -117,6 +122,20 @@ export default class SpanAside extends Vue {
     }
     const text = String(start)
     return text.length > 13 ? Math.floor(+text / 1_000_000) : +text
+  }
+
+  get spanEndMillis () {
+    const end = this.currentSpan?.endTime || this.currentSpan?.end
+    if (end) {
+      const text = String(end)
+      const ms = text.length > 13 ? Math.floor(+text.substring(0, 13)) : +text
+      if (Number.isFinite(ms) && ms > 0) {
+        return ms
+      }
+    }
+    const startMs = this.spanStartMillis
+    const duration = Number(this.currentSpan?.duration) || 0
+    return startMs && duration ? startMs + Math.ceil(duration / 1_000_000) : 0
   }
 
   // 是否有性能剖析

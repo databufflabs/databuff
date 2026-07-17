@@ -128,6 +128,7 @@ class ExtractedMetricRoutingTest {
                                         .setTraceId(ByteString.fromHex("0102030405060708090a0b0c0d0e0f10"))
                                         .setSpanId(ByteString.fromHex("0102030405060708"))
                                         .setName("GET /orders")
+                                        .setKind(Span.SpanKind.SPAN_KIND_SERVER)
                                         .addAttributes(kv("http.method", "GET"))
                                         .addAttributes(kv("http.status_code", "200"))
                                         .addAttributes(kv("url.full", "/orders"))
@@ -157,6 +158,7 @@ class ExtractedMetricRoutingTest {
         span.trace_id = "trace-http";
         span.span_id = "span-http";
         span.parent_id = "";
+        span.type = "SPAN_KIND_SERVER";
         span.service = "demo-order";
         span.serviceId = "demo-order-id";
         span.serviceInstance = "it-instance-1";

@@ -2,6 +2,7 @@ package com.databuff.apm.common.serde;
 
 import com.databuff.apm.common.meta.OtelAttributeMaps;
 import com.databuff.apm.common.model.DcSpan;
+import com.databuff.apm.common.model.OptimizedMetric;
 import org.junit.jupiter.api.Test;
 
 import java.util.Map;
@@ -11,15 +12,49 @@ import static org.assertj.core.api.Assertions.assertThat;
 class DcSpanUtilCoverageTest {
 
     @Test
-    void detectsServiceEntrySpan() {
+    void detectsServiceEntrySpanByIsInOnly() {
         DcSpan entry = new DcSpan();
         entry.parent_id = "0";
         entry.isIn = 1;
         assertThat(DcSpanUtil.isServiceEntrySpan(entry)).isTrue();
 
+        DcSpan rootOutbound = new DcSpan();
+        rootOutbound.parent_id = "";
+        rootOutbound.isIn = 0;
+        rootOutbound.isOut = 1;
+        assertThat(DcSpanUtil.isServiceEntrySpan(rootOutbound)).isFalse();
+
         DcSpan child = new DcSpan();
         child.parent_id = "parent";
         assertThat(DcSpanUtil.isServiceEntrySpan(child)).isFalse();
+
+        DcSpan inboundChild = new DcSpan();
+        inboundChild.parent_id = "parent";
+        inboundChild.isIn = 1;
+        assertThat(DcSpanUtil.isServiceEntrySpan(inboundChild)).isTrue();
+    }
+
+    @Test
+    void outboundRootRpcDoesNotWriteServiceMetric() {
+        DcSpan span = new DcSpan();
+        span.parent_id = "";
+        span.is_parent = 1;
+        span.isIn = 0;
+        span.isOut = 1;
+        span.type = "SPAN_KIND_CLIENT";
+        span.service = "fraud-detection";
+        span.serviceId = "fd";
+        span.serviceInstance = "i1";
+        span.resource = "flagd.evaluation.v1.Service/EventStream";
+        span.name = span.resource;
+        span.duration = 600_000_000_000L;
+        span.start = 1L;
+        span.end = span.start + span.duration;
+        span.meta = "{\"rpc.system\":\"grpc\",\"rpc.method\":\"EventStream\"}";
+
+        assertThat(DcSpanUtil.parseSpanData(span).stream().map(OptimizedMetric::measurement))
+                .contains("service.rpc")
+                .doesNotContain("service");
     }
 
     @Test

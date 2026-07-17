@@ -75,12 +75,18 @@ export default class SpanInfo extends Vue {
       const normalizeDirection = (value: any): number => Number(value) === 1 ? 1 : 0
       this.lastHourDuration.fromTime = dayjs(+toTime  - 3600 * 1000).format('YYYY-MM-DD HH:mm:ss')
       this.lastHourDuration.toTime = dayjs(toTime).format('YYYY-MM-DD HH:mm:ss')
+      const startMs = this.toEpochMillis(newVal._start || newVal.start || newVal.startTime)
+      const endMs = this.toEpochMillis(newVal.endTime || newVal.end)
+        || (startMs && newVal.duration
+          ? startMs + Math.ceil(Number(newVal.duration) / 1_000_000)
+          : 0)
       this.spanInfo = {
         ...newVal,
         isIn: newVal._isInBac !== undefined ? normalizeDirection(newVal._isInBac) : normalizeDirection(newVal.isIn),
         isOut: normalizeDirection(newVal.isOut),
         duration: newVal.duration || 0,
-        startTime: +(`${newVal._start || ''}`).substring(0, 13),
+        startTime: startMs,
+        endTime: endMs,
       }
 
       // 没有性能剖析，切换到tags
@@ -134,6 +140,25 @@ export default class SpanInfo extends Vue {
     } else {
       this.expandedKeys.push(key)
     }
+  }
+
+  /** Normalize portal start/end fields (ms string/number, or ns) to epoch millis. */
+  private toEpochMillis (value: any): number {
+    if (value == null || value === '') {
+      return 0
+    }
+    if (typeof value === 'number') {
+      return value > 1_000_000_000_000_000 ? Math.floor(value / 1_000_000) : value
+    }
+    const text = String(value).trim()
+    if (!text) {
+      return 0
+    }
+    if (text.length > 13) {
+      return Math.floor(+text.substring(0, 13))
+    }
+    const num = +text
+    return Number.isFinite(num) ? num : 0
   }
 
 }

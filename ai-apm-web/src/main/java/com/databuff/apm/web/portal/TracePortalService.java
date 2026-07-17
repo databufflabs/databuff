@@ -1176,7 +1176,8 @@ public class TracePortalService {
         row.put("type", portalDisplay.typeIcon());
         row.put("start", String.valueOf(startMs));
         row.put("startNs", startNs);
-        row.put("end", String.valueOf(startMs + (long) Math.ceil(durationNs / 1_000_000.0)));
+        long endMs = startMs + (long) Math.ceil(durationNs / 1_000_000.0);
+        row.put("end", String.valueOf(endMs));
         row.put("relativeTime", relativeTime);
         row.put("duration", durationNs);
         row.put("exectime", durationNs);
@@ -1189,6 +1190,7 @@ public class TracePortalService {
         row.put("metrics", metrics);
         row.put("_start", String.valueOf(startMs));
         row.put("startTime", startMs);
+        row.put("endTime", endMs);
         if (span.metaHttpStatusCode() != null) {
             row.put("metaHttpStatusCode", span.metaHttpStatusCode());
         }

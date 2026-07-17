@@ -368,6 +368,21 @@ export default class SpanDetail extends Vue {
       // 以relativeTime排序，最早的排在最前，导致图表无法正常绘制
       data.sort((a: any, b: any) => a.relativeTime - b.relativeTime)
 
+      // 自身耗时 = duration - 直接子 span duration 之和
+      const childDurationSum = new Map<string, number>()
+      data.forEach((item: any) => {
+        const parentId = `${item.parent_id || '0'}`
+        if (!parentId || parentId === '0') {
+          return
+        }
+        childDurationSum.set(parentId, (childDurationSum.get(parentId) || 0) + (Number(item.duration) || 0))
+      })
+      data.forEach((item: any) => {
+        const duration = Number(item.duration) || 0
+        const childSum = childDurationSum.get(item.span_id) || 0
+        item.exectime = Math.max(0, duration - childSum)
+      })
+
       const _data =  deepClone(data);
 
       // 所有的parentId
@@ -385,10 +400,8 @@ export default class SpanDetail extends Vue {
         parents = data.filter(item => subLostParentIds.indexOf(item.parent_id) > -1)
       }
 
-      // 总耗时
+      // 总耗时（整条 Trace 墙钟时间）
       const totalDuration = Number(max(data, (d: any) => d.relativeTime + d.duration));
-      // 总执行时间
-      const totalExectime = data.reduce((prev: any, curr: any) => prev + curr.exectime, 0);
       const [parentItem] = parents
       if (parentItem) {
         this.traceInfo = {
@@ -397,19 +410,19 @@ export default class SpanDetail extends Vue {
           service: parentItem.service,
           startTime: +(parentItem._start || '').substring(0, 13),
           duration: totalDuration,
-          exectime: totalExectime,
+          exectime: totalDuration,
         }
       }
 
       // 所有的服务名称
       const services = Array.from(new Set(data.map(item => item.service)));
-      // 服务的执行占比
-      this.serviceInfoList = services.map((service, index) => {
+      // 服务执行占比：该服务自身耗时之和 / 总耗时
+      this.serviceInfoList = services.map((service) => {
         const list: any[] = data.filter((d: any) => d.service === service);
-        const exectime: number = list.reduce((prev: any, curr: any) => prev + curr.exectime, 0)
+        const selfSum: number = list.reduce((prev: any, curr: any) => prev + (Number(curr.exectime) || 0), 0)
         return {
           key: service,
-          value: totalExectime ? exectime / totalExectime : '-',
+          value: totalDuration ? selfSum / totalDuration : '-',
         }
       }).sort((a: any, b: any) => b.value - a.value);
 

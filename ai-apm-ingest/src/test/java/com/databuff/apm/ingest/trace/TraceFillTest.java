@@ -89,6 +89,9 @@ class TraceFillTest {
     @Test
     void sameServiceChildDoesNotMarkInbound() throws Exception {
         DcSpan root = span("trace-7", "root", "", "billing");
+        root.type = "SPAN_KIND_SERVER";
+        root.metaHttpMethod = "GET";
+        root.metaHttpStatusCode = 200;
         DcSpan child = span("trace-7", "child", "root", "billing");
         child.metaHttpMethod = "GET";
         child.metaHttpStatusCode = 200;

@@ -131,6 +131,7 @@ class DcSpanUtilTest {
         span.srcService = "checkout";
         span.srcServiceId = "svc";
         span.srcServiceInstance = "inst-1";
+        span.isIn = 1;
         span.error = 1;
         span.metaErrorType = "SQLException";
 
@@ -188,6 +189,7 @@ class DcSpanUtilTest {
     @Test
     void emitsServiceExceptionForErrorSpan() {
         DcSpan span = baseSpan();
+        span.isIn = 1;
         span.error = 1;
         span.metaHttpStatusCode = 500;
         Assertions.assertThat(DcSpanUtil.parseSpanData(span).stream().map(OptimizedMetric::measurement))
@@ -200,6 +202,7 @@ class DcSpanUtilTest {
         DcSpan span = baseSpan();
         span.type = "SPAN_KIND_SERVER";
         span.parent_id = "";
+        span.isIn = 1;
         span.error = 1;
         span.resource = "GET /api/orders/10001";
         span.name = "GET /api/orders/10001";

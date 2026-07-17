@@ -35,11 +35,13 @@ import ExpandDialog from './expand-dialog.vue';
 type InfoItem = {
   key: string;
   label: string;
+  labelKey?: string;
   value: string | string[];
 }
 
 type Info = {
   title: string;
+  titleKey?: string;
   list: InfoItem[];
 }
 

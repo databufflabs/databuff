@@ -59,13 +59,11 @@ export default class ServiceManageList extends Vue {
   }
 
   private formatData (data: any[]) {
-    const formatItem = (list: any[], total: number) => {
-      // 总耗时
+    const formatItem = (list: any[], totalDuration: number) => {
       const duration = list.reduce((prev: any, curr: any) => prev + curr.duration, 0);
-      // 执行时间
-      const exectime = list.reduce((prev: any, curr: any) => prev + curr.exectime, 0);
-      // 执行占比
-      const exectimePct = total ? exectime / total : '-';
+      const exectime = list.reduce((prev: any, curr: any) => prev + (Number(curr.exectime) || 0), 0);
+      // 执行占比 = 自身汇总 / 总耗时
+      const exectimePct = totalDuration ? exectime / totalDuration : '-';
       return {
         id: uuidv4(),
         duration,
@@ -74,17 +72,23 @@ export default class ServiceManageList extends Vue {
       }
     }
 
-    const totalExectime = this.totalExectime;
-    const _data = data.map(item => ({
-      id: uuidv4(),
-      name: item.resource,
-      service: item.service,
-      resource: item.resource,
-      error: item.error,
-      duration: item.duration || 0,
-      exectime: item.exectime || 0,
-      exectimePct: totalExectime ? (item.exectime || 0) / totalExectime : '-',
-    })).sort((a: any, b: any) => b.exectime - a.exectime);
+    const totalDuration = Number(this.totalExectime) || 0;
+    const _data = data.map(item => {
+      const duration = Number(item.duration) || 0
+      const exectime = Number.isFinite(Number(item.exectime)) ? Number(item.exectime) : duration
+      return {
+        id: uuidv4(),
+        name: item.resource,
+        service: item.service,
+        resource: item.resource,
+        error: item.error,
+        duration,
+        exectime,
+        // 执行占比 = 自身 / 总耗时
+        exectimePct: totalDuration ? exectime / totalDuration : '-',
+        span_id: item.span_id,
+      }
+    }).sort((a: any, b: any) => b.exectime - a.exectime);
 
     // 所有的服务名称
     const services: string[] = Array.from(new Set(_data.map(item => item.service)));
@@ -103,7 +107,7 @@ export default class ServiceManageList extends Vue {
         const spanList = list.filter(item => item.resource === resource);
         // 服务
         return {
-          ...formatItem(spanList, totalExectime),
+          ...formatItem(spanList, totalDuration),
           name: resource,
           spanLength: spanList.length,
           children: spanList,
@@ -114,7 +118,7 @@ export default class ServiceManageList extends Vue {
       const serviceSpanLength = resourceList.reduce((prev: any, curr: any) => prev + curr.spanLength, 0);
       // 服务
       return {
-        ...formatItem(resourceList, totalExectime),
+        ...formatItem(resourceList, totalDuration),
         name: service,
         spanLength: serviceSpanLength,
         children: resourceList,

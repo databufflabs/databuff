@@ -64,6 +64,7 @@ class SerdeRoundTripTest {
     void spanMetricExtraction() {
         DcSpan span = sampleSpan();
         span.type = "SPAN_KIND_SERVER";
+        span.isIn = 1;
         List<OptimizedMetric> metrics = DcSpanUtil.parseSpanData(span);
         assertThat(metrics).hasSize(3);
         assertThat(metrics.get(0).measurement()).isEqualTo("service");
@@ -75,6 +76,7 @@ class SerdeRoundTripTest {
     void spanMetricExtractionIncludesServiceHttpTags() {
         DcSpan span = sampleSpan();
         span.type = "SPAN_KIND_SERVER";
+        span.isIn = 1;
         span.metaHttpUrl = "/api/cart";
         OptimizedMetric http = DcSpanUtil.parseSpanData(span).stream()
                 .filter(m -> "service.http".equals(m.measurement()))
@@ -152,6 +154,7 @@ class SerdeRoundTripTest {
     void spanMetricExtractionIncludesServiceFlow() {
         DcSpan span = sampleSpan();
         span.type = "SPAN_KIND_SERVER";
+        span.isIn = 1;
         span.srcService = "gateway";
         span.srcServiceId = "gw";
         span.dstService = "checkout";
