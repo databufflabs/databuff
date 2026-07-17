@@ -3,38 +3,16 @@ package com.databuff.apm.common.storage;
 import com.databuff.apm.common.time.ApmTimeZones;
 import com.databuff.apm.common.util.PortalServiceIdResolver;
 
-import java.time.Instant;
 import java.time.format.DateTimeParseException;
 import java.util.List;
 
 public final class MetricQueryBuilder {
-
-    /** Portal {@code fromTime}/{@code toTime} and Doris {@code startTime} use Shanghai wall-clock text. */
-    private static final java.time.format.DateTimeFormatter SPAN_DATETIME = ApmTimeZones.WALL_CLOCK;
 
     /** Doris stores span duration in nanoseconds; API exposes average latency in milliseconds. */
     private static final String AVG_DURATION_MS_EXPR =
             "SUM(`sumDuration`) / NULLIF(SUM(`cnt`), 0) / 1000000";
 
     private MetricQueryBuilder() {
-    }
-
-    private static String spanTimeFrom(long fromMillis) {
-        return SPAN_DATETIME.format(Instant.ofEpochMilli(fromMillis));
-    }
-
-    private static String spanTimeTo(long toMillis) {
-        return SPAN_DATETIME.format(Instant.ofEpochMilli(toMillis));
-    }
-
-    private static String resolveSpanTimeFrom(long fromMillis, String fromTimeText) {
-        String literal = normalizeSpanTimeText(fromTimeText);
-        return literal != null ? literal : spanTimeFrom(fromMillis);
-    }
-
-    private static String resolveSpanTimeTo(long toMillis, String toTimeText) {
-        String literal = normalizeSpanTimeText(toTimeText);
-        return literal != null ? literal : spanTimeTo(toMillis);
     }
 
     private static long resolveSpanTimeFromMillis(long fromMillis, String fromTimeText) {
@@ -58,24 +36,30 @@ public final class MetricQueryBuilder {
             "(FLOOR(`end` / 1000000 / 60000) * 60000)";
 
     /**
-     * Trace overview ({@code is_parent=1}) charts bucket by span end minute; drill-down list must match.
-     * Other span lists keep {@code startTime} wall-clock bounds.
+     * All span lists / drill-downs bucket by span end minute to stay consistent with
+     * {@code metric_service_*} (whose {@code ts} is the span end-minute bucket, see
+     * {@link com.databuff.apm.common.metric.TraceMetricMinuteBucket#minuteBucketEpochMsFromEndNanos}).
+     * Bucketing by {@code startTime} drifts off the metric chart for long-lived spans
+     * (e.g. streaming RPC {@code EventStream}).
      */
+    private static String spanEndBucketTimeWhere(
+            long fromMillis,
+            long toMillis,
+            String fromTimeText,
+            String toTimeText) {
+        long from = resolveSpanTimeFromMillis(fromMillis, fromTimeText);
+        long to = resolveSpanTimeToMillis(toMillis, toTimeText);
+        return SPAN_END_MINUTE_BUCKET_MS_EXPR + " >= " + from
+                + " AND " + SPAN_END_MINUTE_BUCKET_MS_EXPR + " < " + to;
+    }
+
     private static String spanListTimeWhere(
             long fromMillis,
             long toMillis,
             String fromTimeText,
             String toTimeText,
             Integer isParent) {
-        if (isParent != null && isParent == 1) {
-            long from = resolveSpanTimeFromMillis(fromMillis, fromTimeText);
-            long to = resolveSpanTimeToMillis(toMillis, toTimeText);
-            return SPAN_END_MINUTE_BUCKET_MS_EXPR + " >= " + from
-                    + " AND " + SPAN_END_MINUTE_BUCKET_MS_EXPR + " < " + to;
-        }
-        String from = resolveSpanTimeFrom(fromMillis, fromTimeText);
-        String to = resolveSpanTimeTo(toMillis, toTimeText);
-        return "`startTime` >= '" + from + "' AND `startTime` <= '" + to + "'";
+        return spanEndBucketTimeWhere(fromMillis, toMillis, fromTimeText, toTimeText);
     }
 
     private static String normalizeSpanTimeText(String text) {
@@ -288,8 +272,7 @@ public final class MetricQueryBuilder {
             String sortOrder,
             String resourceExact,
             String exceptionContains) {
-        String from = resolveSpanTimeFrom(fromMillis, fromTimeText);
-        String to = resolveSpanTimeTo(toMillis, toTimeText);
+        String timeWhere = spanEndBucketTimeWhere(fromMillis, toMillis, fromTimeText, toTimeText);
         String filters = buildTraceErrorSpanListServiceFilter(serviceKeys, virtualServiceFilter)
                 + appendSpanListDetailFilters(resourceExact, null, 1)
                 + appendErrorSpanExceptionFilter(exceptionContains);
@@ -306,14 +289,13 @@ public final class MetricQueryBuilder {
                        `meta.error.type` AS meta_error_type,
                        COALESCE(`meta.http.url`, '') AS meta_http_url
                 FROM %s.`trace_dc_span`
-                WHERE `startTime` >= '%s' AND `startTime` <= '%s'
+                WHERE %s
                 %s
                 ORDER BY %s %s
                 LIMIT %d OFFSET %d
                 """.formatted(
                 database,
-                from,
-                to,
+                timeWhere,
                 filters,
                 spanListOrderColumn(sortField),
                 spanListOrderDirection(sortOrder),
@@ -331,17 +313,16 @@ public final class MetricQueryBuilder {
             String toTimeText,
             String resourceExact,
             String exceptionContains) {
-        String from = resolveSpanTimeFrom(fromMillis, fromTimeText);
-        String to = resolveSpanTimeTo(toMillis, toTimeText);
+        String timeWhere = spanEndBucketTimeWhere(fromMillis, toMillis, fromTimeText, toTimeText);
         String filters = buildTraceErrorSpanListServiceFilter(serviceKeys, virtualServiceFilter)
                 + appendSpanListDetailFilters(resourceExact, null, 1)
                 + appendErrorSpanExceptionFilter(exceptionContains);
         return """
                 SELECT COUNT(*) AS total_cnt
                 FROM %s.`trace_dc_span`
-                WHERE `startTime` >= '%s' AND `startTime` <= '%s'
+                WHERE %s
                 %s
-                """.formatted(database, from, to, filters);
+                """.formatted(database, timeWhere, filters);
     }
 
     static String buildTraceErrorSpanListServiceFilter(
@@ -2848,8 +2829,7 @@ public final class MetricQueryBuilder {
             String serviceInstance,
             String resourceContains,
             String exceptionContains) {
-        String from = spanTimeFrom(fromMillis);
-        String to = spanTimeTo(toMillis);
+        String timeWhere = spanEndBucketTimeWhere(fromMillis, toMillis, null, null);
         String groupColumn = switch (groupBy) {
             case "serviceId" -> "COALESCE(NULLIF(`serviceId`, ''), `service`)";
             case "serviceInstance" -> "COALESCE(NULLIF(`serviceInstance`, ''), `hostName`)";
@@ -2866,13 +2846,13 @@ public final class MetricQueryBuilder {
                            COALESCE(NULLIF(`serviceInstance`, ''), `hostName`) AS service_instance,
                            COUNT(*) AS err_cnt
                     FROM %s.`trace_dc_span`
-                    WHERE `startTime` >= '%s' AND `startTime` <= '%s'
+                    WHERE %s
                     %s
                     GROUP BY COALESCE(NULLIF(`serviceId`, ''), `service`),
                              COALESCE(NULLIF(`serviceInstance`, ''), `hostName`)
                     ORDER BY err_cnt DESC
                     LIMIT 500
-                    """.formatted(database, from, to, filters);
+                    """.formatted(database, timeWhere, filters);
         }
         String groupAlias = switch (groupBy) {
             case "serviceId" -> "service_id";
@@ -2886,12 +2866,12 @@ public final class MetricQueryBuilder {
                 SELECT %s AS %s,
                        COUNT(*) AS err_cnt
                 FROM %s.`trace_dc_span`
-                WHERE `startTime` >= '%s' AND `startTime` <= '%s'
+                WHERE %s
                 %s
                 GROUP BY %s
                 ORDER BY err_cnt DESC
                 LIMIT 500
-                """.formatted(groupColumn, groupAlias, database, from, to, filters, groupColumn);
+                """.formatted(groupColumn, groupAlias, database, timeWhere, filters, groupColumn);
     }
 
     private static StringBuilder spanExceptionFilters(
@@ -3842,12 +3822,11 @@ public final class MetricQueryBuilder {
         return """
                 SELECT COUNT(*) AS total_cnt
                 FROM %s.`trace_dc_span`
-                WHERE `startTime` >= '%s' AND `startTime` <= '%s'
+                WHERE %s
                 %s
                 """.formatted(
                 database,
-                resolveSpanTimeFrom(fromMillis, fromTimeText),
-                resolveSpanTimeTo(toMillis, toTimeText),
+                spanEndBucketTimeWhere(fromMillis, toMillis, fromTimeText, toTimeText),
                 callSpanFilters(
                         serviceId,
                         serviceInstance,
@@ -3914,15 +3893,14 @@ public final class MetricQueryBuilder {
         return """
                 SELECT %s
                 FROM %s.`trace_dc_span`
-                WHERE `startTime` >= '%s' AND `startTime` <= '%s'
+                WHERE %s
                 %s
                 ORDER BY %s %s
                 LIMIT %d OFFSET %d
                 """.formatted(
                 CALL_SPAN_COLUMNS,
                 database,
-                resolveSpanTimeFrom(fromMillis, fromTimeText),
-                resolveSpanTimeTo(toMillis, toTimeText),
+                spanEndBucketTimeWhere(fromMillis, toMillis, fromTimeText, toTimeText),
                 callSpanFilters(
                         serviceId,
                         serviceInstance,
@@ -3974,15 +3952,14 @@ public final class MetricQueryBuilder {
         return """
                 SELECT %s
                 FROM %s.`trace_dc_span`
-                WHERE `startTime` >= '%s' AND `startTime` <= '%s'
+                WHERE %s
                   AND `parent_id` IN (%s)
                   AND `isIn` = 1
                 %s
                 """.formatted(
                 CALL_SPAN_COLUMNS,
                 database,
-                resolveSpanTimeFrom(fromMillis, fromTimeText),
-                resolveSpanTimeTo(toMillis, toTimeText),
+                spanEndBucketTimeWhere(fromMillis, toMillis, fromTimeText, toTimeText),
                 inClause,
                 serviceFilter);
     }

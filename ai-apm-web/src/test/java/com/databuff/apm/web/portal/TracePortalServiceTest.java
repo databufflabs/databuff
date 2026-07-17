@@ -716,8 +716,9 @@ class TracePortalServiceTest {
             assertThat(sql).contains("`dstServiceId` = 'dad537de7e10e098'");
             assertThat(sql).contains("`srcServiceId` = '9bf61532d56eb7b5'");
             assertThat(sql).contains("db.statement");
-            assertThat(sql).contains(">= '2026-06-05 21:37:00'");
-            assertThat(sql).contains("<= '2026-06-05 21:38:00'");
+            assertThat(sql).contains("(FLOOR(`end` / 1000000 / 60000) * 60000) >= ");
+            assertThat(sql).contains("(FLOOR(`end` / 1000000 / 60000) * 60000) < ");
+            assertThat(sql).doesNotContain("`startTime` >=");
             return 1L;
         });
         ApmQueryModels.CallSpanRow dbSpan =

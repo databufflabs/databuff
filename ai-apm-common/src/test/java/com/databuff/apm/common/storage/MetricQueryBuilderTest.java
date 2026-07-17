@@ -122,10 +122,35 @@ class MetricQueryBuilderTest {
                 "desc",
                 50,
                 0);
-        assertThat(sql).contains(">= '2026-06-05 22:10:00'");
-        assertThat(sql).contains("<= '2026-06-05 22:11:00'");
+        assertThat(sql).contains("(FLOOR(`end` / 1000000 / 60000) * 60000) >= ");
+        assertThat(sql).contains("(FLOOR(`end` / 1000000 / 60000) * 60000) < ");
+        assertThat(sql).doesNotContain("`startTime` >=");
         assertThat(sql).contains("$.\"" + "db.statement" + "\"");
         assertThat(sql).contains("$.\"" + "db.system" + "\"");
+    }
+
+    @Test
+    void callSpanListSqlBucketsBySpanEndMinuteForLongLivedSpans() {
+        // Long-lived streaming RPC (e.g. flagd EventStream) starts outside the clicked
+        // metric bucket but ends inside it; metric_service_rpc.ts is the span end-minute
+        // bucket, so the drill-down must filter by end minute too, not startTime.
+        long from = ApmTimeZones.wallClockToEpochMilli("2026-07-17 21:12:00");
+        long to = ApmTimeZones.wallClockToEpochMilli("2026-07-17 21:13:00");
+        String sql = MetricQueryBuilder.callSpanListSql(
+                "databuff",
+                from,
+                to,
+                "2026-07-17 21:12:00",
+                "2026-07-17 21:13:00",
+                null, null,
+                "d7ebbef5e400c2c5", null,
+                "26971b8852fe3d63", null,
+                "flagd.evaluation.v1.Service/EventStream", null, null,
+                false, "service.rpc",
+                "start", "desc", 50, 0);
+        assertThat(sql).contains("(FLOOR(`end` / 1000000 / 60000) * 60000) >= " + from);
+        assertThat(sql).contains("(FLOOR(`end` / 1000000 / 60000) * 60000) < " + to);
+        assertThat(sql).doesNotContain("`startTime` >=");
     }
 
     @Test
@@ -144,8 +169,9 @@ class MetricQueryBuilderTest {
                 50,
                 "2026-06-05 14:00:00",
                 "2026-06-05 14:01:00");
-        assertThat(sql).contains(">= '2026-06-05 14:00:00'");
-        assertThat(sql).contains("<= '2026-06-05 14:01:00'");
+        assertThat(sql).contains("(FLOOR(`end` / 1000000 / 60000) * 60000) >= ");
+        assertThat(sql).contains("(FLOOR(`end` / 1000000 / 60000) * 60000) < ");
+        assertThat(sql).doesNotContain("`startTime` >=");
     }
 
     @Test

@@ -76,6 +76,8 @@ class TraceSpanMetricDrilldownServiceTest {
                 null);
 
         verify(reader).querySpanSummaries(argThat(sql ->
-                sql.contains(">= '2026-06-05 14:00:00'") && sql.contains("<= '2026-06-05 14:01:00'")));
+                sql.contains("(FLOOR(`end` / 1000000 / 60000) * 60000) >= ")
+                        && sql.contains("(FLOOR(`end` / 1000000 / 60000) * 60000) < ")
+                        && !sql.contains("`startTime` >=")));
     }
 }
