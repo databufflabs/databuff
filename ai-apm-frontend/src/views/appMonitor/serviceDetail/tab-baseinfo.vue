@@ -79,7 +79,15 @@
               <i></i>
               <span>{{ $t('modules.components.s_295bb704') }}</span>
             </label>
-            <span class="">{{ getLanguage || '-' }}</span>
+            <span v-if="getLanguage && getLanguage !== '-'" class="language-badge">
+              <span
+                v-if="hasLanguageIcon(getLanguage)"
+                class="db-icon language-icon mr-5"
+                :style="{ color: languageIconColor(getLanguage) }"
+              >{{ resolveLanguageIcon(getLanguage) | DbIconFilter }}</span>
+              <span>{{ languageDisplayName(getLanguage) || getLanguage }}</span>
+            </span>
+            <span v-else>-</span>
           </div>
           <div class="attribute-item">
             <label class="attribute-item-label">
@@ -145,6 +153,12 @@ import TagDialog from '@/views/infrastructure/host/tag-dialog.vue';
 import { toAsyncWait } from '@/utils/common';
 import ServiceApi from '@/api/service';
 import ChartTsSlot from '@/views/appMonitor/serviceAnalysis/chart-ts-slot.vue';
+import {
+  hasLanguageIcon,
+  languageDisplayName,
+  languageIconColor,
+  resolveLanguageIcon,
+} from '@/utils/service-language';
 
 const formatChartData = (data: any[], params: any, tagKey?: string) => {
   return data.map((item: any) => ({
@@ -181,6 +195,11 @@ export default class TabBaseinfo extends Vue {
   public $refs!: {
     tagDialog: TagDialog
   }
+
+  private hasLanguageIcon = hasLanguageIcon
+  private languageDisplayName = languageDisplayName
+  private languageIconColor = languageIconColor
+  private resolveLanguageIcon = resolveLanguageIcon
 
   get getEnableStatus () {
     return this.$store.getters['User/getGroupEnabled']
@@ -707,6 +726,14 @@ export default class TabBaseinfo extends Vue {
     flex: none;
     margin-bottom: 12px;
   }
+}
+.language-badge {
+  display: inline-flex;
+  align-items: center;
+}
+.language-icon {
+  font-size: 16px;
+  line-height: 1;
 }
 .system-span {
   display: inline-block;

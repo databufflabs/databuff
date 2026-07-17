@@ -16,9 +16,20 @@
       ref='listTable'>
       <template slot="column-name" slot-scope="{ row }">
         <div class="service-name-item ell blue">
-          <span class="db-icon mr-5 vm">{{ (row.type || row.language || 'default') | DbIconFilter }}</span>
+          <span class="db-icon mr-5 vm">{{ (row.type || 'default') | DbIconFilter }}</span>
           <span @click="showDetailHandle(row)" class="service-name-text cphu ell">{{ row.name || row.service || '-' }}</span>
         </div>
+      </template>
+      <template slot="column-language" slot-scope="{ row }">
+        <span v-if="hasLanguageIcon(row.language) || languageDisplayName(row.language)" class="language-cell">
+          <span
+            v-if="hasLanguageIcon(row.language)"
+            class="db-icon mr-5 vm language-icon"
+            :style="{ color: languageIconColor(row.language) }"
+          >{{ resolveLanguageIcon(row.language) | DbIconFilter }}</span>
+          <span>{{ languageDisplayName(row.language) || row.language || '-' }}</span>
+        </span>
+        <span v-else>-</span>
       </template>
     </db-table>
   </div>
@@ -28,6 +39,12 @@
 import { Vue, Component, Prop } from 'vue-property-decorator'
 import i18n from '@/i18n';
 import ApmApi from '@/api/apm'
+import {
+  hasLanguageIcon,
+  languageDisplayName,
+  languageIconColor,
+  resolveLanguageIcon,
+} from '@/utils/service-language'
 
 @Component({})
 export default class ServiceTable extends Vue {
@@ -36,6 +53,11 @@ export default class ServiceTable extends Vue {
   public $refs!: {
     listTable: any;
   };
+
+  private hasLanguageIcon = hasLanguageIcon
+  private languageDisplayName = languageDisplayName
+  private languageIconColor = languageIconColor
+  private resolveLanguageIcon = resolveLanguageIcon
 
   get tableQueryParams () {
     return {
@@ -47,6 +69,7 @@ export default class ServiceTable extends Vue {
   private columnConfig: any = [
     { field: 'name', label: i18n.t('modules.views.alarmCenter.alarm.s_8f3747c0') as string, labelKey: 'modules.views.alarmCenter.alarm.s_8f3747c0', slot: 'column-name', minWidth: 150 },
     { field: 'service', prop: 'service', label: i18n.t('modules.views.appMonitor.external.s_5c3acce8') as string, labelKey: 'modules.views.appMonitor.external.s_5c3acce8', minWidth: 120, defaultShow: false },
+    { field: 'language', prop: 'language', label: i18n.t('modules.components.s_295bb704') as string, labelKey: 'modules.components.s_295bb704', slot: 'column-language', minWidth: 100, defaultShow: true },
     { field: 'callCnt', prop: 'callCnt', label: i18n.t('modules.views.appMonitor.cache.s_8bc42b53') as string, labelKey: 'modules.views.appMonitor.cache.s_8bc42b53', unit: 'count', minWidth: 100, defaultShow: true, type: 'progress', sortable: true, defaultSort: 'desc', },
     { field: 'reqRate', prop: 'reqRate', label: i18n.t('modules.views.appMonitor.external.s_c0283020') as string, labelKey: 'modules.views.appMonitor.external.s_c0283020', unit: 'count', lessZeroOneKey: 'callCnt', minWidth: 100, defaultShow: true, suffix: i18n.t('modules.views.appMonitor.database.s_40b291ad') as string, type: 'progress', sortable: true },
     { field: 'lastMinReqRate', prop: 'lastMinReqRate', label: i18n.t('modules.views.appMonitor.external.s_ce60910b') as string, labelKey: 'modules.views.appMonitor.external.s_ce60910b', unit: 'count', lessZeroOneKey: 'callCnt', minWidth: 150, defaultShow: false, suffix: i18n.t('modules.views.appMonitor.database.s_40b291ad') as string, type: 'progress', sortable: true },
@@ -60,6 +83,7 @@ export default class ServiceTable extends Vue {
   private columnFetchFieldMap: any = {
     name: ['name', 'service', 'serviceId', 'type', 'language'],
     service: ['service'],
+    language: ['language'],
     callCnt: ['callCnt'],
     reqRate: ['reqRate'],
     lastMinReqRate: ['lastMinReqRate'],
@@ -117,5 +141,14 @@ export default class ServiceTable extends Vue {
 .monitor-event-info-tip {
   margin-bottom: 5px;
   padding-left: 6px;
+}
+.language-icon {
+  font-size: 16px;
+  line-height: 1;
+}
+.language-cell {
+  display: inline-flex;
+  align-items: center;
+  max-width: 100%;
 }
 </style>

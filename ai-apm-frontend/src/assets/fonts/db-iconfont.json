@@ -240,7 +240,7 @@
     {
       "icon_id": "1444812",
       "name": "cpp",
-      "alias": ["cpp"],
+      "alias": ["cpp", "c++", "cplusplus", "c"],
       "font_class": "cpp",
       "unicode": "e7c7",
       "unicode_decimal": 59335
@@ -1329,7 +1329,7 @@
       "icon_id": "24346854",
       "name": "DotNET",
       "font_class": "dotnet",
-      "alias": ["dotnet", "net"],
+      "alias": ["dotnet", "net", "csharp", "c#"],
       "unicode": "e60c",
       "unicode_decimal": 58892
     },
@@ -1641,7 +1641,7 @@
       "icon_id": "11993111",
       "name": "NodeJS",
       "font_class": "nodejs",
-      "alias": ["nodejs", "node"],
+      "alias": ["nodejs", "node", "javascript", "js", "typescript", "ts"],
       "unicode": "e718",
       "unicode_decimal": 59160
     },

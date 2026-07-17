@@ -124,6 +124,7 @@ class ServicePortalServiceTest {
         when(reader.queryServiceSummaries(anyString())).thenReturn(List.of(
                 new ServiceSummaryPoint("demo-order", null, 100, 5, 1_000_000_000, 50_000_000_000L)));
         when(reader.queryDistinctCount(anyString())).thenReturn(1L);
+        when(reader.queryMetaServices(anyString())).thenReturn(List.of());
 
         ServicePortalService service = TestStorageSupport.servicePortalService(reader);
         Map<String, Object> resp = service.list(Map.of(
@@ -138,9 +139,50 @@ class ServicePortalServiceTest {
         assertThat(rows.get(0).get("serviceId")).isEqualTo("464a0a08964a061e");
         assertThat(rows.get(0).get("callCnt")).isEqualTo(100L);
         assertThat(rows.get(0).get("maxLatency")).isEqualTo(50_000_000_000L);
+        assertThat(rows.get(0).get("language")).isEqualTo("");
         assertThat(resp.get("total")).isEqualTo(1L);
         assertThat(resp.get("status")).isEqualTo(200);
         assertThat(resp.get("message")).isEqualTo("SUCCESS");
+    }
+
+    @Test
+    void listEnrichesLanguageFromMetaService() throws Exception {
+        ApmReadRepository reader = mock(ApmReadRepository.class);
+        when(reader.queryServiceSummaries(anyString())).thenReturn(List.of(
+                new ServiceSummaryPoint("demo-order", null, 100, 5, 1_000_000_000, 0)));
+        when(reader.queryDistinctCount(anyString())).thenReturn(1L);
+        when(reader.queryMetaServices(anyString())).thenReturn(List.of(
+                new ApmQueryModels.MetaServicePoint(
+                        "464a0a08964a061e",
+                        "Order Service",
+                        "demo-order",
+                        "web",
+                        null,
+                        "web",
+                        "jvm",
+                        "java",
+                        "OTLP",
+                        "k8s",
+                        null,
+                        null,
+                        false,
+                        null,
+                        null,
+                        "OpenJDK",
+                        "17")));
+
+        ServicePortalService service = TestStorageSupport.servicePortalService(reader);
+        Map<String, Object> resp = service.list(Map.of(
+                "fromTime", "2026-06-04 11:00:00",
+                "toTime", "2026-06-04 12:00:00",
+                "offset", 0,
+                "size", 20));
+
+        @SuppressWarnings("unchecked")
+        List<Map<String, Object>> rows = (List<Map<String, Object>>) resp.get("data");
+        assertThat(rows).hasSize(1);
+        assertThat(rows.get(0).get("language")).isEqualTo("java");
+        assertThat(rows.get(0).get("type")).isEqualTo("web");
     }
 
     @Test

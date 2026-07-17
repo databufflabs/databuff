@@ -63,4 +63,28 @@ class MetaServiceRegistryTest {
         String json = new String(writer.flushAll().get(0));
         assertThat(json).contains("\"name\":\"New Name\"");
     }
+
+    @Test
+    void stagesUpdateWhenLanguageAppearsFromEmpty() throws Exception {
+        ApmReadRepository reader = mock(ApmReadRepository.class);
+        when(reader.queryMetaServices(anyString())).thenReturn(List.of(
+                MetaServicePoint.minimal("svc-1", "checkout")));
+        registry = new MetaServiceRegistry(reader, "databuff", 60_000L);
+        registry.start();
+
+        registry.remember(MetaServiceInfo.fromNames(
+                "svc-1",
+                "checkout",
+                "checkout",
+                java.util.Map.of(
+                        "telemetry.sdk.language", "java",
+                        "process.runtime.name", "OpenJDK",
+                        "process.runtime.version", "17"),
+                false));
+        DorisBatchWriter writer = new DorisBatchWriter(8);
+        assertThat(registry.stagePending(writer)).isEqualTo(1);
+        String json = new String(writer.flushAll().get(0));
+        assertThat(json).contains("\"language\":\"java\"");
+        assertThat(json).contains("\"technology\":\"jvm\"");
+    }
 }

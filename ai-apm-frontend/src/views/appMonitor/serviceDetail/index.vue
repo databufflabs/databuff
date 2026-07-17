@@ -6,9 +6,12 @@
         <div class="comp-header-title flex-h">
           <span v-if='!hasEventCnt' class="bg-green text-white p-5 line-height-1 font-12 br-2 mr-10">{{ $t('modules.components.db-table.s_fd6e80f1') }}</span>
           <span v-if='hasEventCnt' class="bg-red text-white p-5 line-height-1 font-12 br-2 mr-10">{{ $t('modules.components.db-table.s_c195df63') }}</span>
-          <span class="db-icon mr-5 font-14">{{ getServiceType | DbIconFilter }}</span>
+          <span
+            class="db-icon mr-5 font-16 service-header-icon"
+            :class="{ 'is-language': hasLanguageIcon(serviceDetail.language) }"
+            :style="serviceHeaderIconStyle"
+          >{{ getServiceType | DbIconFilter }}</span>
           <span class="font-16 fw-500 mr-10">{{ serviceDetail.name || serviceDetail.service || '-' }}</span>
-          <span @click.stop="editNameHandle(serviceDetail.name)" class="el-icon-edit font-14 db-blue cp"></span>
         </div>
         <div class="comp-header-action">
           <el-button type="primary" size="small" @click="viewAnalysisHandle">
@@ -49,11 +52,14 @@ import TabThreadpool from './tab-threadpool.vue';
 import TabSql from './tab-sql.vue';
 import TabLog from './tab-log.vue';
 import TabNetwork from './tab-network.vue';
-import { serviceNameNewReg2 } from '@/utils/regexp';
-import ServiceApi from '@/api/service';
 import ApmApi from '@/api/apm';
 import { toAsyncWait } from '@/utils/common';
 import { Getter } from 'vuex-class';
+import {
+  hasLanguageIcon,
+  languageIconColor,
+  resolveServiceDisplayIcon,
+} from '@/utils/service-language';
 
 @Component({
   components: {
@@ -70,6 +76,8 @@ import { Getter } from 'vuex-class';
 })
 export default class ServiceDetail extends Vue {
   @Getter('User/hasNetworkMenu') public hasNetworkMenu!: boolean;
+
+  private hasLanguageIcon = hasLanguageIcon
 
   // 监听上下游服务点击事件，重新获取服务详情
   @Watch('$route.query.sid')
@@ -132,7 +140,17 @@ export default class ServiceDetail extends Vue {
   private tabStatus: any[] = [];
 
   get getServiceType () {
-    return this.serviceDetail?.type || this.serviceDetail?.language || this.serviceDetail?.service_type || 'default';
+    return resolveServiceDisplayIcon(
+      this.serviceDetail?.type || this.serviceDetail?.service_type,
+      this.serviceDetail?.language,
+    )
+  }
+
+  get serviceHeaderIconStyle () {
+    if (!hasLanguageIcon(this.serviceDetail?.language)) {
+      return {}
+    }
+    return { color: languageIconColor(this.serviceDetail.language) }
   }
 
   get hasEventCnt () {
@@ -249,71 +267,6 @@ export default class ServiceDetail extends Vue {
     }
   }
 
-  // 服务改名
-  private editNameHandle (serviceName: any) {
-    this.$prompt(i18n.t('modules.views.appMonitor.service.s_1d13d01c', { value0: serviceName }) as string, i18n.t('modules.views.appMonitor.service.s_4fbb4d92') as string, {
-      customClass: 'edit-prompt-cont',
-      confirmButtonText: i18n.t('modules.views.alarmCenter.alarmDetail.s_38cf16f2') as string, confirmButtonTextKey: 'modules.views.alarmCenter.alarmDetail.s_38cf16f2',
-      cancelButtonText: i18n.t('modules.views.appMonitor.service.s_625fb26b') as string, cancelButtonTextKey: 'modules.views.appMonitor.service.s_625fb26b',
-      inputValidator: (val) => {
-        if (!val || !(val.trim())) {
-          return i18n.t('modules.views.appMonitor.service.s_56540654') as string
-        }
-        if (val.length > 100 || val.length < 4) {
-          return i18n.t('modules.views.appMonitor.service.s_2da0d8da') as string
-        }
-        if (val && !serviceNameNewReg2.test(val)) {
-          return i18n.t('modules.views.appMonitor.service.s_e90e1153') as string
-        }
-        return true
-      },
-      inputPlaceholder: i18n.t('modules.views.appMonitor.service.s_d314caa1') as string, inputPlaceholderKey: 'modules.views.appMonitor.service.s_d314caa1',
-      showClose: false,
-      beforeClose: (action: string, instance: any, done: any) => {
-        if (action === 'confirm') {
-          instance.confirmButtonLoading = true;
-          instance.confirmButtonText = i18n.t('modules.views.appMonitor.service.s_cf0cffe9') as string;
-          const _params: any = {
-            serviceId: this.serviceDetail?.serviceId,
-            name: instance.inputValue,
-          }
-          // temp 异步
-          ServiceApi.updateServiceName(_params).then((result: any) => {
-            const { status, message = '' } = result
-            if (status === 200 && message.toLowerCase() === 'success') {
-              this.serviceDetail.name = instance.inputValue
-              this.$message.success(i18n.t('modules.views.appMonitor.service.s_55aa6366') as string)
-              done()
-            } else {
-              if (message !== 'interrupt') {
-                this.$message.error(i18n.t('modules.views.appMonitor.service.s_ef74211b') as string)
-              }
-            }
-          })
-          .catch((err: any) => {
-            if (err.message !== 'interrupt') {
-              this.$message.error(i18n.t('modules.views.appMonitor.service.s_ef74211b') as string)
-            }
-          })
-          .finally(() => {
-            instance.confirmButtonText = i18n.t('modules.views.alarmCenter.alarmDetail.s_38cf16f2') as string;
-            instance.confirmButtonLoading = false;
-          })
-        } else {
-          done()
-        }
-      },
-      callback: (action: string, instance: any) => {
-        instance.confirmButtonLoading = false;
-      }
-    }).then(({ value }: any) => {
-      // console.log(value)
-    })
-    .catch((err: any) => {
-      console.log(err)
-    })
-  }
-
   // 查看服务流
   private viewFlowHandle () {
     if (!this.serviceDetail?.serviceId) {
@@ -376,6 +329,10 @@ export default class ServiceDetail extends Vue {
 }
 .comp-header {
   align-items: flex-start;
+}
+.service-header-icon.is-language {
+  font-size: 18px;
+  line-height: 1;
 }
 .comp-body {
   flex: 1;

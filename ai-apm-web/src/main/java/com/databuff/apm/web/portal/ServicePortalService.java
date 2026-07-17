@@ -1202,6 +1202,7 @@ public class ServicePortalService {
         row.put("service", service);
         row.put("service_type", serviceType);
         row.put("type", type);
+        row.put("language", nullToEmpty(point.language()));
         row.put("virtual_service", Boolean.TRUE.equals(point.virtualService()));
         return row;
     }
@@ -1783,6 +1784,7 @@ public class ServicePortalService {
 
         long durationMs = Math.max(1L, to - from);
         double durationSec = durationMs / 1000.0;
+        Map<String, MetaServicePoint> metaById = loadMetaServiceIndex();
         List<Map<String, Object>> rows = new ArrayList<>(summaries.size());
         for (ServiceSummaryPoint summary : summaries) {
             long callCnt = summary.requestCount();
@@ -1792,6 +1794,14 @@ public class ServicePortalService {
             String resolvedId = PortalServiceIdResolver.resolve(summary.serviceId(), summary.service());
             String displayName = summary.service();
             String serviceCategory = inferServiceCategory(displayName);
+            MetaServicePoint meta = resolveMetaPoint(resolvedId, metaById);
+            if (meta == null) {
+                meta = resolveMetaPoint(displayName, metaById);
+            }
+            String language = meta != null ? nullToEmpty(meta.language()) : "";
+            String type = firstNonBlank(
+                    meta != null ? meta.type() : null,
+                    inferServiceTypeIcon(displayName, serviceCategory));
             Map<String, Object> row = new LinkedHashMap<>();
             row.put("serviceId", resolvedId);
             row.put("name", displayName);
@@ -1803,7 +1813,8 @@ public class ServicePortalService {
             row.put("maxLatency", Math.round(summary.maxDurationNs()));
             row.put("reqRate", callCnt / durationSec);
             row.put("lastMinReqRate", (callCnt / durationSec) * 60);
-            row.put("type", inferServiceTypeIcon(displayName, serviceCategory));
+            row.put("type", type);
+            row.put("language", language);
             rows.add(row);
         }
 

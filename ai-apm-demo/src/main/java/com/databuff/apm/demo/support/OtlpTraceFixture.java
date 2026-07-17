@@ -275,7 +275,10 @@ public final class OtlpTraceFixture {
                 .addAttributes(kv("service.name", serviceName))
                 .addAttributes(kv("host.name", hostName))
                 .addAttributes(kv("service.instance.id", instanceId))
-                .addAttributes(kv("k8s.namespace.name", "demo"));
+                .addAttributes(kv("k8s.namespace.name", "demo"))
+                .addAttributes(kv("telemetry.sdk.language", "java"))
+                .addAttributes(kv("process.runtime.name", "OpenJDK Runtime Environment"))
+                .addAttributes(kv("process.runtime.version", "17.0.9"));
     }
 
     private static Span.Builder span(
