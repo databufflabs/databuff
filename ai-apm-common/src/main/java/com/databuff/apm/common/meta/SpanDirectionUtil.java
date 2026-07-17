@@ -42,7 +42,8 @@ public final class SpanDirectionUtil {
             return http;
         }
         if (isRpcSpan(span)) {
-            return kindDirection(span, true, false);
+            // SERVER → isIn, CLIENT → isOut (legacy TRACE_IN_NAMES_RPC / TRACE_OUT_NAMES_RPC).
+            return kindDirection(span, true, true);
         }
         if (isMqSpan(span)) {
             if (isMqConsume(span)) {

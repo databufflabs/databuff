@@ -71,6 +71,30 @@ class SpanDirectionUtilTest {
         assertThat(SpanDirectionUtil.resolve(span)).isEqualTo(SpanDirectionUtil.Direction.NONE);
     }
 
+    @Test
+    void rpcServerKindMarksInbound() {
+        DcSpan span = new DcSpan();
+        span.type = "SPAN_KIND_SERVER";
+        span.meta = "{\"rpc.system\":\"grpc\",\"rpc.service\":\"flagd.evaluation.v1.Service\"}";
+        assertThat(SpanDirectionUtil.resolve(span)).isEqualTo(new SpanDirectionUtil.Direction(1, 0));
+    }
+
+    @Test
+    void rpcClientKindMarksOutbound() {
+        DcSpan span = new DcSpan();
+        span.type = "SPAN_KIND_CLIENT";
+        span.meta = "{\"rpc.system\":\"grpc\",\"rpc.service\":\"flagd.evaluation.v1.Service\"}";
+        assertThat(SpanDirectionUtil.resolve(span)).isEqualTo(new SpanDirectionUtil.Direction(0, 1));
+    }
+
+    @Test
+    void dubboClientKindMarksOutbound() {
+        DcSpan span = new DcSpan();
+        span.type = "SPAN_KIND_CLIENT";
+        span.meta = "{\"rpc.system\":\"dubbo\",\"rpc.method\":\"findInventory\"}";
+        assertThat(SpanDirectionUtil.resolve(span)).isEqualTo(new SpanDirectionUtil.Direction(0, 1));
+    }
+
     private static DcSpan httpSpan(String name, String kind) {
         DcSpan span = new DcSpan();
         span.name = name;

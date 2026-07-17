@@ -169,6 +169,14 @@ class TraceFillTest {
         FillPathAndRelationUtil.fillRelations(spans);
         assertThat(httpClient.dstService).isEqualTo("service-b");
         assertThat(dubboClient.dstService).isEqualTo("service-b");
+        assertThat(OtelAttributeMaps.firstNonBlank(OtelAttributeMaps.parse(httpClient), "server.service"))
+                .isEqualTo("service-b");
+        assertThat(OtelAttributeMaps.firstNonBlank(OtelAttributeMaps.parse(dubboClient), "server.service"))
+                .isEqualTo("service-b");
+        assertThat(OtelAttributeMaps.firstNonBlank(OtelAttributeMaps.parse(httpServer), "client.service"))
+                .isEqualTo("service-a");
+        assertThat(OtelAttributeMaps.firstNonBlank(OtelAttributeMaps.parse(dubboServer), "client.service"))
+                .isEqualTo("service-a");
         TraceFillProcessor.FillResult result = new TraceFillProcessor().processTrace(spans);
 
         long serviceACnt = result.metrics().stream()
@@ -482,6 +490,41 @@ class TraceFillTest {
         } finally {
             buffer.close();
         }
+    }
+
+    @Test
+    void rootGrpcClientGetsOutboundDirectionAndServerPeerMeta() {
+        DcSpan client = span("trace-grpc-root", "client", "", "fraud-detection");
+        client.type = "SPAN_KIND_CLIENT";
+        client.serviceInstance = "04a51076-5d42-4d91-a699-9375590ad835";
+        client.resource = "flagd.evaluation.v1.Service/EventStream";
+        client.name = "flagd.evaluation.v1.Service/EventStream";
+        client.meta = "{\"rpc.system\":\"grpc\",\"rpc.service\":\"flagd.evaluation.v1.Service\","
+                + "\"rpc.method\":\"EventStream\",\"server.address\":\"flagd\","
+                + "\"network.peer.address\":\"172.20.0.8\"}";
+
+        DcSpan server = span("trace-grpc-root", "server", "client", "flagd");
+        server.type = "SPAN_KIND_SERVER";
+        server.serviceInstance = "";
+        server.resource = "flagd.evaluation.v1.Service/EventStream";
+        server.name = "flagd.evaluation.v1.Service/EventStream";
+        server.meta = "{\"rpc.system\":\"grpc\",\"rpc.service\":\"flagd.evaluation.v1.Service\","
+                + "\"rpc.method\":\"EventStream\",\"net.peer.name\":\"172.20.0.21\"}";
+
+        FillPathAndRelationUtil.fillRelations(List.of(client, server));
+
+        assertThat(client.isOut).isEqualTo(1);
+        assertThat(client.srcService).isNull();
+        assertThat(client.dstService).isEqualTo("flagd");
+        Map<String, String> clientMeta = OtelAttributeMaps.parse(client);
+        assertThat(clientMeta.get("server.service")).isEqualTo("flagd");
+        assertThat(clientMeta.get("server.ip")).isEqualTo("172.20.0.8");
+
+        assertThat(server.isIn).isEqualTo(1);
+        assertThat(server.srcService).isEqualTo("fraud-detection");
+        Map<String, String> serverMeta = OtelAttributeMaps.parse(server);
+        assertThat(serverMeta.get("client.service")).isEqualTo("fraud-detection");
+        assertThat(serverMeta.get("client.ip")).isEqualTo("172.20.0.21");
     }
 
     private static DcSpan span(String traceId, String spanId, String parentId, String service) {

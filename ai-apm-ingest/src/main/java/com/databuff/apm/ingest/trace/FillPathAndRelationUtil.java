@@ -77,6 +77,7 @@ public final class FillPathAndRelationUtil {
                 span.dstService = span.service;
                 span.dstServiceId = span.serviceId;
                 span.dstServiceInstance = span.serviceInstance;
+                writeClientPeerMeta(span, parent);
                 if (!parent.service.equals(span.service)) {
                     span.isIn = 1;
                     parent.isOut = 1;
@@ -175,6 +176,70 @@ public final class FillPathAndRelationUtil {
         client.dstService = service;
         client.dstServiceId = serviceId;
         client.dstServiceInstance = serviceInstance;
+        writeServerPeerMeta(client, service, serviceInstance);
+    }
+
+    /** Persist caller identity on child spans for UI / agent-tag compatibility. */
+    private static void writeClientPeerMeta(DcSpan child, DcSpan parent) {
+        if (child == null || parent == null || parent.service == null || parent.service.isBlank()) {
+            return;
+        }
+        Map<String, String> meta = new LinkedHashMap<>(OtelAttributeMaps.parse(child));
+        boolean changed = false;
+        if (OtelAttributeMaps.firstNonBlank(meta, "client.service") == null) {
+            meta.put("client.service", parent.service.trim());
+            changed = true;
+        }
+        if (OtelAttributeMaps.firstNonBlank(meta, "client.ip") == null) {
+            String clientIp = OtelAttributeMaps.firstNonBlank(
+                    meta, "net.peer.name", "network.peer.address", "client.address");
+            if (clientIp != null) {
+                meta.put("client.ip", clientIp);
+                changed = true;
+            }
+        }
+        if (changed) {
+            OtelAttributeMaps.replace(child, meta);
+        }
+    }
+
+    /**
+     * Persist callee identity on CLIENT spans ({@code server.service}/{@code server.ip}) so portal
+     * outbound detail can read peer info without relying on Databuff-agent-only tags.
+     */
+    private static void writeServerPeerMeta(DcSpan client, String service, String serviceInstance) {
+        if (client == null || service == null || service.isBlank()) {
+            return;
+        }
+        Map<String, String> meta = new LinkedHashMap<>(OtelAttributeMaps.parse(client));
+        boolean changed = false;
+        if (OtelAttributeMaps.firstNonBlank(meta, "server.service") == null) {
+            meta.put("server.service", service.trim());
+            changed = true;
+        }
+        String serverIp = firstNonBlank(
+                serviceInstance,
+                OtelAttributeMaps.firstNonBlank(
+                        meta, "server.ip", "network.peer.address", "server.address", "net.peer.name"));
+        if (serverIp != null && OtelAttributeMaps.firstNonBlank(meta, "server.ip") == null) {
+            meta.put("server.ip", serverIp);
+            changed = true;
+        }
+        if (changed) {
+            OtelAttributeMaps.replace(client, meta);
+        }
+    }
+
+    private static String firstNonBlank(String... values) {
+        if (values == null) {
+            return null;
+        }
+        for (String value : values) {
+            if (value != null && !value.isBlank()) {
+                return value.trim();
+            }
+        }
+        return null;
     }
 
     private static void propagateTraceContext(
