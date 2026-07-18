@@ -55,9 +55,7 @@
 
 ---
 
-<p align="center" id="aiops-roadmap" style="font-size:18px;font-weight:700;margin:8px 0;">AIOps Roadmap: Visible → Legion → Inspect → Diagnose → Repair → Predict → Answer</p>
-
-<p align="center">Read the roadmap first, then expand each step. The full arc is the closed loop of AIOps — from "can see" to "can act" to "can accompany".</p>
+<p align="center" id="aiops-roadmap" style="font-size:24px;font-weight:700;margin:8px 0;">AIOps Roadmap: Visible → Legion → Inspect → Diagnose → Repair → Predict → Answer</p>
 
 <p align="center"><img src="docs/images/screenshots/aiops-arc-en.svg" alt="AIOps 路线图" width="980" /></p>
 
