@@ -1162,7 +1162,8 @@ public final class MetricQueryBuilder {
                        SUM(`cnt`) AS request_cnt,
                        SUM(`error`) AS error_cnt,
                        %s AS slow_cnt,
-                       SUM(`sumDuration`) AS sum_duration_ns
+                       SUM(`sumDuration`) AS sum_duration_ns,
+                       MAX(`maxDuration`) AS max_duration_ns
                 FROM %s.`%s`
                 WHERE %s
                   AND `isIn` = '1'
@@ -1311,7 +1312,8 @@ public final class MetricQueryBuilder {
                        SUM(`cnt`) AS request_cnt,
                        SUM(`error`) AS error_cnt,
                        %s AS slow_cnt,
-                       SUM(`sumDuration`) AS sum_duration_ns
+                       SUM(`sumDuration`) AS sum_duration_ns,
+                       MAX(`maxDuration`) AS max_duration_ns
                 FROM %s.`%s`
                 WHERE %s
                   AND `isIn` = '1'
@@ -1724,6 +1726,7 @@ public final class MetricQueryBuilder {
                        SUM(`cnt`) AS request_cnt,
                        SUM(`error`) AS error_cnt,
                        SUM(`sumDuration`) / NULLIF(SUM(`cnt`), 0) / 1000000 AS avg_duration,
+                       MAX(`maxDuration`) AS max_duration_ns,
                        SUM(`readRows`) AS sum_read_rows,
                        SUM(`updateRows`) AS sum_update_rows
                 FROM %s.`metric_service_db`
@@ -1803,6 +1806,7 @@ public final class MetricQueryBuilder {
                        SUM(`cnt`) AS request_cnt,
                        SUM(`error`) AS error_cnt,
                        SUM(`sumDuration`) / NULLIF(SUM(`cnt`), 0) / 1000000 AS avg_duration,
+                       MAX(`maxDuration`) AS max_duration_ns,
                        %s
                 FROM %s.`%s`
                 WHERE %s
@@ -2390,7 +2394,8 @@ public final class MetricQueryBuilder {
                        `service`, `url`, `httpMethod`, `httpCode`,
                        SUM(`cnt`) AS request_cnt,
                        SUM(`error`) AS error_cnt,
-                       SUM(`sumDuration`) / NULLIF(SUM(`cnt`), 0) / 1000000 AS avg_duration
+                       SUM(`sumDuration`) / NULLIF(SUM(`cnt`), 0) / 1000000 AS avg_duration,
+                       MAX(`maxDuration`) AS max_duration_ns
                 FROM %s.`metric_service_http`
                 WHERE %s
                 %s

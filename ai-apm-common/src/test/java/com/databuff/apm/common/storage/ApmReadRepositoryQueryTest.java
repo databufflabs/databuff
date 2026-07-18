@@ -73,6 +73,22 @@ class ApmReadRepositoryQueryTest {
     }
 
     @Test
+    void parsesDbServiceSummaryMaxDuration() throws Exception {
+        ApmReadRepository reader = reader(rs -> {
+            when(rs.next()).thenReturn(true, false);
+            when(rs.getString("service")).thenReturn("[mysql]db");
+            when(rs.getString("service_id")).thenReturn("db-id");
+            when(rs.getString("db_type")).thenReturn("mysql");
+            when(rs.getLong("request_cnt")).thenReturn(5L);
+            when(rs.getLong("error_cnt")).thenReturn(0L);
+            when(rs.getLong("slow_cnt")).thenReturn(2L);
+            when(rs.getDouble("sum_duration_ns")).thenReturn(500.0);
+            when(rs.getDouble("max_duration_ns")).thenReturn(1000.0);
+        });
+        assertThat(reader.queryDbServiceSummaries("select 1").get(0).maxDurationNs()).isEqualTo(1000.0);
+    }
+
+    @Test
     void parsesDistinctCount() throws Exception {
         ApmReadRepository reader = reader(rs -> when(rs.next()).thenReturn(false));
         assertThat(reader.queryDistinctCount("select 1")).isZero();

@@ -218,7 +218,9 @@ public final class ApmQueryModels {
             long errorCount,
             long slowCount,
             /** Total sumDuration in nanoseconds (before dividing by cnt). */
-            double sumDurationNs) {
+            double sumDurationNs,
+            /** Maximum duration in nanoseconds. */
+            double maxDurationNs) {
     }
 
     /** Time-bucket rollup for portal /service/serviceListTrendChart. */
@@ -328,7 +330,9 @@ public final class ApmQueryModels {
             long requestCount,
             long errorCount,
             /** Average response time in milliseconds. */
-            double avgDuration) {
+            double avgDuration,
+            /** Maximum response time in nanoseconds. */
+            double maxDurationNs) {
     }
 
     public record DbEndpointPoint(
@@ -342,6 +346,8 @@ public final class ApmQueryModels {
             long errorCount,
             /** Average response time in milliseconds. */
             double avgDuration,
+            /** Maximum response time in nanoseconds. */
+            double maxDurationNs,
             double sumReadRows,
             double sumUpdateRows) {
     }
@@ -378,6 +384,8 @@ public final class ApmQueryModels {
             long errorCount,
             /** Average response time in milliseconds. */
             double avgDuration,
+            /** Maximum response time in nanoseconds. */
+            double maxDurationNs,
             double sumReadRows,
             double sumUpdateRows,
             double sumReqBodyLength,

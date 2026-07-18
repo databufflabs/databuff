@@ -3349,6 +3349,7 @@ public class ServicePortalService {
         long normalCnt = Math.max(0, callCnt - errCnt - slowCnt);
         double errRate = callCnt > 0 ? (double) errCnt / callCnt : 0;
         long avgLatencyNs = avgDurationMsToNs(point.avgDuration());
+        long maxLatencyNs = Math.round(point.maxDurationNs());
 
         Map<String, Object> row = new LinkedHashMap<>();
         row.put("resource", point.url());
@@ -3364,12 +3365,7 @@ public class ServicePortalService {
         row.put("errRate", errRate);
         row.put("reqRate", callCnt / durationSec);
         row.put("avgLatency", avgLatencyNs);
-        row.put("p50Latency", avgLatencyNs);
-        row.put("p75Latency", avgLatencyNs);
-        row.put("p90Latency", avgLatencyNs);
-        row.put("p95Latency", avgLatencyNs);
-        row.put("p99Latency", avgLatencyNs);
-        row.put("maxLatency", avgLatencyNs);
+        row.put("maxLatency", maxLatencyNs);
         row.put("datasource", "OTLP");
         row.put("progressValue", Map.of("callCnt", 0, "avgLatency", 0, "errRate", 0));
         return row;
@@ -3382,6 +3378,7 @@ public class ServicePortalService {
         long normalCnt = Math.max(0, callCnt - errCnt - slowCnt);
         double errRate = callCnt > 0 ? (double) errCnt / callCnt : 0;
         long avgLatencyNs = avgDurationMsToNs(point.avgDuration());
+        long maxLatencyNs = Math.round(point.maxDurationNs());
         String rpcType = point.tags() != null ? point.tags().get("type") : null;
 
         Map<String, Object> row = new LinkedHashMap<>();
@@ -3399,12 +3396,7 @@ public class ServicePortalService {
         row.put("errRate", errRate);
         row.put("reqRate", callCnt / durationSec);
         row.put("avgLatency", avgLatencyNs);
-        row.put("p50Latency", avgLatencyNs);
-        row.put("p75Latency", avgLatencyNs);
-        row.put("p90Latency", avgLatencyNs);
-        row.put("p95Latency", avgLatencyNs);
-        row.put("p99Latency", avgLatencyNs);
-        row.put("maxLatency", avgLatencyNs);
+        row.put("maxLatency", maxLatencyNs);
         row.put("datasource", "OTLP");
         row.put("progressValue", Map.of("callCnt", 0, "avgLatency", 0, "errRate", 0));
         return row;
@@ -3417,6 +3409,7 @@ public class ServicePortalService {
         long normalCnt = Math.max(0, callCnt - errCnt - slowCnt);
         double errRate = callCnt > 0 ? (double) errCnt / callCnt : 0;
         long avgLatencyNs = avgDurationMsToNs(point.avgDuration());
+        long maxLatencyNs = Math.round(point.maxDurationNs());
 
         Map<String, Object> row = new LinkedHashMap<>();
         row.put("resource", point.resource());
@@ -3433,12 +3426,7 @@ public class ServicePortalService {
         row.put("errRate", errRate);
         row.put("reqRate", callCnt / durationSec);
         row.put("avgLatency", avgLatencyNs);
-        row.put("p50Latency", avgLatencyNs);
-        row.put("p75Latency", avgLatencyNs);
-        row.put("p90Latency", avgLatencyNs);
-        row.put("p95Latency", avgLatencyNs);
-        row.put("p99Latency", avgLatencyNs);
-        row.put("maxLatency", avgLatencyNs);
+        row.put("maxLatency", maxLatencyNs);
         row.put("datasource", "OTLP");
         row.put("progressValue", Map.of("callCnt", 0, "avgLatency", 0, "errRate", 0));
         return row;
@@ -3660,7 +3648,7 @@ public class ServicePortalService {
         if (kind == VirtualServiceKind.MQ) {
             putMqSideMetrics(row, metrics, consumerMetrics);
         } else if (kind == VirtualServiceKind.REMOTE) {
-            putRemoteLatencyFields(row, avgLatencyNs);
+            putRemoteLatencyFields(row, metrics.maxDurationNs());
         }
         return row;
     }
@@ -3698,14 +3686,8 @@ public class ServicePortalService {
         row.put("reqOutAvgLatency", reqOutAvgLatency);
     }
 
-    private static void putRemoteLatencyFields(Map<String, Object> row, double avgLatencyNs) {
-        long latency = (long) avgLatencyNs;
-        row.put("p50Latency", latency);
-        row.put("p75Latency", latency);
-        row.put("p90Latency", latency);
-        row.put("p95Latency", latency);
-        row.put("p99Latency", latency);
-        row.put("p100Latency", latency);
+    private static void putRemoteLatencyFields(Map<String, Object> row, double maxDurationNs) {
+        row.put("p100Latency", Math.round(maxDurationNs));
     }
 
     private static String virtualServiceRowKey(Map<String, Object> row) {

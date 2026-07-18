@@ -214,7 +214,8 @@ public class ApmReadRepository implements AutoCloseable {
                         rs.getLong("request_cnt"),
                         rs.getLong("error_cnt"),
                         rs.getLong("slow_cnt"),
-                        rs.getDouble("sum_duration_ns")));
+                        rs.getDouble("sum_duration_ns"),
+                        rs.getDouble("max_duration_ns")));
             }
         }
         return points;
@@ -420,7 +421,8 @@ public class ApmReadRepository implements AutoCloseable {
                         rs.getString("httpCode"),
                         rs.getLong("request_cnt"),
                         rs.getLong("error_cnt"),
-                        rs.getDouble("avg_duration")));
+                        rs.getDouble("avg_duration"),
+                        rs.getDouble("max_duration_ns")));
             }
         }
         return points;
@@ -459,6 +461,7 @@ public class ApmReadRepository implements AutoCloseable {
                         rs.getLong("request_cnt"),
                         rs.getLong("error_cnt"),
                         rs.getDouble("avg_duration"),
+                        rs.getDouble("max_duration_ns"),
                         rs.getDouble("sum_read_rows"),
                         rs.getDouble("sum_update_rows")));
             }
@@ -514,6 +517,7 @@ public class ApmReadRepository implements AutoCloseable {
                         rs.getLong("request_cnt"),
                         rs.getLong("error_cnt"),
                         rs.getDouble("avg_duration"),
+                        rs.getDouble("max_duration_ns"),
                         rs.getDouble("sum_read_rows"),
                         rs.getDouble("sum_update_rows"),
                         rs.getDouble("sum_req_body_length"),

@@ -167,11 +167,6 @@ export default class ServiceTable extends Vue {
     { field: 'errCnt', prop: 'errCnt', label: i18n.t('modules.views.appMonitor.resourceDetail.s_f9e62864') as string, labelKey: 'modules.views.appMonitor.resourceDetail.s_f9e62864', unit: 'count', minWidth: 100, defaultShow: false, type: 'progress', sortable: true },
     { field: 'errRate', prop: 'errRate', label: i18n.t('modules.views.appMonitor.cache.s_0c8524d7') as string, labelKey: 'modules.views.appMonitor.cache.s_0c8524d7', slot: 'errRate', unit: 'percent', lessZeroOneKey: 'errCnt', minWidth: 100, defaultShow: true, type: 'progress', progressDirection: 'horizontal', progressType: 'circle', progressStatus: 'exception', progressBarWidth: 3, progressMax: 1, sortable: true },
     { field: 'avgLatency', prop: 'avgLatency', label: i18n.t('modules.views.appMonitor.cache.s_96a0c062') as string, labelKey: 'modules.views.appMonitor.cache.s_96a0c062', slot: 'avgLatency', unit: 'ns', minWidth: 120, defaultShow: true, type: 'progress', sortable: true },
-    { field: 'p50Latency', prop: 'p50Latency', label: i18n.t('modules.views.appMonitor.external.s_13a12460') as string, labelKey: 'modules.views.appMonitor.external.s_13a12460', unit: 'ns', minWidth: 120, defaultShow: false, type: 'progress', sortable: true },
-    { field: 'p75Latency', prop: 'p75Latency', label: i18n.t('modules.views.appMonitor.external.s_4b846a1b') as string, labelKey: 'modules.views.appMonitor.external.s_4b846a1b', unit: 'ns', minWidth: 120, defaultShow: false, type: 'progress', sortable: true },
-    { field: 'p90Latency', prop: 'p90Latency', label: i18n.t('modules.views.appMonitor.external.s_28e0109c') as string, labelKey: 'modules.views.appMonitor.external.s_28e0109c', unit: 'ns', minWidth: 120, defaultShow: false, type: 'progress', sortable: true },
-    { field: 'p95Latency', prop: 'p95Latency', label: i18n.t('modules.views.appMonitor.external.s_e8123b2d') as string, labelKey: 'modules.views.appMonitor.external.s_e8123b2d', unit: 'ns', minWidth: 120, defaultShow: false, type: 'progress', sortable: true },
-    { field: 'p99Latency', prop: 'p99Latency', label: i18n.t('modules.views.appMonitor.external.s_8c8e1f39') as string, labelKey: 'modules.views.appMonitor.external.s_8c8e1f39', unit: 'ns', minWidth: 120, defaultShow: false, type: 'progress', sortable: true },
     { field: 'maxLatency', prop: 'maxLatency', label: i18n.t('modules.views.appMonitor.external.s_3bff553d') as string, labelKey: 'modules.views.appMonitor.external.s_3bff553d', unit: 'ns', minWidth: 120, defaultShow: true, type: 'progress', sortable: true },
   ];
 
@@ -234,11 +229,6 @@ export default class ServiceTable extends Vue {
     errCnt: ['errCnt'],
     errRate: ['errRate', 'errCnt'],
     avgLatency: ['avgLatency'],
-    p50Latency: ['p50Latency'],
-    p75Latency: ['p75Latency'],
-    p90Latency: ['p90Latency'],
-    p95Latency: ['p95Latency'],
-    p99Latency: ['p99Latency'],
     maxLatency: ['maxLatency'],
   };
   private columnFetchFields = Object.keys(this.columnFetchFieldMap);

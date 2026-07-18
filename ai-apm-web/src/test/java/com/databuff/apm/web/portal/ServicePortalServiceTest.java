@@ -457,9 +457,9 @@ class ServicePortalServiceTest {
       assertThat(sql).doesNotContain("`service_id` =");
       return List.of(
               new ApmQueryModels.HttpEndpointPoint(
-                      "9bf61532d56eb7b5", "service-a", "/demo/checkout", "GET", "200", 29, 0, 45.0),
+                      "9bf61532d56eb7b5", "service-a", "/demo/checkout", "GET", "200", 29, 0, 45.0, 90_000_000.0),
               new ApmQueryModels.HttpEndpointPoint(
-                      "fedcba0987654321", "service-b", "/api/orders/10001", "GET", "200", 29, 0, 80.0));
+                      "fedcba0987654321", "service-b", "/api/orders/10001", "GET", "200", 29, 0, 80.0, 160_000_000.0));
     });
 
     ServicePortalService service = TestStorageSupport.servicePortalService(reader);
@@ -490,7 +490,7 @@ class ServicePortalServiceTest {
       }
       assertThat(sql).doesNotContain("`isIn` = '1'");
       return List.of(new ApmQueryModels.HttpEndpointPoint(
-              "9bf61532d56eb7b5", "service-a", "/demo/checkout", "GET", "200", 29, 0, 45.0));
+              "9bf61532d56eb7b5", "service-a", "/demo/checkout", "GET", "200", 29, 0, 45.0, 90_000_000.0));
     });
 
     ServicePortalService service = TestStorageSupport.servicePortalService(reader);
@@ -519,7 +519,7 @@ class ServicePortalServiceTest {
               "dad537de7e10e098", "mysql",
               "INSERT INTO demo_order_audit(order_id) VALUES (?)",
               "INSERT", "mysql", "demo_apm",
-              29, 0, 2.0, 100, 0));
+              29, 0, 2.0, 4_000_000.0, 100, 0));
     });
 
     ServicePortalService service = TestStorageSupport.servicePortalService(reader);
@@ -556,7 +556,7 @@ class ServicePortalServiceTest {
               "dad537de7e10e098", "mysql",
               "INSERT INTO demo_order_audit(order_id) VALUES (?)",
               "INSERT", "mysql", "demo_apm",
-              29, 0, 2.0, 100, 0));
+              29, 0, 2.0, 4_000_000.0, 100, 0));
     });
     when(reader.queryTopGroups(anyString())).thenReturn(List.of("mysql", "[mysql]demo_apm"));
 
@@ -642,7 +642,7 @@ class ServicePortalServiceTest {
               "es1234567890abcd", "[elasticsearch]es:9200",
               "GET orders/_search",
               "GET", "elasticsearch", "orders",
-              18, 0, 4.0, 0, 0));
+              18, 0, 4.0, 8_000_000.0, 0, 0));
     });
     when(reader.queryTopGroups(anyString())).thenReturn(List.of("[elasticsearch]es:9200"));
 
@@ -678,7 +678,7 @@ class ServicePortalServiceTest {
       return List.of(new ApmQueryModels.ComponentEndpointPoint(
               "fedcba0987654321", "service-b", "com.demo.OrderService/getOrder",
               java.util.Map.of("type", "dubbo", "statusCode", "0"),
-              29, 0, 45.0, 0, 0, 0, 0, 0, 0));
+              29, 0, 45.0, 90_000_000.0, 0, 0, 0, 0, 0, 0));
     });
 
     ServicePortalService service = TestStorageSupport.servicePortalService(reader);
@@ -705,9 +705,9 @@ class ServicePortalServiceTest {
     ApmReadRepository reader = mock(ApmReadRepository.class);
     when(reader.queryHttpEndpoints(anyString())).thenReturn(List.of(
             new ApmQueryModels.HttpEndpointPoint(
-                    "demo-order-id", "demo-order", "/orders", "GET", "200", 20, 1, 50.0),
+                    "demo-order-id", "demo-order", "/orders", "GET", "200", 20, 1, 50.0, 100_000_000.0),
             new ApmQueryModels.HttpEndpointPoint(
-                    "demo-order-id", "demo-order", "/health", "GET", "200", 50, 0, 10.0)));
+                    "demo-order-id", "demo-order", "/health", "GET", "200", 50, 0, 10.0, 20_000_000.0)));
 
     ServicePortalService service = TestStorageSupport.servicePortalService(reader);
     Map<String, Object> resp = service.endpoints(Map.of(
@@ -727,6 +727,11 @@ class ServicePortalServiceTest {
     assertThat(rows.get(0).get("resource")).isEqualTo("/health");
     assertThat(rows.get(0).get("callCnt")).isEqualTo(50L);
     assertThat(rows.get(0).get("serviceId")).isEqualTo("353958a7cd58ce61");
+    assertThat(rows.get(0).get("avgLatency")).isEqualTo(10_000_000L);
+    assertThat(rows.get(0).get("maxLatency")).isEqualTo(20_000_000L);
+    assertThat(rows.get(1).get("resource")).isEqualTo("/orders");
+    assertThat(rows.get(1).get("avgLatency")).isEqualTo(50_000_000L);
+    assertThat(rows.get(1).get("maxLatency")).isEqualTo(100_000_000L);
   }
 
   @Test
@@ -755,9 +760,9 @@ class ServicePortalServiceTest {
     ApmReadRepository reader = mock(ApmReadRepository.class);
     when(reader.queryHttpEndpoints(anyString())).thenReturn(List.of(
             new ApmQueryModels.HttpEndpointPoint(
-                    "demo-order-id", "demo-order", "/orders", "GET", "200", 20, 1, 50.0),
+                    "demo-order-id", "demo-order", "/orders", "GET", "200", 20, 1, 50.0, 100_000_000.0),
             new ApmQueryModels.HttpEndpointPoint(
-                    "demo-order-id", "demo-order", "/health", "GET", "200", 50, 0, 10.0)));
+                    "demo-order-id", "demo-order", "/health", "GET", "200", 50, 0, 10.0, 20_000_000.0)));
 
     ServicePortalService service = TestStorageSupport.servicePortalService(reader);
     List<Map<String, Object>> rows = service.reqTop(Map.of(
@@ -928,10 +933,10 @@ class ServicePortalServiceTest {
       String sql = invocation.getArgument(0);
       if (sql.contains("`isOut` = '1'")) {
         return List.of(new ApmQueryModels.HttpEndpointPoint(
-                "a1b2c3d4e5f67890", "service-a", "/api/orders/10001", "GET", "200", 29, 0, 100.0));
+                "a1b2c3d4e5f67890", "service-a", "/api/orders/10001", "GET", "200", 29, 0, 100.0, 200_000_000.0));
       }
       return List.of(new ApmQueryModels.HttpEndpointPoint(
-              "fedcba0987654321", "service-b", "/api/orders/10001", "GET", "200", 29, 0, 80.0));
+              "fedcba0987654321", "service-b", "/api/orders/10001", "GET", "200", 29, 0, 80.0, 160_000_000.0));
     });
 
     ServicePortalService service = TestStorageSupport.servicePortalService(reader);
@@ -999,7 +1004,7 @@ class ServicePortalServiceTest {
     ApmReadRepository reader = mock(ApmReadRepository.class);
     when(reader.queryHttpEndpoints(anyString())).thenReturn(List.of(
             new ApmQueryModels.HttpEndpointPoint(
-                    "demo-order-id", "demo-order", "/orders", "GET", "200", 20, 1, 50.0)));
+                    "demo-order-id", "demo-order", "/orders", "GET", "200", 20, 1, 50.0, 100_000_000.0)));
 
     ServicePortalService service = TestStorageSupport.servicePortalService(reader);
     Map<String, Object> resp = service.callEndpoints(Map.of(
@@ -1082,7 +1087,7 @@ class ServicePortalServiceTest {
       return List.of(new ApmQueryModels.ComponentEndpointPoint(
               "redis-id", "[redis]demo", "GET key",
               java.util.Map.of("command", "GET"),
-              15, 0, 1.5, 0, 0, 100, 200, 0, 0));
+              15, 0, 1.5, 3_000_000.0, 0, 0, 100, 200, 0, 0));
     });
     when(reader.queryTopGroups(anyString())).thenReturn(List.of("[redis]demo", "service-a"));
 
@@ -1108,7 +1113,7 @@ class ServicePortalServiceTest {
     when(reader.queryDbEndpoints(anyString())).thenReturn(List.of(
             new ApmQueryModels.DbEndpointPoint(
                     "dad537de7e10e098", "mysql", "SELECT 1", "SELECT", "mysql", "demo_apm",
-                    28, 0, 2.0, 100, 0)));
+                    28, 0, 2.0, 4_000_000.0, 100, 0)));
     when(reader.queryTopGroups(anyString())).thenReturn(List.of("mysql", "service-a"));
 
     ServicePortalService service = TestStorageSupport.servicePortalService(reader);
@@ -1140,7 +1145,7 @@ class ServicePortalServiceTest {
       }
       return List.of(new ApmQueryModels.DbEndpointPoint(
               "dad537de7e10e098", "mysql", "SELECT 1", "SELECT", "mysql", "demo_apm",
-              28, 0, 2.0, 100, 0));
+              28, 0, 2.0, 4_000_000.0, 100, 0));
     });
     when(reader.queryTopGroups(anyString())).thenReturn(List.of("mysql", "service-a"));
     when(reader.queryMetaServices(anyString())).thenReturn(List.of(
@@ -1224,7 +1229,7 @@ class ServicePortalServiceTest {
     ApmReadRepository reader = mock(ApmReadRepository.class);
     when(reader.queryHttpEndpoints(anyString())).thenReturn(List.of(
             new ApmQueryModels.HttpEndpointPoint(
-                    "demo-order-id", "demo-order", "/orders", "POST", "200", 30, 2, 25.0)));
+                    "demo-order-id", "demo-order", "/orders", "POST", "200", 30, 2, 25.0, 50_000_000.0)));
 
     ServicePortalService service = TestStorageSupport.servicePortalService(reader);
     Map<String, Object> info = service.resourceInfo(Map.of(
@@ -1248,7 +1253,7 @@ class ServicePortalServiceTest {
     ApmReadRepository reader = mock(ApmReadRepository.class);
     when(reader.queryHttpEndpoints(anyString())).thenReturn(List.of(
             new ApmQueryModels.HttpEndpointPoint(
-                    "9bf61532d56eb7b5", "service-a", "/demo/checkout", "GET", "200", 29, 1, 45.0)));
+                    "9bf61532d56eb7b5", "service-a", "/demo/checkout", "GET", "200", 29, 1, 45.0, 90_000_000.0)));
     when(reader.queryComponentResourceRelations(anyString(), any())).thenAnswer(invocation -> {
       String sql = invocation.getArgument(0);
       if (sql.contains("`isIn` = '1'") && sql.contains("GROUP BY `service_id`, `service`, `url`")) {
@@ -1283,7 +1288,7 @@ class ServicePortalServiceTest {
     ApmReadRepository reader = mock(ApmReadRepository.class);
     when(reader.queryHttpEndpoints(anyString())).thenReturn(List.of(
             new ApmQueryModels.HttpEndpointPoint(
-                    "9bf61532d56eb7b5", "service-a", "/demo/checkout", "GET", "200", 29, 1, 45.0)));
+                    "9bf61532d56eb7b5", "service-a", "/demo/checkout", "GET", "200", 29, 1, 45.0, 90_000_000.0)));
     when(reader.queryComponentResourceRelations(anyString(), any())).thenAnswer(invocation -> {
       String sql = invocation.getArgument(0);
       if (sql.contains("metric_service_http")
@@ -1564,7 +1569,7 @@ class ServicePortalServiceTest {
         return List.of(new ApmQueryModels.ComponentEndpointPoint(
                 "9bf61532d56eb7b5", "service-a", "com.demo.OrderService/getOrder",
                 java.util.Map.of("type", "dubbo"),
-                18, 0, 45.0, 0, 0, 0, 0, 0, 0));
+                18, 0, 45.0, 90_000_000.0, 0, 0, 0, 0, 0, 0));
       }
       return List.of();
     });
@@ -1613,7 +1618,7 @@ class ServicePortalServiceTest {
                     "mysql-order-id", "mysql-order", "mysql-order", "db", null, "mysql",
                     null, null, "OTLP", null, null, null, Boolean.TRUE, null, null, null, null)));
     when(reader.queryDbServiceSummaries(anyString())).thenReturn(List.of(
-            new DbServiceSummaryPoint("mysql-order", "mysql-order-id", "mysql", 120, 3, 8, 960_000_000)));
+            new DbServiceSummaryPoint("mysql-order", "mysql-order-id", "mysql", 120, 3, 8, 960_000_000, 16_000_000)));
 
     ServicePortalService service = TestStorageSupport.servicePortalService(reader);
     Map<String, Object> result = service.dbList(Map.of(
@@ -1644,7 +1649,7 @@ class ServicePortalServiceTest {
                     "service-h-id", "service-h", "service-h", "db", null, "web",
                     null, null, "OTLP", null, null, null, Boolean.FALSE, null, null, null, null)));
     when(reader.queryDbServiceSummaries(anyString())).thenReturn(List.of(
-            new DbServiceSummaryPoint("[mysql]dogi", "mysql-order-id", "mysql", 120, 3, 8, 960_000_000)));
+            new DbServiceSummaryPoint("[mysql]dogi", "mysql-order-id", "mysql", 120, 3, 8, 960_000_000, 16_000_000)));
 
     ServicePortalService service = TestStorageSupport.servicePortalService(reader);
     Map<String, Object> result = service.dbList(Map.of(
@@ -1672,9 +1677,9 @@ class ServicePortalServiceTest {
     when(reader.queryDbServiceSummaries(anyString())).thenAnswer(invocation -> {
       String sql = invocation.getArgument(0);
       if (sql.contains("srcService")) {
-        return List.of(new DbServiceSummaryPoint("[kafka]orders", "kafka-topic-id", "kafka", 40, 1, 0, 200_000_000));
+        return List.of(new DbServiceSummaryPoint("[kafka]orders", "kafka-topic-id", "kafka", 40, 1, 0, 200_000_000, 10_000_000));
       }
-      return List.of(new DbServiceSummaryPoint("[kafka]orders", "kafka-topic-id", "kafka", 100, 2, 0, 500_000_000));
+      return List.of(new DbServiceSummaryPoint("[kafka]orders", "kafka-topic-id", "kafka", 100, 2, 0, 500_000_000, 10_000_000));
     });
 
     ServicePortalService service = TestStorageSupport.servicePortalService(reader);
@@ -1700,9 +1705,9 @@ class ServicePortalServiceTest {
     when(reader.queryDbServiceSummaries(anyString())).thenAnswer(invocation -> {
       String sql = invocation.getArgument(0);
       if (sql.contains("srcService")) {
-        return List.of(new DbServiceSummaryPoint("orders-topic", "kafka-topic-id", "kafka", 40, 1, 0, 200_000_000));
+        return List.of(new DbServiceSummaryPoint("orders-topic", "kafka-topic-id", "kafka", 40, 1, 0, 200_000_000, 10_000_000));
       }
-      return List.of(new DbServiceSummaryPoint("orders-topic", "kafka-topic-id", "kafka", 100, 2, 0, 500_000_000));
+      return List.of(new DbServiceSummaryPoint("orders-topic", "kafka-topic-id", "kafka", 100, 2, 0, 500_000_000, 10_000_000));
     });
 
     ServicePortalService service = TestStorageSupport.servicePortalService(reader);
@@ -1727,7 +1732,7 @@ class ServicePortalServiceTest {
                     "redis-id", "redis-cache", "redis-cache", "cache", null, "redis",
                     null, null, "OTLP", null, null, null, Boolean.TRUE, null, null, null, null)));
     when(reader.queryDbServiceSummaries(anyString())).thenReturn(List.of(
-            new DbServiceSummaryPoint("redis-cache", "redis-id", "GET", 80, 0, 5, 160_000_000)));
+            new DbServiceSummaryPoint("redis-cache", "redis-id", "GET", 80, 0, 5, 160_000_000, 4_000_000)));
 
     ServicePortalService service = TestStorageSupport.servicePortalService(reader);
     Map<String, Object> result = service.cacheList(Map.of(
@@ -1748,8 +1753,8 @@ class ServicePortalServiceTest {
     ApmReadRepository reader = mock(ApmReadRepository.class);
     when(reader.queryMetaServices(anyString())).thenReturn(List.of());
     when(reader.queryDbServiceSummaries(anyString())).thenReturn(List.of(
-            new DbServiceSummaryPoint("[elasticsearch]es:9200", "es-id", "elasticsearch", 120, 0, 0, 600_000_000),
-            new DbServiceSummaryPoint("[remote]api.example.com:443", "remote-id", "http", 80, 1, 0, 320_000_000)));
+            new DbServiceSummaryPoint("[elasticsearch]es:9200", "es-id", "elasticsearch", 120, 0, 0, 600_000_000, 10_000_000),
+            new DbServiceSummaryPoint("[remote]api.example.com:443", "remote-id", "http", 80, 1, 0, 320_000_000, 8_000_000)));
 
     ServicePortalService service = TestStorageSupport.servicePortalService(reader);
     Map<String, Object> result = service.remoteCallList(Map.of(
@@ -1762,6 +1767,9 @@ class ServicePortalServiceTest {
     List<Map<String, Object>> rows = (List<Map<String, Object>>) result.get("data");
     assertThat(rows).hasSize(1);
     assertThat(rows.get(0).get("name")).isEqualTo("[remote]api.example.com:443");
+    assertThat(rows.get(0).get("avgLatency")).isEqualTo(4_000_000.0);
+    assertThat(rows.get(0).get("p100Latency")).isEqualTo(8_000_000L);
+    assertThat(rows.get(0).containsKey("p50Latency")).isFalse();
   }
 
   @Test

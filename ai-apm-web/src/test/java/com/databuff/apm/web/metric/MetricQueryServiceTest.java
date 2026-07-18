@@ -44,7 +44,7 @@ class MetricQueryServiceTest {
     void returnsHttpEndpointsFromDoris() throws Exception {
         ApmReadRepository reader = mock(ApmReadRepository.class);
         when(reader.queryHttpEndpoints(anyString())).thenReturn(List.of(
-                new HttpEndpointPoint("demo-order-id", "demo-order", "/orders", "GET", "200", 50, 2, 12.0)));
+                new HttpEndpointPoint("demo-order-id", "demo-order", "/orders", "GET", "200", 50, 2, 12.0, 24_000_000.0)));
         MetricQueryService service = new MetricQueryService(reader, TestStorageSupport.storage());
         assertThat(service.httpEndpoints(new MetricQueryService.HttpQueryRequest("demo-order", 0, 1000, 50)))
                 .hasSize(1);
