@@ -8,10 +8,12 @@
 
 <h3>Open Source · AI-Native OpenTelemetry APM</h3>
 
-<p><strong>Ask one question in plain English — AI agents query metrics, traces, and topology together, then tell you what broke.</strong></p>
+<p><strong>Ask one question in plain English — AI agents query metrics, traces, and topology together, then tell you what broke. The self-healing ops loop observes and diagnoses first; autonomous remediation is on the Roadmap.</strong></p>
 
 <p align="center">
   <a href="https://demo.databuff.ai">Live Demo</a>
+  &nbsp;|&nbsp;
+  <a href="https://github.com/databufflabs/databuff/releases">Releases</a>
   &nbsp;|&nbsp;
   <a href="docs/README_en.md">Documentation</a>
   &nbsp;|&nbsp;
@@ -29,7 +31,10 @@
 - 🎯 **AI application observability** (Roadmap) — LLM call chains · token analytics · agent topology · skill/tool/model tracing
 - ⚡ **eBPF APM** (Roadmap) — kernel-level, non-intrusive collection without code changes
 - 📊 **OpenTelemetry APM foundation** — OTLP ingestion with troubleshooting, tracing, service metrics, and topology
+- 🔗 **SkyWalking native ingest** — gRPC :11800, keep your existing Java Agent jar, point `collector.backend_service` at DataBuff for traces / JVM metrics / topology / log correlation
 - 🚨 **Alerting loop** — threshold and change detection, scheduled evaluation, alert event history
+- 🛠 **Ops Expert · SSH troubleshooting** — install recovery and live runtime root-cause via read-only SSH on target hosts; built-in `expertId=ops`, guarded by a shell denylist (`rm`, `dd`, `sudo`, `iptables`, …) so the agent can only triage, not mutate
+- 🔄 **Self-Healing Ops loop** — observe and diagnose first: AI inspection experts triage anomalies and suggest fixes; autonomous inspect → diagnose → remediate is the long-term vision on the Roadmap
 - 🔧 **Skill + Tool extensibility** — override built-in skills, add custom digital experts without touching core code
 - 🔌 **MCP both ways** — expose platform capabilities to Cursor / Claude; ingest external MCPs (Prometheus, SkyWalking, etc.)
 - 🐳 **Minimal 3-component stack** — Ingest + Doris + Web; one Docker / K8s command, no middleware sprawl
@@ -133,11 +138,19 @@ Requires **docker** and **docker-compose**. The install script auto-detects amd6
 curl -fsSL https://databuff.ai/databuff/ai-apm-install.sh | bash
 ```
 
-**2. Install Demo App** (optional)
+**2. Upgrade existing Docker install** (v0.1.3+, keeps `data/`)
+
+```bash
+curl -fsSL https://databuff.ai/databuff/ai-apm-update.sh | bash
+```
+
+**3. Install Demo App** (optional)
 
 ```bash
 curl -fsSL https://databuff.ai/databuff/ai-apm-demo-install.sh | bash
 ```
+
+> Latest release: **[v0.1.3 — SkyWalking Native Ingest + Ops Expert SSH Troubleshooting](https://github.com/databufflabs/databuff/releases/tag/0.1.3)**
 
 <details>
 <summary><b>Offline Install</b></summary>
