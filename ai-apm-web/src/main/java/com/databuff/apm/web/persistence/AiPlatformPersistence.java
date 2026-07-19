@@ -59,30 +59,47 @@ public class AiPlatformPersistence {
             log.info("AI platform config store not ready; platform definitions stay in-memory only");
             return;
         }
-        try {
-            List<AiToolDefinition> tools = repository.loadAiTools().stream()
-                    .map(AiPlatformPersistence::toToolDefinition)
-                    .toList();
-            List<AiSkillDefinition> skills = repository.loadAiSkills().stream()
-                    .map(AiPlatformPersistence::toSkillDefinition)
-                    .toList();
-            List<AiExpertDefinition> experts = repository.loadAiExperts().stream()
-                    .map(AiPlatformPersistence::toExpertDefinition)
-                    .toList();
-            List<AiCapabilityDefinition> capabilities = repository.loadAiCapabilities().stream()
-                    .map(AiPlatformPersistence::toCapabilityDefinition)
-                    .toList();
+        // Load each section independently so one bad row (e.g. an expert referencing
+        // a disabled skill) does not abort hydration of unrelated sections — most
+        // notably capabilities, which the homepage 7-step arc depends on.
+        List<AiToolDefinition> tools = loadSection("tools", repository::loadAiTools, AiPlatformPersistence::toToolDefinition);
+        List<AiSkillDefinition> skills = loadSection("skills", repository::loadAiSkills, AiPlatformPersistence::toSkillDefinition);
+        List<AiExpertDefinition> experts = loadSection("experts", repository::loadAiExperts, AiPlatformPersistence::toExpertDefinition);
+        List<AiCapabilityDefinition> capabilities = loadSection("capabilities", repository::loadAiCapabilities, AiPlatformPersistence::toCapabilityDefinition);
 
-            toolManagementService.applyPersistedRows(tools);
-            skillManagementService.applyPersistedRows(skills);
-            expertManagementService.applyPersistedRows(experts);
-            capabilityManagementService.applyPersistedRows(capabilities);
-            persistenceEnabled = true;
-            log.info("AI platform persistence enabled ({} tools, {} skills, {} experts, {} capabilities from store)",
-                    tools.size(), skills.size(), experts.size(), capabilities.size());
+        applySection("tools", tools, toolManagementService::applyPersistedRows);
+        applySection("skills", skills, skillManagementService::applyPersistedRows);
+        applySection("experts", experts, expertManagementService::applyPersistedRows);
+        applySection("capabilities", capabilities, capabilityManagementService::applyPersistedRows);
+
+        persistenceEnabled = true;
+        log.info("AI platform persistence enabled ({} tools, {} skills, {} experts, {} capabilities from store)",
+                tools.size(), skills.size(), experts.size(), capabilities.size());
+    }
+
+    private <R, T> List<T> loadSection(String name, SqlLoader<R> loader, java.util.function.Function<R, T> mapper) {
+        try {
+            return loader.load().stream().map(mapper).toList();
         } catch (Exception e) {
-            log.warn("Failed to load AI platform config from store: {}", e.getMessage());
+            log.warn("Failed to load AI platform {} from store: {}", name, e.getMessage());
+            return List.of();
         }
+    }
+
+    private <T> void applySection(String name, List<T> rows, java.util.function.Consumer<List<T>> applier) {
+        if (rows.isEmpty()) {
+            return;
+        }
+        try {
+            applier.accept(rows);
+        } catch (Exception e) {
+            log.warn("Failed to apply AI platform {} from store (skipped): {}", name, e.getMessage());
+        }
+    }
+
+    @FunctionalInterface
+    private interface SqlLoader<R> {
+        List<R> load() throws Exception;
     }
 
     public void persistTool(AiToolDefinition definition) {

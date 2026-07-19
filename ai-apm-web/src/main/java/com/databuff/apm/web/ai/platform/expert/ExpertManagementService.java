@@ -7,6 +7,8 @@ import com.databuff.apm.web.ai.platform.skill.SkillManagementService;
 import com.databuff.apm.web.ai.platform.tool.ToolManagementService;
 import com.databuff.apm.web.persistence.AiPlatformPersistence;
 import jakarta.annotation.PostConstruct;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 import org.springframework.beans.factory.ObjectProvider;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Service;
@@ -20,6 +22,8 @@ import java.util.concurrent.ConcurrentMap;
 
 @Service
 public class ExpertManagementService {
+
+    private static final Logger log = LoggerFactory.getLogger(ExpertManagementService.class);
 
     @Autowired
     private ToolManagementService toolManagementService;
@@ -87,7 +91,14 @@ public class ExpertManagementService {
     public void applyPersistedRows(List<AiExpertDefinition> definitions) {
         boolean routableExpertsChanged = false;
         for (AiExpertDefinition definition : definitions) {
-            validate(definition);
+            try {
+                validate(definition);
+            } catch (Exception e) {
+                // Skip a single bad persisted row (e.g. references a disabled skill)
+                // rather than aborting hydration of every other expert.
+                log.warn("Skipping persisted expert {} from store: {}", definition.expertId(), e.getMessage());
+                continue;
+            }
             experts.compute(definition.expertId(), (id, existing) -> {
                 boolean builtIn = (existing != null && existing.builtIn()) || definition.builtIn();
                 List<String> toolIds;
