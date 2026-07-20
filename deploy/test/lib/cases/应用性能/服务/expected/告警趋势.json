@@ -2,25 +2,25 @@
   "status": 200,
   "message": "success",
   "data": {
-    "1781407980000": {
-      "value": 0,
-      "trafficLight": "green"
+    "1784555400000": {
+      "value": 1,
+      "trafficLight": "yellow"
     },
-    "1781408040000": {
-      "value": 0,
-      "trafficLight": "green"
+    "1784555460000": {
+      "value": 1,
+      "trafficLight": "yellow"
     },
-    "1781408100000": {
-      "value": 0,
-      "trafficLight": "green"
+    "1784555520000": {
+      "value": 1,
+      "trafficLight": "yellow"
     },
-    "1781408160000": {
-      "value": 0,
-      "trafficLight": "green"
+    "1784555580000": {
+      "value": 1,
+      "trafficLight": "yellow"
     },
-    "1781408220000": {
-      "value": 0,
-      "trafficLight": "green"
+    "1784555640000": {
+      "value": 1,
+      "trafficLight": "yellow"
     }
   }
 }

@@ -16,10 +16,9 @@
       "type": "mysql",
       "datasource": "OTLP",
       "virtual_service": true,
-      "alarmCount": 0,
-      "alarmPendingCount": 0,
+      "alarmCount": 5,
       "alarmMetric": {
-        "total": 0
+        "total": 5
       }
     },
     {
@@ -39,7 +38,6 @@
       "datasource": "OTLP",
       "virtual_service": true,
       "alarmCount": 0,
-      "alarmPendingCount": 0,
       "alarmMetric": {
         "total": 0
       }

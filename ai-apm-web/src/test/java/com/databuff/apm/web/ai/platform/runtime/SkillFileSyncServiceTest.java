@@ -31,6 +31,9 @@ class SkillFileSyncServiceTest {
         Files.writeString(
                 builtinDir.resolve("skill.data.metrics/SKILL.md"),
                 "---\nname: skill.data.metrics\ndescription: metrics\n---\nmetrics body");
+        Path qaProductSkill = Path.of("../deploy/common/skills/skill.qa.product/SKILL.md").normalize();
+        Files.createDirectories(builtinDir.resolve("skill.qa.product"));
+        Files.copy(qaProductSkill, builtinDir.resolve("skill.qa.product/SKILL.md"));
 
         runtimeConfig = new AgentRuntimeConfig();
         runtimeConfig.setBuiltinSkillsDir(builtinDir.toString());

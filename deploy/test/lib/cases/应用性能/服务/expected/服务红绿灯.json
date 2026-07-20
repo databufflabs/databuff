@@ -3,8 +3,16 @@
   "message": "success",
   "data": [
     {
-      "timestamp": 1781407980000,
+      "timestamp": 1784555400000,
       "serviceOrders": [
+        {
+          "serviceId": "c72cc83a8831e407",
+          "name": "[mysql]demo_apm",
+          "service": "[mysql]demo_apm",
+          "value": 1,
+          "trafficLight": "yellow",
+          "businessName": ""
+        },
         {
           "serviceId": "c89bb188ecff78ec",
           "name": "[elasticsearch]es:9200",
@@ -17,14 +25,6 @@
           "serviceId": "c1fbe6792ea65d41",
           "name": "[kafka]order-events",
           "service": "[kafka]order-events",
-          "value": 0,
-          "trafficLight": "green",
-          "businessName": ""
-        },
-        {
-          "serviceId": "c72cc83a8831e407",
-          "name": "[mysql]demo_apm",
-          "service": "[mysql]demo_apm",
           "value": 0,
           "trafficLight": "green",
           "businessName": ""
@@ -56,8 +56,16 @@
       ]
     },
     {
-      "timestamp": 1781408040000,
+      "timestamp": 1784555460000,
       "serviceOrders": [
+        {
+          "serviceId": "c72cc83a8831e407",
+          "name": "[mysql]demo_apm",
+          "service": "[mysql]demo_apm",
+          "value": 1,
+          "trafficLight": "yellow",
+          "businessName": ""
+        },
         {
           "serviceId": "c89bb188ecff78ec",
           "name": "[elasticsearch]es:9200",
@@ -70,14 +78,6 @@
           "serviceId": "c1fbe6792ea65d41",
           "name": "[kafka]order-events",
           "service": "[kafka]order-events",
-          "value": 0,
-          "trafficLight": "green",
-          "businessName": ""
-        },
-        {
-          "serviceId": "c72cc83a8831e407",
-          "name": "[mysql]demo_apm",
-          "service": "[mysql]demo_apm",
           "value": 0,
           "trafficLight": "green",
           "businessName": ""
@@ -109,8 +109,16 @@
       ]
     },
     {
-      "timestamp": 1781408100000,
+      "timestamp": 1784555520000,
       "serviceOrders": [
+        {
+          "serviceId": "c72cc83a8831e407",
+          "name": "[mysql]demo_apm",
+          "service": "[mysql]demo_apm",
+          "value": 1,
+          "trafficLight": "yellow",
+          "businessName": ""
+        },
         {
           "serviceId": "c89bb188ecff78ec",
           "name": "[elasticsearch]es:9200",
@@ -123,14 +131,6 @@
           "serviceId": "c1fbe6792ea65d41",
           "name": "[kafka]order-events",
           "service": "[kafka]order-events",
-          "value": 0,
-          "trafficLight": "green",
-          "businessName": ""
-        },
-        {
-          "serviceId": "c72cc83a8831e407",
-          "name": "[mysql]demo_apm",
-          "service": "[mysql]demo_apm",
           "value": 0,
           "trafficLight": "green",
           "businessName": ""
@@ -162,8 +162,16 @@
       ]
     },
     {
-      "timestamp": 1781408160000,
+      "timestamp": 1784555580000,
       "serviceOrders": [
+        {
+          "serviceId": "c72cc83a8831e407",
+          "name": "[mysql]demo_apm",
+          "service": "[mysql]demo_apm",
+          "value": 1,
+          "trafficLight": "yellow",
+          "businessName": ""
+        },
         {
           "serviceId": "c89bb188ecff78ec",
           "name": "[elasticsearch]es:9200",
@@ -176,14 +184,6 @@
           "serviceId": "c1fbe6792ea65d41",
           "name": "[kafka]order-events",
           "service": "[kafka]order-events",
-          "value": 0,
-          "trafficLight": "green",
-          "businessName": ""
-        },
-        {
-          "serviceId": "c72cc83a8831e407",
-          "name": "[mysql]demo_apm",
-          "service": "[mysql]demo_apm",
           "value": 0,
           "trafficLight": "green",
           "businessName": ""
@@ -215,8 +215,16 @@
       ]
     },
     {
-      "timestamp": 1781408220000,
+      "timestamp": 1784555640000,
       "serviceOrders": [
+        {
+          "serviceId": "c72cc83a8831e407",
+          "name": "[mysql]demo_apm",
+          "service": "[mysql]demo_apm",
+          "value": 1,
+          "trafficLight": "yellow",
+          "businessName": ""
+        },
         {
           "serviceId": "c89bb188ecff78ec",
           "name": "[elasticsearch]es:9200",
@@ -229,14 +237,6 @@
           "serviceId": "c1fbe6792ea65d41",
           "name": "[kafka]order-events",
           "service": "[kafka]order-events",
-          "value": 0,
-          "trafficLight": "green",
-          "businessName": ""
-        },
-        {
-          "serviceId": "c72cc83a8831e407",
-          "name": "[mysql]demo_apm",
-          "service": "[mysql]demo_apm",
           "value": 0,
           "trafficLight": "green",
           "businessName": ""

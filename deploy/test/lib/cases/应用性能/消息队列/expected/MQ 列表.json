@@ -17,7 +17,6 @@
       "datasource": "OTLP",
       "virtual_service": true,
       "alarmCount": 0,
-      "alarmPendingCount": 0,
       "alarmMetric": {
         "total": 0
       },

@@ -14,17 +14,12 @@
       "errRate": 0.0,
       "reqRate": 0.03333333333333333,
       "avgLatency": 240000000,
-      "p50Latency": 240000000,
-      "p75Latency": 240000000,
-      "p90Latency": 240000000,
-      "p95Latency": 240000000,
-      "p99Latency": 240000000,
       "maxLatency": 240000000,
       "datasource": "OTLP",
       "progressValue": {
-        "errRate": 0,
+        "callCnt": 0,
         "avgLatency": 0,
-        "callCnt": 0
+        "errRate": 0
       }
     },
     {
@@ -41,17 +36,12 @@
       "errRate": 0.0,
       "reqRate": 0.03333333333333333,
       "avgLatency": 7000000,
-      "p50Latency": 7000000,
-      "p75Latency": 7000000,
-      "p90Latency": 7000000,
-      "p95Latency": 7000000,
-      "p99Latency": 7000000,
       "maxLatency": 7000000,
       "datasource": "OTLP",
       "progressValue": {
-        "errRate": 0,
+        "callCnt": 0,
         "avgLatency": 0,
-        "callCnt": 0
+        "errRate": 0
       }
     }
   ],

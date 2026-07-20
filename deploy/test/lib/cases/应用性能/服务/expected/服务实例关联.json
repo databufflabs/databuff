@@ -26,16 +26,6 @@
         "componentType": "service.rpc"
       },
       {
-        "serviceId": "c89bb188ecff78ec",
-        "reqInCnt": 10,
-        "reqInErrCnt": 0,
-        "reqInTime": 180000000.0,
-        "reqOutCnt": 10,
-        "reqOutErrCnt": 0,
-        "reqOutTime": 180000000.0,
-        "componentType": "service.db"
-      },
-      {
         "serviceId": "c72cc83a8831e407",
         "reqInCnt": 10,
         "reqInErrCnt": 0,
@@ -43,6 +33,16 @@
         "reqOutCnt": 10,
         "reqOutErrCnt": 0,
         "reqOutTime": 200000000.0,
+        "componentType": "service.db"
+      },
+      {
+        "serviceId": "c89bb188ecff78ec",
+        "reqInCnt": 10,
+        "reqInErrCnt": 0,
+        "reqInTime": 180000000.0,
+        "reqOutCnt": 10,
+        "reqOutErrCnt": 0,
+        "reqOutTime": 180000000.0,
         "componentType": "service.db"
       },
       {
@@ -74,14 +74,14 @@
         "alarmCount": 0
       },
       {
-        "serviceId": "c89bb188ecff78ec",
-        "serviceName": "[elasticsearch]es:9200",
-        "serviceType": "db",
-        "alarmCount": 0
-      },
-      {
         "serviceId": "c72cc83a8831e407",
         "serviceName": "[mysql]demo_apm",
+        "serviceType": "db",
+        "alarmCount": 5
+      },
+      {
+        "serviceId": "c89bb188ecff78ec",
+        "serviceName": "[elasticsearch]es:9200",
         "serviceType": "db",
         "alarmCount": 0
       },

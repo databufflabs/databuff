@@ -43,8 +43,8 @@
         "errCnt": 10,
         "errRate": 0.3333333333333333,
         "avgLatency": 31.666666666666668,
-        "alarmCount": 0,
-        "errType": 0,
+        "alarmCount": 5,
+        "errType": 1,
         "service_type": "default",
         "type": "default"
       },

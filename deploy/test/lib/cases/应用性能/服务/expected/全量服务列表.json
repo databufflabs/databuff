@@ -8,6 +8,7 @@
       "service": "[elasticsearch]es:9200",
       "service_type": "db",
       "type": "elasticsearch",
+      "language": "",
       "virtual_service": true
     },
     {
@@ -16,6 +17,7 @@
       "service": "[kafka]order-events",
       "service_type": "mq",
       "type": "kafka",
+      "language": "",
       "virtual_service": true
     },
     {
@@ -24,6 +26,7 @@
       "service": "[mysql]demo_apm",
       "service_type": "db",
       "type": "mysql",
+      "language": "",
       "virtual_service": true
     },
     {
@@ -32,6 +35,7 @@
       "service": "[redis]redis:6379",
       "service_type": "cache",
       "type": "redis",
+      "language": "",
       "virtual_service": true
     },
     {
@@ -40,6 +44,7 @@
       "service": "service-a",
       "service_type": "web",
       "type": "web",
+      "language": "java",
       "virtual_service": false
     },
     {
@@ -48,6 +53,7 @@
       "service": "service-b",
       "service_type": "web",
       "type": "web",
+      "language": "java",
       "virtual_service": false
     }
   ]

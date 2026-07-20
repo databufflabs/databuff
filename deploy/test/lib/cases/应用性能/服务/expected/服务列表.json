@@ -11,7 +11,8 @@
       "maxLatency": 45000000,
       "reqRate": 0.1,
       "lastMinReqRate": 6.0,
-      "type": "mysql"
+      "type": "mysql",
+      "language": ""
     },
     {
       "serviceId": "94d612e1c2166206",
@@ -24,7 +25,8 @@
       "maxLatency": 13000000,
       "reqRate": 0.06666666666666667,
       "lastMinReqRate": 4.0,
-      "type": "redis"
+      "type": "redis",
+      "language": ""
     },
     {
       "serviceId": "5457a0119281bb98",
@@ -37,7 +39,8 @@
       "maxLatency": 80000000,
       "reqRate": 0.06666666666666667,
       "lastMinReqRate": 4.0,
-      "type": "web"
+      "type": "web",
+      "language": "java"
     },
     {
       "serviceId": "c89bb188ecff78ec",
@@ -50,7 +53,8 @@
       "maxLatency": 18000000,
       "reqRate": 0.03333333333333333,
       "lastMinReqRate": 2.0,
-      "type": "elasticsearch"
+      "type": "elasticsearch",
+      "language": ""
     },
     {
       "serviceId": "c1fbe6792ea65d41",
@@ -63,7 +67,8 @@
       "maxLatency": 8000000,
       "reqRate": 0.03333333333333333,
       "lastMinReqRate": 2.0,
-      "type": "kafka"
+      "type": "kafka",
+      "language": ""
     },
     {
       "serviceId": "9bf61532d56eb7b5",
@@ -76,7 +81,8 @@
       "maxLatency": 240000000,
       "reqRate": 0.03333333333333333,
       "lastMinReqRate": 2.0,
-      "type": "web"
+      "type": "web",
+      "language": "java"
     }
   ],
   "status": 200,

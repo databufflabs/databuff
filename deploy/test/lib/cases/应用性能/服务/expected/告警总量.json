@@ -2,7 +2,7 @@
   "status": 200,
   "message": "success",
   "data": {
-    "alarmCount": 0,
+    "alarmCount": 5,
     "exceptionCount": 5
   }
 }

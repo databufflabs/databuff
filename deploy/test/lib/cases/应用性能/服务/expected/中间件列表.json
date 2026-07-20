@@ -12,6 +12,7 @@
       "reqRate": 0.1,
       "lastMinReqRate": 6.0,
       "type": "mysql",
+      "language": "",
       "service_type": "db"
     },
     {
@@ -26,6 +27,7 @@
       "reqRate": 0.03333333333333333,
       "lastMinReqRate": 2.0,
       "type": "mysql",
+      "language": "",
       "service_type": "db"
     }
   ],
