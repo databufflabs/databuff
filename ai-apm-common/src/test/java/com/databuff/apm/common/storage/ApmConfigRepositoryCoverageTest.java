@@ -125,6 +125,7 @@ class ApmConfigRepositoryCoverageTest {
         when(listRs.getTimestamp("created_at")).thenReturn(Timestamp.from(Instant.parse("2026-06-01T00:00:00Z")));
         when(listRs.getTimestamp("updated_at")).thenReturn(Timestamp.from(Instant.parse("2026-06-01T01:00:00Z")));
         when(listRs.getInt("message_count")).thenReturn(4);
+        when(listRs.getString("first_user_message")).thenReturn("hello");
 
         ApmConfigRepository repository = new ApmConfigRepository(reader, "databuff");
         assertThat(repository.countAiSessions()).isEqualTo(3L);

@@ -240,6 +240,7 @@ class ApmConfigRepositoryTest {
         when(sessionsRs.getString("user_name")).thenReturn("admin");
         when(sessionsRs.getString("agent")).thenReturn("brain");
         when(sessionsRs.getInt("message_count")).thenReturn(1);
+        when(sessionsRs.getString("first_user_message")).thenReturn("hello");
         when(sessionsRs.getTimestamp("created_at")).thenReturn(Timestamp.from(now));
         when(sessionsRs.getTimestamp("updated_at")).thenReturn(Timestamp.from(now));
         when(messagesRs.next()).thenReturn(true, false);

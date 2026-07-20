@@ -266,13 +266,24 @@ public class ApmConfigRepository {
     public List<AiSessionSummaryRow> loadRecentAiSessions(int limit, int offset) throws SQLException {
         int safeLimit = Math.max(1, limit);
         int safeOffset = Math.max(0, offset);
-        String sql = "SELECT session_id, user_id, user_name, MAX(agent) AS agent,"
+        String messageTable = qualified(DorisTableNames.CONFIG_AI_MESSAGE);
+        String sql = "SELECT grouped.session_id, grouped.user_id, grouped.user_name, grouped.agent,"
+                + " grouped.created_at, grouped.updated_at, grouped.message_count,"
+                + " (SELECT m2.content FROM " + messageTable + " m2"
+                + " WHERE m2.session_id = grouped.session_id"
+                + " AND m2.message_type = 'USER'"
+                + " AND m2.content IS NOT NULL AND TRIM(m2.content) != ''"
+                + " ORDER BY m2.round_index, m2.message_index, m2.created_at, m2.message_id"
+                + " LIMIT 1) AS first_user_message"
+                + " FROM ("
+                + " SELECT session_id, user_id, user_name, MAX(agent) AS agent,"
                 + " MIN(created_at) AS created_at, MAX(updated_at) AS updated_at,"
                 + " COUNT(*) AS message_count"
-                + " FROM " + qualified(DorisTableNames.CONFIG_AI_MESSAGE)
+                + " FROM " + messageTable
                 + " WHERE session_type = 'USER'"
                 + " GROUP BY session_id, user_id, user_name"
-                + " ORDER BY updated_at DESC LIMIT " + safeLimit + " OFFSET " + safeOffset;
+                + " ) grouped"
+                + " ORDER BY grouped.updated_at DESC LIMIT " + safeLimit + " OFFSET " + safeOffset;
         List<AiSessionSummaryRow> rows = new ArrayList<>();
         try (Connection connection = reader.connection();
              Statement statement = connection.createStatement();
@@ -285,7 +296,8 @@ public class ApmConfigRepository {
                         rs.getString("agent"),
                         rs.getTimestamp("created_at").toInstant(),
                         rs.getTimestamp("updated_at").toInstant(),
-                        rs.getInt("message_count")));
+                        rs.getInt("message_count"),
+                        rs.getString("first_user_message")));
             }
         }
         return rows;
@@ -1117,7 +1129,8 @@ public class ApmConfigRepository {
             String agent,
             Instant createdAt,
             Instant updatedAt,
-            int messageCount) {
+            int messageCount,
+            String firstUserMessage) {
     }
 
     public record AiMessageRow(

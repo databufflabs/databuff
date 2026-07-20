@@ -62,7 +62,7 @@ class AiSessionPersistenceTest {
         when(connection.prepareStatement(contains("config_ai_message"))).thenReturn(messagePs);
         when(statement.executeQuery(anyString())).thenAnswer(invocation -> {
             String sql = invocation.getArgument(0, String.class);
-            if (sql.contains("LIMIT 1")) {
+            if (sql.startsWith("SELECT 1 FROM")) {
                 return schemaRs;
             }
             return sessionsRs;
@@ -74,6 +74,7 @@ class AiSessionPersistenceTest {
         when(sessionsRs.getString("user_name")).thenReturn("admin");
         when(sessionsRs.getString("agent")).thenReturn("brain");
         when(sessionsRs.getInt("message_count")).thenReturn(1);
+        when(sessionsRs.getString("first_user_message")).thenReturn("hi");
         Instant now = Instant.now();
         when(sessionsRs.getTimestamp("created_at")).thenReturn(Timestamp.from(now));
         when(sessionsRs.getTimestamp("updated_at")).thenReturn(Timestamp.from(now));
@@ -119,6 +120,50 @@ class AiSessionPersistenceTest {
     }
 
     @Test
+    void listsPersistedSessionTitleWhenNotHydratedInMemory() throws Exception {
+        ApmReadRepository reader = mock(ApmReadRepository.class);
+        Connection connection = mock(Connection.class);
+        Statement statement = mock(Statement.class);
+        ResultSet schemaRs = mock(ResultSet.class);
+        ResultSet sessionsRs = mock(ResultSet.class);
+        ResultSet countRs = mock(ResultSet.class);
+        when(reader.connection()).thenReturn(connection);
+        when(connection.createStatement()).thenReturn(statement);
+        when(statement.executeQuery(anyString())).thenAnswer(invocation -> {
+            String sql = invocation.getArgument(0, String.class);
+            if (sql.startsWith("SELECT 1 FROM")) {
+                return schemaRs;
+            }
+            if (sql.startsWith("SELECT COUNT(*) AS total FROM")) {
+                return countRs;
+            }
+            return sessionsRs;
+        });
+        when(schemaRs.next()).thenReturn(true);
+        when(countRs.next()).thenReturn(true);
+        when(countRs.getLong("total")).thenReturn(1L);
+        when(sessionsRs.next()).thenReturn(true, false);
+        when(sessionsRs.getString("session_id")).thenReturn("s-persisted");
+        when(sessionsRs.getString("user_id")).thenReturn("admin");
+        when(sessionsRs.getString("user_name")).thenReturn("admin");
+        when(sessionsRs.getString("agent")).thenReturn("brain");
+        when(sessionsRs.getInt("message_count")).thenReturn(2);
+        when(sessionsRs.getString("first_user_message")).thenReturn("查询最近 1 小时错误率");
+        Instant now = Instant.now();
+        when(sessionsRs.getTimestamp("created_at")).thenReturn(Timestamp.from(now));
+        when(sessionsRs.getTimestamp("updated_at")).thenReturn(Timestamp.from(now));
+
+        DorisAvailability availability = new DorisAvailability();
+        availability.markAvailable();
+        AiSessionStore store = new AiSessionStore();
+        AiSessionPersistence persistence = new AiSessionPersistence(
+                reader, availability, store, new AiMessagePersistenceQueue(reader, TestStorageSupport.storage()), TestStorageSupport.storage());
+
+        assertThat(persistence.listSessions(0, 20)).singleElement()
+                .satisfies(summary -> assertThat(summary.title()).isEqualTo("查询最近 1 小时错误率"));
+    }
+
+    @Test
     void toleratesLoadFailure() throws Exception {
         ApmReadRepository reader = mock(ApmReadRepository.class);
         Connection connection = mock(Connection.class);
@@ -128,7 +173,7 @@ class AiSessionPersistenceTest {
         when(connection.createStatement()).thenReturn(statement);
         when(statement.executeQuery(anyString())).thenAnswer(invocation -> {
             String sql = invocation.getArgument(0, String.class);
-            if (sql.contains("LIMIT 1")) {
+            if (sql.startsWith("SELECT 1 FROM")) {
                 return schemaRs;
             }
             throw new SQLException("load failed");

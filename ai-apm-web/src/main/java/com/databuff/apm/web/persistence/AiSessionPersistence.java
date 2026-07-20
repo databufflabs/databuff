@@ -269,7 +269,7 @@ public class AiSessionPersistence {
                 row.sessionId(),
                 row.agent(),
                 "USER",
-                null,
+                summarizeTitle(row.firstUserMessage()),
                 null,
                 null,
                 row.userName(),
@@ -347,11 +347,16 @@ public class AiSessionPersistence {
                 .map(ApmConfigRepository.AiMessageRow::content)
                 .filter(content -> content != null && !content.isBlank())
                 .findFirst()
-                .map(content -> {
-                    String trimmed = content.trim().replaceAll("\\s+", " ");
-                    return trimmed.length() <= 48 ? trimmed : trimmed.substring(0, 48) + "...";
-                })
+                .map(AiSessionPersistence::summarizeTitle)
                 .orElse(null);
+    }
+
+    private static String summarizeTitle(String content) {
+        if (content == null || content.isBlank()) {
+            return null;
+        }
+        String trimmed = content.trim().replaceAll("\\s+", " ");
+        return trimmed.length() <= 48 ? trimmed : trimmed.substring(0, 48) + "...";
     }
 
     private static String stringMetadata(Map<String, Object> metadata, String key) {
