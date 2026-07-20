@@ -41,6 +41,7 @@ pnpm-debug.log*
 
 ### Local scratch
 .local/
+.tmp/
 CLAUDE.md
 
 ### Web runtime data (Docker Compose mounts ./ai-apm-web → /app)
