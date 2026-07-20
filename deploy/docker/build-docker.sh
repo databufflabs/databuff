@@ -50,6 +50,7 @@ stage_main_package() {
     "${STAGE_DIR}/sql/migrations" \
     "${STAGE_DIR}/data/fe-meta" \
     "${STAGE_DIR}/data/be-storage" \
+    "${STAGE_DIR}/data/web" \
     "${STAGE_DIR}/scripts"
 
   cp -f "${APM_DOCKER_SRC}/docker-compose.yml" "${STAGE_DIR}/"

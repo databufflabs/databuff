@@ -1,6 +1,6 @@
 # Docker 部署
 
-ingest、web、Doris 默认从离线镜像包目录按本机架构下载并 `docker load`；运行时仅挂载 `data/`（Doris 持久化）。应用镜像统一为 `databuffhub/*` 短名。
+ingest、web、Doris 默认从离线镜像包目录按本机架构下载并 `docker load`；运行时挂载 `data/`（Doris + web 持久化）。应用镜像统一为 `databuffhub/*` 短名。
 
 ## 目录结构
 
@@ -19,7 +19,7 @@ docker/
 ├── ai-apm-offline-demo-install.sh
 ├── build-docker.sh       # 打部署包并 SCP 上传到 databuff-site
 ├── build-docker-offline.sh # 打一体化离线大包（部署包 + 镜像）
-├── data/                 # Doris 持久化
+├── data/                 # 持久化（Doris FE/BE + web 报告/Skill）
 └── scripts/
 ```
 

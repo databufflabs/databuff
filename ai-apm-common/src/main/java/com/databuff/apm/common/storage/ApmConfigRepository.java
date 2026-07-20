@@ -269,12 +269,7 @@ public class ApmConfigRepository {
         String messageTable = qualified(DorisTableNames.CONFIG_AI_MESSAGE);
         String sql = "SELECT grouped.session_id, grouped.user_id, grouped.user_name, grouped.agent,"
                 + " grouped.created_at, grouped.updated_at, grouped.message_count,"
-                + " (SELECT m2.content FROM " + messageTable + " m2"
-                + " WHERE m2.session_id = grouped.session_id"
-                + " AND m2.message_type = 'USER'"
-                + " AND m2.content IS NOT NULL AND TRIM(m2.content) != ''"
-                + " ORDER BY m2.round_index, m2.message_index, m2.created_at, m2.message_id"
-                + " LIMIT 1) AS first_user_message"
+                + " first_msg.content AS first_user_message"
                 + " FROM ("
                 + " SELECT session_id, user_id, user_name, MAX(agent) AS agent,"
                 + " MIN(created_at) AS created_at, MAX(updated_at) AS updated_at,"
@@ -283,6 +278,14 @@ public class ApmConfigRepository {
                 + " WHERE session_type = 'USER'"
                 + " GROUP BY session_id, user_id, user_name"
                 + " ) grouped"
+                + " LEFT JOIN ("
+                + " SELECT session_id, content,"
+                + " ROW_NUMBER() OVER (PARTITION BY session_id"
+                + " ORDER BY round_index, message_index, created_at, message_id) AS rn"
+                + " FROM " + messageTable
+                + " WHERE session_type = 'USER' AND message_type = 'USER'"
+                + " AND content IS NOT NULL AND TRIM(content) != ''"
+                + " ) first_msg ON grouped.session_id = first_msg.session_id AND first_msg.rn = 1"
                 + " ORDER BY grouped.updated_at DESC LIMIT " + safeLimit + " OFFSET " + safeOffset;
         List<AiSessionSummaryRow> rows = new ArrayList<>();
         try (Connection connection = reader.connection();

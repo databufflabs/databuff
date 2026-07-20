@@ -6,6 +6,7 @@ cd "$ROOT"
 
 DORIS_DATA_FE="${ROOT}/data/fe-meta"
 DORIS_DATA_BE="${ROOT}/data/be-storage"
+WEB_DATA="${ROOT}/data/web"
 DORIS_FE_SERVICE="ai-apm-doris-fe"
 DORIS_BE_SERVICE="ai-apm-doris-be"
 INGEST_SERVICE="ai-apm-ingest"
@@ -22,6 +23,7 @@ doris_has_data() {
 }
 
 chmod +x "${ROOT}/scripts/"*.sh 2>/dev/null || true
+mkdir -p "$WEB_DATA"
 
 if [ -f "${ROOT}/env.sh" ]; then
   set -a
@@ -53,7 +55,7 @@ if doris_has_data; then
   compose_up "$INGEST_SERVICE" "$WEB_SERVICE"
 else
   echo "[start] initializing doris"
-  mkdir -p "$DORIS_DATA_FE" "$DORIS_DATA_BE"
+  mkdir -p "$DORIS_DATA_FE" "$DORIS_DATA_BE" "$WEB_DATA"
   compose_up_wait "$DORIS_FE_SERVICE" "$DORIS_BE_SERVICE" || { bootstrap_web_for_troubleshooting; exit 1; }
   "${ROOT}/scripts/init-doris.sh"
   compose_up "$INGEST_SERVICE" "$WEB_SERVICE"
