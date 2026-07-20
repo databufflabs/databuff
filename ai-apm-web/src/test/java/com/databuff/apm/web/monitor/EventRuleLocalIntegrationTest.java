@@ -225,8 +225,11 @@ class EventRuleLocalIntegrationTest {
         }
 
         @Bean
-        AlarmService alarmService(AlarmStore alarmStore, EventRuleService eventRuleService) {
-            return new AlarmService(alarmStore, eventRuleService);
+        AlarmService alarmService(
+                AlarmStore alarmStore,
+                EventRuleService eventRuleService,
+                EventPersistence eventPersistence) {
+            return new AlarmService(alarmStore, eventRuleService, eventPersistence);
         }
     }
 }

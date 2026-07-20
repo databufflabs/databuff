@@ -1,5 +1,6 @@
 package com.databuff.apm.web.monitor.service;
 
+import com.databuff.apm.common.storage.ApmConfigRepository;
 import com.databuff.apm.common.util.PortalServiceIdResolver;
 import com.databuff.apm.web.portal.PortalTimeParser;
 import com.databuff.apm.web.config.common.CommonResponse;
@@ -8,6 +9,8 @@ import com.databuff.apm.web.monitor.AlarmStore;
 import com.databuff.apm.web.monitor.EventRule;
 import com.databuff.apm.web.monitor.EventRuleService;
 import com.databuff.apm.web.monitor.policy.AlarmPolicySupport;
+import com.databuff.apm.web.persistence.EventPersistence;
+import org.springframework.lang.Nullable;
 import org.springframework.stereotype.Service;
 
 import java.time.Instant;
@@ -26,13 +29,20 @@ import java.util.stream.Collectors;
 public class AlarmService {
 
     private static final long EVENT_COUNT = 1L;
+    /** Portal duration includes the trigger minute bucket: end - start + 1min. */
+    private static final long DURATION_MINUTE_PAD_SECONDS = 60L;
 
     private final AlarmStore alarmStore;
     private final EventRuleService eventRuleService;
+    private final EventPersistence eventPersistence;
 
-    public AlarmService(AlarmStore alarmStore, EventRuleService eventRuleService) {
+    public AlarmService(
+            AlarmStore alarmStore,
+            EventRuleService eventRuleService,
+            @Nullable EventPersistence eventPersistence) {
         this.alarmStore = alarmStore;
         this.eventRuleService = eventRuleService;
+        this.eventPersistence = eventPersistence;
     }
 
     public long countAlarms(Map<String, Object> body) {
@@ -41,6 +51,7 @@ public class AlarmService {
 
     public Map<String, Object> queryParams(Map<String, Object> body) {
         List<Alarm> alarms = listAlarmsInQueryRange(body);
+        Map<String, List<ApmConfigRepository.EventRow>> eventsByAlarmId = batchLinkedEvents(alarms);
         Map<String, String> serviceNameById = new LinkedHashMap<>();
         Set<String> ruleNames = new LinkedHashSet<>();
         for (Alarm event : alarms) {
@@ -51,7 +62,7 @@ public class AlarmService {
                     serviceNameById.putIfAbsent(serviceId, serviceName);
                 }
             }
-            resolveRuleNames(event).forEach(ruleNames::add);
+            resolveRuleNames(event, eventsByAlarmId.getOrDefault(event.id(), List.of())).forEach(ruleNames::add);
         }
         List<Map<String, String>> serviceOptions = serviceNameById.entrySet().stream()
                 .map(entry -> Map.of(
@@ -92,9 +103,10 @@ public class AlarmService {
 
     public Map<String, Object> list(Map<String, Object> body) {
         Map<String, Object> params = body == null ? Map.of() : body;
-        List<Alarm> alarms = listAlarmsInQueryRange(params);
-        List<Map<String, Object>> rows = new ArrayList<>(filterAlarms(params, alarms).stream()
-                .map(this::toPortalAlarm)
+        List<Alarm> alarms = filterAlarms(params, listAlarmsInQueryRange(params));
+        Map<String, List<ApmConfigRepository.EventRow>> eventsByAlarmId = batchLinkedEvents(alarms);
+        List<Map<String, Object>> rows = new ArrayList<>(alarms.stream()
+                .map(alarm -> toPortalAlarm(alarm, eventsByAlarmId.getOrDefault(alarm.id(), List.of())))
                 .toList());
         rows.sort(alarmRowComparator(params));
         long total = rows.size();
@@ -201,18 +213,26 @@ public class AlarmService {
         String idLike = stringValue(body.get("idLike"));
         List<String> serviceFilters = resolveTriggerValues(body, "serviceId");
         List<String> ruleNameFilters = resolveTriggerValues(body, "ruleName");
+        Map<String, List<ApmConfigRepository.EventRow>> eventsByAlarmId =
+                ruleNameFilters.isEmpty() ? Map.of() : batchLinkedEvents(alarms);
         return alarms.stream()
                 .filter(event -> matchesLevel(event, levels))
                 .filter(event -> matchesDescription(event, description))
                 .filter(event -> matchesIdLike(event, idLike))
                 .filter(event -> matchesService(event, serviceFilters))
-                .filter(event -> matchesRuleName(resolveRuleNames(event), ruleNameFilters))
+                .filter(event -> matchesRuleName(
+                        resolveRuleNames(event, eventsByAlarmId.getOrDefault(event.id(), List.of())),
+                        ruleNameFilters))
                 .toList();
     }
 
     private Map<String, Object> toPortalAlarm(Alarm event) {
+        return toPortalAlarm(event, listLinkedEvents(event));
+    }
+
+    private Map<String, Object> toPortalAlarm(Alarm event, List<ApmConfigRepository.EventRow> linkedEvents) {
         AlarmTiming timing = resolveAlarmTiming(event);
-        List<String> ruleNameList = resolveRuleNames(event);
+        List<String> ruleNameList = resolveRuleNames(event, linkedEvents);
         Map<String, Object> trigger = new LinkedHashMap<>();
         trigger.put("service", List.of(event.service()));
         trigger.put("serviceId", List.of(PortalServiceIdResolver.normalize(event.service())));
@@ -234,7 +254,7 @@ public class AlarmService {
         row.put("serviceId", PortalServiceIdResolver.normalize(event.service()));
         row.put("serviceName", event.service());
         row.put("triggerObject", event.service());
-        row.put("abnormalMetrics", resolveAbnormalMetrics(event));
+        row.put("abnormalMetrics", resolveAbnormalMetrics(event, linkedEvents));
         if (!ruleNameList.isEmpty()) {
             row.put("ruleName", ruleNameList.get(0));
         }
@@ -263,33 +283,73 @@ public class AlarmService {
         return tags;
     }
 
-    private List<String> resolveRuleNames(Alarm alarm) {
-        if (alarm.service() == null || alarm.service().isBlank()) {
-            return List.of();
+    private List<String> resolveRuleNames(Alarm alarm, List<ApmConfigRepository.EventRow> linkedEvents) {
+        LinkedHashSet<String> names = new LinkedHashSet<>();
+        for (ApmConfigRepository.EventRow event : linkedEvents) {
+            if (event.ruleName() != null && !event.ruleName().isBlank()) {
+                names.add(event.ruleName());
+            }
         }
-        return eventRuleService.listRules().stream()
-                .filter(rule -> alarm.service().equals(rule.service()))
-                .map(EventRule::ruleName)
-                .filter(name -> name != null && !name.isBlank())
-                .distinct()
-                .toList();
+        if (!names.isEmpty()) {
+            return List.copyOf(names);
+        }
+        for (EventRule rule : resolveMatchedRules(alarm)) {
+            if (rule.ruleName() != null && !rule.ruleName().isBlank()) {
+                names.add(rule.ruleName());
+            }
+        }
+        return List.copyOf(names);
     }
 
-    private List<String> resolveAbnormalMetrics(Alarm alarm) {
-        if (alarm.service() == null || alarm.service().isBlank()) {
-            return List.of();
-        }
+    private List<String> resolveAbnormalMetrics(Alarm alarm, List<ApmConfigRepository.EventRow> linkedEvents) {
         LinkedHashSet<String> metrics = new LinkedHashSet<>();
-        for (EventRule rule : eventRuleService.listRules()) {
-            if (!alarm.service().equals(rule.service())) {
-                continue;
-            }
-            String metric = rule.metric();
-            if (metric != null && !metric.isBlank()) {
-                metrics.add(metric);
+        for (ApmConfigRepository.EventRow event : linkedEvents) {
+            eventRuleService.findRule(event.ruleId()).ifPresent(rule -> {
+                if (rule.metric() != null && !rule.metric().isBlank()) {
+                    metrics.add(rule.metric());
+                }
+            });
+        }
+        if (!metrics.isEmpty()) {
+            return List.copyOf(metrics);
+        }
+        for (EventRule rule : resolveMatchedRules(alarm)) {
+            if (rule.metric() != null && !rule.metric().isBlank()) {
+                metrics.add(rule.metric());
             }
         }
         return List.copyOf(metrics);
+    }
+
+    /**
+     * Exact service match only. Wildcard {@code *} rules are resolved via linked events
+     * ({@link #listLinkedEvents}) so we do not attribute every global rule to one alarm.
+     */
+    private List<EventRule> resolveMatchedRules(Alarm alarm) {
+        if (alarm.service() == null || alarm.service().isBlank()) {
+            return List.of();
+        }
+        List<EventRule> exact = new ArrayList<>();
+        for (EventRule rule : eventRuleService.listRules()) {
+            if (alarm.service().equals(rule.service())) {
+                exact.add(rule);
+            }
+        }
+        return exact;
+    }
+
+    private Map<String, List<ApmConfigRepository.EventRow>> batchLinkedEvents(List<Alarm> alarms) {
+        if (eventPersistence == null || !eventPersistence.isPersistenceEnabled() || alarms == null || alarms.isEmpty()) {
+            return Map.of();
+        }
+        return eventPersistence.listForAlarms(alarms);
+    }
+
+    private List<ApmConfigRepository.EventRow> listLinkedEvents(Alarm alarm) {
+        if (eventPersistence == null || !eventPersistence.isPersistenceEnabled() || alarm == null) {
+            return List.of();
+        }
+        return eventPersistence.listForAlarm(alarm);
     }
 
     private record AlarmTiming(long startMillis, Long endMillis, long durationSeconds) {
@@ -297,8 +357,11 @@ public class AlarmService {
 
     private AlarmTiming resolveAlarmTiming(Alarm alarm) {
         long triggerMillis = alarm.triggeredAt().toEpochMilli();
-        Long resolvedMillis = alarm.resolvedAt() == null ? triggerMillis : alarm.resolvedAt().toEpochMilli();
-        return new AlarmTiming(triggerMillis, resolvedMillis, 0L);
+        long endMillis = alarm.resolvedAt() == null
+                ? triggerMillis
+                : alarm.resolvedAt().toEpochMilli();
+        long durationSeconds = Math.max(0L, (endMillis - triggerMillis) / 1000L) + DURATION_MINUTE_PAD_SECONDS;
+        return new AlarmTiming(triggerMillis, endMillis, durationSeconds);
     }
 
     private static int portalLevel(String level) {

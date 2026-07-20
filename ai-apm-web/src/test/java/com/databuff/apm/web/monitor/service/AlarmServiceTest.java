@@ -1,12 +1,14 @@
 package com.databuff.apm.web.monitor.service;
 
 import com.databuff.apm.common.time.ApmTimeZones;
+import com.databuff.apm.common.storage.ApmConfigRepository;
 import com.databuff.apm.web.monitor.Alarm;
 import com.databuff.apm.web.monitor.AlarmStore;
 import com.databuff.apm.web.monitor.EventRule;
 import com.databuff.apm.web.monitor.EventRuleService;
 import com.databuff.apm.web.portal.PortalTimeParser;
 import com.databuff.apm.web.monitor.TestMonitorRecordIds;
+import com.databuff.apm.web.persistence.EventPersistence;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 
@@ -14,6 +16,7 @@ import java.time.Instant;
 import java.time.LocalDateTime;
 import java.util.List;
 import java.util.Map;
+import java.util.Optional;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.mockito.Mockito.mock;
@@ -29,7 +32,7 @@ class AlarmServiceTest {
     void setUp() {
         alarmStore = new AlarmStore(TestMonitorRecordIds.create());
         eventRuleService = mock(EventRuleService.class);
-        alarmService = new AlarmService(alarmStore, eventRuleService);
+        alarmService = new AlarmService(alarmStore, eventRuleService, null);
         alarmStore.open("demo-order", EventRule.WAY_THRESHOLD, "critical", "error rate exceeded");
     }
 
@@ -98,7 +101,7 @@ class AlarmServiceTest {
     }
 
     @Test
-    void listUsesResolvedTimeForEndTriggerTimeWithZeroDuration() {
+    void listUsesResolvedTimeForEndTriggerTimeWithDurationPlusOneMinute() {
         Instant triggeredAt = Instant.parse("2026-06-09T10:56:00Z");
         Instant resolvedAt = triggeredAt.plusSeconds(362);
         Alarm alarm = alarmStore.findOpenByService("demo-order").orElseThrow();
@@ -120,9 +123,34 @@ class AlarmServiceTest {
         @SuppressWarnings("unchecked")
         List<Map<String, Object>> list = (List<Map<String, Object>>) ((Map<?, ?>) response.get("data")).get("list");
         assertThat(list).hasSize(1);
-        assertThat(((Number) list.get(0).get("duration")).longValue()).isZero();
+        // duration = (end - start) + 1 minute
+        assertThat(((Number) list.get(0).get("duration")).longValue()).isEqualTo(422L);
         assertThat(((Number) list.get(0).get("endTriggerTime")).longValue())
                 .isEqualTo(resolvedAt.toEpochMilli());
+    }
+
+    @Test
+    void listUsesOneMinuteDurationWhenResolvedAtEqualsTriggeredAt() {
+        Instant triggeredAt = Instant.parse("2026-06-09T10:56:00Z");
+        Alarm alarm = alarmStore.findOpenByService("demo-order").orElseThrow();
+        alarmStore.persistExisting(new Alarm(
+                alarm.id(),
+                alarm.policyId(),
+                alarm.service(),
+                alarm.detectionWay(),
+                alarm.level(),
+                alarm.message(),
+                Alarm.STATUS_RESOLVED,
+                triggeredAt,
+                triggeredAt));
+
+        Map<String, Object> response = alarmService.list(Map.of(
+                "fromTime", triggeredAt.minusSeconds(60).toEpochMilli(),
+                "toTime", triggeredAt.plusSeconds(600).toEpochMilli()));
+
+        @SuppressWarnings("unchecked")
+        List<Map<String, Object>> list = (List<Map<String, Object>>) ((Map<?, ?>) response.get("data")).get("list");
+        assertThat(((Number) list.get(0).get("duration")).longValue()).isEqualTo(60L);
     }
 
     @Test
@@ -353,6 +381,36 @@ class AlarmServiceTest {
         assertThat(list.get(0).get("serviceName")).isEqualTo("inventory");
     }
 
+    @Test
+    void detailReturnsAbnormalMetricsFromLinkedEventsWhenRuleServiceIsWildcard() {
+        EventPersistence eventPersistence = mock(EventPersistence.class);
+        when(eventPersistence.isPersistenceEnabled()).thenReturn(true);
+        Alarm alarm = alarmStore.findOpenByService("demo-order").orElseThrow();
+        when(eventPersistence.listForAlarm(alarm)).thenReturn(List.of(
+                new ApmConfigRepository.EventRow(
+                        "E1",
+                        2L,
+                        "服务入口错误率过高",
+                        "demo-order",
+                        EventRule.WAY_THRESHOLD,
+                        "critical",
+                        "trigger",
+                        "error rate exceeded",
+                        "demo-order",
+                        false,
+                        Instant.now())));
+        when(eventRuleService.findRule(2L)).thenReturn(Optional.of(wildcardErrorRateRule()));
+        when(eventRuleService.listRules()).thenReturn(List.of(wildcardErrorRateRule()));
+
+        AlarmService service = new AlarmService(alarmStore, eventRuleService, eventPersistence);
+
+        Map<String, Object> response = service.detail(alarm.id());
+        @SuppressWarnings("unchecked")
+        Map<String, Object> detail = (Map<String, Object>) response.get("data");
+        assertThat(detail.get("abnormalMetrics")).isEqualTo(List.of("service.error.pct"));
+        assertThat(detail.get("ruleName")).isEqualTo("服务入口错误率过高");
+    }
+
     private static EventRule demoOrderRule() {
         return new EventRule(
                 2L,
@@ -362,6 +420,21 @@ class AlarmServiceTest {
                 "demo-order",
                 "service.http.cnt",
                 0.05,
+                EventRule.COMPARATOR_GT,
+                true,
+                null,
+                null);
+    }
+
+    private static EventRule wildcardErrorRateRule() {
+        return new EventRule(
+                2L,
+                "服务入口错误率过高",
+                EventRule.CLASSIFY_SINGLE,
+                EventRule.WAY_THRESHOLD,
+                "*",
+                "service.error.pct",
+                10.0,
                 EventRule.COMPARATOR_GT,
                 true,
                 null,

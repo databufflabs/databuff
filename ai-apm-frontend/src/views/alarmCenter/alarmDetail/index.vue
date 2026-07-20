@@ -42,7 +42,6 @@
           <div v-if="showOtherInfo" class="info-row">
             <div class="info-t flex-h"><span class="label">{{ $t('modules.views.alarmCenter.alarmDetail.s_1a42bdb8') }}</span>{{ detail.triggerObject || detail.serviceName || '-' }}</div>
             <div class="info-t flex-h"><span class="label">{{ $t('modules.views.alarmCenter.alarmDetail.s_87ae1624') }}</span>{{ abnormalMetricsText }}</div>
-            <div class="info-t flex-h"><span class="label">{{ $t('modules.views.alarmCenter.alarm.s_c62e34c5') }}</span>{{ detail.type | AlarmTypeFilter }}</div>
             <div v-if="getEnableStatus" class="info-t flex-h"><span class="label">{{ $t('modules.views.alarmCenter.alarm.s_f9d4e244') }}</span>
               <span>{{ detail.domainName || '-' }}</span>
             </div>
