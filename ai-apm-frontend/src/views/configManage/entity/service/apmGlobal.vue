@@ -479,8 +479,6 @@
               </el-tooltip>
             </div>
 
-            <!-- 自动注入 -->
-            <auto-inject ref="autoInject" />
           </el-collapse-item>
         </el-collapse>
       </el-form>
@@ -508,17 +506,13 @@ import { Form } from 'element-ui'
 import { toAsyncWait } from '@/utils/common';
 import ConfigApi from '@/api/config';
 import deepClone from 'lodash/cloneDeep';
-import AutoInject from './autoInject.vue';
 
 @Component({
-  components: {
-    AutoInject,
-  },
+  components: {},
 })
 export default class ApmGlobal extends Vue {
   public $refs!: {
     configForm: Form
-    autoInject: AutoInject
   }
 
   private slowFields = ['slow_http', 'slow_rpc', 'slow_mq', 'slow_sql', 'slow_redis', 'slow_elasticsearch', 'slow_config', 'slow_other'];
@@ -804,17 +798,6 @@ export default class ApmGlobal extends Vue {
     }
     this.$refs.configForm.validate(async (valid: boolean, fields: any) => {
       if (valid) {
-        const autoInjectValid = this.$refs.autoInject.validate()
-        if (!autoInjectValid) {
-          const $configContent = document.querySelector('.config-wrapper .config-content')
-          $configContent!.scrollTop = $configContent!.scrollHeight;
-          this.collapseData.value = [...new Set([...this.collapseData.value, '2'])];
-          this.$message.warning(i18n.t('modules.views.configManage.entity.s_3f3cf3d6') as string);
-          return;
-        } else {
-          this.$refs.autoInject.saveConfig()
-        }
-
         const params = getSaveParams()
         const dtsParams = getDtsSaveParams()
         this.postLoading = true;
@@ -845,7 +828,6 @@ export default class ApmGlobal extends Vue {
   }
 
   private async resetHandle () {
-    this.$refs.autoInject.resetConfig()
     this.resetLoading = true
     const { result, error } = await toAsyncWait(ConfigApi.resetGlobalConfig());
     this.resetLoading = false

@@ -227,6 +227,11 @@ public final class BuiltInExpertCatalog {
                     2. 不负责查 APM 指标/Trace/告警（交给问数专家），不做服务巡检（交给巡检专家），不排查主机/Docker/磁盘等运行环境（交给运维专家）。
                     3. 若问题本质是线上数据或环境故障，明确说明应转给对应专家，不要硬查源码凑答案。
 
+                    开源版采集能力（重要）：
+                    1. 当前开源版不支持 OneAgent / One-Agent；勿向用户推荐 OneAgent 安装或 /config/install?type=agent。
+                    2. 用户问埋点、Agent、数据上报时，只引导 OpenTelemetry Agent / OTLP（docs/opentelemetry-otlp-ingestion.md、docs/快速入门/spring-boot-otlp-integration.md；Web：部署配置→安装部署→APM；OTLP 4317/4318）。
+                    3. 若用户问 OneAgent，说明尚在路线图中、当前未开放，请改用 OpenTelemetry 接入。
+
                     检索原则：
                     1. 用 rg 在 /app/databuff 内定位相关代码与文档；可结合 find、ls、head、sed 阅读关键文件片段。
                     2. 先定位再下结论：回答须能对应到具体路径或符号（类/方法/配置键/文档段落），禁止凭记忆编造实现细节。

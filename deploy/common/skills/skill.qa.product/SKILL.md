@@ -23,11 +23,24 @@ description: 产品使用、功能说明与配置含义答疑规则
 5. 找不到依据时如实说明「未找到相关依据」，不要猜测。
 6. 命令仅用于只读检索与阅读；不要改文件、不要重启服务、不要执行破坏性操作。
 
+## 开源版能力边界（采集 / Agent）
+
+当前开源版本**不支持** OneAgent / One-Agent 统一采集 Agent（见 `docs/Roadmap.md` 下一阶段规划；Web 安装页 OneAgent 页签为「待开放」）。向用户答疑时：
+
+- **不要**向用户推荐安装或使用 OneAgent（勿引导 `/config/install?type=agent`、`/config/status?type=agent` 作为可用方案）；UI 上 OneAgent 相关入口为「待开放」，仅作展示。
+- 用户问应用埋点、数据上报、Agent 安装、如何采集 Trace/指标时，统一引导 **OpenTelemetry / OTLP** 方案：
+  - 文档：`docs/opentelemetry-otlp-ingestion.md`、`docs/快速入门/spring-boot-otlp-integration.md`（Java）、`docs/快速入门/docker安装部署.md`、`docs/快速入门/k8s安装部署.md`
+  - Web 入口：**部署配置 → 安装部署 → APM**（路由 `/deployInstall?type=apm`）；也可参考 **OTel Collector** 页签
+  - Ingest OTLP 端口：gRPC **4317**、HTTP **4318**
+  - Java 零侵入：`-javaagent:opentelemetry-javaagent.jar` 并配置 `OTEL_EXPORTER_OTLP_*`、`OTEL_SERVICE_NAME` 等环境变量
+- 若用户明确问 OneAgent / One-Agent，说明该能力尚在路线图中、当前版本未开放，请改用 OpenTelemetry Agent 或 OTLP SDK 接入。
+
 ## 常用检索路径（按需）
 
 | 场景 | 优先看 |
 |------|--------|
 | 产品用法 / 手册 | `docs/` |
+| 应用埋点 / OTLP 接入 | `docs/opentelemetry-otlp-ingestion.md`、`docs/快速入门/spring-boot-otlp-integration.md` |
 | 部署与运维安装 | `deploy/`、`docs/运维参考/`、`docs/快速入门/` |
 | Web / AI 平台后端 | `ai-apm-web/src/` |
 | 前端页面与路由 | `ai-apm-frontend/src/` |

@@ -10,7 +10,7 @@
       </div>
 
       <div class="tabs-pane-wrap">
-        <component :is="activeName" />
+        <coming-soon page-name="OneAgent" />
       </div>
     </div>
   </div>
@@ -18,14 +18,12 @@
 
 <script lang="ts">
 import { Vue, Component, Watch } from 'vue-property-decorator';
-import Agent from './agent/index.vue';
+import ComingSoon from '@/components/coming-soon/index.vue';
 
 @Component({
-  components: {
-    Agent,
-  }
+  components: { ComingSoon },
 })
-export default class AlarmConfig extends Vue {
+export default class ConfigStatus extends Vue {
   private tabs = [
     { label: 'OneAgent', value: 'agent' },
   ]
@@ -79,6 +77,10 @@ export default class AlarmConfig extends Vue {
   .tabs-pane-wrap {
     flex: 1;
     overflow: hidden;
+
+    :deep(.coming-soon-wrapper) {
+      min-height: 360px;
+    }
   }
 }
 </style>

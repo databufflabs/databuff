@@ -66,6 +66,31 @@ class SkillFileSyncServiceTest {
     }
 
     @Test
+    void qaProductSkillSteersUsersToOpenTelemetryNotOneAgent() throws Exception {
+        AiSkillDefinition skill = new AiSkillDefinition(
+                "skill.qa.product",
+                "产品答疑",
+                null,
+                "Product QA skill",
+                DeployCommonSkills.contentUri("skill.qa.product"),
+                DeployCommonSkills.contentUri("skill.qa.product"),
+                true,
+                true,
+                1L,
+                "",
+                Instant.now(),
+                Instant.now());
+
+        String body = service.readSkillContent(skill);
+
+        assertThat(body)
+                .contains("不支持")
+                .contains("OneAgent")
+                .contains("OpenTelemetry")
+                .contains("docs/opentelemetry-otlp-ingestion.md");
+    }
+
+    @Test
     void syncsRemoteSkillToCustomDirectory() throws Exception {
         Path source = tempDir.resolve("source/SKILL.md");
         Files.createDirectories(source.getParent());

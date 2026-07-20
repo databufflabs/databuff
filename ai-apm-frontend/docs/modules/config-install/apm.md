@@ -1,48 +1,25 @@
 # APM 配置
 
-> 页面: `/config/install?type=apm`
-> 文件: `src/views/configInstall/apm/index.vue`
+> 页面: `/deploy/access?type=apm`
+> 文件: `src/views/deployInstall/apm/index.vue`
 
 ## 页面职责
 
-APM 页用于按部署环境和语言给出应用接入指引，既包含主机环境，也包含容器环境。
+APM 页用于按部署环境和语言给出 **OpenTelemetry** 应用接入指引，既包含主机环境，也包含容器环境。
 
 ## 页面结构
 
-- 环境选择:
-  - `host`
-  - `container`
-- 语言/容器选择:
-  - 主机环境下可授权的语言
-  - 容器环境下当前只有 `kubernetes`
-- Java 场景额外支持:
-  - `auto`
-  - `manual`
-
-## 主要接口
-
-- `UserApi.getDownloadVersion`
-- `UserApi.getAuthLangs`
-
-详细接口见:
-
-- [User API](../../api/user.md)
-
-## 关键参数
-
-- `type=apm`
-- `env`: `host` / `container`
-- `lang`: 语言或容器类型，如 `java`、`python`、`kubernetes`
+- 环境选择: `host` / `container`
+- 语言/容器选择: Java、Python、Go、Node.js、.NET 等；容器环境为 `kubernetes`
+- Java 场景额外支持: `auto`（OpenTelemetry Injector）/ `manual`（`-javaagent`）
 
 ## 典型流程
 
-- 第一步跳转到 OneAgent 安装页完成基础安装
-- 第二步按环境和语言选择对应接入说明
-- Java 自动注入模式会引导到:
-  - 部署状态页开启自动注入
-  - 配置管理里的服务监控高级配置
+1. 在页面选择环境与语言
+2. 按说明配置 OpenTelemetry Java Agent 或对应语言 SDK
+3. 将 OTLP 数据指向 DataBuff Ingest（默认 gRPC `4317`、HTTP `4318`）
 
-## 注意事项
+## 相关文档
 
-- 可选语言会受 `getAuthLangs` 返回的授权语言列表控制
-- 代码里保留了 `ruby` 入口位，但当前未授权也没有对应组件
+- 仓库根目录 `docs/opentelemetry-otlp-ingestion.md`
+- 仓库根目录 `docs/快速入门/spring-boot-otlp-integration.md`
