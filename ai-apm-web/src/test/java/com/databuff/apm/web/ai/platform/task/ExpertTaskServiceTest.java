@@ -9,6 +9,7 @@ import com.databuff.apm.web.ai.platform.runtime.ExpertChatResult;
 import com.databuff.apm.web.ai.platform.runtime.ExpertRuntime;
 import com.databuff.apm.web.ai.platform.runtime.ExpertRuntimeEvent;
 import com.databuff.apm.web.ai.platform.runtime.ExpertRuntimeRegistry;
+import com.databuff.apm.web.ai.platform.runtime.SessionExpertRuntimeRegistry;
 import com.databuff.apm.web.ai.platform.runtime.SessionWorkspaceService;
 import com.databuff.apm.web.ai.platform.runtime.TaskGeneratedFileRegistry;
 import com.databuff.apm.web.ai.tool.ApmToolkit;
@@ -55,12 +56,14 @@ class ExpertTaskServiceTest {
         TestAiSupport.PlatformRuntimeFixture fixture =
                 aiFixture.buildPlatformRuntime(Mockito.mock(ApmToolkit.class));
         ExpertRuntimeRegistry runtimeRegistry = mock(ExpertRuntimeRegistry.class);
+        SessionExpertRuntimeRegistry sessionRuntimeRegistry = mock(SessionExpertRuntimeRegistry.class);
         ExpertRuntime runtime = mock(ExpertRuntime.class);
         when(runtime.stream(any(ExpertChatInput.class)))
                 .thenReturn(Flux.just(ExpertRuntimeEvent.text("metrics ok")));
         when(runtime.chat(any(ExpertChatInput.class)))
                 .thenReturn(Mono.just(ExpertChatResult.ok("metrics ok")));
         when(runtimeRegistry.getOrCreate("data")).thenReturn(runtime);
+        when(sessionRuntimeRegistry.getOrCreate(any(String.class), any())).thenReturn(runtime);
         sessionStore = new AiSessionStore();
         pendingRegistry = new ExpertTaskPendingRegistry();
         ExpertTaskTextGuard taskTextGuard = new ExpertTaskTextGuard();
@@ -71,6 +74,7 @@ class ExpertTaskServiceTest {
         taskService = new ExpertTaskService(
                 fixture.expertManagementService(),
                 providerOf(runtimeRegistry),
+                providerOf(sessionRuntimeRegistry),
                 null,
                 sessionStore,
                 pendingRegistry,
@@ -164,7 +168,8 @@ class ExpertTaskServiceTest {
         ExpertTaskPendingRegistry pendingRegistry = new ExpertTaskPendingRegistry();
         ExpertTaskService service = new ExpertTaskService(
                 Mockito.mock(ExpertManagementService.class),
-                providerOf(null),
+                providerOf((ExpertRuntimeRegistry) null),
+                providerOf((SessionExpertRuntimeRegistry) null),
                 null,
                 sessionStore,
                 pendingRegistry,
@@ -251,6 +256,36 @@ class ExpertTaskServiceTest {
 
             @Override
             public void ifAvailable(Consumer<ExpertRuntimeRegistry> consumer) {
+                consumer.accept(registry);
+            }
+        };
+    }
+
+    private static ObjectProvider<SessionExpertRuntimeRegistry> providerOf(
+            SessionExpertRuntimeRegistry registry) {
+        return new ObjectProvider<>() {
+            @Override
+            public SessionExpertRuntimeRegistry getObject() {
+                return registry;
+            }
+
+            @Override
+            public SessionExpertRuntimeRegistry getObject(Object... args) {
+                return registry;
+            }
+
+            @Override
+            public SessionExpertRuntimeRegistry getIfAvailable() {
+                return registry;
+            }
+
+            @Override
+            public SessionExpertRuntimeRegistry getIfUnique() {
+                return registry;
+            }
+
+            @Override
+            public void ifAvailable(Consumer<SessionExpertRuntimeRegistry> consumer) {
                 consumer.accept(registry);
             }
         };

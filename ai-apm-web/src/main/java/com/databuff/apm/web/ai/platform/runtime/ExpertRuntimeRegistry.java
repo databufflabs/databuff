@@ -92,8 +92,9 @@ public class ExpertRuntimeRegistry {
             removed.runtime.close();
             log.info("Invalidated runtime for expert {}: {}", expertId, reason);
         }
-        if ("brain".equals(expertId)) {
-            releaseSessionBrainRuntimes();
+        SessionExpertRuntimeRegistry sessionRegistry = sessionExpertRuntimeRegistry.getIfAvailable();
+        if (sessionRegistry != null) {
+            sessionRegistry.releaseByExpert(expertId);
         }
     }
 
@@ -155,13 +156,6 @@ public class ExpertRuntimeRegistry {
 
     private Object lockFor(String expertId) {
         return ("expert-runtime-lock:" + expertId).intern();
-    }
-
-    private void releaseSessionBrainRuntimes() {
-        SessionExpertRuntimeRegistry registry = sessionExpertRuntimeRegistry.getIfAvailable();
-        if (registry != null) {
-            registry.releaseAll();
-        }
     }
 
     private record CachedRuntime(RuntimeCacheKey cacheKey, ExpertRuntime runtime) {

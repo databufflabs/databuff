@@ -112,7 +112,8 @@ class SkillPackageServiceTest {
                         "SKILL.md",
                         "templates/summary-brief.html",
                         "templates/report-analysis.html",
-                        "templates/inspection-report.html");
+                        "templates/inspection-report.html",
+                        "templates/trend-chart-snippet.html");
     }
 
     private static byte[] buildZip(String skillMarkdown, String extraPath, String extraContent) throws Exception {

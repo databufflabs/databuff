@@ -3,8 +3,8 @@
 #
 # 全新安装 / 重装：会删除安装目录（含 data/）。
 # 保留数据升级请使用同包内 update.sh。
-#   tar -xzf databuff-ai-apm-offline-0.1.5-amd64.tar.gz
-#   cd databuff-ai-apm-offline-0.1.5-amd64
+#   tar -xzf databuff-ai-apm-offline-0.1.4-amd64.tar.gz
+#   cd databuff-ai-apm-offline-0.1.4-amd64
 #   sudo ./install.sh
 #
 # 环境变量:

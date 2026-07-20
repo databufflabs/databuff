@@ -21,7 +21,7 @@ class GlobalTopologyPortalServiceTest {
     private static GlobalTopologyPortalService service(
             GlobalTopologyQueryService queryService,
             AlarmStore alarmStore) {
-        return new GlobalTopologyPortalService(queryService, alarmStore);
+        return new GlobalTopologyPortalService(queryService, new ServiceAlarmCounter(alarmStore));
     }
 
     private static AlarmStore emptyAlarmStore() {

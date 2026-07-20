@@ -18,8 +18,8 @@
 #   FORCE_PULL_IMAGES  1=强制重新下载镜像（同 --pull-images）
 #
 # 指定版本:
-#   curl -fsSL .../ai-apm-install.sh | bash -s -- --version 0.1.5
-#   APM_VERSION=0.1.5 curl -fsSL .../ai-apm-install.sh | bash
+#   curl -fsSL .../ai-apm-install.sh | bash -s -- --version 0.1.4
+#   APM_VERSION=0.1.4 curl -fsSL .../ai-apm-install.sh | bash
 
 set -e
 

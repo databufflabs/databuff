@@ -15,6 +15,7 @@ import com.databuff.apm.web.ai.platform.runtime.ExpertRuntime;
 import com.databuff.apm.web.ai.platform.runtime.ExpertRuntimeEvent;
 import com.databuff.apm.web.ai.platform.runtime.ExpertRuntimeRegistry;
 import com.databuff.apm.web.ai.platform.runtime.SessionExpertRuntimeRegistry;
+import com.databuff.apm.web.ai.platform.expert.AiExpertDefinition;
 import com.databuff.apm.web.ai.tool.ApmToolkit;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeEach;
@@ -84,11 +85,18 @@ class BrainAsyncRoutingIntegrationTest {
         when(registry.getOrCreate("brain")).thenReturn(brainRuntime);
 
         SessionExpertRuntimeRegistry sessionRegistry = mock(SessionExpertRuntimeRegistry.class);
-        when(sessionRegistry.getOrCreate(any(String.class), any())).thenReturn(brainRuntime);
+        when(sessionRegistry.getOrCreate(any(String.class), any())).thenAnswer(invocation -> {
+            AiExpertDefinition expert = invocation.getArgument(1);
+            if (expert != null && "data".equals(expert.expertId())) {
+                return dataRuntime;
+            }
+            return brainRuntime;
+        });
 
         taskService = new ExpertTaskService(
                 fixture.expertManagementService(),
                 providerOf(registry),
+                providerOf(sessionRegistry),
                 null,
                 sessionStore,
                 pendingRegistry,
@@ -192,6 +200,36 @@ class BrainAsyncRoutingIntegrationTest {
 
             @Override
             public void ifAvailable(Consumer<ExpertRuntimeRegistry> consumer) {
+                consumer.accept(registry);
+            }
+        };
+    }
+
+    private static ObjectProvider<SessionExpertRuntimeRegistry> providerOf(
+            SessionExpertRuntimeRegistry registry) {
+        return new ObjectProvider<>() {
+            @Override
+            public SessionExpertRuntimeRegistry getObject() {
+                return registry;
+            }
+
+            @Override
+            public SessionExpertRuntimeRegistry getObject(Object... args) {
+                return registry;
+            }
+
+            @Override
+            public SessionExpertRuntimeRegistry getIfAvailable() {
+                return registry;
+            }
+
+            @Override
+            public SessionExpertRuntimeRegistry getIfUnique() {
+                return registry;
+            }
+
+            @Override
+            public void ifAvailable(Consumer<SessionExpertRuntimeRegistry> consumer) {
                 consumer.accept(registry);
             }
         };

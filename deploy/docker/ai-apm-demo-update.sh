@@ -2,7 +2,7 @@
 # DataBuff AI APM Demo 在线升级（停掉旧 demo，换成目标版本）
 #
 #   curl -fsSL https://databuff.ai/databuff/ai-apm-demo-update.sh | bash
-#   curl -fsSL .../ai-apm-demo-update.sh | bash -s -- --version 0.1.5
+#   curl -fsSL .../ai-apm-demo-update.sh | bash -s -- --version 0.1.4
 #   curl -fsSL .../ai-apm-demo-update.sh | bash -s -- --pull-images
 #
 # 与 ai-apm-demo-install.sh 区别:

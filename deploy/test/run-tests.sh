@@ -8,8 +8,10 @@
 # Ops docs: docs/运维参考/Docker运维.md 「发布验收 / Release gate」
 #
 # Usage:
-#   ./run-tests.sh                  # 跑接口 + AI chat（已配置 API Key 时）
+#   ./run-tests.sh                  # 跑接口 + AI chat（已配置 API Key 时）+ 会话记忆（需 DEEPSEEK_API_KEY）
 #   TEST_SKIP_AI_CHAT=1 ./run-tests.sh
+#   TEST_SKIP_AI_MEMORY=1 ./run-tests.sh
+#   DEEPSEEK_API_KEY=sk-... ./run-tests.sh   # 启用 AI 会话记忆集成测试
 set -euo pipefail
 
 TEST_DIR="$(cd "$(dirname "$0")" && pwd)"

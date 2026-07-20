@@ -59,6 +59,34 @@ class SessionExpertRuntimeRegistryTest {
     }
 
     @Test
+    void keepsSeparateRuntimesPerExpertInSameSession() {
+        AiExpertDefinition brain = expertManagementService.find("brain").orElseThrow();
+        AiExpertDefinition inspection = expertManagementService.find("inspection").orElseThrow();
+        String sessionId = "session-multi-expert";
+
+        ExpertRuntime brainRuntime = registry.getOrCreate(sessionId, brain);
+        ExpertRuntime inspectionRuntime = registry.getOrCreate(sessionId, inspection);
+
+        assertThat(inspectionRuntime).isNotSameAs(brainRuntime);
+        assertThat(registry.getOrCreate(sessionId, inspection)).isSameAs(inspectionRuntime);
+    }
+
+    @Test
+    void releaseOneExpertDoesNotDropOtherExpertsInSession() {
+        AiExpertDefinition brain = expertManagementService.find("brain").orElseThrow();
+        AiExpertDefinition inspection = expertManagementService.find("inspection").orElseThrow();
+        String sessionId = "session-release-one";
+
+        ExpertRuntime brainRuntime = registry.getOrCreate(sessionId, brain);
+        ExpertRuntime inspectionRuntime = registry.getOrCreate(sessionId, inspection);
+
+        registry.release(sessionId, "brain");
+
+        assertThat(registry.getOrCreate(sessionId, brain)).isNotSameAs(brainRuntime);
+        assertThat(registry.getOrCreate(sessionId, inspection)).isSameAs(inspectionRuntime);
+    }
+
+    @Test
     void releaseRecreatesRuntimeForSameSession() {
         AiExpertDefinition brain = expertManagementService.find("brain").orElseThrow();
         String sessionId = "session-b";

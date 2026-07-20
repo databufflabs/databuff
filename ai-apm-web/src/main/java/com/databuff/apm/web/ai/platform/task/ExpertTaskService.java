@@ -11,8 +11,10 @@ import com.databuff.apm.web.ai.platform.runtime.ExpertChatScopeRegistry;
 import com.databuff.apm.web.ai.platform.runtime.ExpertRuntime;
 import com.databuff.apm.web.ai.platform.runtime.ExpertRuntimeEvent;
 import com.databuff.apm.web.ai.platform.runtime.ExpertRuntimeRegistry;
+import com.databuff.apm.web.ai.platform.runtime.SessionExpertRuntimeRegistry;
 import com.databuff.apm.web.ai.platform.runtime.SessionWorkspaceService;
 import com.databuff.apm.web.ai.platform.runtime.TaskGeneratedFileRegistry;
+import com.databuff.apm.web.ai.platform.expert.AiExpertDefinition;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.beans.factory.annotation.Autowired;
@@ -42,6 +44,7 @@ public class ExpertTaskService {
 
     private final ExpertManagementService expertManagementService;
     private final ObjectProvider<ExpertRuntimeRegistry> expertRuntimeRegistry;
+    private final ObjectProvider<SessionExpertRuntimeRegistry> sessionExpertRuntimeRegistry;
     private final ObjectProvider<ExpertTaskPersistence> persistence;
     private final AiSessionStore sessionStore;
     private final ExpertTaskPendingRegistry pendingRegistry;
@@ -56,6 +59,7 @@ public class ExpertTaskService {
     public ExpertTaskService(
             ExpertManagementService expertManagementService,
             ObjectProvider<ExpertRuntimeRegistry> expertRuntimeRegistry,
+            ObjectProvider<SessionExpertRuntimeRegistry> sessionExpertRuntimeRegistry,
             ObjectProvider<ExpertTaskPersistence> persistence,
             AiSessionStore sessionStore,
             ExpertTaskPendingRegistry pendingRegistry,
@@ -65,6 +69,7 @@ public class ExpertTaskService {
             TaskGeneratedFileRegistry generatedFileRegistry) {
         this.expertManagementService = expertManagementService;
         this.expertRuntimeRegistry = expertRuntimeRegistry;
+        this.sessionExpertRuntimeRegistry = sessionExpertRuntimeRegistry;
         this.persistence = persistence;
         this.sessionStore = sessionStore;
         this.pendingRegistry = pendingRegistry;
@@ -261,32 +266,42 @@ public class ExpertTaskService {
         current = updateStatus(current, ExpertTaskStatus.RUNNING, null, null);
         publish(ExpertTaskEvent.running(current));
         try {
-            ExpertRuntimeRegistry registry = expertRuntimeRegistry.getIfAvailable();
-            if (registry == null) {
+            ExpertRuntimeRegistry sharedRegistry = expertRuntimeRegistry.getIfAvailable();
+            SessionExpertRuntimeRegistry sessionRegistry = sessionExpertRuntimeRegistry.getIfAvailable();
+            String targetExpertId = current.targetExpertId();
+            AiExpertDefinition targetExpert = expertManagementService.find(targetExpertId)
+                    .orElseThrow(() -> new IllegalStateException("expert not found: " + targetExpertId));
+            final ExpertRuntime runtime;
+            if (sessionRegistry != null) {
+                runtime = sessionRegistry.getOrCreate(current.sessionId(), targetExpert);
+            } else if (sharedRegistry != null) {
+                runtime = sharedRegistry.getOrCreate(targetExpertId);
+            } else {
                 throw new IllegalStateException("ExpertRuntimeRegistry unavailable");
             }
-            ExpertRuntime runtime = registry.getOrCreate(current.targetExpertId());
             int roundIndex = metadataInt(current.metadata(), ExpertMessageConstants.META_ROUND_INDEX,
                     sessionStore.peekCurrentRoundIndex(current.sessionId()));
             String userName = metadataString(current.metadata(), "userName");
+            String parentSessionId = current.sessionId();
             String runtimeSessionId = ExpertChatScopeRegistry.taskScopedSessionId(
-                    current.sessionId(), current.taskId());
+                    parentSessionId, current.taskId());
             Map<String, Object> context = ExpertMessageContext.taskMetadata(
-                    current.sessionId(),
+                    parentSessionId,
                     roundIndex,
                     current.taskId(),
                     current.sourceExpertId(),
                     runtimeSessionId);
             String wrappedInput = ExpertMessageContext.wrapTaskInput(
-                    current.sessionId(),
+                    parentSessionId,
                     roundIndex,
                     current.taskId(),
                     current.sourceExpertId(),
                     current.input());
-            // ChatScope/AgentScope + TaskContext stack all key by runtimeSessionId — never touch parent brain scope.
+            // ChatScope stays on runtimeSessionId; AgentScope memory uses parentSessionId on the
+            // per-(session, expert) runtime so serial dispatches share memory.
             ExpertChatInput input = new ExpertChatInput(
                     wrappedInput,
-                    runtimeSessionId,
+                    parentSessionId,
                     userName,
                     null,
                     context);

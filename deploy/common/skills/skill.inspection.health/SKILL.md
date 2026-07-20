@@ -19,7 +19,7 @@ description: 服务健康巡检与异常诊断流程
    - 实例数变化 / 消失实例
    - Web / service 类型补充：服务异常分布、JVM/GC、CPU/内存使用率
 3. 发现可疑问题后，不要直接定论根因；按异常方向补充证据：`queryMetricData`、`queryServiceTopology`、`queryTraceListByCondition`、`queryTraceDetail`、`queryServiceAlarms`、`queryLogTrend`、`queryLogDetail`、`queryLogsByTraceId`。
-4. 巡检结论较完整时，**可主动建议**生成 HTML 巡检报告（这是 `skill.summary.html` 中唯一允许主动建议 HTML 的场景）；用户同意或明确要求导出时，再按 `inspection-report.html` 写出到 `outputs/`（一次 `readWorkspaceFile` 读完整模版，见该 Skill「选模版与读取」）。**不要**在用户未同意时直接写文件。
+4. 巡检结论较完整时，**必须**按 `skill.summary.html` 的 `inspection-report.html` 写出 HTML 报告到 `outputs/`（一次 `readWorkspaceFile` 读完整模版，见该 Skill「选模版与读取」），**不要**先征求用户同意；写完后一句话告知文件名便于预览。
 5. 未发现明显异常时，也要说明这是工具结果，并结合用户问题决定是否继续查明细。
 
 ## 时间范围
@@ -34,6 +34,7 @@ description: 服务健康巡检与异常诊断流程
 
 - 需要展示趋势时，先调用 `drawTrendCharts` 传入所有图表数据，再输出文字结论。
 - 不要在 Markdown 中插入 `![...](chart)` 图片；前端会根据 `drawTrendCharts` 结果自动渲染。
+- 若写出 HTML 巡检/趋势报告，须在 HTML 内嵌 ECharts，见 `skill.summary.html` 与 `trend-chart-snippet.html`。
 
 ## 回答要求
 

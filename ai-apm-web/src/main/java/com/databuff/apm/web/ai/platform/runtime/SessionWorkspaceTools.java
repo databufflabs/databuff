@@ -2,6 +2,7 @@ package com.databuff.apm.web.ai.platform.runtime;
 
 import com.databuff.apm.web.ai.agent.AgentRuntimeConfig;
 import com.databuff.apm.web.ai.agent.ShellCommandPolicy;
+import com.databuff.apm.web.ai.platform.task.ExpertMessageConstants;
 import com.databuff.apm.web.ai.platform.task.ExpertSessionResolver;
 import io.agentscope.core.agent.RuntimeContext;
 import io.agentscope.core.message.ImageBlock;
@@ -225,7 +226,7 @@ public class SessionWorkspaceTools {
         if (runtimeContext == null) {
             return;
         }
-        String runtimeSessionId = runtimeContext.getSessionId();
+        String runtimeSessionId = taskScopedSessionId(runtimeContext);
         if (!ExpertChatScopeRegistry.isTaskScopedSessionId(runtimeSessionId)) {
             return;
         }
@@ -233,6 +234,15 @@ public class SessionWorkspaceTools {
         String taskId = runtimeSessionId.substring(
                 suffix + ExpertChatScopeRegistry.TASK_SESSION_SUFFIX.length()).trim();
         generatedFileRegistry.record(sessionId, taskId, relativePath);
+    }
+
+    private static String taskScopedSessionId(RuntimeContext runtimeContext) {
+        Object scoped = runtimeContext.get(ExpertMessageConstants.META_RUNTIME_SESSION_ID);
+        if (scoped != null && !String.valueOf(scoped).isBlank()) {
+            return String.valueOf(scoped).trim();
+        }
+        String sessionId = runtimeContext.getSessionId();
+        return sessionId == null ? null : sessionId.trim();
     }
 
     private static String normalizeListingPath(String relativePath) {

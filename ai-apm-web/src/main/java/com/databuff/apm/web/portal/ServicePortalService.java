@@ -67,14 +67,17 @@ public class ServicePortalService {
     private final ApmReadRepository readRepository;
     private final String metricDatabase;
     private final GlobalTopologyQueryService globalTopologyQueryService;
+    private final ServiceAlarmCounter serviceAlarmCounter;
 
     public ServicePortalService(
             ApmReadRepository readRepository,
             ApmStorageProperties storageProperties,
-            GlobalTopologyQueryService globalTopologyQueryService) {
+            GlobalTopologyQueryService globalTopologyQueryService,
+            ServiceAlarmCounter serviceAlarmCounter) {
         this.readRepository = readRepository;
         this.metricDatabase = storageProperties.metricDatabase();
         this.globalTopologyQueryService = globalTopologyQueryService;
+        this.serviceAlarmCounter = serviceAlarmCounter;
     }
 
     public List<Map<String, Object>> serviceListTrendChart(Map<String, Object> body) {
@@ -526,6 +529,7 @@ public class ServicePortalService {
                 .filter(row -> matchesVirtualServiceListFilters(row, serviceName, serviceIds, statusType))
                 .filter(row -> matchesVirtualServiceKind(kind, row))
                 .collect(Collectors.toCollection(ArrayList::new));
+        enrichVirtualServiceAlarmCounts(kind, rows, from, to);
         sortEndpointRows(rows, sortField, sortOrder);
 
         int total = rows.size();
@@ -1284,18 +1288,21 @@ public class ServicePortalService {
         }
 
         final Map<String, Object> entity = traceServiceEntity;
+        long serviceAlarmCount = toLong(entity.get("alarmCount"));
         return summaries.stream()
-                .map(point -> toServiceInstanceRow(point, entity))
+                .map(point -> toServiceInstanceRow(point, entity, serviceAlarmCount))
                 .toList();
     }
 
     private Map<String, Object> toServiceInstanceRow(
-            ServiceInstanceSummaryPoint point, Map<String, Object> traceServiceEntity) {
+            ServiceInstanceSummaryPoint point,
+            Map<String, Object> traceServiceEntity,
+            long serviceAlarmCount) {
         Map<String, Object> row = new LinkedHashMap<>();
         row.put("serviceInstance", point.serviceInstance());
         row.put("hostName", unknownIfBlank(point.hostName()));
         row.put("hostIp", unknownIfBlank(firstNonBlank(point.hostId(), point.hostName())));
-        row.put("alarmCount", 0L);
+        row.put("alarmCount", serviceAlarmCount);
         row.put("serviceCall", point.callCount());
         putIfPresent(row, "k8sNamespace", point.k8sNamespace());
         putIfPresent(row, "k8sPodName", point.k8sPodName());
@@ -1361,6 +1368,7 @@ public class ServicePortalService {
         List<Map<String, Object>> serviceId2Name = peerDisplayNames.entrySet().stream()
                 .map(entry -> toPeerId2NameRow(entry.getKey(), entry.getValue()))
                 .toList();
+        enrichPeerAlarmCounts(serviceId2Name, from, to);
 
         Map<String, Object> data = new LinkedHashMap<>();
         data.put("reqCnt", loadServiceRequestRate(serviceId, from, to));
@@ -1887,7 +1895,8 @@ public class ServicePortalService {
                 ? meta.virtualService()
                 : false);
         service.put("describe", meta != null ? nullToEmpty(meta.describe()) : "");
-        service.put("alarmCount", 0L);
+        service.put("alarmCount", serviceAlarmCounter.countFor(
+                resolvedId, firstNonBlank(displayName, collectedService), from, to));
         service.put("tags", Map.of("custom", List.of()));
         service.put("componentTypes", loadServiceComponentTypes(serviceId, from, to));
         service.put("bizEvents", List.of());
@@ -3667,8 +3676,26 @@ public class ServicePortalService {
             return;
         }
         row.put("alarmCount", 0);
-        row.put("alarmPendingCount", 0);
         row.put("alarmMetric", Map.of("total", 0));
+    }
+
+    private void enrichVirtualServiceAlarmCounts(
+            VirtualServiceKind kind,
+            List<Map<String, Object>> rows,
+            long from,
+            long to) {
+        if (kind == VirtualServiceKind.REMOTE || rows.isEmpty()) {
+            return;
+        }
+        Map<String, Long> counts = serviceAlarmCounter.countByService(from, to);
+        for (Map<String, Object> row : rows) {
+            long alarmCount = serviceAlarmCounter.resolve(
+                    stringValue(row.get("serviceId"), ""),
+                    stringValue(row.get("name"), stringValue(row.get("service"), "")),
+                    counts);
+            row.put("alarmCount", alarmCount);
+            row.put("alarmMetric", Map.of("total", alarmCount));
+        }
     }
 
     private static void putMqSideMetrics(
@@ -4171,6 +4198,20 @@ public class ServicePortalService {
         row.put("serviceType", serviceType);
         row.put("alarmCount", 0);
         return row;
+    }
+
+    private void enrichPeerAlarmCounts(List<Map<String, Object>> peers, long from, long to) {
+        if (peers.isEmpty()) {
+            return;
+        }
+        Map<String, Long> counts = serviceAlarmCounter.countByService(from, to);
+        for (Map<String, Object> row : peers) {
+            long alarmCount = serviceAlarmCounter.resolve(
+                    stringValue(row.get("serviceId"), ""),
+                    stringValue(row.get("serviceName"), ""),
+                    counts);
+            row.put("alarmCount", alarmCount);
+        }
     }
 
     private double loadServiceRequestRate(String serviceId, long from, long to) {

@@ -8,6 +8,7 @@ import com.databuff.apm.web.ai.platform.runtime.ExpertChatInput;
 import com.databuff.apm.web.ai.platform.runtime.ExpertRuntime;
 import com.databuff.apm.web.ai.platform.runtime.ExpertRuntimeEvent;
 import com.databuff.apm.web.ai.platform.runtime.ExpertRuntimeRegistry;
+import com.databuff.apm.web.ai.platform.runtime.SessionExpertRuntimeRegistry;
 import com.databuff.apm.web.ai.tool.ApmToolkit;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeEach;
@@ -70,6 +71,7 @@ class ExpertAsyncRoutingIntegrationTest {
         taskService = new ExpertTaskService(
                 expertManagementService,
                 providerOf(runtimeRegistry),
+                emptySessionRegistryProvider(),
                 null,
                 sessionStore,
                 pendingRegistry,
@@ -147,6 +149,34 @@ class ExpertAsyncRoutingIntegrationTest {
             @Override
             public void ifAvailable(Consumer<ExpertRuntimeRegistry> consumer) {
                 consumer.accept(registry);
+            }
+        };
+    }
+
+    private static ObjectProvider<SessionExpertRuntimeRegistry> emptySessionRegistryProvider() {
+        return new ObjectProvider<>() {
+            @Override
+            public SessionExpertRuntimeRegistry getObject() {
+                return null;
+            }
+
+            @Override
+            public SessionExpertRuntimeRegistry getObject(Object... args) {
+                return null;
+            }
+
+            @Override
+            public SessionExpertRuntimeRegistry getIfAvailable() {
+                return null;
+            }
+
+            @Override
+            public SessionExpertRuntimeRegistry getIfUnique() {
+                return null;
+            }
+
+            @Override
+            public void ifAvailable(Consumer<SessionExpertRuntimeRegistry> consumer) {
             }
         };
     }

@@ -36,7 +36,7 @@ description: APM 指标、Trace、日志与告警查询规则
 | 日志明细检索 | `queryLogDetail(...)`，**禁止**传 traceId/spanId |
 | 某 trace 的日志 | `queryLogsByTraceId(traceId, ...)` |
 | 某 span 的日志 | `queryLogsBySpanId(spanId, traceId, ...)` |
-| 趋势图 | 拿到趋势数据后调用 `drawTrendCharts(charts)`，再输出文字结论 |
+| 趋势图 | 拿到趋势数据后调用 `drawTrendCharts(charts)`，再输出文字结论；若同时写 HTML 报告，须按 `skill.summary.html` 内嵌 ECharts，见 `trend-chart-snippet.html` |
 
 ## queryMetricData 参数
 
@@ -146,3 +146,4 @@ description: APM 指标、Trace、日志与告警查询规则
 - 缺少服务名时，先查服务列表再回答。
 - 使用中文回答。
 - 不要在 Markdown 中插入 `![...](chart)`；趋势图由前端根据 `drawTrendCharts` 自动渲染。
+- 若用 `writeWorkspaceFile` 写出含趋势的 HTML，须内嵌 ECharts 与真实 `labels`/`values`，见 `skill.summary.html` 与 `trend-chart-snippet.html`。

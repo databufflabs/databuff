@@ -13,20 +13,23 @@ import org.slf4j.LoggerFactory;
 import org.springframework.context.annotation.Lazy;
 import org.springframework.stereotype.Service;
 
+import java.util.ArrayList;
 import java.util.List;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.ConcurrentMap;
 
 /**
- * Keeps one AgentScope runtime per chat session for the brain expert so async
- * continuations reuse the same agent instance created at session start.
+ * Keeps one AgentScope runtime per {@code (chatSessionId, expertId)} so multi-turn chat and
+ * serial async dispatches to the same expert reuse memory via {@code stateStore}.
+ * <p>
+ * ChatScope / TaskContext stay on {@code sessionId#task:{taskId}} keys; AgentScope memory uses the
+ * logical chat session id on the per-expert agent instance.
  */
 @Service
 @Lazy
 public class SessionExpertRuntimeRegistry {
 
     private static final Logger log = LoggerFactory.getLogger(SessionExpertRuntimeRegistry.class);
-    private static final String BRAIN_EXPERT_ID = "brain";
 
     private final SkillManagementService skillManagementService;
     private final InMemoryLlmProviderStore llmProviderStore;
@@ -52,20 +55,25 @@ public class SessionExpertRuntimeRegistry {
         if (sessionId == null || sessionId.isBlank()) {
             throw new IllegalArgumentException("sessionId is required for session-scoped runtime");
         }
-        if (expert == null || !BRAIN_EXPERT_ID.equals(expert.expertId())) {
-            throw new IllegalArgumentException("session-scoped runtime only supports brain expert");
+        if (expert == null || expert.expertId() == null || expert.expertId().isBlank()) {
+            throw new IllegalArgumentException("expert is required for session-scoped runtime");
         }
         if (!expert.enabled()) {
             throw new IllegalStateException("expert is disabled: " + expert.expertId());
         }
+        String normalizedSessionId = ExpertChatScopeRegistry.parentSessionId(sessionId.trim());
+        if (normalizedSessionId == null) {
+            normalizedSessionId = sessionId.trim();
+        }
+        String expertId = expert.expertId().trim();
+        String cacheEntryKey = cacheEntryKey(normalizedSessionId, expertId);
         RuntimeCacheKey expectedKey = computeCacheKey(expert);
-        String normalizedSessionId = sessionId.trim();
-        CachedSessionRuntime cached = runtimes.get(normalizedSessionId);
+        CachedSessionRuntime cached = runtimes.get(cacheEntryKey);
         if (cached != null && cached.cacheKey.fingerprint().equals(expectedKey.fingerprint())) {
             return cached.runtime;
         }
-        synchronized (lockFor(normalizedSessionId)) {
-            cached = runtimes.get(normalizedSessionId);
+        synchronized (lockFor(cacheEntryKey)) {
+            cached = runtimes.get(cacheEntryKey);
             if (cached != null && cached.cacheKey.fingerprint().equals(expectedKey.fingerprint())) {
                 return cached.runtime;
             }
@@ -76,9 +84,9 @@ public class SessionExpertRuntimeRegistry {
             RuntimeCacheKey actualKey = runtime instanceof AgentScopeExpertRuntime scoped
                     ? scoped.cacheKey()
                     : expectedKey;
-            runtimes.put(normalizedSessionId, new CachedSessionRuntime(actualKey, runtime));
-            log.info("Created session-scoped brain runtime for session {} with cache key {}",
-                    normalizedSessionId, actualKey.fingerprint());
+            runtimes.put(cacheEntryKey, new CachedSessionRuntime(normalizedSessionId, expertId, actualKey, runtime));
+            log.info("Created session-scoped runtime for session {} expert {} with cache key {}",
+                    normalizedSessionId, expertId, actualKey.fingerprint());
             return runtime;
         }
     }
@@ -87,16 +95,70 @@ public class SessionExpertRuntimeRegistry {
         if (sessionId == null || sessionId.isBlank()) {
             return;
         }
-        CachedSessionRuntime removed = runtimes.remove(sessionId.trim());
+        String normalizedSessionId = ExpertChatScopeRegistry.parentSessionId(sessionId.trim());
+        if (normalizedSessionId == null) {
+            normalizedSessionId = sessionId.trim();
+        }
+        List<String> keys = new ArrayList<>();
+        for (var entry : runtimes.entrySet()) {
+            if (normalizedSessionId.equals(entry.getValue().sessionId())) {
+                keys.add(entry.getKey());
+            }
+        }
+        for (String key : keys) {
+            CachedSessionRuntime removed = runtimes.remove(key);
+            if (removed != null) {
+                removed.runtime.close();
+                log.info("Released session-scoped runtime for session {} expert {}",
+                        removed.sessionId(), removed.expertId());
+            }
+        }
+    }
+
+    public void release(String sessionId, String expertId) {
+        if (sessionId == null || sessionId.isBlank() || expertId == null || expertId.isBlank()) {
+            return;
+        }
+        String normalizedSessionId = ExpertChatScopeRegistry.parentSessionId(sessionId.trim());
+        if (normalizedSessionId == null) {
+            normalizedSessionId = sessionId.trim();
+        }
+        String key = cacheEntryKey(normalizedSessionId, expertId.trim());
+        CachedSessionRuntime removed = runtimes.remove(key);
         if (removed != null) {
             removed.runtime.close();
-            log.info("Released session-scoped brain runtime for session {}", sessionId.trim());
+            log.info("Released session-scoped runtime for session {} expert {}",
+                    removed.sessionId(), removed.expertId());
+        }
+    }
+
+    public void releaseByExpert(String expertId) {
+        if (expertId == null || expertId.isBlank()) {
+            return;
+        }
+        String normalizedExpertId = expertId.trim();
+        List<String> keys = new ArrayList<>();
+        for (var entry : runtimes.entrySet()) {
+            if (normalizedExpertId.equals(entry.getValue().expertId())) {
+                keys.add(entry.getKey());
+            }
+        }
+        for (String key : keys) {
+            CachedSessionRuntime removed = runtimes.remove(key);
+            if (removed != null) {
+                removed.runtime.close();
+                log.info("Released session-scoped runtime for session {} expert {} (expert invalidated)",
+                        removed.sessionId(), removed.expertId());
+            }
         }
     }
 
     public void releaseAll() {
-        for (String sessionId : runtimes.keySet()) {
-            release(sessionId);
+        for (String key : List.copyOf(runtimes.keySet())) {
+            CachedSessionRuntime removed = runtimes.remove(key);
+            if (removed != null) {
+                removed.runtime.close();
+            }
         }
     }
 
@@ -111,14 +173,24 @@ public class SessionExpertRuntimeRegistry {
                 .orElse(null);
         String providerCode = provider == null ? "default" : provider.providerCode();
         long providerVersion = provider == null ? 0L : llmProviderStore.providerVersion(providerCode);
-        String routingCatalogHash = brainRoutingCatalog.routableExpertsFingerprint();
+        String routingCatalogHash = "brain".equals(expert.expertId())
+                ? brainRoutingCatalog.routableExpertsFingerprint()
+                : "";
         return RuntimeCacheKey.of(expert, tools, skills, providerCode, providerVersion, routingCatalogHash);
     }
 
-    private Object lockFor(String sessionId) {
-        return ("session-expert-runtime-lock:" + sessionId).intern();
+    static String cacheEntryKey(String sessionId, String expertId) {
+        return sessionId + '\0' + expertId;
     }
 
-    private record CachedSessionRuntime(RuntimeCacheKey cacheKey, ExpertRuntime runtime) {
+    private Object lockFor(String cacheEntryKey) {
+        return ("session-expert-runtime-lock:" + cacheEntryKey).intern();
+    }
+
+    private record CachedSessionRuntime(
+            String sessionId,
+            String expertId,
+            RuntimeCacheKey cacheKey,
+            ExpertRuntime runtime) {
     }
 }

@@ -1,8 +1,8 @@
 #!/usr/bin/env bash
 # DataBuff AI APM Demo 离线安装（解压离线包后在本目录执行）
 #
-#   tar -xzf databuff-ai-apm-offline-0.1.5-amd64.tar.gz
-#   cd databuff-ai-apm-offline-0.1.5-amd64
+#   tar -xzf databuff-ai-apm-offline-0.1.4-amd64.tar.gz
+#   cd databuff-ai-apm-offline-0.1.4-amd64
 #   sudo ./install_demo.sh
 #
 # 需先安装主栈（./install.sh），或确保 INGEST_HOST 指向可用的 ingest 地址。

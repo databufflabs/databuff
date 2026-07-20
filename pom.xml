@@ -36,7 +36,7 @@
 
     <properties>
         <!-- 项目版本：子模块通过 ${revision} 引用，发版时只改此处 -->
-        <revision>0.1.5</revision>
+        <revision>0.1.4</revision>
         <!-- 编译与运行统一使用 JDK 17 -->
         <java.version>17</java.version>
         <maven.compiler.release>17</maven.compiler.release>

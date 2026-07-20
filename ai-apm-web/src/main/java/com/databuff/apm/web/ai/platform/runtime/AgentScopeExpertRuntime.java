@@ -141,8 +141,9 @@ public class AgentScopeExpertRuntime implements ExpertRuntime {
         if (taskId != null && !taskId.isBlank()) {
             exposeToolEvents = true;
         }
+        // ChatScope stays task-scoped so unregister never wipes the parent brain scope.
         return new ExpertChatContext.State(
-                input.sessionId(),
+                resolveChatScopeSessionId(input, taskId),
                 input.userName(),
                 expert.expertId(),
                 input.assistantMessageId(),
@@ -153,11 +154,11 @@ public class AgentScopeExpertRuntime implements ExpertRuntime {
 
     private RuntimeContext buildRuntimeContext(ExpertChatInput input) {
         RuntimeContext.Builder builder = RuntimeContext.builder();
-        Object runtimeSessionId = input.context().get(ExpertMessageConstants.META_RUNTIME_SESSION_ID);
-        if (runtimeSessionId != null && !String.valueOf(runtimeSessionId).isBlank()) {
-            builder.sessionId(String.valueOf(runtimeSessionId).trim());
-        } else if (input.sessionId() != null && !input.sessionId().isBlank()) {
-            builder.sessionId(input.sessionId());
+        // AgentScope memory key: logical chat session. Do not use task-scoped ids here —
+        // same (session, expert) must share memory across serial dispatches and direct chat.
+        String memorySessionId = resolveMemorySessionId(input);
+        if (memorySessionId != null && !memorySessionId.isBlank()) {
+            builder.sessionId(memorySessionId);
         }
         if (input.userName() != null && !input.userName().isBlank()) {
             builder.userId(input.userName());
@@ -167,13 +168,24 @@ public class AgentScopeExpertRuntime implements ExpertRuntime {
             builder.put("assistantMessageId", input.assistantMessageId());
         }
         builder.putAll(input.mergedContext());
+        String chatScopeSessionId = resolveChatScopeSessionId(
+                input, stringMetadata(input.context(), ExpertMessageConstants.META_TASK_ID));
+        if (chatScopeSessionId != null
+                && !chatScopeSessionId.isBlank()
+                && ExpertChatScopeRegistry.isTaskScopedSessionId(chatScopeSessionId)) {
+            builder.put(ExpertMessageConstants.META_RUNTIME_SESSION_ID, chatScopeSessionId);
+        }
+        if (memorySessionId != null && !memorySessionId.isBlank()) {
+            builder.put(ExpertMessageConstants.META_SESSION_ID, memorySessionId);
+        }
         return builder.build();
     }
 
     private Msg buildUserMessage(ExpertChatInput input) {
+        String memorySessionId = resolveMemorySessionId(input);
         Map<String, Object> metadata = new LinkedHashMap<>();
-        if (input.sessionId() != null && !input.sessionId().isBlank()) {
-            metadata.put("sessionId", input.sessionId());
+        if (memorySessionId != null && !memorySessionId.isBlank()) {
+            metadata.put("sessionId", memorySessionId);
         }
         if (input.userName() != null && !input.userName().isBlank()) {
             metadata.put("userName", input.userName());
@@ -188,14 +200,14 @@ public class AgentScopeExpertRuntime implements ExpertRuntime {
                 .metadata(metadata);
         List<ImageBlock> imageBlocks = WorkspaceImageSupport.readImageAttachments(
                 sessionWorkspaceService,
-                input.sessionId(),
+                memorySessionId,
                 input.context().get("attachments"));
         if (imageBlocks.isEmpty()) {
             Object rawAttachments = input.context().get("attachments");
             int attachmentCount = rawAttachments instanceof List<?> list ? list.size() : 0;
             if (attachmentCount > 0) {
                 log.warn("Session {} has {} attachments but no ImageBlocks were built for the LLM message",
-                        input.sessionId(), attachmentCount);
+                        memorySessionId, attachmentCount);
             }
             return builder.textContent(input.message().trim()).build();
         }
@@ -203,8 +215,47 @@ public class AgentScopeExpertRuntime implements ExpertRuntime {
                 input.message(),
                 imageBlocks);
         log.info("Session {} injecting {} image block(s) into user message for vision",
-                input.sessionId(), imageBlocks.size());
+                memorySessionId, imageBlocks.size());
         return builder.content(contentBlocks).build();
+    }
+
+    /**
+     * Logical chat session id used for AgentScope {@code stateStore} / workspace paths.
+     */
+    static String resolveMemorySessionId(ExpertChatInput input) {
+        if (input == null) {
+            return null;
+        }
+        String fromMeta = stringMetadata(input.context(), ExpertMessageConstants.META_SESSION_ID);
+        if (fromMeta != null && !fromMeta.isBlank()) {
+            String parent = ExpertChatScopeRegistry.parentSessionId(fromMeta);
+            return parent == null ? fromMeta.trim() : parent;
+        }
+        if (input.sessionId() != null && !input.sessionId().isBlank()) {
+            String parent = ExpertChatScopeRegistry.parentSessionId(input.sessionId());
+            return parent == null ? input.sessionId().trim() : parent;
+        }
+        return null;
+    }
+
+    /**
+     * ChatScope / tool-trace key: {@code sessionId#task:{taskId}} for subtasks, else logical session.
+     */
+    static String resolveChatScopeSessionId(ExpertChatInput input, String taskId) {
+        String memorySessionId = resolveMemorySessionId(input);
+        if (taskId != null && !taskId.isBlank() && memorySessionId != null) {
+            String scoped = ExpertChatScopeRegistry.taskScopedSessionId(memorySessionId, taskId);
+            if (scoped != null && !scoped.isBlank()) {
+                return scoped;
+            }
+        }
+        Object runtimeSessionId = input == null || input.context() == null
+                ? null
+                : input.context().get(ExpertMessageConstants.META_RUNTIME_SESSION_ID);
+        if (runtimeSessionId != null && !String.valueOf(runtimeSessionId).isBlank()) {
+            return String.valueOf(runtimeSessionId).trim();
+        }
+        return memorySessionId;
     }
 
     private static String stringMetadata(Map<String, Object> metadata, String key) {

@@ -28,6 +28,12 @@ from ai_chat_integration import (  # noqa: E402
     is_llm_ready,
     run_ai_chat_tool_loop,
 )
+from ai_session_memory import (  # noqa: E402
+    ENV_API_KEY as DEEPSEEK_API_KEY_ENV,
+    GROUP_SESSION_MEMORY,
+    deepseek_api_key,
+    run_ai_session_memory_cases,
+)
 from demo_window import MIN_WARMUP_SECONDS, QUERY_WINDOW_MS, aligned_query_window, trace_batch_bounds  # noqa: E402
 from ingest_warmup import wait_for_ingest_warmup  # noqa: E402
 from json_assert import assert_matches  # noqa: E402
@@ -442,6 +448,18 @@ def main() -> int:
         default=float(os.environ.get("TEST_AI_CHAT_POLL_TIMEOUT", "180")),
         help="seconds to wait for each AI chat session",
     )
+    parser.add_argument(
+        "--skip-ai-memory",
+        action="store_true",
+        default=os.environ.get("TEST_SKIP_AI_MEMORY", "0") == "1",
+        help="skip AI session memory integration tests (also skipped when DEEPSEEK_API_KEY unset)",
+    )
+    parser.add_argument(
+        "--ai-memory-poll-timeout",
+        type=float,
+        default=float(os.environ.get("TEST_AI_MEMORY_POLL_TIMEOUT", "240")),
+        help="seconds to wait for each AI memory turn",
+    )
     args = parser.parse_args()
 
     min_warmup = int(os.environ.get("TEST_MIN_WARMUP_SECONDS", str(MIN_WARMUP_SECONDS)))
@@ -506,6 +524,43 @@ def main() -> int:
                     report.failed += 1
         else:
             print("[test] skip AI chat: no enabled LLM provider with API key configured")
+
+    if not args.skip_ai_memory:
+        if deepseek_api_key():
+            print(
+                f"[test] running AI session memory cases "
+                f"(env {DEEPSEEK_API_KEY_ENV} set) ..."
+            )
+            memory_results = run_ai_session_memory_cases(
+                base,
+                token,
+                poll_timeout_sec=args.ai_memory_poll_timeout,
+            )
+            for item in memory_results:
+                report.results.append(
+                    CaseResult(
+                        module=MODULE_AI_PLATFORM,
+                        group=GROUP_SESSION_MEMORY,
+                        name=item.name,
+                        path=f"/webapi/api/v1/ai/sessions/{item.session_id or '-'}/messages",
+                        method="CHAT",
+                        ok=item.ok,
+                        http_status=200 if item.ok else 0,
+                        elapsed_ms=item.elapsed_ms,
+                        detail=item.detail,
+                        expected_file="ai-session-memory/multi-turn-context",
+                        expected_json="same expert retains prior turn context",
+                    )
+                )
+                report.total += 1
+                if item.ok:
+                    report.passed += 1
+                else:
+                    report.failed += 1
+        else:
+            print(
+                f"[test] skip AI session memory: set {DEEPSEEK_API_KEY_ENV} to enable"
+            )
 
     json_path = report_dir / f"report-{stamp}.json"
     html_path = report_dir / f"report-{stamp}.html"

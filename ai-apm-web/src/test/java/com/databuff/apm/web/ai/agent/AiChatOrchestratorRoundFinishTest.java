@@ -9,6 +9,7 @@ import com.databuff.apm.web.ai.platform.task.ExpertTaskStatus;
 import com.databuff.apm.web.ai.platform.task.ExpertTaskTextGuard;
 import com.databuff.apm.web.ai.platform.expert.ExpertManagementService;
 import com.databuff.apm.web.ai.platform.runtime.ExpertRuntimeRegistry;
+import com.databuff.apm.web.ai.platform.runtime.SessionExpertRuntimeRegistry;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
@@ -36,6 +37,7 @@ class AiChatOrchestratorRoundFinishTest {
         taskService = new ExpertTaskService(
                 Mockito.mock(ExpertManagementService.class),
                 emptyRegistryProvider(),
+                emptySessionRegistryProvider(),
                 emptyPersistenceProvider(),
                 store,
                 pendingRegistry,
@@ -381,6 +383,34 @@ class AiChatOrchestratorRoundFinishTest {
 
             @Override
             public void ifAvailable(java.util.function.Consumer<ExpertRuntimeRegistry> consumer) {
+            }
+        };
+    }
+
+    private static ObjectProvider<SessionExpertRuntimeRegistry> emptySessionRegistryProvider() {
+        return new ObjectProvider<>() {
+            @Override
+            public SessionExpertRuntimeRegistry getObject() {
+                return null;
+            }
+
+            @Override
+            public SessionExpertRuntimeRegistry getObject(Object... args) {
+                return null;
+            }
+
+            @Override
+            public SessionExpertRuntimeRegistry getIfAvailable() {
+                return null;
+            }
+
+            @Override
+            public SessionExpertRuntimeRegistry getIfUnique() {
+                return null;
+            }
+
+            @Override
+            public void ifAvailable(java.util.function.Consumer<SessionExpertRuntimeRegistry> consumer) {
             }
         };
     }

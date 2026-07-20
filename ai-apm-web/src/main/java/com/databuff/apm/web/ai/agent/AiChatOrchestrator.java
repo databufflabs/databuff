@@ -315,7 +315,7 @@ public class AiChatOrchestrator implements BrainRoundContinuer {
                     AiMessageStatus.FAILED,
                     failedMetadata);
             sessionStore.completeRound(sessionId, expertId);
-            releaseSessionBrainRuntime(sessionId, expertId);
+            releaseSessionRuntimeAfterRound(sessionId, expertId);
         } finally {
             activeChatTasks.remove(sessionId);
             boolean keepRunning = shouldKeepSessionRunning(sessionId);
@@ -351,13 +351,13 @@ public class AiChatOrchestrator implements BrainRoundContinuer {
                     return;
                 }
                 sessionStore.completeRound(sessionId, expertId);
-                releaseSessionBrainRuntime(sessionId, expertId);
+                releaseSessionRuntimeAfterRound(sessionId, expertId);
                 return;
             }
             sessionStore.finalizeBrainRoundText(
                     sessionId, assistantMessageId, expertId, normalizedReply, metadata);
             completePendingBrainStream(sessionId, normalizedReply);
-            releaseSessionBrainRuntime(sessionId, expertId);
+            releaseSessionRuntimeAfterRound(sessionId, expertId);
             return;
         }
         Map<String, Object> finalMetadata = new LinkedHashMap<>(metadata);
@@ -371,7 +371,7 @@ public class AiChatOrchestrator implements BrainRoundContinuer {
                 AiMessageStatus.COMPLETED,
                 Map.copyOf(finalMetadata));
         sessionStore.completeRound(sessionId, expertId);
-        releaseSessionBrainRuntime(sessionId, expertId);
+        releaseSessionRuntimeAfterRound(sessionId, expertId);
     }
 
     private void deferBrainDispatchPhaseReply(
@@ -993,7 +993,7 @@ public class AiChatOrchestrator implements BrainRoundContinuer {
     }
 
     private ExpertRuntime expertRuntime(String sessionId, AiExpertDefinition expert, boolean transientRuntime) {
-        if ("brain".equals(expert.expertId()) && sessionId != null && !sessionId.isBlank()) {
+        if (sessionId != null && !sessionId.isBlank()) {
             return sessionExpertRuntimeRegistry.getOrCreate(sessionId, expert);
         }
         if (transientRuntime && runtimeAdapter != null) {
@@ -1006,13 +1006,15 @@ public class AiChatOrchestrator implements BrainRoundContinuer {
         if (!transientRuntime || runtimeAdapter == null) {
             return false;
         }
-        return !("brain".equals(expertId) && sessionId != null && !sessionId.isBlank());
+        // Session-scoped runtimes are cached (and backed by stateStore); never close after a turn.
+        return sessionId == null || sessionId.isBlank();
     }
 
-    private void releaseSessionBrainRuntime(String sessionId, String expertId) {
-        if ("brain".equals(expertId) && sessionId != null && !sessionId.isBlank()) {
-            sessionExpertRuntimeRegistry.release(sessionId);
+    private void releaseSessionRuntimeAfterRound(String sessionId, String expertId) {
+        if (sessionId == null || sessionId.isBlank() || expertId == null || expertId.isBlank()) {
+            return;
         }
+        sessionExpertRuntimeRegistry.release(sessionId, expertId);
     }
 
     private static Map<String, Object> withModelMetadata(Map<String, Object> metadata, ChatMessageContext context) {

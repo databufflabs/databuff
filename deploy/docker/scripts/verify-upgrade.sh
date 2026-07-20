@@ -1,8 +1,8 @@
 #!/usr/bin/env bash
 # Post-upgrade verification for Docker in-place upgrades.
 # Usage:
-#   ./scripts/verify-upgrade.sh --expected-version=0.1.5
-#   EXPECTED_VERSION=0.1.5 ./scripts/verify-upgrade.sh
+#   ./scripts/verify-upgrade.sh --expected-version=0.1.4
+#   EXPECTED_VERSION=0.1.4 ./scripts/verify-upgrade.sh
 #   ./scripts/verify-upgrade.sh --skip-health --skip-schema
 
 SCRIPT_DIR="$(cd "$(dirname "$0")" && pwd)"

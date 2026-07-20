@@ -10,8 +10,11 @@ import com.databuff.apm.common.query.TimeSeriesFillUtil;
 import com.databuff.apm.common.util.PortalServiceIdResolver;
 import com.databuff.apm.common.storage.ApmReadRepository;
 import com.databuff.apm.web.TestStorageSupport;
+import com.databuff.apm.web.monitor.Alarm;
+import com.databuff.apm.web.monitor.AlarmStore;
 import org.junit.jupiter.api.Test;
 
+import java.time.Instant;
 import java.util.List;
 import java.util.Map;
 
@@ -309,6 +312,7 @@ class ServicePortalServiceTest {
         assertThat(info.get("service")).isEqualTo("demo-order");
         assertThat(info.get("service_type")).isEqualTo("web");
         assertThat(info.get("callCnt")).isEqualTo(100L);
+        assertThat(info.get("alarmCount")).isEqualTo(0L);
         assertThat(info.get("k8sNamespace")).isEqualTo("");
         assertThat(info).doesNotContainKey("serviceInstanceCount");
         @SuppressWarnings("unchecked")
@@ -317,6 +321,33 @@ class ServicePortalServiceTest {
         @SuppressWarnings("unchecked")
         Map<String, Object> tags = (Map<String, Object>) info.get("tags");
         assertThat(tags.get("custom")).isEqualTo(List.of());
+    }
+
+    @Test
+    void serviceInfoMarksAlarmCountWhenServiceHasAlarmsInRange() throws Exception {
+        ApmReadRepository reader = mock(ApmReadRepository.class);
+        when(reader.queryMetaServices(anyString())).thenReturn(List.of(
+                ApmQueryModels.MetaServicePoint.minimal("demo-order", "Order Service")));
+        when(reader.queryServiceSummaries(anyString())).thenReturn(List.of());
+        when(reader.queryDistinctCount(anyString())).thenReturn(0L);
+
+        AlarmStore alarmStore = mock(AlarmStore.class);
+        Instant triggeredAt = Instant.parse("2026-06-04T11:30:00Z");
+        when(alarmStore.listInTimeRange(any(), any())).thenReturn(List.of(
+                new Alarm("a1", 0L, "demo-order", "threshold", "critical", "alarm", "open",
+                        triggeredAt, null),
+                new Alarm("a2", 0L, "demo-order", "threshold", "warning", "alarm", "resolved",
+                        triggeredAt, triggeredAt)));
+
+        ServicePortalService service = TestStorageSupport.servicePortalService(
+                reader, new ServiceAlarmCounter(alarmStore));
+        Map<String, Object> info = service.serviceInfo(Map.of(
+                "serviceId", "demo-order",
+                "fromTime", "2026-06-04 11:00:00",
+                "toTime", "2026-06-04 12:00:00"));
+
+        assertThat(info).isNotNull();
+        assertThat(info.get("alarmCount")).isEqualTo(2L);
     }
 
     @Test

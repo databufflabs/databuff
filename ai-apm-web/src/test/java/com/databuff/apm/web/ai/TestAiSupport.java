@@ -160,6 +160,7 @@ public final class TestAiSupport {
                     new ObjectMapper());
             ObjectMapper objectMapper = new ObjectMapper();
             ExpertRuntimeRegistry[] registryHolder = new ExpertRuntimeRegistry[1];
+            SessionExpertRuntimeRegistry[] sessionRegistryHolder = new SessionExpertRuntimeRegistry[1];
             AiSessionStore sessionStore = new AiSessionStore();
             ExpertTaskPendingRegistry pendingRegistry = new ExpertTaskPendingRegistry();
             ExpertTaskTextGuard taskTextGuard = new ExpertTaskTextGuard();
@@ -172,6 +173,7 @@ public final class TestAiSupport {
             ExpertTaskService expertTaskService = new ExpertTaskService(
                     expertManagementService,
                     providerOf(registryHolder),
+                    providerOf(sessionRegistryHolder),
                     null,
                     sessionStore,
                     pendingRegistry,
@@ -225,6 +227,7 @@ public final class TestAiSupport {
                     brainRoutingCatalog,
                     providerOf(sessionExpertRuntimeRegistry));
             registryHolder[0] = registry;
+            sessionRegistryHolder[0] = sessionExpertRuntimeRegistry;
             return new PlatformRuntimeFixture(
                     toolManagementService,
                     skillManagementService,
@@ -239,6 +242,38 @@ public final class TestAiSupport {
                     brainContinuationService,
                     brainContinuerRef,
                     sessionExpertRuntimeRegistry);
+        }
+
+        private static ObjectProvider<SessionExpertRuntimeRegistry> providerOf(
+                SessionExpertRuntimeRegistry[] holder) {
+            return new ObjectProvider<>() {
+                @Override
+                public SessionExpertRuntimeRegistry getObject() {
+                    return holder[0];
+                }
+
+                @Override
+                public SessionExpertRuntimeRegistry getObject(Object... args) {
+                    return holder[0];
+                }
+
+                @Override
+                public SessionExpertRuntimeRegistry getIfAvailable() {
+                    return holder[0];
+                }
+
+                @Override
+                public SessionExpertRuntimeRegistry getIfUnique() {
+                    return holder[0];
+                }
+
+                @Override
+                public void ifAvailable(Consumer<SessionExpertRuntimeRegistry> consumer) {
+                    if (holder[0] != null) {
+                        consumer.accept(holder[0]);
+                    }
+                }
+            };
         }
 
         private static ObjectProvider<SessionExpertRuntimeRegistry> providerOf(

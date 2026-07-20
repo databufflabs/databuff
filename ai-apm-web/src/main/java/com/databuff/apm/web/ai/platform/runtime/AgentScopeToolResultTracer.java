@@ -1,6 +1,8 @@
 package com.databuff.apm.web.ai.platform.runtime;
 
+import com.databuff.apm.web.ai.platform.task.ExpertMessageConstants;
 import com.databuff.apm.web.ai.platform.task.ExpertSessionResolver;
+import io.agentscope.core.agent.RuntimeContext;
 import io.agentscope.core.message.ToolResultBlock;
 import io.agentscope.core.tracing.Tracer;
 import io.agentscope.core.tracing.TracerRegistry;
@@ -40,13 +42,25 @@ public class AgentScopeToolResultTracer implements Tracer {
             return;
         }
         long durationMs = Math.max(0L, System.currentTimeMillis() - startedAtMs);
-        String runtimeSessionId = param.getRuntimeContext() == null
-                ? null
-                : param.getRuntimeContext().getSessionId();
-        if (runtimeSessionId == null || runtimeSessionId.isBlank()) {
-            runtimeSessionId = ExpertSessionResolver.sessionIdFromRuntimeContext(param.getRuntimeContext())
+        // Prefer task-scoped ChatScope key so capture matches TraceRecorder; AgentScope memory
+        // uses the logical session id on RuntimeContext.getSessionId().
+        String captureSessionId = chatScopeSessionId(param.getRuntimeContext());
+        if (captureSessionId == null || captureSessionId.isBlank()) {
+            captureSessionId = ExpertSessionResolver.sessionIdFromRuntimeContext(param.getRuntimeContext())
                     .orElse("");
         }
-        sessionHook.captureToolResult(runtimeSessionId, param.getToolUseBlock(), result, durationMs);
+        sessionHook.captureToolResult(captureSessionId, param.getToolUseBlock(), result, durationMs);
+    }
+
+    private static String chatScopeSessionId(RuntimeContext runtimeContext) {
+        if (runtimeContext == null) {
+            return null;
+        }
+        Object scoped = runtimeContext.get(ExpertMessageConstants.META_RUNTIME_SESSION_ID);
+        if (scoped != null && !String.valueOf(scoped).isBlank()) {
+            return String.valueOf(scoped).trim();
+        }
+        String sessionId = runtimeContext.getSessionId();
+        return sessionId == null || sessionId.isBlank() ? null : sessionId.trim();
     }
 }

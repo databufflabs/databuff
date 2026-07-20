@@ -2,15 +2,11 @@ package com.databuff.apm.web.portal;
 
 import com.databuff.apm.common.query.ApmQueryModels.ServiceFlowEdge;
 import com.databuff.apm.common.util.PortalServiceIdResolver;
-import com.databuff.apm.web.monitor.Alarm;
-import com.databuff.apm.web.monitor.AlarmStore;
 
 import static com.databuff.apm.common.util.PortalServiceIdResolver.normalize;
 import org.springframework.stereotype.Service;
 
-import java.time.Instant;
 import java.util.ArrayList;
-import java.util.HashMap;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
@@ -20,13 +16,13 @@ import java.util.Map;
 public class GlobalTopologyPortalService {
 
     private final GlobalTopologyQueryService globalTopologyQueryService;
-    private final AlarmStore alarmStore;
+    private final ServiceAlarmCounter serviceAlarmCounter;
 
     public GlobalTopologyPortalService(
             GlobalTopologyQueryService globalTopologyQueryService,
-            AlarmStore alarmStore) {
+            ServiceAlarmCounter serviceAlarmCounter) {
         this.globalTopologyQueryService = globalTopologyQueryService;
-        this.alarmStore = alarmStore;
+        this.serviceAlarmCounter = serviceAlarmCounter;
     }
 
     public Map<String, Object> graph(Map<String, Object> body) {
@@ -145,57 +141,15 @@ public class GlobalTopologyPortalService {
         if (nodeMap.isEmpty()) {
             return;
         }
-        Map<String, Long> alarmCountsByService = countAlarmsByService(from, to);
+        Map<String, Long> alarmCountsByService = serviceAlarmCounter.countByService(from, to);
         for (Map<String, Object> node : nodeMap.values()) {
-            long alarmCount = resolveAlarmCount(node, alarmCountsByService);
+            long alarmCount = serviceAlarmCounter.resolve(
+                    ServicePortalService.stringValue(node.get("id"), ""),
+                    ServicePortalService.stringValue(node.get("name"), ""),
+                    alarmCountsByService);
             node.put("alarmCount", alarmCount);
             node.put("errType", alarmCount > 0 ? 1 : 0);
         }
-    }
-
-    private Map<String, Long> countAlarmsByService(long from, long to) {
-        Map<String, Long> counts = new HashMap<>();
-        Instant fromInstant = Instant.ofEpochMilli(from);
-        Instant toInstant = Instant.ofEpochMilli(to);
-        for (Alarm alarm : alarmStore.listInTimeRange(fromInstant, toInstant)) {
-            String service = alarm.service();
-            if (service == null || service.isBlank()) {
-                continue;
-            }
-            String serviceKey = normalize(service);
-            if (serviceKey.isBlank()) {
-                continue;
-            }
-            counts.merge(serviceKey, 1L, Long::sum);
-        }
-        return counts;
-    }
-
-    private static long resolveAlarmCount(
-            Map<String, Object> node,
-            Map<String, Long> alarmCountsByService) {
-        String nodeId = ServicePortalService.stringValue(node.get("id"), "");
-        if (!nodeId.isBlank()) {
-            long direct = alarmCountsByService.getOrDefault(nodeId, 0L);
-            if (direct > 0) {
-                return direct;
-            }
-        }
-        String serviceName = ServicePortalService.stringValue(node.get("name"), "");
-        if (!serviceName.isBlank()) {
-            String normalizedName = normalize(serviceName);
-            long byName = alarmCountsByService.getOrDefault(normalizedName, 0L);
-            if (byName > 0) {
-                return byName;
-            }
-        }
-        for (Map.Entry<String, Long> entry : alarmCountsByService.entrySet()) {
-            if (PortalServiceIdResolver.matches(nodeId, entry.getKey())
-                    || PortalServiceIdResolver.matches(serviceName, entry.getKey())) {
-                return entry.getValue();
-            }
-        }
-        return 0L;
     }
 
     private static String resolveNodeId(String serviceId, String serviceName) {

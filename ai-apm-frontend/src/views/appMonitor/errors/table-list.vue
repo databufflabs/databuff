@@ -267,7 +267,8 @@ export default class TableList extends Vue {
   private viewDetailHandle (row: any) {
     const { exception, resourceQuery, rootResourceQuery, sid, sn, si, fromTime, toTime, durationRange } = this.$route.query
     const query: any = { exception, resourceQuery, rootResourceQuery, sid, sn, si }
-    const _name = encodeURIComponent(row[this.currType])
+    // 交给 Vue Router 编码，避免 encodeURIComponent 后再编码导致 %252F
+    const _name = row[this.currType]
     if (this.currType === 'exceptionName') {
       query.exception = _name
     } else if (this.currType === 'rootResource') {
@@ -298,7 +299,8 @@ export default class TableList extends Vue {
       return
     }
     const query = { ...this.$route.query }
-    const _name = encodeURIComponent(row[this.currType])
+    // 交给 Vue Router 编码，避免 encodeURIComponent 后再编码导致 %252F
+    const _name = row[this.currType]
     if (this.currType === 'exceptionName') {
       query.exception = _name
     } else if (this.currType === 'rootResource') {

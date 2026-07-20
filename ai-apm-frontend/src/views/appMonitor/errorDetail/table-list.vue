@@ -172,7 +172,8 @@ export default class TableList extends Vue {
         Object.entries(item.meta || {}).forEach(([key, value]: any) => {
           _meta[`meta.${key}`] = value
         })
-        return { ...item, meta: item.meta || {}, ..._meta, errorType: item.meta['error.type'] }
+        // 错误类型以后端统一计算的 errorType 为准（含 resource fallback），勿用可能为空的 meta['error.type'] 覆盖
+        return { ...item, meta: item.meta || {}, ..._meta }
       })
       this.listTotal = responseData.total || result.total || 0
       this.tableList = page === 1 ? list : Array.from(this.tableList).concat(list);
