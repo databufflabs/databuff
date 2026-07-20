@@ -15,8 +15,8 @@
 #   KUBECONFIG          kubeconfig 路径（未设置时自动尝试常见路径）
 #
 # 指定版本:
-#   curl -fsSL .../ai-apm-demo-k8s-install.sh | bash -s -- --version 0.1.4
-#   APM_VERSION=0.1.4 curl -fsSL .../ai-apm-demo-k8s-install.sh | bash
+#   curl -fsSL .../ai-apm-demo-k8s-install.sh | bash -s -- --version 0.1.5
+#   APM_VERSION=0.1.5 curl -fsSL .../ai-apm-demo-k8s-install.sh | bash
 
 set -euo pipefail
 

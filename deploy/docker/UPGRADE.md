@@ -71,7 +71,7 @@ Optional API regression: from the repo, `deploy/test/run-tests.sh` (requires dem
 Use when you want to refresh bundle/images first, then start and migrate manually:
 
 ```bash
-SKIP_START=1 ./update.sh --version 0.1.4
+SKIP_START=1 ./update.sh --version 0.1.5
 cd /opt/databuff-ai-apm
 # shellcheck source=scripts/compose-env.sh
 . scripts/compose-env.sh
@@ -111,7 +111,7 @@ Offline / in install dir:
 
 ```bash
 cd /opt/databuff-ai-apm
-./update.sh --restore-backup --version 0.1.4
+./update.sh --restore-backup --version 0.1.5
 ```
 
 What it does: stop services → restore trusted backup → sync deploy files/images → migrate + start (with auto-retry). It does **not** run `install.sh`.
@@ -128,7 +128,7 @@ cd /opt/databuff-ai-apm
 ls -lt backups/data-backup-*
 rm -rf data/
 cp -a backups/data-backup-YYYYMMDD-HHMMSS data
-./update.sh --restore-backup --version 0.1.4
+./update.sh --restore-backup --version 0.1.5
 ```
 
 Do not hand-edit `schema_version` or drop Doris tables unless you know the exact partial state.

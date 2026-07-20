@@ -1,8 +1,8 @@
 #!/usr/bin/env bash
 # DataBuff AI APM 离线升级（解压目标版本离线包后在本目录执行）
 #
-#   tar -xzf databuff-ai-apm-offline-0.1.4-amd64.tar.gz
-#   cd databuff-ai-apm-offline-0.1.4-amd64
+#   tar -xzf databuff-ai-apm-offline-0.1.5-amd64.tar.gz
+#   cd databuff-ai-apm-offline-0.1.5-amd64
 #   sudo ./update.sh
 #
 # 与 install.sh 区别:
@@ -10,8 +10,8 @@
 #   update.sh  = 就地升级，保留 /opt/databuff-ai-apm/data/
 #
 # 也可在安装目录指定离线包路径（全程无需联网）:
-#   sudo UPDATE_BUNDLE_ROOT=/path/to/databuff-ai-apm-offline-0.1.4-amd64 \
-#        SKIP_PULL_IMAGES=1 /opt/databuff-ai-apm/update.sh --version 0.1.4
+#   sudo UPDATE_BUNDLE_ROOT=/path/to/databuff-ai-apm-offline-0.1.5-amd64 \
+#        SKIP_PULL_IMAGES=1 /opt/databuff-ai-apm/update.sh --version 0.1.5
 #
 # 环境变量:
 #   APM_INSTALL_DIR    安装目录 (默认 /opt/databuff-ai-apm)

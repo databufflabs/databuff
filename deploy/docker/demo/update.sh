@@ -2,7 +2,7 @@
 # DataBuff AI APM Demo 就地升级（在安装目录执行）
 #
 #   cd /opt/databuff-ai-apm-demo && ./update.sh
-#   ./update.sh --version 0.1.4 --pull-images
+#   ./update.sh --version 0.1.5 --pull-images
 #
 # 环境变量:
 #   APM_PKG_BASE       部署包地址
