@@ -129,6 +129,16 @@ class AgentScopeRuntimeAdapterTest {
     }
 
     @Test
+    void sessionScopedOpsEnablesPendingToolRecovery() {
+        AiExpertDefinition opsExpert = expertManagementService.find("ops").orElseThrow();
+        ExpertRuntime runtime = adapter.buildSessionRuntime(opsExpert, "session-scoped-ops");
+        ReActAgent agent = ((AgentScopeExpertRuntime) runtime).agent();
+
+        assertThat(agent.getName()).isEqualTo("ops");
+        assertThat(agent.isPendingToolRecoveryEnabled()).isTrue();
+    }
+
+    @Test
     void brainPromptDiscoversCustomExpertDynamically() {
         Instant now = Instant.now();
         expertManagementService.save(new AiExpertDefinition(

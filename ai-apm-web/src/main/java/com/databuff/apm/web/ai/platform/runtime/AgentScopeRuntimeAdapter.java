@@ -163,9 +163,6 @@ public class AgentScopeRuntimeAdapter {
         List<McpClientWrapper> mcpClients = toolFactory.registerTools(toolkit, tools);
         toolkit.registerTool(sessionWorkspaceTools);
 
-        boolean sessionScopedBrain = chatSessionId != null
-                && !chatSessionId.isBlank()
-                && "brain".equals(expert.expertId());
         EmbedSkillsResult embeddedSkills = embedExpertSkills(resolveSystemPrompt(expert), skillIds);
         ReActAgent.Builder builder = ReActAgent.builder()
                 .name(expert.expertId())
@@ -178,14 +175,17 @@ public class AgentScopeRuntimeAdapter {
                 .permissionContext(AgentScopePermissionSupport.autoAllowContext());
 
         if (chatSessionId != null && !chatSessionId.isBlank()) {
+            // Abort/timeout mid-tool leaves ToolUse without ToolResult in stateStore memory.
+            // Without recovery, the next call (incl. orchestrator stream→chat fallback) fails with
+            // "Pending tool calls exist without results".
             builder.stateStore(sharedAgentStateStore)
-                    .defaultSessionId(chatSessionId.trim());
+                    .defaultSessionId(chatSessionId.trim())
+                    .enablePendingToolRecovery(true);
         }
 
-        if (sessionScopedBrain && embeddedSkills.embedded()) {
-            // Skill body is embedded in sysPrompt; avoid load_skill on every turn (incl. async continuation).
-            builder.enablePendingToolRecovery(true);
-        } else if (!embeddedSkills.embedded() && hasSkillRepository(skillIds)) {
+        // When skill bodies are already embedded in sysPrompt (incl. session-scoped brain), skip
+        // dynamic load_skill so async continuation does not re-invoke META skill tools every turn.
+        if (!embeddedSkills.embedded() && hasSkillRepository(skillIds)) {
             AgentSkillRepository repository = new ExpertScopedSkillRepository(
                     agentRuntimeConfig.layeredSkillRepository(),
                     skillIds);
