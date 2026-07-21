@@ -12,6 +12,13 @@ import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
 import java.util.concurrent.atomic.AtomicBoolean;
 
+/**
+ * Fan-in hub for expert completion events.
+ * <p>
+ * Queues and drains are <b>per sessionId</b>: different sessions drain concurrently;
+ * within one session, {@link BrainRoundContinuer#continueBrainRound} is expected to block
+ * until that turn finishes so messages are processed serially.
+ */
 @Service
 public class BrainContinuationService {
 
@@ -22,6 +29,7 @@ public class BrainContinuationService {
     private final ConcurrentMap<String, ConcurrentLinkedQueue<ExpertTaskCompletionEvent>> queues =
             new ConcurrentHashMap<>();
     private final ConcurrentMap<String, AtomicBoolean> draining = new ConcurrentHashMap<>();
+    /** One drain worker may run per session; different sessions use the pool concurrently. */
     private final ExecutorService executor = Executors.newCachedThreadPool(r -> {
         Thread thread = new Thread(r, "brain-continuation");
         thread.setDaemon(true);
@@ -67,12 +75,14 @@ public class BrainContinuationService {
             }
             ConcurrentLinkedQueue<ExpertTaskCompletionEvent> queue = queues.get(sessionId);
             ExpertTaskCompletionEvent event;
+            // Serial per session: continuer blocks until the brain turn for this event completes.
             while (queue != null && (event = queue.poll()) != null) {
                 try {
                     continuer.continueBrainRound(event);
                 } catch (Exception e) {
                     log.warn("Brain continuation failed for session {} task {}: {}",
                             sessionId, event.taskId(), e.getMessage());
+                    pendingRegistry.removePending(sessionId, event.taskId());
                 }
             }
         } finally {

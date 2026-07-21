@@ -38,16 +38,28 @@ public final class ExpertMessageConstants {
                 + "。请等待系统注入该任务的回调结果后，再决定是否串行再次派发。";
     }
 
-    public static String expertResultContinueHint(boolean failure) {
-        if (failure) {
-            return "\n---\n[系统] 异步子任务失败。请说明原因并在可行时调整方案，继续完成整体任务。"
-                    + "若仍有未完成的异步 task，勿输出最终 TEXT。"
-                    + "本轮异步任务全部完成前产生的回答属于内部中间过程，前端可能折叠，不视为已向用户交付。\n";
+    /**
+     * @param allAsyncComplete true when this session's pending count reached 0 after applying
+     *                         the current expert response (pending-1).
+     */
+    public static String expertResultContinueHint(boolean failure, boolean allAsyncComplete) {
+        if (!allAsyncComplete) {
+            if (failure) {
+                return "\n---\n[系统] 异步子任务失败。本 session 仍有未完成的异步 task（pending>0）。"
+                        + "请消化本条结果并说明影响；勿输出最终 TEXT。"
+                        + "中间回答属于内部过程，前端可能折叠。\n";
+            }
+            return "\n---\n[系统] 以上为异步子任务返回。本 session 仍有未完成的异步 task（pending>0）。"
+                    + "请消化本条结果；勿输出最终 TEXT。"
+                    + "中间回答属于内部过程，前端可能折叠。\n";
         }
-        return "\n---\n[系统] 以上为异步子任务返回。请继续推进用户请求；"
-                + "若仍有未完成的异步 task，勿输出最终 TEXT。"
-                + "本轮异步任务全部完成前产生的回答属于内部中间过程，前端可能折叠，不视为已向用户交付。"
-                + "当最后一个异步任务完成时，最终回答必须自包含并重新呈现本轮所有专家的详细结论、关键数据、证据和建议；"
-                + "不得仅给摘要或只列专家贡献，也不得使用“如上”“上一轮已说明”“此前已展示”等引用中间过程的表述。\n";
+        if (failure) {
+            return "\n---\n[系统] 本 session 本轮所有异步子任务均已结束（pending=0）。"
+                    + "以上为最后一条子任务失败回传。请输出自包含最终 TEXT："
+                    + "汇总本轮已收到的专家结论，说明失败影响与可行下一步。\n";
+        }
+        return "\n---\n[系统] 本 session 本轮所有异步子任务均已结束（pending=0）。"
+                + "以上为最后一条子任务返回。请输出自包含最终 TEXT，重新呈现本轮所有专家的详细结论、"
+                + "关键数据、证据和建议；不得仅给摘要，也不得使用“如上”“上一轮已说明”等引用中间过程的表述。\n";
     }
 }

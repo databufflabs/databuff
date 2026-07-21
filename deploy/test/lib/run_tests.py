@@ -34,6 +34,10 @@ from ai_session_memory import (  # noqa: E402
     deepseek_api_key,
     run_ai_session_memory_cases,
 )
+from ai_brain_async_routing import (  # noqa: E402
+    GROUP_BRAIN_ASYNC,
+    run_ai_brain_async_routing_cases,
+)
 from demo_window import MIN_WARMUP_SECONDS, QUERY_WINDOW_MS, aligned_query_window, trace_batch_bounds  # noqa: E402
 from ingest_warmup import wait_for_ingest_warmup  # noqa: E402
 from json_assert import assert_matches  # noqa: E402
@@ -460,6 +464,18 @@ def main() -> int:
         default=float(os.environ.get("TEST_AI_MEMORY_POLL_TIMEOUT", "240")),
         help="seconds to wait for each AI memory turn",
     )
+    parser.add_argument(
+        "--skip-ai-brain-async",
+        action="store_true",
+        default=os.environ.get("TEST_SKIP_AI_BRAIN_ASYNC", "0") == "1",
+        help="skip AI brain async routing tests (also skipped when DEEPSEEK_API_KEY unset)",
+    )
+    parser.add_argument(
+        "--ai-brain-async-poll-timeout",
+        type=float,
+        default=float(os.environ.get("TEST_AI_BRAIN_ASYNC_POLL_TIMEOUT", "300")),
+        help="seconds to wait for each AI brain async routing session",
+    )
     args = parser.parse_args()
 
     min_warmup = int(os.environ.get("TEST_MIN_WARMUP_SECONDS", str(MIN_WARMUP_SECONDS)))
@@ -560,6 +576,43 @@ def main() -> int:
         else:
             print(
                 f"[test] skip AI session memory: set {DEEPSEEK_API_KEY_ENV} to enable"
+            )
+
+    if not args.skip_ai_brain_async:
+        if deepseek_api_key():
+            print(
+                f"[test] running AI brain async routing cases "
+                f"(env {DEEPSEEK_API_KEY_ENV} set) ..."
+            )
+            brain_async_results = run_ai_brain_async_routing_cases(
+                base,
+                token,
+                poll_timeout_sec=args.ai_brain_async_poll_timeout,
+            )
+            for item in brain_async_results:
+                report.results.append(
+                    CaseResult(
+                        module=MODULE_AI_PLATFORM,
+                        group=GROUP_BRAIN_ASYNC,
+                        name=item.name,
+                        path=f"/webapi/api/v1/ai/sessions/{item.session_id or '-'}/messages",
+                        method="CHAT",
+                        ok=item.ok,
+                        http_status=200 if item.ok else 0,
+                        elapsed_ms=item.elapsed_ms,
+                        detail=item.detail,
+                        expected_file="ai-brain-async/session-serial-fan-in",
+                        expected_json="same-session serial fan-in; cross-session isolation",
+                    )
+                )
+                report.total += 1
+                if item.ok:
+                    report.passed += 1
+                else:
+                    report.failed += 1
+        else:
+            print(
+                f"[test] skip AI brain async routing: set {DEEPSEEK_API_KEY_ENV} to enable"
             )
 
     json_path = report_dir / f"report-{stamp}.json"

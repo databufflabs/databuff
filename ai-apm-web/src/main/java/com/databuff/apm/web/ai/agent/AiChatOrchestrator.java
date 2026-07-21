@@ -45,6 +45,7 @@ import java.util.concurrent.ConcurrentMap;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
 import java.util.concurrent.Future;
+import java.util.concurrent.TimeUnit;
 
 @Service
 public class AiChatOrchestrator implements BrainRoundContinuer {
@@ -206,49 +207,96 @@ public class AiChatOrchestrator implements BrainRoundContinuer {
         return Boolean.TRUE.equals(flag);
     }
 
+    /**
+     * Per-session serial brain consumption of expert completion events.
+     * <p>
+     * Protocol: dispatch → pending+1; each response → pending-1 then feed this session's brain agent.
+     * Same session must not cancel peer continuations; different sessions stay concurrent via
+     * {@link com.databuff.apm.web.ai.platform.task.BrainContinuationService} per-session drains.
+     * When pending reaches 0, the prompt includes an all-async-complete signal so brain can emit
+     * final TEXT.
+     */
     @Override
     public void continueBrainRound(ExpertTaskCompletionEvent event) {
         if (event == null || event.sessionId() == null || event.sessionId().isBlank()) {
             return;
         }
-        if (sessionStore.isAbortRequested(event.sessionId())) {
-            expertTaskPendingRegistry.removePending(event.sessionId(), event.taskId());
+        String sessionId = event.sessionId().trim();
+        if (sessionStore.isAbortRequested(sessionId)) {
+            expertTaskPendingRegistry.removePending(sessionId, event.taskId());
             return;
         }
-        sessionStore.setRunning(event.sessionId(), true);
-        String assistantMessageId = sessionStore.peekReservedAssistantMessageId(event.sessionId());
-        if (assistantMessageId == null || assistantMessageId.isBlank()) {
-            assistantMessageId = sessionStore.reserveAssistantMessageId(event.sessionId(), "brain");
+        // Same session: wait for any in-flight brain turn to finish. Never cancel peer work.
+        awaitSessionBrainIdle(sessionId);
+        if (sessionStore.isAbortRequested(sessionId)) {
+            expertTaskPendingRegistry.removePending(sessionId, event.taskId());
+            return;
         }
-        // Clear pending only after brain continuation is opened (running + reserved assistant slot).
-        expertTaskPendingRegistry.removePending(event.sessionId(), event.taskId());
+        sessionStore.setRunning(sessionId, true);
+        String assistantMessageId = sessionStore.peekReservedAssistantMessageId(sessionId);
+        if (assistantMessageId == null || assistantMessageId.isBlank()) {
+            assistantMessageId = sessionStore.reserveAssistantMessageId(sessionId, "brain");
+        }
+        // Response arrived → pending-1 for this session.
+        expertTaskPendingRegistry.removePending(sessionId, event.taskId());
+        boolean allAsyncComplete = !expertTaskPendingRegistry.hasPending(sessionId);
         AiExpertDefinition expert = resolveExpert("brain");
         String continuation = ExpertMessageContext.wrapBrainContinuation(
-                event.sessionId(),
+                sessionId,
                 event.roundIndex(),
                 event.taskId(),
                 event.targetExpertId(),
                 event.text(),
-                event.failure());
-        ChatMessageContext chatContext = new ChatMessageContext(continuation, Map.of(
-                ExpertMessageConstants.META_TRIGGER_SOURCE, ExpertMessageConstants.TRIGGER_EXPERT_RESULT,
-                ExpertMessageConstants.META_TASK_ID, event.taskId(),
-                ExpertMessageConstants.META_ROUND_INDEX, event.roundIndex(),
-                ExpertMessageConstants.META_SESSION_ID, event.sessionId()));
+                event.failure(),
+                allAsyncComplete);
+        Map<String, Object> context = new LinkedHashMap<>();
+        context.put(ExpertMessageConstants.META_TRIGGER_SOURCE, ExpertMessageConstants.TRIGGER_EXPERT_RESULT);
+        context.put(ExpertMessageConstants.META_TASK_ID, event.taskId());
+        context.put(ExpertMessageConstants.META_ROUND_INDEX, event.roundIndex());
+        context.put(ExpertMessageConstants.META_SESSION_ID, sessionId);
+        context.put("allAsyncComplete", allAsyncComplete);
+        ChatMessageContext chatContext = new ChatMessageContext(continuation, Map.copyOf(context));
         String finalAssistantMessageId = assistantMessageId;
-        Future<?> previous = activeChatTasks.remove(event.sessionId());
-        if (previous != null) {
-            previous.cancel(true);
-        }
+        String userName = event.userName() == null ? sessionStore.peekUserName(sessionId) : event.userName();
         Future<?> future = streamExecutor.submit(() -> executeAssistantReply(
-                event.sessionId(),
+                sessionId,
                 "brain",
                 finalAssistantMessageId,
-                event.userName() == null ? sessionStore.peekUserName(event.sessionId()) : event.userName(),
+                userName,
                 chatContext,
                 expert,
                 false));
-        activeChatTasks.put(event.sessionId(), future);
+        activeChatTasks.put(sessionId, future);
+        // Block drain thread until this session turn finishes → true per-session serial processing.
+        awaitFutureQuietly(future, sessionId, event.taskId());
+    }
+
+    private void awaitSessionBrainIdle(String sessionId) {
+        Future<?> previous = activeChatTasks.get(sessionId);
+        if (previous == null || previous.isDone()) {
+            return;
+        }
+        awaitFutureQuietly(previous, sessionId, null);
+    }
+
+    private void awaitFutureQuietly(Future<?> future, String sessionId, String taskId) {
+        if (future == null) {
+            return;
+        }
+        try {
+            future.get(agentRuntimeConfig.expertRoundTimeoutMillis(), TimeUnit.MILLISECONDS);
+        } catch (java.util.concurrent.TimeoutException e) {
+            log.warn("Brain turn timed out waiting for session {} task {}", sessionId, taskId);
+        } catch (CancellationException e) {
+            // New user abort/submit may cancel; peer expert completions must not cancel.
+            log.debug("Brain turn cancelled for session {} task {}", sessionId, taskId);
+        } catch (InterruptedException e) {
+            Thread.currentThread().interrupt();
+            log.warn("Interrupted waiting brain turn for session {} task {}", sessionId, taskId);
+        } catch (Exception e) {
+            log.warn("Brain turn failed for session {} task {}: {}",
+                    sessionId, taskId, e.getMessage());
+        }
     }
 
     private void submitAssistantReply(
@@ -1020,8 +1068,29 @@ public class AiChatOrchestrator implements BrainRoundContinuer {
     private static Map<String, Object> withModelMetadata(Map<String, Object> metadata, ChatMessageContext context) {
         Map<String, Object> merged = new LinkedHashMap<>(metadata);
         if (context != null && context.context() != null) {
-            putIfNotBlank(merged, "modelProviderCode", stringValue(context.context().get("modelProviderCode")));
-            putIfNotBlank(merged, "modelName", stringValue(context.context().get("modelName")));
+            Map<String, Object> ctx = context.context();
+            putIfNotBlank(merged, "modelProviderCode", stringValue(ctx.get("modelProviderCode")));
+            putIfNotBlank(merged, "modelName", stringValue(ctx.get("modelName")));
+            putIfNotBlank(merged, ExpertMessageConstants.META_TRIGGER_SOURCE,
+                    stringValue(ctx.get(ExpertMessageConstants.META_TRIGGER_SOURCE)));
+            putIfNotBlank(merged, ExpertMessageConstants.META_TASK_ID,
+                    stringValue(ctx.get(ExpertMessageConstants.META_TASK_ID)));
+            putIfNotBlank(merged, ExpertMessageConstants.META_SESSION_ID,
+                    stringValue(ctx.get(ExpertMessageConstants.META_SESSION_ID)));
+            Object round = ctx.get(ExpertMessageConstants.META_ROUND_INDEX);
+            if (round instanceof Number number) {
+                merged.put(ExpertMessageConstants.META_ROUND_INDEX, number.intValue());
+            } else if (round != null) {
+                try {
+                    merged.put(ExpertMessageConstants.META_ROUND_INDEX, Integer.parseInt(String.valueOf(round)));
+                } catch (NumberFormatException ignored) {
+                    // keep existing metadata
+                }
+            }
+            Object allDone = ctx.get("allAsyncComplete");
+            if (allDone instanceof Boolean bool) {
+                merged.put("allAsyncComplete", bool);
+            }
         }
         return Map.copyOf(merged);
     }

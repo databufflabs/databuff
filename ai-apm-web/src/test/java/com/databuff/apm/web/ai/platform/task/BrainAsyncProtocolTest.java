@@ -7,16 +7,15 @@ import com.databuff.apm.web.ai.UpdateLlmProviderRequest;
 import com.databuff.apm.web.ai.agent.AiChatOrchestrator;
 import com.databuff.apm.web.ai.agent.AiRuntimeForwarder;
 import com.databuff.apm.web.ai.agent.AiRuntimeRouter;
-import com.databuff.apm.web.support.WebTestClusterSupport;
 import com.databuff.apm.web.ai.agent.AiSessionStore;
 import com.databuff.apm.web.ai.platform.runtime.ExpertChatInput;
-import com.databuff.apm.web.ai.platform.runtime.ExpertChatResult;
 import com.databuff.apm.web.ai.platform.runtime.ExpertRuntime;
 import com.databuff.apm.web.ai.platform.runtime.ExpertRuntimeEvent;
 import com.databuff.apm.web.ai.platform.runtime.ExpertRuntimeRegistry;
 import com.databuff.apm.web.ai.platform.runtime.SessionExpertRuntimeRegistry;
 import com.databuff.apm.web.ai.platform.expert.AiExpertDefinition;
 import com.databuff.apm.web.ai.tool.ApmToolkit;
+import com.databuff.apm.web.support.WebTestClusterSupport;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
@@ -41,10 +40,10 @@ import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.when;
 
 /**
- * End-to-end: expert deliverable TEXT → brain continuation → round-final TEXT.
- * Covers single-expert, parallel multi-expert (same session serial fan-in), and cross-session isolation.
+ * Protocol-level tests for brain ↔ expert async collaboration.
+ * Covers failure, mixed success/failure, intermediate demote, and no-peer-cancel.
  */
-class BrainAsyncRoutingIntegrationTest {
+class BrainAsyncProtocolTest {
 
     @TempDir
     Path tempDir;
@@ -54,8 +53,9 @@ class BrainAsyncRoutingIntegrationTest {
     private BrainContinuationService continuationService;
     private ExpertTaskService taskService;
     private AiChatOrchestrator orchestrator;
-    private final AtomicInteger brainStreamCalls = new AtomicInteger();
     private final List<String> brainPrompts = new ArrayList<>();
+    private final AtomicInteger brainStreamCalls = new AtomicInteger();
+    private final AtomicInteger brainCancelCount = new AtomicInteger();
 
     @BeforeEach
     void setUp() {
@@ -70,18 +70,18 @@ class BrainAsyncRoutingIntegrationTest {
         pendingRegistry = new ExpertTaskPendingRegistry();
         ExpertTaskTextGuard textGuard = new ExpertTaskTextGuard();
         AtomicReference<BrainRoundContinuer> continuerRef = new AtomicReference<>();
-        continuationService = new BrainContinuationService(continuerRefProvider(continuerRef), pendingRegistry);
+        continuationService = new BrainContinuationService(providerOf(continuerRef), pendingRegistry);
 
         ExpertRuntimeRegistry registry = mock(ExpertRuntimeRegistry.class);
         ExpertRuntime dataRuntime = mock(ExpertRuntime.class);
         when(dataRuntime.stream(any(ExpertChatInput.class)))
-                .thenReturn(Flux.just(ExpertRuntimeEvent.text("最近1小时共 3 个服务")));
+                .thenReturn(Flux.just(ExpertRuntimeEvent.text("data结论：3个服务")));
         ExpertRuntime opsRuntime = mock(ExpertRuntime.class);
         when(opsRuntime.stream(any(ExpertChatInput.class)))
                 .thenReturn(Flux.just(ExpertRuntimeEvent.text("ops结论：磁盘正常")));
         ExpertRuntime inspectionRuntime = mock(ExpertRuntime.class);
         when(inspectionRuntime.stream(any(ExpertChatInput.class)))
-                .thenReturn(Flux.just(ExpertRuntimeEvent.text("inspection结论：错误率偏高")));
+                .thenReturn(Flux.error(new RuntimeException("inspection工具连接超时")));
 
         ExpertRuntime brainRuntime = mock(ExpertRuntime.class);
         when(brainRuntime.stream(any(ExpertChatInput.class))).thenAnswer(invocation -> {
@@ -92,18 +92,15 @@ class BrainAsyncRoutingIntegrationTest {
             }
             brainStreamCalls.incrementAndGet();
             if (message.contains("pending=0") || message.contains("均已结束")) {
-                return Flux.just(ExpertRuntimeEvent.text("终稿：已汇总 ops 与 inspection"));
+                return Flux.just(ExpertRuntimeEvent.text("终稿：汇总完成"));
             }
             if (message.contains("pending>0") || message.contains("仍有未完成")) {
-                return Flux.just(ExpertRuntimeEvent.text("中间：已收到部分专家结果，继续等待"));
-            }
-            if (message.contains("已完成")) {
-                return Flux.just(ExpertRuntimeEvent.text("整合后的终稿：共 3 个服务"));
+                return Flux.just(ExpertRuntimeEvent.text("中间：等待其余专家"));
             }
             return Flux.empty();
         });
         when(brainRuntime.chat(any(ExpertChatInput.class)))
-                .thenReturn(Mono.just(ExpertChatResult.ok("整合后的终稿：共 3 个服务")));
+                .thenReturn(Mono.just(com.databuff.apm.web.ai.platform.runtime.ExpertChatResult.ok("终稿")));
         when(registry.getOrCreate("data")).thenReturn(dataRuntime);
         when(registry.getOrCreate("ops")).thenReturn(opsRuntime);
         when(registry.getOrCreate("inspection")).thenReturn(inspectionRuntime);
@@ -112,9 +109,7 @@ class BrainAsyncRoutingIntegrationTest {
         SessionExpertRuntimeRegistry sessionRegistry = mock(SessionExpertRuntimeRegistry.class);
         when(sessionRegistry.getOrCreate(any(String.class), any())).thenAnswer(invocation -> {
             AiExpertDefinition expert = invocation.getArgument(1);
-            if (expert == null) {
-                return brainRuntime;
-            }
+            if (expert == null) return brainRuntime;
             return switch (expert.expertId()) {
                 case "data" -> dataRuntime;
                 case "ops" -> opsRuntime;
@@ -125,8 +120,8 @@ class BrainAsyncRoutingIntegrationTest {
 
         taskService = new ExpertTaskService(
                 fixture.expertManagementService(),
-                providerOf(registry),
-                providerOf(sessionRegistry),
+                registryProviderOf(registry),
+                sessionRegistryProviderOf(sessionRegistry),
                 null,
                 sessionStore,
                 pendingRegistry,
@@ -161,71 +156,23 @@ class BrainAsyncRoutingIntegrationTest {
     }
 
     @Test
-    void expertDeliverableTriggersBrainRoundFinalText() throws Exception {
+    void expertFailureStillTriggersBrainFinalText() throws Exception {
         String sessionId = sessionStore.ensureSession(null, "brain", "rk", "web-1", "admin");
-        sessionStore.appendUserMessage(sessionId, "查询最近1小时的服务列表", "brain", "admin", Map.of());
-        sessionStore.reserveAssistantMessageId(sessionId, "brain");
-        sessionStore.setRunning(sessionId, true);
-        int roundIndex = sessionStore.peekCurrentRoundIndex(sessionId);
-
-        ExpertTask task = taskService.submit(new ExpertTaskRequest(
-                sessionId,
-                "brain",
-                "data",
-                "查询最近1小时的服务列表",
-                null,
-                Map.of(
-                        ExpertMessageConstants.META_ROUND_INDEX, roundIndex,
-                        "userName", "admin")));
-
-        ExpertTask finished = taskService.waitFor(task.taskId(), Duration.ofSeconds(5));
-        assertThat(finished.status()).isEqualTo(ExpertTaskStatus.SUCCEEDED);
-
-        assertThat(awaitRoundFinal(sessionId)).isTrue();
-        assertThat(sessionStore.isRunning(sessionId)).isFalse();
-        assertThat(sessionStore.messages(sessionId))
-                .anySatisfy(message -> {
-                    assertThat(message.messageType()).isEqualTo("TEXT");
-                    assertThat(message.expertId()).isEqualTo("brain");
-                    assertThat(message.content()).containsAnyOf("整合后的终稿", "终稿");
-                    assertThat(message.metadata().get(ExpertMessageConstants.META_IS_ROUND_FINAL))
-                            .isEqualTo(Boolean.TRUE);
-                    assertThat(message.metadata().get(ExpertMessageConstants.META_TRIGGER_SOURCE))
-                            .isEqualTo(ExpertMessageConstants.TRIGGER_EXPERT_RESULT);
-                });
-        assertThat(pendingRegistry.hasPending(sessionId)).isFalse();
-    }
-
-    @Test
-    void parallelExpertsSameSessionAreConsumedSeriallyWithoutCancel() throws Exception {
-        String sessionId = sessionStore.ensureSession(null, "brain", "rk", "web-1", "admin");
-        sessionStore.appendUserMessage(sessionId, "并行排查 mysql", "brain", "admin", Map.of());
+        sessionStore.appendUserMessage(sessionId, "巡检服务", "brain", "admin", Map.of());
         sessionStore.reserveAssistantMessageId(sessionId, "brain");
         sessionStore.setRunning(sessionId, true);
         int roundIndex = sessionStore.peekCurrentRoundIndex(sessionId);
         Map<String, Object> meta = Map.of(
-                ExpertMessageConstants.META_ROUND_INDEX, roundIndex,
-                "userName", "admin");
+                ExpertMessageConstants.META_ROUND_INDEX, roundIndex, "userName", "admin");
 
-        ExpertTask ops = taskService.submit(new ExpertTaskRequest(
-                sessionId, "brain", "ops", "排查运行环境", null, meta));
-        ExpertTask inspection = taskService.submit(new ExpertTaskRequest(
-                sessionId, "brain", "inspection", "健康巡检", null, meta));
+        ExpertTask task = taskService.submit(new ExpertTaskRequest(
+                sessionId, "brain", "inspection", "巡检", null, meta));
 
-        assertThat(taskService.waitFor(ops.taskId(), Duration.ofSeconds(5)).status())
-                .isEqualTo(ExpertTaskStatus.SUCCEEDED);
-        assertThat(taskService.waitFor(inspection.taskId(), Duration.ofSeconds(5)).status())
-                .isEqualTo(ExpertTaskStatus.SUCCEEDED);
+        ExpertTask finished = taskService.waitFor(task.taskId(), Duration.ofSeconds(5));
+        assertThat(finished.status()).isEqualTo(ExpertTaskStatus.FAILED);
 
         assertThat(awaitRoundFinal(sessionId)).isTrue();
-        assertThat(sessionStore.isRunning(sessionId)).isFalse();
         assertThat(pendingRegistry.hasPending(sessionId)).isFalse();
-
-        assertThat(sessionStore.messages(sessionId))
-                .anyMatch(message -> "ops".equals(message.expertId())
-                        && Boolean.TRUE.equals(message.metadata().get(ExpertMessageConstants.META_IS_EXPERT_DELIVERABLE)))
-                .anyMatch(message -> "inspection".equals(message.expertId())
-                        && Boolean.TRUE.equals(message.metadata().get(ExpertMessageConstants.META_IS_EXPERT_DELIVERABLE)));
 
         assertThat(sessionStore.messages(sessionId))
                 .anySatisfy(message -> {
@@ -234,10 +181,46 @@ class BrainAsyncRoutingIntegrationTest {
                     assertThat(Boolean.TRUE.equals(message.metadata().get(ExpertMessageConstants.META_IS_ROUND_FINAL)))
                             .isTrue();
                     assertThat(message.content()).contains("终稿");
-                    assertThat(message.content()).doesNotContain("继续等待");
+                });
+    }
+
+    @Test
+    void mixedSuccessAndFailureBrainFinalizesWithBothResults() throws Exception {
+        String sessionId = sessionStore.ensureSession(null, "brain", "rk", "web-1", "admin");
+        sessionStore.appendUserMessage(sessionId, "并行排查", "brain", "admin", Map.of());
+        sessionStore.reserveAssistantMessageId(sessionId, "brain");
+        sessionStore.setRunning(sessionId, true);
+        int roundIndex = sessionStore.peekCurrentRoundIndex(sessionId);
+        Map<String, Object> meta = Map.of(
+                ExpertMessageConstants.META_ROUND_INDEX, roundIndex, "userName", "admin");
+
+        ExpertTask ops = taskService.submit(new ExpertTaskRequest(
+                sessionId, "brain", "ops", "排查环境", null, meta));
+        ExpertTask inspection = taskService.submit(new ExpertTaskRequest(
+                sessionId, "brain", "inspection", "巡检", null, meta));
+
+        assertThat(taskService.waitFor(ops.taskId(), Duration.ofSeconds(5)).status())
+                .isEqualTo(ExpertTaskStatus.SUCCEEDED);
+        assertThat(taskService.waitFor(inspection.taskId(), Duration.ofSeconds(5)).status())
+                .isEqualTo(ExpertTaskStatus.FAILED);
+
+        assertThat(awaitRoundFinal(sessionId)).isTrue();
+        assertThat(pendingRegistry.hasPending(sessionId)).isFalse();
+
+        assertThat(sessionStore.messages(sessionId))
+                .anyMatch(message -> "ops".equals(message.expertId())
+                        && Boolean.TRUE.equals(message.metadata().get(ExpertMessageConstants.META_IS_EXPERT_DELIVERABLE)))
+                .anyMatch(message -> "inspection".equals(message.expertId())
+                        && "ERROR".equals(message.messageType()));
+
+        assertThat(sessionStore.messages(sessionId))
+                .anySatisfy(message -> {
+                    assertThat(message.expertId()).isEqualTo("brain");
+                    assertThat(Boolean.TRUE.equals(message.metadata().get(ExpertMessageConstants.META_IS_ROUND_FINAL)))
+                            .isTrue();
+                    assertThat(message.content()).contains("终稿");
                 });
 
-        assertThat(brainStreamCalls.get()).isGreaterThanOrEqualTo(2);
         synchronized (brainPrompts) {
             assertThat(brainPrompts.stream().anyMatch(p -> p.contains("pending>0") || p.contains("仍有未完成")))
                     .isTrue();
@@ -247,51 +230,48 @@ class BrainAsyncRoutingIntegrationTest {
     }
 
     @Test
-    void differentSessionsDrainConcurrentlyAndStayIsolated() throws Exception {
-        String sessionA = sessionStore.ensureSession(null, "brain", "rk", "web-1", "admin");
-        String sessionB = sessionStore.ensureSession(null, "brain", "rk", "web-1", "admin");
-        sessionStore.appendUserMessage(sessionA, "session-A", "brain", "admin", Map.of());
-        sessionStore.appendUserMessage(sessionB, "session-B", "brain", "admin", Map.of());
-        sessionStore.reserveAssistantMessageId(sessionA, "brain");
-        sessionStore.reserveAssistantMessageId(sessionB, "brain");
-        sessionStore.setRunning(sessionA, true);
-        sessionStore.setRunning(sessionB, true);
+    void intermediateBrainTextDemotedToReasoningWhilePending() throws Exception {
+        String sessionId = sessionStore.ensureSession(null, "brain", "rk", "web-1", "admin");
+        sessionStore.appendUserMessage(sessionId, "并行排查", "brain", "admin", Map.of());
+        sessionStore.reserveAssistantMessageId(sessionId, "brain");
+        sessionStore.setRunning(sessionId, true);
+        int roundIndex = sessionStore.peekCurrentRoundIndex(sessionId);
+        Map<String, Object> meta = Map.of(
+                ExpertMessageConstants.META_ROUND_INDEX, roundIndex, "userName", "admin");
 
-        int roundA = sessionStore.peekCurrentRoundIndex(sessionA);
-        int roundB = sessionStore.peekCurrentRoundIndex(sessionB);
+        ExpertTask ops = taskService.submit(new ExpertTaskRequest(
+                sessionId, "brain", "ops", "排查", null, meta));
+        ExpertTask inspection = taskService.submit(new ExpertTaskRequest(
+                sessionId, "brain", "inspection", "巡检", null, meta));
 
-        ExpertTask taskA = taskService.submit(new ExpertTaskRequest(
-                sessionA, "brain", "data", "A任务", null,
-                Map.of(ExpertMessageConstants.META_ROUND_INDEX, roundA, "userName", "admin")));
-        ExpertTask taskB = taskService.submit(new ExpertTaskRequest(
-                sessionB, "brain", "data", "B任务", null,
-                Map.of(ExpertMessageConstants.META_ROUND_INDEX, roundB, "userName", "admin")));
+        taskService.waitFor(ops.taskId(), Duration.ofSeconds(5));
+        taskService.waitFor(inspection.taskId(), Duration.ofSeconds(5));
 
-        assertThat(taskService.waitFor(taskA.taskId(), Duration.ofSeconds(5)).status())
-                .isEqualTo(ExpertTaskStatus.SUCCEEDED);
-        assertThat(taskService.waitFor(taskB.taskId(), Duration.ofSeconds(5)).status())
-                .isEqualTo(ExpertTaskStatus.SUCCEEDED);
+        assertThat(awaitRoundFinal(sessionId)).isTrue();
 
-        assertThat(awaitRoundFinal(sessionA)).isTrue();
-        assertThat(awaitRoundFinal(sessionB)).isTrue();
+        List<AiSessionStore.ChatMessage> messages = sessionStore.messages(sessionId);
+        boolean hasIntermediateReasoning = messages.stream()
+                .anyMatch(message -> "brain".equals(message.expertId())
+                        && "REASONING".equals(message.messageType())
+                        && message.content() != null
+                        && message.content().contains("中间"));
+        assertThat(hasIntermediateReasoning).isTrue();
 
-        assertThat(sessionStore.messages(sessionA))
-                .noneMatch(message -> message.content() != null && message.content().contains("session-B"));
-        assertThat(sessionStore.messages(sessionB))
-                .noneMatch(message -> message.content() != null && message.content().contains("session-A"));
-        assertThat(pendingRegistry.hasPending(sessionA)).isFalse();
-        assertThat(pendingRegistry.hasPending(sessionB)).isFalse();
+        long roundFinalCount = messages.stream()
+                .filter(message -> "brain".equals(message.expertId())
+                        && "TEXT".equals(message.messageType())
+                        && Boolean.TRUE.equals(message.metadata().get(ExpertMessageConstants.META_IS_ROUND_FINAL)))
+                .count();
+        assertThat(roundFinalCount).isEqualTo(1L);
     }
 
     private boolean awaitRoundFinal(String sessionId) throws InterruptedException {
         for (int i = 0; i < 100; i++) {
-            boolean roundFinalSeen = sessionStore.messages(sessionId).stream()
+            boolean seen = sessionStore.messages(sessionId).stream()
                     .anyMatch(message -> "TEXT".equals(message.messageType())
                             && "brain".equals(message.expertId())
                             && Boolean.TRUE.equals(message.metadata().get(ExpertMessageConstants.META_IS_ROUND_FINAL)));
-            if (roundFinalSeen && !sessionStore.isRunning(sessionId)) {
-                return true;
-            }
+            if (seen && !sessionStore.isRunning(sessionId)) return true;
             Thread.sleep(50L);
         }
         return sessionStore.messages(sessionId).stream()
@@ -300,95 +280,34 @@ class BrainAsyncRoutingIntegrationTest {
                         && Boolean.TRUE.equals(message.metadata().get(ExpertMessageConstants.META_IS_ROUND_FINAL)));
     }
 
-    private static ObjectProvider<ExpertRuntimeRegistry> providerOf(ExpertRuntimeRegistry registry) {
+    private static <T> ObjectProvider<T> providerOf(AtomicReference<T> ref) {
         return new ObjectProvider<>() {
-            @Override
-            public ExpertRuntimeRegistry getObject() {
-                return registry;
-            }
-
-            @Override
-            public ExpertRuntimeRegistry getObject(Object... args) {
-                return registry;
-            }
-
-            @Override
-            public ExpertRuntimeRegistry getIfAvailable() {
-                return registry;
-            }
-
-            @Override
-            public ExpertRuntimeRegistry getIfUnique() {
-                return registry;
-            }
-
-            @Override
-            public void ifAvailable(Consumer<ExpertRuntimeRegistry> consumer) {
-                consumer.accept(registry);
-            }
+            @Override public T getObject() { return ref.get(); }
+            @Override public T getObject(Object... args) { return ref.get(); }
+            @Override public T getIfAvailable() { return ref.get(); }
+            @Override public T getIfUnique() { return ref.get(); }
+            @Override public void ifAvailable(Consumer<T> c) { T v = ref.get(); if (v != null) c.accept(v); }
         };
     }
 
-    private static ObjectProvider<SessionExpertRuntimeRegistry> providerOf(
+    private static ObjectProvider<ExpertRuntimeRegistry> registryProviderOf(ExpertRuntimeRegistry registry) {
+        return new ObjectProvider<>() {
+            @Override public ExpertRuntimeRegistry getObject() { return registry; }
+            @Override public ExpertRuntimeRegistry getObject(Object... args) { return registry; }
+            @Override public ExpertRuntimeRegistry getIfAvailable() { return registry; }
+            @Override public ExpertRuntimeRegistry getIfUnique() { return registry; }
+            @Override public void ifAvailable(Consumer<ExpertRuntimeRegistry> c) { c.accept(registry); }
+        };
+    }
+
+    private static ObjectProvider<SessionExpertRuntimeRegistry> sessionRegistryProviderOf(
             SessionExpertRuntimeRegistry registry) {
         return new ObjectProvider<>() {
-            @Override
-            public SessionExpertRuntimeRegistry getObject() {
-                return registry;
-            }
-
-            @Override
-            public SessionExpertRuntimeRegistry getObject(Object... args) {
-                return registry;
-            }
-
-            @Override
-            public SessionExpertRuntimeRegistry getIfAvailable() {
-                return registry;
-            }
-
-            @Override
-            public SessionExpertRuntimeRegistry getIfUnique() {
-                return registry;
-            }
-
-            @Override
-            public void ifAvailable(Consumer<SessionExpertRuntimeRegistry> consumer) {
-                consumer.accept(registry);
-            }
-        };
-    }
-
-    private static ObjectProvider<BrainRoundContinuer> continuerRefProvider(
-            AtomicReference<BrainRoundContinuer> holder) {
-        return new ObjectProvider<>() {
-            @Override
-            public BrainRoundContinuer getObject() {
-                return holder.get();
-            }
-
-            @Override
-            public BrainRoundContinuer getObject(Object... args) {
-                return holder.get();
-            }
-
-            @Override
-            public BrainRoundContinuer getIfAvailable() {
-                return holder.get();
-            }
-
-            @Override
-            public BrainRoundContinuer getIfUnique() {
-                return holder.get();
-            }
-
-            @Override
-            public void ifAvailable(Consumer<BrainRoundContinuer> consumer) {
-                BrainRoundContinuer continuer = holder.get();
-                if (continuer != null) {
-                    consumer.accept(continuer);
-                }
-            }
+            @Override public SessionExpertRuntimeRegistry getObject() { return registry; }
+            @Override public SessionExpertRuntimeRegistry getObject(Object... args) { return registry; }
+            @Override public SessionExpertRuntimeRegistry getIfAvailable() { return registry; }
+            @Override public SessionExpertRuntimeRegistry getIfUnique() { return registry; }
+            @Override public void ifAvailable(Consumer<SessionExpertRuntimeRegistry> c) { c.accept(registry); }
         };
     }
 }
