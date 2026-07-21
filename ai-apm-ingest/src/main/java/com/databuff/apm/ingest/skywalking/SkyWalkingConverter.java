@@ -178,7 +178,7 @@ public final class SkyWalkingConverter {
         dc.metaHttpStatusCode = parseInt(firstNonBlank(meta.get("http.status_code"), meta.get("status_code")));
         String url = firstNonBlank(meta.get("url"), meta.get("http.url"), meta.get("http.route"));
         if (url != null && !DcSpanUtil.isRpcProtocolUrl(url)) {
-            dc.metaHttpUrl = url;
+            dc.metaHttpUrl = DcSpanUtil.normalizeHttpUrl(url);
         }
     }
 

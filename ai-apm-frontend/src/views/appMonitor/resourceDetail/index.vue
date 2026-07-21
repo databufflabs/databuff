@@ -121,8 +121,8 @@ export default class ResourceDetail extends Vue {
 
   private queryParams: any = {
     serviceId: '',
-    // isIn: 1,
-    resource: ''
+    url: '',
+    resource: '',
   }
   private queryCode = ''
   private componentType = ''
@@ -182,12 +182,12 @@ export default class ResourceDetail extends Vue {
     this.queryCode = decodeRouteQuery(endpoint as string);
     this.componentType = componentType as string
 
-    // 筛选区及列表参数
+    // 筛选区及列表参数：HTTP 用 url（无 host 路径），其他组件用 resource
     this.queryParams = {
-      // isIn: 1,
       serviceId: _sid,
-      resource: this.queryCode,
-      ...(this.componentType === 'service.http' ? { url: this.queryCode } : {}),
+      ...(this.componentType === 'service.http'
+        ? { url: this.queryCode }
+        : { resource: this.queryCode }),
     }
   }
 
@@ -239,7 +239,7 @@ export default class ResourceDetail extends Vue {
       // isIn: this.queryParams.isIn,
       serviceId: this.queryParams.serviceId,
       ...(this.componentType === 'service.http'
-        ? { url: this.queryParams.resource }
+        ? { url: this.queryParams.url }
         : { resource: this.queryParams.resource }),
       componentType: this.componentType,
       fromTime,
@@ -314,7 +314,19 @@ export default class ResourceDetail extends Vue {
   private async serviceTabnavStatus () {
     const { fromTime, toTime } = this.getGlobalTimeV2();
     const { sid } = this.$route.query;
-    const { error, result } = await toAsyncWait(ApmApi.serviceTabnavStatus({ serviceId: decodeRouteQuery(String(sid)), fromTime: new Date(fromTime).valueOf(), toTime: new Date(toTime).valueOf(), resource: decodeRouteQuery(String(this.$route.query.endpoint)), componentType: this.componentType }));
+    const endpoint = decodeRouteQuery(String(this.$route.query.endpoint));
+    const tabnavParams: any = {
+      serviceId: decodeRouteQuery(String(sid)),
+      fromTime: new Date(fromTime).valueOf(),
+      toTime: new Date(toTime).valueOf(),
+      componentType: this.componentType,
+    };
+    if (this.componentType === 'service.http') {
+      tabnavParams.url = endpoint;
+    } else {
+      tabnavParams.resource = endpoint;
+    }
+    const { error, result } = await toAsyncWait(ApmApi.serviceTabnavStatus(tabnavParams));
     if (!error) {
       this.tabStatus = Array.isArray(result?.data) ? result?.data : [];
     } else {

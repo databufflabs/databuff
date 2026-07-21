@@ -311,7 +311,7 @@ export default class TabRelation extends Vue {
       componentType: this.componentType,
       serviceId: decodePortalServiceId(this.queryParams.serviceId),
       ...(this.componentType === 'service.http'
-        ? { url: this.queryParams.resource }
+        ? { url: this.queryParams.url }
         : { resource: this.queryParams.resource }),
       start: fromTime.valueOf(),
       end: toTime.valueOf(),

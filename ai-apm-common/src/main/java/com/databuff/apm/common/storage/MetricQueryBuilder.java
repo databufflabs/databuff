@@ -353,13 +353,21 @@ public final class MetricQueryBuilder {
         return filters.toString();
     }
 
-    /** Strict portal endpoint match on {@code meta.http.url}. */
-    static String appendSpanListResourceFilter(String resourcePath) {
-        if (resourcePath == null || resourcePath.isBlank()) {
+    /**
+     * HTTP interface span list filter on path-only {@code url} (no host).
+     * Matches normalized {@code meta.http.url}; suffix match covers legacy absolute URLs.
+     */
+    static String appendSpanListResourceFilter(String urlPath) {
+        if (urlPath == null || urlPath.isBlank()) {
             return "";
         }
-        String escaped = escapeLiteral(resourcePath.trim());
-        return " AND `meta.http.url` = '" + escaped + "' ";
+        String trimmed = urlPath.trim();
+        String escaped = escapeLiteral(trimmed);
+        if (trimmed.contains("://")) {
+            return " AND COALESCE(`meta.http.url`, '') = '" + escaped + "' ";
+        }
+        return " AND (COALESCE(`meta.http.url`, '') = '" + escaped + "'"
+                + " OR COALESCE(`meta.http.url`, '') LIKE '%" + escaped + "') ";
     }
 
     private static String appendTraceSpanListScopeFilters(Integer isParent, String parentId) {

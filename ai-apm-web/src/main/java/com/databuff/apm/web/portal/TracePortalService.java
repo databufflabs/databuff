@@ -124,7 +124,7 @@ public class TracePortalService {
         List<String> serviceKeys = resolveTraceServiceKeys(body);
         boolean virtualServiceFilter = isVirtualTraceServiceFilter(body);
         String exception = decodeQueryValue(body.get("exception"));
-        String resource = ServicePortalService.decodeResourceValue(decodeQueryValue(body.get("resource")));
+        String resource = resolveInterfaceUrlFilter(body);
         String sortField = ServicePortalService.stringValue(body.get("sortField"), "startTime");
         String sortOrder = ServicePortalService.stringValue(body.get("sortOrder"), "desc");
         int limit = Math.max(1, Math.min(size <= 0 ? 50 : size, 500));
@@ -653,11 +653,8 @@ public class TracePortalService {
     }
 
     public List<String> tabnavStatus(Map<String, Object> body) {
-        String resource = decodeQueryValue(body.get("resource"));
         Map<String, Object> query = new LinkedHashMap<>(body);
-        if (resource != null && !resource.isBlank()) {
-            query.put("resource", resource);
-        }
+        applyInterfaceFilterToQuery(query);
         List<Map<String, Object>> spans = filterPortalSpans(loadPortalSpans(query), query);
 
         List<String> tabs = new ArrayList<>();
@@ -676,10 +673,7 @@ public class TracePortalService {
     public Map<String, Object> resourcePercent(Map<String, Object> body) {
         long duration = toLong(body.get("duration"));
         Map<String, Object> query = new LinkedHashMap<>(body);
-        String resource = decodeQueryValue(body.get("resource"));
-        if (resource != null && !resource.isBlank()) {
-            query.put("resource", resource);
-        }
+        applyInterfaceFilterToQuery(query);
         String serviceId = resolveService(body);
         if (serviceId != null && !serviceId.isBlank()) {
             query.put("serviceId", serviceId);
@@ -937,9 +931,35 @@ public class TracePortalService {
                 null,
                 ServicePortalService.stringValue(body.get("sortField"), "startTime"),
                 ServicePortalService.stringValue(body.get("sortOrder"), "desc"),
-                ServicePortalService.decodeResourceValue(decodeQueryValue(body.get("resource"))),
+                resolveInterfaceUrlFilter(body),
                 parseSpanListMinDuration(body),
                 parseSpanListError(body));
+    }
+
+    /**
+     * HTTP interface queries filter by path-only {@code url}; other component types use {@code resource}.
+     */
+    private static String resolveInterfaceUrlFilter(Map<String, Object> body) {
+        if ("service.http".equals(ServicePortalService.stringValue(body.get("componentType"), null))) {
+            String url = ServicePortalService.decodeResourceValue(decodeQueryValue(body.get("url")));
+            if (url != null && !url.isBlank()) {
+                return url;
+            }
+        }
+        return ServicePortalService.decodeResourceValue(decodeQueryValue(body.get("resource")));
+    }
+
+    private static void applyInterfaceFilterToQuery(Map<String, Object> query) {
+        String filterKey = resolveInterfaceUrlFilter(query);
+        if (filterKey == null || filterKey.isBlank()) {
+            return;
+        }
+        if ("service.http".equals(ServicePortalService.stringValue(query.get("componentType"), null))) {
+            query.put("url", filterKey);
+            query.remove("resource");
+        } else {
+            query.put("resource", filterKey);
+        }
     }
 
     private List<String> resolveTraceServiceKeys(Map<String, Object> body) {
@@ -1358,10 +1378,14 @@ public class TracePortalService {
             rows.removeIf(row -> !resources.contains(String.valueOf(row.get("resource"))));
         }
 
-        String resource = ServicePortalService.decodeResourceValue(decodeQueryValue(body.get("resource")));
-        if (resource != null && !resource.isBlank()) {
-            final String endpoint = resource;
-            rows.removeIf(row -> !endpoint.equals(resolveSpanListEndpoint(row)));
+        String endpointFilter = resolveInterfaceUrlFilter(body);
+        if (endpointFilter != null && !endpointFilter.isBlank()) {
+            final String endpoint = endpointFilter;
+            if ("service.http".equals(ServicePortalService.stringValue(body.get("componentType"), null))) {
+                rows.removeIf(row -> !matchesHttpSpanUrl(endpoint, row));
+            } else {
+                rows.removeIf(row -> !endpoint.equals(String.valueOf(row.get("resource"))));
+            }
         }
 
         String fuzzyTraceName = ServicePortalService.stringValue(body.get("fuzzyTraceName"), null);
@@ -1554,15 +1578,18 @@ public class TracePortalService {
         }
     }
 
-    private static String resolveSpanListEndpoint(Map<String, Object> row) {
+    private static boolean matchesHttpSpanUrl(String url, Map<String, Object> row) {
+        if (url == null || url.isBlank()) {
+            return true;
+        }
         Object metaObj = row.get("meta");
         if (metaObj instanceof Map<?, ?> meta) {
-            Object url = meta.get("http.url");
-            if (url != null && !String.valueOf(url).isBlank()) {
-                return String.valueOf(url);
+            Object httpUrl = meta.get("http.url");
+            if (httpUrl != null && !String.valueOf(httpUrl).isBlank()) {
+                return url.equals(DcSpanUtil.normalizeHttpUrl(String.valueOf(httpUrl)));
             }
         }
-        return String.valueOf(row.get("resource"));
+        return String.valueOf(row.get("resource")).contains(url);
     }
 
     private static String decodeQueryValue(Object value) {

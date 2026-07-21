@@ -356,6 +356,31 @@ class OtelConverterTest {
     }
 
     @Test
+    void normalizesAbsoluteHttpUrlToPathOnly() throws Exception {
+        ExportTraceServiceRequest request = ExportTraceServiceRequest.newBuilder()
+                .addResourceSpans(ResourceSpans.newBuilder()
+                        .setResource(Resource.newBuilder()
+                                .addAttributes(kv("service.name", "frontend")))
+                        .addScopeSpans(ScopeSpans.newBuilder()
+                                .addSpans(Span.newBuilder()
+                                        .setTraceId(ByteString.fromHex("0102030405060708090a0b0c0d0e0f10"))
+                                        .setSpanId(ByteString.fromHex("0102030405060708"))
+                                        .setParentSpanId(ByteString.fromHex("0102030405060709"))
+                                        .setName("GET")
+                                        .setKind(Span.SpanKind.SPAN_KIND_CLIENT)
+                                        .setStartTimeUnixNano(1_700_000_000_000_000_000L)
+                                        .setEndTimeUnixNano(1_700_000_050_000_000L)
+                                        .addAttributes(kv("http.method", "GET"))
+                                        .addAttributes(kv("url.full",
+                                                "http://frontend-proxy:8080/api/recommendations?productIds=HQTGWGPNH4"))
+                                        .addAttributes(kv("http.response.status_code", "200")))))
+                .build();
+
+        DcSpan span = converter.convertTraces(request).get(0).span();
+        assertThat(span.metaHttpUrl).isEqualTo("/api/recommendations?productIds=HQTGWGPNH4");
+    }
+
+    @Test
     void stableHttpSemconvProducesInboundServiceHttpMetric() throws Exception {
         ExportTraceServiceRequest request = ExportTraceServiceRequest.newBuilder()
                 .addResourceSpans(ResourceSpans.newBuilder()

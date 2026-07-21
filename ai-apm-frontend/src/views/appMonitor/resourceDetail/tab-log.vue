@@ -160,7 +160,7 @@ export default class TabLog extends Vue {
       serviceId,
       componentType: this.componentType,
       graphStats: ['callCnts'],
-      url: this.queryParams?.url || this.queryParams?.resource || this.current?.resource,
+      url: this.queryParams?.url || this.current?.resource,
     }
     this.chartGroup.trend.loading = true;
     const { result, error } = await toAsyncWait(ApmApi.traceTrend({ ..._params }))

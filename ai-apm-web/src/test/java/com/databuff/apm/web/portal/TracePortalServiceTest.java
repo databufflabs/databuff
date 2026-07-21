@@ -164,7 +164,8 @@ class TracePortalServiceTest {
         TracePortalService service = new TracePortalService(
                 traceQuery, mock(ServiceFlowService.class), mock(ApmReadRepository.class), TestStorageSupport.storage());
         Map<String, Object> resp = service.spanList(Map.of(
-                "resource", "/demo/checkout",
+                "url", "/demo/checkout",
+                "componentType", "service.http",
                 "fromTime", "2026-06-01 11:00:00",
                 "toTime", "2026-06-01 13:00:00",
                 "offset", 0,
@@ -185,6 +186,49 @@ class TracePortalServiceTest {
         @SuppressWarnings("unchecked")
         Map<String, Object> meta = (Map<String, Object>) list.get(0).get("meta");
         assertThat(meta.get("http.url")).isEqualTo("/demo/checkout");
+    }
+
+    @Test
+    void resourceSpanListMatchesAbsoluteHttpUrlAgainstPortalUrl() {
+        TraceQueryService traceQuery = mock(TraceQueryService.class);
+        when(traceQuery.spanListCount(any())).thenReturn(1L);
+        when(traceQuery.spanList(any())).thenReturn(List.of(
+                new SpanSummary(
+                        "t1", "s1", "frontend", "046b2a50b8c3c54c",
+                        "GET /api/recommendations?productIds=HQTGWGPNH4",
+                        "2026-07-21 15:59:00", 2_000_000L, 0,
+                        "frontend-pod", "GET",
+                        "frontend-pod", 200, null,
+                        null, null,
+                        "http://frontend-proxy:8080/api/recommendations?productIds=HQTGWGPNH4"),
+                new SpanSummary(
+                        "t2", "s2", "frontend", "046b2a50b8c3c54c",
+                        "GET /api/health",
+                        "2026-07-21 15:59:01", 1_000_000L, 0,
+                        "frontend-pod", "GET /api/health",
+                        "frontend-pod", 200, null,
+                        null, null,
+                        "http://frontend-proxy:8080/api/health")));
+
+        TracePortalService service = new TracePortalService(
+                traceQuery, mock(ServiceFlowService.class), mock(ApmReadRepository.class), TestStorageSupport.storage());
+        Map<String, Object> resp = service.spanList(Map.of(
+                "url", "/api/recommendations?productIds=HQTGWGPNH4",
+                "componentType", "service.http",
+                "fromTime", "2026-07-21 15:00:00",
+                "toTime", "2026-07-21 16:00:00",
+                "offset", 0,
+                "size", 20));
+
+        @SuppressWarnings("unchecked")
+        Map<String, Object> data = (Map<String, Object>) resp.get("data");
+        @SuppressWarnings("unchecked")
+        List<Map<String, Object>> list = (List<Map<String, Object>>) data.get("list");
+        assertThat(list).hasSize(1);
+        @SuppressWarnings("unchecked")
+        Map<String, Object> meta = (Map<String, Object>) list.get(0).get("meta");
+        assertThat(meta.get("http.url"))
+                .isEqualTo("http://frontend-proxy:8080/api/recommendations?productIds=HQTGWGPNH4");
     }
 
     @Test

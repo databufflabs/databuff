@@ -63,7 +63,7 @@ class SkyWalkingConverterTest {
         assertThat(span.type).isEqualTo("SPAN_KIND_SERVER");
         assertThat(span.trace_id).isEqualTo("trace-abc");
         assertThat(span.metaHttpMethod).isEqualTo("GET");
-        assertThat(span.metaHttpUrl).isEqualTo("http://example/orders");
+        assertThat(span.metaHttpUrl).isEqualTo("/orders");
         assertThat(span.metaHttpStatusCode).isEqualTo(200);
         assertThat(TraceDataSources.resolve(OtelAttributeMaps.parse(span))).isEqualTo(TraceDataSources.SKY_WALKING);
         assertThat(SpanDirectionUtil.resolve(span).isIn()).isEqualTo(1);

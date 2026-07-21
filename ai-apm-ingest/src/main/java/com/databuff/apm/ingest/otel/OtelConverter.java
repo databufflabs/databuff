@@ -455,7 +455,7 @@ public final class OtelConverter {
                 attributes.get("http.route"),
                 attributes.get("url.path"));
         if (httpUrl != null && !DcSpanUtil.isRpcProtocolUrl(httpUrl)) {
-            dc.metaHttpUrl = httpUrl;
+            dc.metaHttpUrl = DcSpanUtil.normalizeHttpUrl(httpUrl);
         }
     }
 

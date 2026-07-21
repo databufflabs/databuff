@@ -192,7 +192,8 @@ class MetricQueryBuilderTest {
                 "/demo/checkout",
                 1_000_000_000L,
                 1);
-        assertThat(sql).contains("`meta.http.url` = '/demo/checkout'");
+        assertThat(sql).contains("COALESCE(`meta.http.url`, '') = '/demo/checkout'");
+        assertThat(sql).contains("COALESCE(`meta.http.url`, '') LIKE '%/demo/checkout'");
         assertThat(sql).contains("`duration` >= 1000000000");
         assertThat(sql).contains("`error` = 1");
 
@@ -208,7 +209,8 @@ class MetricQueryBuilderTest {
                 "/demo/checkout",
                 1_000_000_000L,
                 1);
-        assertThat(countSql).contains("`meta.http.url` = '/demo/checkout'");
+        assertThat(countSql).contains("COALESCE(`meta.http.url`, '') = '/demo/checkout'");
+        assertThat(countSql).contains("COALESCE(`meta.http.url`, '') LIKE '%/demo/checkout'");
         assertThat(countSql).contains("`duration` >= 1000000000");
         assertThat(countSql).contains("`error` = 1");
     }
