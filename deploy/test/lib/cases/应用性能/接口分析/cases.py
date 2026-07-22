@@ -13,7 +13,8 @@ CASE_DIR = Path(__file__).resolve().parent
 def build_cases(frm_ms: int, to_ms: int) -> list[ApiCase]:
     page = "接口分析"
     sb = service_body(frm_ms, to_ms)
-    sb_limit = service_body(frm_ms, to_ms, limit=20)
+    # portal spanList 读 size（不是 limit）；与 expected 条数对齐
+    sb_limit = service_body(frm_ms, to_ms, size=40)
     rb = resource_body(frm_ms, to_ms)
     return [
         ApiCase(page, "服务端点列表", "POST", "/webapi/service/endpoints", sb, CASE_DIR),

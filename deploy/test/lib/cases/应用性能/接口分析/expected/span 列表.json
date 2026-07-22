@@ -22,7 +22,7 @@
         "metaHttpStatusCode": 200,
         "meta": {
           "http.status_code": 200,
-          "http.url": "http://service-b:8080/api/orders/10001"
+          "http.url": "/api/orders/10001"
         }
       },
       {
@@ -62,7 +62,7 @@
         "metaHttpStatusCode": 200,
         "meta": {
           "http.status_code": 200,
-          "http.url": "https://payments.example.com/api/risk/check"
+          "http.url": "/api/risk/check"
         }
       },
       {
@@ -124,7 +124,7 @@
         "metaHttpStatusCode": 200,
         "meta": {
           "http.status_code": 200,
-          "http.url": "http://service-b:8080/api/orders/10001"
+          "http.url": "/api/orders/10001"
         }
       },
       {
@@ -146,7 +146,7 @@
         "metaHttpStatusCode": 200,
         "meta": {
           "http.status_code": 200,
-          "http.url": "https://payments.example.com/api/risk/check"
+          "http.url": "/api/risk/check"
         }
       },
       {
@@ -208,7 +208,7 @@
         "metaHttpStatusCode": 200,
         "meta": {
           "http.status_code": 200,
-          "http.url": "http://service-b:8080/api/orders/10001"
+          "http.url": "/api/orders/10001"
         }
       },
       {
@@ -230,7 +230,7 @@
         "metaHttpStatusCode": 200,
         "meta": {
           "http.status_code": 200,
-          "http.url": "https://payments.example.com/api/risk/check"
+          "http.url": "/api/risk/check"
         }
       },
       {
@@ -274,7 +274,7 @@
         "metaHttpStatusCode": 200,
         "meta": {
           "http.status_code": 200,
-          "http.url": "http://service-b:8080/api/orders/10001"
+          "http.url": "/api/orders/10001"
         }
       },
       {
@@ -296,7 +296,7 @@
         "metaHttpStatusCode": 200,
         "meta": {
           "http.status_code": 200,
-          "http.url": "https://payments.example.com/api/risk/check"
+          "http.url": "/api/risk/check"
         }
       },
       {
@@ -358,7 +358,7 @@
         "metaHttpStatusCode": 200,
         "meta": {
           "http.status_code": 200,
-          "http.url": "http://service-b:8080/api/orders/10001"
+          "http.url": "/api/orders/10001"
         }
       },
       {
@@ -380,7 +380,7 @@
         "metaHttpStatusCode": 200,
         "meta": {
           "http.status_code": 200,
-          "http.url": "https://payments.example.com/api/risk/check"
+          "http.url": "/api/risk/check"
         }
       },
       {
@@ -442,7 +442,7 @@
         "metaHttpStatusCode": 200,
         "meta": {
           "http.status_code": 200,
-          "http.url": "http://service-b:8080/api/orders/10001"
+          "http.url": "/api/orders/10001"
         }
       },
       {
@@ -464,7 +464,7 @@
         "metaHttpStatusCode": 200,
         "meta": {
           "http.status_code": 200,
-          "http.url": "https://payments.example.com/api/risk/check"
+          "http.url": "/api/risk/check"
         }
       },
       {
@@ -526,7 +526,7 @@
         "metaHttpStatusCode": 200,
         "meta": {
           "http.status_code": 200,
-          "http.url": "http://service-b:8080/api/orders/10001"
+          "http.url": "/api/orders/10001"
         }
       },
       {
@@ -548,7 +548,7 @@
         "metaHttpStatusCode": 200,
         "meta": {
           "http.status_code": 200,
-          "http.url": "https://payments.example.com/api/risk/check"
+          "http.url": "/api/risk/check"
         }
       },
       {
@@ -610,7 +610,7 @@
         "metaHttpStatusCode": 200,
         "meta": {
           "http.status_code": 200,
-          "http.url": "http://service-b:8080/api/orders/10001"
+          "http.url": "/api/orders/10001"
         }
       },
       {
@@ -632,7 +632,7 @@
         "metaHttpStatusCode": 200,
         "meta": {
           "http.status_code": 200,
-          "http.url": "https://payments.example.com/api/risk/check"
+          "http.url": "/api/risk/check"
         }
       },
       {
@@ -694,7 +694,7 @@
         "metaHttpStatusCode": 200,
         "meta": {
           "http.status_code": 200,
-          "http.url": "http://service-b:8080/api/orders/10001"
+          "http.url": "/api/orders/10001"
         }
       },
       {
@@ -716,7 +716,7 @@
         "metaHttpStatusCode": 200,
         "meta": {
           "http.status_code": 200,
-          "http.url": "https://payments.example.com/api/risk/check"
+          "http.url": "/api/risk/check"
         }
       },
       {
@@ -778,7 +778,7 @@
         "metaHttpStatusCode": 200,
         "meta": {
           "http.status_code": 200,
-          "http.url": "http://service-b:8080/api/orders/10001"
+          "http.url": "/api/orders/10001"
         }
       },
       {
@@ -800,7 +800,7 @@
         "metaHttpStatusCode": 200,
         "meta": {
           "http.status_code": 200,
-          "http.url": "https://payments.example.com/api/risk/check"
+          "http.url": "/api/risk/check"
         }
       },
       {
@@ -844,6 +844,6 @@
         "meta": {}
       }
     ],
-    "total": 40
+    "total": {"$range": [1, 100000]}
   }
 }

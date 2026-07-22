@@ -144,8 +144,13 @@ def call_pair_body(frm_ms: int, to_ms: int, **extra: Any) -> dict[str, Any]:
 
 
 def resource_body(frm_ms: int, to_ms: int, **extra: Any) -> dict[str, Any]:
-    body = {**service_body(frm_ms, to_ms), "resource": DEMO_ENDPOINT, **extra}
-    body["url"] = body["resource"]
+    """HTTP 接口详情请求体，对齐前端 resourceDetail：service.http 用 url（路径，无 GET/host）。"""
+    body = {
+        **service_body(frm_ms, to_ms),
+        "componentType": "service.http",
+        "url": DEMO_ENDPOINT,
+        **extra,
+    }
     return body
 
 
