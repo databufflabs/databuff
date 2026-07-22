@@ -2,7 +2,6 @@ package com.databuff.apm.common.storage;
 
 import com.databuff.apm.common.query.ApmQueryModels;
 
-import java.util.Collections;
 import java.util.List;
 
 /**
@@ -110,7 +109,11 @@ public final class TraceSpanMetricDrilldownService {
                     minDurationNs,
                     error));
         } catch (Exception e) {
-            return Collections.emptyList();
+            // Do not swallow: portal/API boundary maps Throwable to a user-facing message.
+            if (e instanceof RuntimeException runtime) {
+                throw runtime;
+            }
+            throw new RuntimeException(e);
         }
     }
 
@@ -164,7 +167,10 @@ public final class TraceSpanMetricDrilldownService {
                     minDurationNs,
                     error));
         } catch (Exception e) {
-            return 0L;
+            if (e instanceof RuntimeException runtime) {
+                throw runtime;
+            }
+            throw new RuntimeException(e);
         }
     }
 

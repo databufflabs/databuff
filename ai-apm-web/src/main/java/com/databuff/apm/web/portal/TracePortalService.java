@@ -67,41 +67,45 @@ public class TracePortalService {
     }
 
     public Map<String, Object> list(Map<String, Object> body) {
-        String traceId = decodeTraceId(body.get("traceId"));
-        int offset = ServicePortalService.intValue(body.get("offset"), 0);
-        int size = ServicePortalService.intValue(body.get("size"), 50);
+        try {
+            String traceId = decodeTraceId(body.get("traceId"));
+            int offset = ServicePortalService.intValue(body.get("offset"), 0);
+            int size = ServicePortalService.intValue(body.get("size"), 50);
 
-        List<Map<String, Object>> spans;
-        if (traceId != null && !traceId.isBlank()) {
-            spans = loadTraceDetailPortalSpans(traceId);
-        } else {
-            spans = loadPortalSpans(body);
-        }
+            List<Map<String, Object>> spans;
+            if (traceId != null && !traceId.isBlank()) {
+                spans = loadTraceDetailPortalSpans(traceId);
+            } else {
+                spans = loadPortalSpans(body);
+            }
 
-        List<Map<String, Object>> filtered = filterPortalSpans(spans, body);
-        List<Map<String, Object>> page = traceId != null && !traceId.isBlank()
-                ? paginate(filtered, offset, size)
-                : filtered;
+            List<Map<String, Object>> filtered = filterPortalSpans(spans, body);
+            List<Map<String, Object>> page = traceId != null && !traceId.isBlank()
+                    ? paginate(filtered, offset, size)
+                    : filtered;
 
-        if (traceId != null && !traceId.isBlank()) {
+            if (traceId != null && !traceId.isBlank()) {
+                Map<String, Object> response = new LinkedHashMap<>();
+                response.put("status", 200);
+                response.put("message", "success");
+                response.put("data", page);
+                response.put("total", filtered.size());
+                return response;
+            }
+
+            long total = traceQueryService.spanListCount(buildSpanListRequest(body, offset, size));
+            Map<String, Object> data = new LinkedHashMap<>();
+            data.put("list", page);
+            data.put("total", total);
+
             Map<String, Object> response = new LinkedHashMap<>();
             response.put("status", 200);
             response.put("message", "success");
-            response.put("data", page);
-            response.put("total", filtered.size());
+            response.put("data", data);
             return response;
+        } catch (Exception e) {
+            return PortalQueryErrors.fail("查询调用链列表", e);
         }
-
-        long total = traceQueryService.spanListCount(buildSpanListRequest(body, offset, size));
-        Map<String, Object> data = new LinkedHashMap<>();
-        data.put("list", page);
-        data.put("total", total);
-
-        Map<String, Object> response = new LinkedHashMap<>();
-        response.put("status", 200);
-        response.put("message", "success");
-        response.put("data", data);
-        return response;
     }
 
     /** Interface-level span list ({@code POST /webapi/trace/spanList}). */
@@ -171,16 +175,8 @@ public class TracePortalService {
             response.put("message", "success");
             response.put("data", data);
             return response;
-        } catch (Exception ignored) {
-            Map<String, Object> data = new LinkedHashMap<>();
-            data.put("list", List.of());
-            data.put("total", 0L);
-
-            Map<String, Object> response = new LinkedHashMap<>();
-            response.put("status", 200);
-            response.put("message", "success");
-            response.put("data", data);
-            return response;
+        } catch (Exception e) {
+            return PortalQueryErrors.fail("查询错误调用链列表", e);
         }
     }
 
@@ -215,8 +211,8 @@ public class TracePortalService {
                     .map(this::toExceptionListRow)
                     .toList();
             return CommonResponse.listPage(rows, total, offset, rows.size());
-        } catch (Exception ignored) {
-            return CommonResponse.listPage(List.of(), 0, offset, 0);
+        } catch (Exception e) {
+            return PortalQueryErrors.fail("查询异常列表", e);
         }
     }
 
@@ -268,30 +264,39 @@ public class TracePortalService {
 
     private Map<String, Object> queryResourceSpanList(
             Map<String, Object> body, java.util.function.Consumer<Map<String, Object>> extraFilter) {
-        Map<String, Object> query = new LinkedHashMap<>(body);
-        if (extraFilter != null) {
-            extraFilter.accept(query);
+        try {
+            Map<String, Object> query = new LinkedHashMap<>(body);
+            if (extraFilter != null) {
+                extraFilter.accept(query);
+            }
+
+            int offset = ServicePortalService.intValue(query.get("offset"), 0);
+            int size = ServicePortalService.intValue(query.get("size"), 50);
+            List<Map<String, Object>> spans = loadResourcePortalSpans(query);
+            List<Map<String, Object>> filtered = filterPortalSpans(spans, query);
+
+            long total = traceQueryService.spanListCount(buildResourceSpanListRequest(query, offset, size));
+            Map<String, Object> data = new LinkedHashMap<>();
+            data.put("list", filtered);
+            data.put("total", total);
+
+            Map<String, Object> response = new LinkedHashMap<>();
+            response.put("status", 200);
+            response.put("message", "success");
+            response.put("data", data);
+            return response;
+        } catch (Exception e) {
+            return PortalQueryErrors.fail("查询接口调用链列表", e);
         }
-
-        int offset = ServicePortalService.intValue(query.get("offset"), 0);
-        int size = ServicePortalService.intValue(query.get("size"), 50);
-        List<Map<String, Object>> spans = loadResourcePortalSpans(query);
-        List<Map<String, Object>> filtered = filterPortalSpans(spans, query);
-
-        long total = traceQueryService.spanListCount(buildResourceSpanListRequest(query, offset, size));
-        Map<String, Object> data = new LinkedHashMap<>();
-        data.put("list", filtered);
-        data.put("total", total);
-
-        Map<String, Object> response = new LinkedHashMap<>();
-        response.put("status", 200);
-        response.put("message", "success");
-        response.put("data", data);
-        return response;
     }
 
     public Map<String, Object> queryParamsV2(Map<String, Object> body) {
-        List<Map<String, Object>> spans = loadPortalSpans(body);
+        final List<Map<String, Object>> spans;
+        try {
+            spans = loadPortalSpans(body);
+        } catch (Exception e) {
+            return PortalQueryErrors.fail("查询调用链筛选参数", e);
+        }
 
         Map<String, Integer> status = new LinkedHashMap<>();
         status.put("0", 0);
@@ -354,19 +359,23 @@ public class TracePortalService {
     }
 
     public Map<String, Object> traceSpans(Map<String, Object> body) {
-        String traceId = decodeTraceId(body.get("traceId"));
-        List<Map<String, Object>> spans = traceId == null || traceId.isBlank()
-                ? List.of()
-                : loadTraceDetailPortalSpans(traceId);
-        int limit = Math.min(ServicePortalService.intValue(body.get("size"), 1000), 1000);
-        List<Map<String, Object>> page = paginate(spans, 0, limit);
+        try {
+            String traceId = decodeTraceId(body.get("traceId"));
+            List<Map<String, Object>> spans = traceId == null || traceId.isBlank()
+                    ? List.of()
+                    : loadTraceDetailPortalSpans(traceId);
+            int limit = Math.min(ServicePortalService.intValue(body.get("size"), 1000), 1000);
+            List<Map<String, Object>> page = paginate(spans, 0, limit);
 
-        Map<String, Object> response = new LinkedHashMap<>();
-        response.put("status", 200);
-        response.put("message", "success");
-        response.put("data", page);
-        response.put("total", spans.size());
-        return response;
+            Map<String, Object> response = new LinkedHashMap<>();
+            response.put("status", 200);
+            response.put("message", "success");
+            response.put("data", page);
+            response.put("total", spans.size());
+            return response;
+        } catch (Exception e) {
+            return PortalQueryErrors.fail("查询调用链详情", e);
+        }
     }
 
     public Map<String, Object> callSpans(Map<String, Object> body) {

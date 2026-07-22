@@ -114,6 +114,26 @@ class TracePortalServiceTest {
     }
 
     @Test
+    void listReturnsFriendlyFailWhenStorageThrows() {
+        TraceQueryService traceQuery = mock(TraceQueryService.class);
+        when(traceQuery.spanList(any())).thenThrow(new RuntimeException(
+                "errCode = 2, detailMessage = fail to find path in version_graph. spec_version: 0-4532"));
+
+        TracePortalService service = new TracePortalService(
+                traceQuery, mock(ServiceFlowService.class), mock(ApmReadRepository.class), TestStorageSupport.storage());
+        Map<String, Object> resp = service.list(Map.of(
+                "parentId", "0",
+                "fromTime", "2026-07-22 18:25:00",
+                "toTime", "2026-07-22 18:30:00",
+                "offset", 0,
+                "size", 50));
+
+        assertThat(resp.get("status")).isEqualTo(500);
+        assertThat(String.valueOf(resp.get("message"))).contains("版本链损坏");
+        assertThat(resp).doesNotContainKey("data");
+    }
+
+    @Test
     void spanListCombinesHttpMethodAndUrlWhenResourceIsMethodOnly() {
         TraceQueryService traceQuery = mock(TraceQueryService.class);
         when(traceQuery.spanListCount(any())).thenReturn(1L);

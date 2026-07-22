@@ -116,7 +116,10 @@ public class TraceQueryService {
             String sql = MetricQueryBuilder.traceDetailSql(traceDatabase, request.traceId());
             return readRepository.querySpanDetails(sql);
         } catch (Exception e) {
-            return Collections.emptyList();
+            if (e instanceof RuntimeException runtime) {
+                throw runtime;
+            }
+            throw new RuntimeException(e);
         }
     }
 

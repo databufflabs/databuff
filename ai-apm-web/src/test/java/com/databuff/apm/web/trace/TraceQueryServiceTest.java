@@ -32,16 +32,19 @@ class TraceQueryServiceTest {
     }
 
     @Test
-    void returnsEmptyWhenDorisFails() throws Exception {
+    void propagatesWhenDorisFails() throws Exception {
         ApmReadRepository reader = mock(ApmReadRepository.class);
         when(reader.querySpanSummaries(anyString())).thenThrow(new RuntimeException("down"));
         TraceQueryService service = new TraceQueryService(reader, TestStorageSupport.storage());
-        assertThat(service.spanList(new TraceQueryService.SpanListRequest(null, 0, 1000, 20))).isEmpty();
+        org.junit.jupiter.api.Assertions.assertThrows(
+                RuntimeException.class,
+                () -> service.spanList(new TraceQueryService.SpanListRequest(null, 0, 1000, 20)));
     }
 
     @Test
     void appliesDefaultLimit() throws Exception {
         ApmReadRepository reader = mock(ApmReadRepository.class);
+        when(reader.queryErrorRate(anyString())).thenReturn(new ErrorRateSnapshot(0, 0));
         when(reader.querySpanSummaries(anyString())).thenReturn(List.of());
         TraceQueryService service = new TraceQueryService(reader, TestStorageSupport.storage());
         assertThat(service.spanList(new TraceQueryService.SpanListRequest("svc", 0, 1000, 0))).isEmpty();
@@ -58,11 +61,13 @@ class TraceQueryServiceTest {
     }
 
     @Test
-    void returnsEmptyTraceDetailWhenStoreFails() throws Exception {
+    void propagatesTraceDetailWhenStoreFails() throws Exception {
         ApmReadRepository reader = mock(ApmReadRepository.class);
         when(reader.querySpanDetails(anyString())).thenThrow(new RuntimeException("down"));
         TraceQueryService service = new TraceQueryService(reader, TestStorageSupport.storage());
-        assertThat(service.traceDetail(new TraceQueryService.TraceDetailRequest("t1"))).isEmpty();
+        org.junit.jupiter.api.Assertions.assertThrows(
+                RuntimeException.class,
+                () -> service.traceDetail(new TraceQueryService.TraceDetailRequest("t1")));
     }
 
     @Test
