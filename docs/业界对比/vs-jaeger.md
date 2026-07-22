@@ -1,10 +1,6 @@
 # DataBuff vs Jaeger
 
-> 对比文档 · [English](./vs-jaeger_en.md)
-
 同机实测对比 **DataBuff v0.1.4** 与 **Jaeger v1.76.0**（192.168.50.140）。同一 Demo（service-a / service-b）分别上报 OTLP：DataBuff `:4318`，Jaeger all-in-one UI `:16686`。标记：✅ 本环境可验证 · △ 有入口但深度有限 · ❌ 无等价能力。
-
-博客成稿（HTML + 全量截图）：[DataBuff vs Jaeger：同环境实测对比](https://databuff.ai/blog/databuff-vs-jaeger)
 
 ## 一、能力对照全表
 

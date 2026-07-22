@@ -1,10 +1,6 @@
 # DataBuff vs SkyWalking
 
-> Comparison · [中文](./vs-skywalking.md)
-
 Same-host lab on `192.168.50.140`: **DataBuff v0.1.4** vs **SkyWalking 10.4.0**, same Demo (`service-a` / `service-b`). DataBuff uses OTLP `:4318`; SkyWalking uses Agent gRPC `:31180`. Marks: ✅ verified in this lab · △ present but limited · ❌ no equivalent.
-
-Full HTML article with screenshots: [DataBuff vs SkyWalking (lab compare)](https://databuff.ai/blog/databuff-vs-skywalking)
 
 ## 1. Capability matrix
 

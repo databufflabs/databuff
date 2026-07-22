@@ -1,10 +1,6 @@
 # DataBuff vs Pinpoint
 
-> 对比文档 · [English](./vs-pinpoint_en.md)
-
 同机实测对比 **DataBuff v0.1.4** 与 **Pinpoint 3.1.0**（192.168.50.140）。同机双跑：DataBuff 走 OTLP `:4318`（service-a / service-b）；Pinpoint 走官方 quickstart Java Agent（application=`pinpoint-quickapp`，Web `:18080` / Demo `:18085`）。标记：✅ 本环境可验证 · △ 有入口但本 lab 深度有限 · ❌ 无等价能力。
-
-博客成稿（HTML + 全量截图）：Epic 本地 `compare-vs-pinpoint.html`。
 
 ## 一、能力对照全表
 

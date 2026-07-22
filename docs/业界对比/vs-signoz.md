@@ -1,10 +1,6 @@
 # DataBuff vs SigNoz
 
-> 对比文档 · [English](./vs-signoz_en.md)
-
 同机实测对比 **DataBuff v0.1.4** 与 **SigNoz v0.133.0**（192.168.50.140）。同一 Demo（service-a / service-b）：DataBuff 走 OTLP `:4318`，SigNoz 走 OTLP `:24318`。标记：✅ 本环境可验证 · △ 有入口但深度有限 · ❌ 无等价能力。
-
-博客成稿（HTML + 全量截图）：[DataBuff vs SigNoz：同环境实测对比](https://databuff.ai/blog/zh/databuff-vs-signoz)
 
 ## 一、能力对照全表
 

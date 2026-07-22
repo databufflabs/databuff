@@ -1,7 +1,5 @@
 # DataBuff vs Pinpoint
 
-> Comparison · [中文](./vs-pinpoint.md)
-
 Side-by-side lab comparison of **DataBuff v0.1.4** and **Pinpoint 3.1.0** on `192.168.50.140`. Both stacks run on the same host: DataBuff ingests OTLP on `:4318` (`service-a` / `service-b`); Pinpoint uses the official quickstart Java Agent (`application=pinpoint-quickapp`, Web `:18080` / Demo `:18085`). Legend: ✅ verified in this lab · △ entry exists but limited depth here · ❌ no equivalent capability.
 
 ## Capability matrix

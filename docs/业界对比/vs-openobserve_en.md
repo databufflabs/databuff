@@ -1,10 +1,6 @@
 # DataBuff vs OpenObserve
 
-> Comparison · [中文](./vs-openobserve.md)
-
 Same-host lab on `192.168.50.140`: **DataBuff v0.1.4** vs **OpenObserve v0.91.0-rc1**, same Demo (`service-a` / `service-b`). DataBuff uses OTLP `:4318`; OpenObserve OTLP HTTP is `:5080/api/default`. Marks: ✅ verified in this lab · △ present but limited · ❌ no equivalent.
-
-Full HTML article with screenshots: [DataBuff vs OpenObserve (lab compare)](https://databuff.ai/blog/databuff-vs-openobserve)
 
 Positioning: DataBuff = AI-native APM depth; OpenObserve = unified observability platform (Logs / Metrics / Traces / RUM), strong on log search and object-storage cost.
 

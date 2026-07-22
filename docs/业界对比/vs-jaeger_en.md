@@ -1,10 +1,6 @@
 # DataBuff vs Jaeger
 
-> Comparison · [中文](./vs-jaeger.md)
-
 Same-host lab on `192.168.50.140`: **DataBuff v0.1.4** vs **Jaeger v1.76.0**, same Demo (`service-a` / `service-b`). DataBuff uses OTLP `:4318`; Jaeger all-in-one UI is `:16686`. Marks: ✅ verified in this lab · △ present but limited · ❌ no equivalent.
-
-Full HTML article with screenshots: [DataBuff vs Jaeger (lab compare)](https://databuff.ai/blog/databuff-vs-jaeger)
 
 ## 1. Capability matrix
 

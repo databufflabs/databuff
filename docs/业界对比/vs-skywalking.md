@@ -1,10 +1,6 @@
 # DataBuff vs SkyWalking
 
-> 对比文档 · [English](./vs-skywalking_en.md)
-
 同机实测对比 **DataBuff v0.1.4** 与 **SkyWalking 10.4.0**（192.168.50.140）。同一 Demo（service-a / service-b）：DataBuff 走 OTLP `:4318`，SkyWalking 走 Agent gRPC `:31180`。标记：✅ 本环境可验证 · △ 有入口但深度有限 · ❌ 无等价能力。
-
-博客成稿（HTML + 全量截图）：[DataBuff vs SkyWalking：同环境实测对比](https://databuff.ai/blog/databuff-vs-skywalking)
 
 ## 一、能力对照全表
 

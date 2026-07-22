@@ -1,10 +1,6 @@
 # DataBuff vs SigNoz
 
-> Comparison · [中文](./vs-signoz.md)
-
 Same-host lab on `192.168.50.140`: **DataBuff v0.1.4** vs **SigNoz v0.133.0**, same Demo (`service-a` / `service-b`). DataBuff uses OTLP `:4318`; SigNoz uses OTLP `:24318`. Marks: ✅ verified in this lab · △ present but limited · ❌ no equivalent.
-
-Full HTML article with screenshots: [DataBuff vs SigNoz (lab compare)](https://databuff.ai/blog/en/databuff-vs-signoz)
 
 ## 1. Capability matrix
 

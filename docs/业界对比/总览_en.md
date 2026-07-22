@@ -1,6 +1,6 @@
 # Comparison Overview
 
-> This page summarizes capability comparisons between DataBuff and mainstream APM/observability systems. [Switch to Chinese](./总览.md)
+> This page summarizes capability comparisons between DataBuff and mainstream APM/observability systems.
 
 ## Capability Matrix
 
@@ -18,4 +18,4 @@
 - [DataBuff vs Jaeger](./vs-jaeger.md)
 - [DataBuff vs Pinpoint](./vs-pinpoint.md)
 - [DataBuff vs SigNoz](./vs-signoz_en.md) — Same-host lab: 7 AI capabilities / APM 19 rows / alerting + screenshots
-- [DataBuff vs OpenObserve](./vs-openobserve.md) — Same-host lab: seven AI / full APM matrix (Pipelines/Reports/RUM) / alerting + screenshots · [Blog](https://databuff.ai/blog/databuff-vs-openobserve)
+- [DataBuff vs OpenObserve](./vs-openobserve.md) — Same-host lab: seven AI / full APM matrix (Pipelines/Reports/RUM) / alerting + screenshots

@@ -1,10 +1,6 @@
 # DataBuff vs OpenObserve
 
-> 对比文档 · [English](./vs-openobserve_en.md)
-
 同机实测对比 **DataBuff v0.1.4** 与 **OpenObserve v0.91.0-rc1**（192.168.50.140）。同一 Demo（service-a / service-b）分别上报 OTLP：DataBuff `:4318`，OpenObserve OTLP HTTP `:5080/api/default`。标记：✅ 本环境可验证 · △ 有入口但深度有限 · ❌ 无等价能力。
-
-博客成稿（HTML + 全量截图）：[DataBuff vs OpenObserve：同环境实测对比](https://databuff.ai/blog/databuff-vs-openobserve)
 
 ## 一、能力对照全表
 
