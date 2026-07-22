@@ -4,13 +4,15 @@
   "private": false,
   "license": "AGPL-3.0-or-later",
   "scripts": {
-    "dev": "vite",
-    "serve": "vite --host",
-    "build": "tsc && vite build",
+    "copy:mermaid": "node scripts/copy-mermaid-vendor.mjs",
+    "postinstall": "node scripts/copy-mermaid-vendor.mjs",
+    "dev": "yarn copy:mermaid && vite",
+    "serve": "yarn copy:mermaid && vite --host",
+    "build": "yarn copy:mermaid && tsc && vite build",
     "i18n:extract": "node scripts/i18n-normalize.mjs",
     "i18n:apply": "node scripts/i18n-normalize.mjs",
     "i18n:sync": "node scripts/i18n-normalize.mjs",
-    "build:visualizer": "tsc && cross-env VITE_ENABLE_VISUALIZER=true vite build",
+    "build:visualizer": "yarn copy:mermaid && tsc && cross-env VITE_ENABLE_VISUALIZER=true vite build",
     "preview": "vite preview"
   },
   "dependencies": {
@@ -49,6 +51,7 @@
     "lodash": "^4.17.21",
     "marked": "^4.0.18",
     "md5": "^2.3.0",
+    "mermaid": "^11",
     "simplebar-vue": "^1.6.10",
     "sortablejs": "^1.15.6",
     "spark-md5": "^3.0.2",

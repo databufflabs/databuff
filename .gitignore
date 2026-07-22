@@ -19,6 +19,8 @@ Thumbs.db
 
 ### Node / frontend build (ai-apm-frontend)
 node_modules/
+# Generated from node_modules/mermaid at build/dev time (see scripts/copy-mermaid-vendor.mjs)
+ai-apm-frontend/public/vendor/
 dist/
 .vite/
 coverage/
