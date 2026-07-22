@@ -9,8 +9,15 @@ import org.springframework.core.Ordered;
 import org.springframework.core.annotation.Order;
 import org.springframework.stereotype.Component;
 
+import java.util.concurrent.atomic.AtomicBoolean;
+import java.util.concurrent.atomic.AtomicLong;
+
 /**
  * Loads Doris-backed config after the web port is listening so startup is not blocked on remote JDBC.
+ *
+ * <p>Periodic Doris probes always call {@link #ensureHydrated(true)} while Doris is reachable, so
+ * config is re-pulled after outages and after "ping OK but reads were empty/stale" cluster mess.
+ * Incomplete loads rely on the next probe (no tight retry loop).
  */
 @Component
 public class PersistenceStartupHydrator {
@@ -30,6 +37,13 @@ public class PersistenceStartupHydrator {
     private final ExpertTaskPersistence expertTaskPersistence;
     private final MetricCorePersistence metricCorePersistence;
     private final DorisAvailability dorisAvailability;
+    private final AtomicBoolean hydrateRunning = new AtomicBoolean(false);
+    /**
+     * Force-reload requests (Doris recovery). Generation ensures an in-flight hydrate that started
+     * before the force cannot clear it; follow-up runs until a load started at/after the request succeeds.
+     */
+    private final AtomicLong forceGeneration = new AtomicLong(0);
+    private final AtomicLong satisfiedForceGeneration = new AtomicLong(0);
 
     public PersistenceStartupHydrator(
             LlmProviderPersistence llmProviderPersistence,
@@ -71,23 +85,69 @@ public class PersistenceStartupHydrator {
         log.info("Persistence hydrate scheduled (web port {})", event.getWebServer().getPort());
     }
 
-    /** Called when periodic Doris probe recovers from unavailable → available. */
-    public void scheduleRecoveryHydrate() {
+    /**
+     * Periodic / recovery entry. Always re-reads live load status.
+     *
+     * @param forceReload {@code true} after Doris outage — pull config again even if previously loaded
+     */
+    public void ensureHydrated(boolean forceReload) {
         if (dorisAvailability.isUnavailable()) {
-            log.info("Skip persistence recovery hydrate while Doris still unavailable");
+            return;
+        }
+        if (forceReload) {
+            forceGeneration.incrementAndGet();
+        }
+        if (!needsHydrate()) {
             return;
         }
         scheduleHydrate("persistence-hydrator-recovery");
-        log.info("Persistence recovery hydrate scheduled");
+    }
+
+    /** @deprecated use {@link #ensureHydrated(boolean)} */
+    public void scheduleRecoveryHydrate() {
+        ensureHydrated(true);
+    }
+
+    /** Live status: tables ready and last load succeeded, and no pending force-reload. */
+    public boolean isHydrateCompleted() {
+        return llmProviderPersistence.persistenceEnabled() && !forcePending();
+    }
+
+    private boolean needsHydrate() {
+        return forcePending() || !llmProviderPersistence.persistenceEnabled();
+    }
+
+    private boolean forcePending() {
+        return forceGeneration.get() != satisfiedForceGeneration.get();
     }
 
     private void scheduleHydrate(String threadName) {
-        Thread worker = new Thread(this::hydrateAll, threadName);
+        if (!needsHydrate()) {
+            return;
+        }
+        if (!hydrateRunning.compareAndSet(false, true)) {
+            return;
+        }
+        Thread worker = new Thread(() -> {
+            boolean loaded = false;
+            try {
+                loaded = hydrateAll();
+            } finally {
+                hydrateRunning.set(false);
+                // A newer force-reload arrived while we were loading: run again now.
+                // Incomplete loads wait for the periodic probe (avoids a tight retry loop).
+                if (loaded && forcePending()) {
+                    scheduleHydrate("persistence-hydrator-followup");
+                }
+            }
+        }, threadName);
         worker.setDaemon(true);
         worker.start();
     }
 
-    void hydrateAll() {
+    /** @return {@code true} when LLM config tables were ready and load succeeded */
+    boolean hydrateAll() {
+        long forceGenAtStart = forceGeneration.get();
         long started = System.currentTimeMillis();
         try {
             metricCorePersistence.reloadFromStore();
@@ -96,15 +156,24 @@ public class PersistenceStartupHydrator {
             eventRuleStore.reloadFromStore();
             alarmPolicyHydrator.reloadFromStore();
             eventPersistence.reloadFromStore();
-            llmProviderPersistence.reloadFromStore();
+            boolean llmReady = llmProviderPersistence.reloadFromStore();
             alarmSilencePersistence.reloadFromStore();
             alarmPersistence.reloadFromStore();
             aiSessionPersistence.reloadFromStore();
             aiPlatformPersistence.reloadFromStore();
             expertTaskPersistence.reloadFromStore();
-            log.info("Persistence hydrate finished in {} ms", System.currentTimeMillis() - started);
+            if (llmReady) {
+                // Only satisfy force requests that existed when this load started.
+                satisfiedForceGeneration.updateAndGet(prev -> Math.max(prev, forceGenAtStart));
+                log.info("Persistence hydrate finished in {} ms", System.currentTimeMillis() - started);
+                return true;
+            }
+            log.info("Persistence hydrate incomplete in {} ms; periodic probe will retry",
+                    System.currentTimeMillis() - started);
+            return false;
         } catch (Exception e) {
             log.warn("Persistence hydrate failed: {}", e.getMessage());
+            return false;
         }
     }
 }

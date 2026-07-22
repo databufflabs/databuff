@@ -33,7 +33,9 @@ class LlmProviderPersistenceTest {
         sync.reloadFromStore();
         LlmProviderView view = store.updateProvider("openai", new UpdateLlmProviderRequest(null, "sk", null, true));
         assertThat(sync.persistenceEnabled()).isFalse();
-        sync.persistUpdate("openai", new UpdateLlmProviderRequest(null, "sk", null, true), view);
+        assertThatThrownBy(() -> sync.persistUpdate("openai", new UpdateLlmProviderRequest(null, "sk", null, true), view))
+                .isInstanceOf(IllegalStateException.class)
+                .hasMessageContaining("配置库暂不可用");
         assertThat(sync.persistenceEnabled()).isFalse();
     }
 
@@ -88,7 +90,7 @@ class LlmProviderPersistenceTest {
     }
 
     @Test
-    void enablesPersistenceWhenSchemaReadyEvenIfLoadFails() throws Exception {
+    void keepsPersistenceDisabledWhenLoadFailsSoHydrateCanRetry() throws Exception {
         ApmReadRepository reader = mock(ApmReadRepository.class);
         Connection connection = mock(Connection.class);
         Statement statement = mock(Statement.class);
@@ -106,7 +108,7 @@ class LlmProviderPersistenceTest {
 
         InMemoryLlmProviderStore store = TestBeanSupport.llmProviderStore();
         LlmProviderPersistence sync = new LlmProviderPersistence(reader, store, TestStorageSupport.storage());
-        sync.reloadFromStore();
-        assertThat(sync.persistenceEnabled()).isTrue();
+        assertThat(sync.reloadFromStore()).isFalse();
+        assertThat(sync.persistenceEnabled()).isFalse();
     }
 }

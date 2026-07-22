@@ -6,6 +6,7 @@ import org.junit.jupiter.api.Test;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.mockito.Mockito.mock;
+import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.verifyNoInteractions;
 
@@ -38,7 +39,19 @@ class DorisAvailabilityMonitorTest {
     }
 
     @Test
-    void periodicProbeRecoveryRehydratesPersistence() {
+    void periodicProbeAlwaysForceReloadsWhenDorisUp() {
+        DorisAvailability availability = new DorisAvailability();
+        PersistenceStartupHydrator hydrator = mock(PersistenceStartupHydrator.class);
+        DorisAvailabilityMonitor monitor = newMonitor(availability, hydrator);
+        monitor.overrideProbeResult(true);
+        monitor.probeAtStartup();
+        monitor.probePeriodically();
+
+        verify(hydrator).ensureHydrated(true);
+    }
+
+    @Test
+    void periodicProbeForceReloadsAfterDorisRecovery() {
         DorisAvailability availability = new DorisAvailability();
         PersistenceStartupHydrator hydrator = mock(PersistenceStartupHydrator.class);
         DorisAvailabilityMonitor monitor = newMonitor(availability, hydrator);
@@ -50,19 +63,7 @@ class DorisAvailabilityMonitorTest {
         monitor.probePeriodically();
 
         assertThat(availability.isUnavailable()).isFalse();
-        verify(hydrator).scheduleRecoveryHydrate();
-    }
-
-    @Test
-    void periodicProbeDoesNotRehydrateWhenAlreadyAvailable() {
-        DorisAvailability availability = new DorisAvailability();
-        PersistenceStartupHydrator hydrator = mock(PersistenceStartupHydrator.class);
-        DorisAvailabilityMonitor monitor = newMonitor(availability, hydrator);
-        monitor.overrideProbeResult(true);
-        monitor.probeAtStartup();
-        monitor.probePeriodically();
-
-        verifyNoInteractions(hydrator);
+        verify(hydrator).ensureHydrated(true);
     }
 
     @Test
@@ -77,6 +78,21 @@ class DorisAvailabilityMonitorTest {
         assertThat(availability.isUnavailable()).isTrue();
         assertThat(availability.reason()).contains("awaiting startup probe");
         verifyNoInteractions(hydrator);
+    }
+
+    @Test
+    void periodicProbeDoesNotTouchHydratorWhenDorisDown() {
+        DorisAvailability availability = new DorisAvailability();
+        PersistenceStartupHydrator hydrator = mock(PersistenceStartupHydrator.class);
+        DorisAvailabilityMonitor monitor = newMonitor(availability, hydrator);
+        monitor.overrideProbeResult(true);
+        monitor.probeAtStartup();
+
+        monitor.overrideProbeResult(false);
+        monitor.probePeriodically();
+
+        verify(hydrator, never()).ensureHydrated(false);
+        verify(hydrator, never()).ensureHydrated(true);
     }
 
     private static DorisAvailabilityMonitor newMonitor(

@@ -88,9 +88,11 @@ public class DorisAvailabilityMonitor {
             }
             if (wasUnavailable) {
                 log.info("Doris recovered (periodic probe OK); exiting troubleshooting mode");
-                if (persistenceHydrator != null) {
-                    persistenceHydrator.scheduleRecoveryHydrate();
-                }
+            }
+            // Always force-reload while Doris is up. Ping-only "available" can still serve
+            // empty/stale reads during cluster mess; only a fresh load after recovery is safe.
+            if (persistenceHydrator != null) {
+                persistenceHydrator.ensureHydrated(true);
             }
             return;
         }

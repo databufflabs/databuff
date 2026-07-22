@@ -35,38 +35,40 @@ public class LlmProviderPersistence {
         this.configDatabase = storageProperties.configDatabase();
     }
 
-    synchronized void reloadFromStore() {
+    /**
+     * Reload LLM providers/models from Doris into the in-memory store.
+     * Returns {@code true} only when the config tables are queryable and both loads succeed,
+     * so callers can retry on full-server boot races (Doris ping OK but tables not ready yet).
+     */
+    synchronized boolean reloadFromStore() {
         ApmConfigRepository repository = new ApmConfigRepository(readRepository, configDatabase);
         if (!repository.schemaReady()) {
             persistenceEnabled = false;
             log.info("Config store not ready; LLM providers stay in-memory only");
-            return;
+            return false;
         }
-        persistenceEnabled = true;
 
-        List<ApmConfigRepository.LlmProviderRow> rows = List.of();
-        List<ApmConfigRepository.LlmModelRow> modelRows = List.of();
+        List<ApmConfigRepository.LlmProviderRow> rows;
+        List<ApmConfigRepository.LlmModelRow> modelRows;
         try {
             rows = repository.loadLlmProviders();
-        } catch (Exception e) {
-            log.warn("Failed to load LLM providers from store: {}", e.getMessage());
-        }
-        try {
             modelRows = repository.loadLlmModels();
         } catch (Exception e) {
-            log.warn("Failed to load LLM models from store: {}", e.getMessage());
+            persistenceEnabled = false;
+            log.warn("Failed to load LLM providers/models from store: {}", e.getMessage());
+            return false;
         }
         if (!rows.isEmpty() || !modelRows.isEmpty()) {
             memoryStore.applyPersistedRows(rows, modelRows);
         }
+        persistenceEnabled = true;
         log.info("LLM provider persistence enabled ({} providers, {} models from store)",
                 rows.size(), modelRows.size());
+        return true;
     }
 
     public void persistDetail(SaveLlmProviderRequest request, LlmProviderView view) {
-        if (!ensurePersistence()) {
-            return;
-        }
+        ensurePersistenceOrThrow();
         try {
             ApmConfigRepository repository = new ApmConfigRepository(readRepository, configDatabase);
             String cipher = request.apiKey() != null && !request.apiKey().isBlank()
@@ -81,6 +83,8 @@ public class LlmProviderPersistence {
                     view.defaultModel(),
                     view.apiType()));
             repository.replaceLlmModels(view.providerCode(), memoryStore.exportModelRows(view.providerCode()));
+        } catch (IllegalStateException e) {
+            throw e;
         } catch (Exception e) {
             log.error("Failed to persist LLM provider detail {}: {}", view.providerCode(), e.getMessage(), e);
             throw new IllegalStateException("保存模型配置到数据库失败: " + e.getMessage(), e);
@@ -88,9 +92,7 @@ public class LlmProviderPersistence {
     }
 
     public void persistUpdate(String providerCode, UpdateLlmProviderRequest request, LlmProviderView view) {
-        if (!ensurePersistence()) {
-            return;
-        }
+        ensurePersistenceOrThrow();
         try {
             ApmConfigRepository repository = new ApmConfigRepository(readRepository, configDatabase);
             String cipher = request.apiKey() != null && !request.apiKey().isBlank()
@@ -104,7 +106,9 @@ public class LlmProviderPersistence {
                     cipher,
                     view.defaultModel(),
                     view.apiType()));
-            repository.replaceLlmModels(view.providerCode(), memoryStore.exportModelRows(view.providerCode()));
+            repository.replaceLlmModels(providerCode, memoryStore.exportModelRows(providerCode));
+        } catch (IllegalStateException e) {
+            throw e;
         } catch (Exception e) {
             log.error("Failed to persist LLM provider {}: {}", providerCode, e.getMessage(), e);
             throw new IllegalStateException("保存模型配置到数据库失败: " + e.getMessage(), e);
@@ -112,9 +116,7 @@ public class LlmProviderPersistence {
     }
 
     public void persistCreate(CreateLlmProviderRequest request, LlmProviderView view) {
-        if (!ensurePersistence()) {
-            return;
-        }
+        ensurePersistenceOrThrow();
         try {
             ApmConfigRepository repository = new ApmConfigRepository(readRepository, configDatabase);
             String cipher = request.apiKey() != null && !request.apiKey().isBlank()
@@ -129,21 +131,21 @@ public class LlmProviderPersistence {
                     view.defaultModel(),
                     view.apiType()));
             repository.replaceLlmModels(view.providerCode(), memoryStore.exportModelRows(view.providerCode()));
+        } catch (IllegalStateException e) {
+            throw e;
         } catch (Exception e) {
             log.error("Failed to persist new LLM provider {}: {}", view.providerCode(), e.getMessage(), e);
             throw new IllegalStateException("保存模型配置到数据库失败: " + e.getMessage(), e);
         }
     }
 
-    private synchronized boolean ensurePersistence() {
+    private synchronized void ensurePersistenceOrThrow() {
         if (!persistenceEnabled) {
             reloadFromStore();
         }
         if (!persistenceEnabled) {
-            log.warn("LLM provider config saved in memory only; Doris store unavailable");
-            return false;
+            throw new IllegalStateException("保存模型配置到数据库失败: 配置库暂不可用，请稍后重试");
         }
-        return true;
     }
 
     boolean persistenceEnabled() {

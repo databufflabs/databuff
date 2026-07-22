@@ -9,7 +9,7 @@
     custom-class="log-detail-drawer"
     @closed="onClosed">
     <div v-loading="loading" class="log-detail-shell">
-      <header class="log-detail-header">
+      <header :class="['log-detail-header', detail ? severityClass(detail.status) : '']">
         <div class="log-detail-title-row">
           <div class="log-detail-title-wrap">
             <h3 class="log-detail-title">{{ drawerTitle }}</h3>
@@ -50,9 +50,12 @@
       <div v-if="error && !detail" class="log-detail-state describe">{{ errorText }}</div>
       <div v-else-if="detail" class="log-detail-scroll">
         <div v-if="activeTab === 'overview'" class="log-detail-body">
-          <section class="log-detail-section">
+          <section class="log-detail-section is-message">
             <div class="log-detail-section-title">{{ $t('modules.views.alarmCenter.eventDetail.s_a19a72d2') }}</div>
-            <pre :class="['log-detail-message', messageIsJson ? 'is-json' : '']">{{ messageDisplay }}</pre>
+            <div :class="['log-detail-message-wrap', severityClass(detail.status)]">
+              <div class="log-detail-message-rail" aria-hidden="true" />
+              <pre :class="['log-detail-message', messageIsJson ? 'is-json' : '']">{{ messageDisplay }}</pre>
+            </div>
           </section>
 
           <section class="log-detail-section">
@@ -410,6 +413,25 @@ export default class LogDetailDrawer extends Vue {
   padding: 18px 24px 0;
   background: var(--bg-color);
   border-bottom: 1px solid var(--border-color-light);
+
+  /* Soft severity wash — warn/error only; INFO stays neutral */
+  &.is-warn {
+    background: rgba(247, 149, 50, 0.05);
+  }
+
+  &.is-error {
+    background: rgba(225, 40, 40, 0.04);
+  }
+}
+
+:root[data-theme=dark] {
+  .log-detail-header.is-warn {
+    background: rgba(247, 149, 50, 0.08);
+  }
+
+  .log-detail-header.is-error {
+    background: rgba(225, 40, 40, 0.08);
+  }
 }
 
 .log-detail-title-row {
@@ -540,20 +562,54 @@ export default class LogDetailDrawer extends Vue {
 }
 
 .log-detail-section {
-  padding: 16px 18px;
+  padding: 14px 16px 16px;
   background: var(--bg-color);
   border: 1px solid var(--border-color-light);
-  border-radius: 10px;
+  border-radius: 8px;
+
+  &.is-message {
+    padding-bottom: 14px;
+  }
 }
 
 .log-detail-section-title {
-  margin: 0 0 12px;
-  padding-left: 10px;
-  border-left: 3px solid var(--color-primary);
+  margin: 0 0 10px;
   font-size: 13px;
   font-weight: 600;
   line-height: 18px;
   color: var(--color-text-primary);
+}
+
+.log-detail-message-wrap {
+  display: flex;
+  align-items: stretch;
+  min-width: 0;
+  border-radius: 6px;
+  overflow: hidden;
+  background: var(--bg-color03);
+  border: 1px solid var(--border-color-extra-light);
+
+  &.is-info .log-detail-message-rail {
+    background: var(--color-success, #08be7e);
+  }
+
+  &.is-warn .log-detail-message-rail {
+    background: var(--color-warning, #f79532);
+  }
+
+  &.is-error .log-detail-message-rail {
+    background: var(--color-danger, #e12828);
+  }
+
+  &.is-muted .log-detail-message-rail {
+    background: var(--color-text-secondary, #b5b7bb);
+  }
+}
+
+.log-detail-message-rail {
+  width: 3px;
+  flex: none;
+  background: var(--color-text-secondary, #b5b7bb);
 }
 
 .log-detail-message,
@@ -564,11 +620,15 @@ export default class LogDetailDrawer extends Vue {
   overflow-wrap: anywhere;
   word-break: normal;
   font-size: 12px;
-  line-height: 1.6;
-  color: var(--color-text-regular);
-  background: var(--bg-color03);
-  border-radius: 6px;
+  line-height: 1.65;
+  color: var(--color-text-primary);
+  background: transparent;
   font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, 'Liberation Mono', 'Courier New', monospace;
+}
+
+.log-detail-message {
+  flex: 1;
+  min-width: 0;
 }
 
 .log-detail-message.is-json,
@@ -579,8 +639,10 @@ export default class LogDetailDrawer extends Vue {
 
 .log-detail-json {
   max-height: calc(100vh - 180px);
-  border: 1px solid var(--border-color-light);
-  background: var(--bg-color);
+  border: 1px solid var(--border-color-extra-light);
+  border-radius: 6px;
+  background: var(--bg-color03);
+  color: var(--color-text-primary);
 }
 
 .log-detail-kv-list {
@@ -590,10 +652,10 @@ export default class LogDetailDrawer extends Vue {
 
 .log-detail-kv {
   display: grid;
-  grid-template-columns: 156px minmax(0, 1fr);
+  grid-template-columns: 148px minmax(0, 1fr);
   gap: 16px;
   align-items: start;
-  padding: 9px 0;
+  padding: 8px 0;
   font-size: 12px;
   line-height: 20px;
 
@@ -603,11 +665,12 @@ export default class LogDetailDrawer extends Vue {
 }
 
 .log-detail-k {
-  color: var(--color-text-secondary);
+  color: var(--color-text-regular);
   overflow-wrap: anywhere;
 
   &.is-code {
     font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, 'Liberation Mono', 'Courier New', monospace;
+    color: var(--color-text-regular);
   }
 }
 
@@ -620,7 +683,7 @@ export default class LogDetailDrawer extends Vue {
 .log-detail-mono {
   font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, 'Liberation Mono', 'Courier New', monospace;
   font-variant-numeric: tabular-nums;
-  color: var(--color-text-regular);
+  color: var(--color-text-primary);
 }
 
 .log-detail-link {
@@ -658,6 +721,11 @@ export default class LogDetailDrawer extends Vue {
   &.is-info {
     color: var(--color-success);
     background-color: rgba(8, 190, 126, 0.1);
+  }
+
+  &.is-muted {
+    color: var(--color-text-secondary);
+    background-color: var(--bg-color03);
   }
 }
 </style>
