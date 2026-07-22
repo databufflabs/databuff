@@ -63,6 +63,7 @@ curl -fsSL https://databuff.ai/databuff/ai-apm-install.sh | bash
 ### 业界对比
 
 - [DataBuff vs SkyWalking](业界对比/vs-skywalking.md)
+- [DataBuff vs Jaeger](业界对比/vs-jaeger.md)
 - [DataBuff vs SigNoz](业界对比/vs-signoz.md)
 
 ## 核心链路

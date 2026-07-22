@@ -99,7 +99,7 @@ sudo rpm -i opentelemetry-injector-0.9.0-1.x86_64.rpm`;
     return `OTEL_SERVICE_NAME=my-service
 OTEL_TRACES_EXPORTER=otlp
 OTEL_METRICS_EXPORTER=otlp
-OTEL_LOGS_EXPORTER=none
+OTEL_LOGS_EXPORTER=otlp
 OTEL_EXPORTER_OTLP_PROTOCOL=grpc
 OTEL_EXPORTER_OTLP_ENDPOINT=${this.resolvedIngestGrpcEndpoint}
 OTEL_PROPAGATORS=tracecontext,baggage

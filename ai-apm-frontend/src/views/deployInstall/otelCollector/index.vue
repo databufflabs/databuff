@@ -64,6 +64,10 @@ service:
     metrics:
       receivers: [otlp]
       processors: [batch]
+      exporters: [otlp/databuff]
+    logs:
+      receivers: [otlp]
+      processors: [batch]
       exporters: [otlp/databuff]`;
   }
 
@@ -81,6 +85,10 @@ service:
       processors: [batch]
       exporters: [otlphttp/databuff]
     metrics:
+      receivers: [otlp]
+      processors: [batch]
+      exporters: [otlphttp/databuff]
+    logs:
       receivers: [otlp]
       processors: [batch]
       exporters: [otlphttp/databuff]`;

@@ -99,11 +99,11 @@ import Kubernetes from './kubernetes.vue';
 export default class DeployApm extends Vue {
   private activeName: 'host' | 'container' = 'host';
   private langActive = 'java';
-  private injectMode: 'auto' | 'manual' = 'auto';
+  private injectMode: 'auto' | 'manual' = 'manual';
 
   private injectTabs = [
-    { label: i18n.t('modules.views.configInstall.apm.s_d2f66d9b') as string, labelKey: 'modules.views.configInstall.apm.s_d2f66d9b', value: 'auto', describe: i18n.t('modules.views.deployInstall.apm.s_b73a9477') as string, describeKey: 'modules.views.deployInstall.apm.s_b73a9477' },
     { label: i18n.t('modules.views.configInstall.apm.s_c7d68fb7') as string, labelKey: 'modules.views.configInstall.apm.s_c7d68fb7', value: 'manual', describe: i18n.t('modules.views.deployInstall.apm.s_8989faac') as string, describeKey: 'modules.views.deployInstall.apm.s_8989faac' },
+    { label: i18n.t('modules.views.configInstall.apm.s_d2f66d9b') as string, labelKey: 'modules.views.configInstall.apm.s_d2f66d9b', value: 'auto', describe: i18n.t('modules.views.deployInstall.apm.s_b73a9477') as string, describeKey: 'modules.views.deployInstall.apm.s_b73a9477' },
   ]
 
   private langList = [
@@ -207,7 +207,7 @@ export default class DeployApm extends Vue {
   private setActive (env?: string, lang?: string, inject?: string) {
     this.activeName = env === 'container' ? 'container' : 'host';
     if (this.activeName === 'host') {
-      this.injectMode = inject === 'manual' ? 'manual' : 'auto';
+      this.injectMode = inject === 'auto' ? 'auto' : 'manual';
       const names = this.langList.map(t => t.name);
       this.langActive = typeof lang === 'string' && names.includes(lang) ? lang : 'java';
     }

@@ -858,8 +858,8 @@ export default {
       "logs": {
         "s_overview": "概览",
         "s_meta": "基础信息",
-        "s_attributes": "Attributes",
-        "s_resources": "Resource",
+        "s_attributes": "属性",
+        "s_resources": "资源",
         "s_load_failed": "加载日志详情失败",
         "s_detail_title": "日志详情"
       },

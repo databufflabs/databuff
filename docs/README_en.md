@@ -63,6 +63,7 @@ Online docs: [databuff.ai/docs](https://databuff.ai/docs/en/)
 ### Comparisons
 
 - [DataBuff vs SkyWalking](业界对比/vs-skywalking_en.md)
+- [DataBuff vs Jaeger](业界对比/vs-jaeger_en.md)
 - [DataBuff vs SigNoz](业界对比/vs-signoz_en.md)
 
 ## Core Pipeline

@@ -42,9 +42,10 @@ export default class HostNode extends Vue {
     return `export OTEL_SERVICE_NAME=my-node-service
 export OTEL_TRACES_EXPORTER=otlp
 export OTEL_METRICS_EXPORTER=none
-export OTEL_LOGS_EXPORTER=none
+export OTEL_LOGS_EXPORTER=otlp
 export OTEL_EXPORTER_OTLP_PROTOCOL=http/protobuf
 export OTEL_EXPORTER_OTLP_TRACES_ENDPOINT=${this.resolvedIngestHttpEndpoint}/v1/traces
+export OTEL_EXPORTER_OTLP_LOGS_ENDPOINT=${this.resolvedIngestHttpEndpoint}/v1/logs
 export OTEL_NODE_RESOURCE_DETECTORS=env,host,os
 export OTEL_PROPAGATORS=tracecontext,baggage
 export NODE_OPTIONS="--require @opentelemetry/auto-instrumentations-node/register"

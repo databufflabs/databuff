@@ -44,7 +44,7 @@ export default class HostNet extends Vue {
     return `export OTEL_SERVICE_NAME=my-net-service
 export OTEL_TRACES_EXPORTER=otlp
 export OTEL_METRICS_EXPORTER=none
-export OTEL_LOGS_EXPORTER=none
+export OTEL_LOGS_EXPORTER=otlp
 export OTEL_EXPORTER_OTLP_PROTOCOL=http/protobuf
 export OTEL_EXPORTER_OTLP_ENDPOINT=${this.resolvedIngestHttpEndpoint}
 export OTEL_PROPAGATORS=tracecontext,baggage
@@ -60,6 +60,7 @@ dotnet run`;
 | \`OTEL_EXPORTER_OTLP_ENDPOINT\` | Ingest OTLP HTTP 地址（4318） |
 | \`OTEL_EXPORTER_OTLP_PROTOCOL\` | 设为 \`http/protobuf\` |
 | \`OTEL_TRACES_EXPORTER\` | 设为 \`otlp\` 启用 Trace 上报 |
+| \`OTEL_LOGS_EXPORTER\` | 设为 \`otlp\` 启用 Log 上报 |
 `
 }
 </script>

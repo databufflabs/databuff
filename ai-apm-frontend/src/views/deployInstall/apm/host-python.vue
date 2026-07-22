@@ -41,7 +41,7 @@ export default class HostPython extends Vue {
     return `export OTEL_SERVICE_NAME=my-python-service
 export OTEL_TRACES_EXPORTER=otlp
 export OTEL_METRICS_EXPORTER=none
-export OTEL_LOGS_EXPORTER=none
+export OTEL_LOGS_EXPORTER=otlp
 export OTEL_EXPORTER_OTLP_PROTOCOL=http/protobuf
 export OTEL_EXPORTER_OTLP_ENDPOINT=${this.resolvedIngestHttpEndpoint}
 export OTEL_PROPAGATORS=tracecontext,baggage

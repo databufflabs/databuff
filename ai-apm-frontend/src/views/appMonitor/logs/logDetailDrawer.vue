@@ -1,86 +1,110 @@
 <template>
   <el-drawer
     :visible.sync="drawerVisible"
-    :title="drawerTitle"
     direction="rtl"
-    size="560px"
+    size="720px"
     append-to-body
+    :with-header="false"
     :wrapper-closable="true"
     custom-class="log-detail-drawer"
     @closed="onClosed">
     <div v-loading="loading" class="log-detail-shell">
-      <div v-if="error && !detail" class="log-detail-state describe">{{ errorText }}</div>
-      <template v-else-if="detail">
-        <div class="log-detail-tabs">
+      <header class="log-detail-header">
+        <div class="log-detail-title-row">
+          <div class="log-detail-title-wrap">
+            <h3 class="log-detail-title">{{ drawerTitle }}</h3>
+            <div v-if="detail" class="log-detail-summary">
+              <span :class="['log-level-tag', severityClass(detail.status)]">{{ severityLabel }}</span>
+              <span v-if="detail.service" class="log-detail-summary-text">{{ detail.service }}</span>
+              <span v-if="detail.serviceInstance" class="log-detail-summary-sep">/</span>
+              <span v-if="detail.serviceInstance" class="log-detail-summary-text is-muted">{{ detail.serviceInstance }}</span>
+              <span v-if="eventTimeText" class="log-detail-summary-sep">·</span>
+              <span v-if="eventTimeText" class="log-detail-summary-text is-muted is-mono">{{ eventTimeText }}</span>
+            </div>
+          </div>
+          <button type="button" class="log-detail-close" @click="drawerVisible = false">
+            <i class="el-icon-close" />
+          </button>
+        </div>
+
+        <div v-if="detail" class="log-detail-tabs" role="tablist">
           <button
             type="button"
+            role="tab"
+            :aria-selected="activeTab === 'overview'"
             :class="['log-detail-tab', activeTab === 'overview' ? 'is-active' : '']"
             @click="activeTab = 'overview'">
             {{ $t('modules.views.appMonitor.logs.s_overview') }}
           </button>
           <button
             type="button"
+            role="tab"
+            :aria-selected="activeTab === 'json'"
             :class="['log-detail-tab', activeTab === 'json' ? 'is-active' : '']"
             @click="activeTab = 'json'">
             JSON
           </button>
         </div>
+      </header>
 
-        <div class="log-detail-scroll">
-          <div v-if="activeTab === 'overview'" class="log-detail-body">
-            <section class="log-detail-section">
-              <div class="log-detail-section-title">{{ $t('modules.views.alarmCenter.eventDetail.s_a19a72d2') }}</div>
-              <pre :class="['log-detail-message', messageIsJson ? 'is-json' : '']">{{ messageDisplay }}</pre>
-            </section>
+      <div v-if="error && !detail" class="log-detail-state describe">{{ errorText }}</div>
+      <div v-else-if="detail" class="log-detail-scroll">
+        <div v-if="activeTab === 'overview'" class="log-detail-body">
+          <section class="log-detail-section">
+            <div class="log-detail-section-title">{{ $t('modules.views.alarmCenter.eventDetail.s_a19a72d2') }}</div>
+            <pre :class="['log-detail-message', messageIsJson ? 'is-json' : '']">{{ messageDisplay }}</pre>
+          </section>
 
-            <section class="log-detail-section">
-              <div class="log-detail-section-title">{{ $t('modules.views.appMonitor.logs.s_meta') }}</div>
-              <div class="log-detail-kv-list">
-                <div v-for="item in metaItems" :key="item.key" class="log-detail-kv">
-                  <div class="log-detail-k">{{ item.label }}</div>
-                  <div class="log-detail-v">
-                    <span
-                      v-if="item.key === 'status'"
-                      :class="['log-level-tag', severityClass(item.value)]">{{ item.value || '-' }}</span>
-                    <template v-else-if="item.key === 'traceId' && item.value">
-                      <span class="log-detail-mono">{{ item.value }}</span>
-                      <span
-                        v-if="canViewTrace"
-                        @click.stop="onViewTrace"
-                        class="log-detail-link db-blue cp">{{ $t('modules.views.metrics.list.s_607e7a4f') }}</span>
-                    </template>
-                    <span v-else :class="item.mono ? 'log-detail-mono' : ''">{{ item.value || '-' }}</span>
-                  </div>
+          <section class="log-detail-section">
+            <div class="log-detail-section-title">{{ $t('modules.views.appMonitor.logs.s_meta') }}</div>
+            <div class="log-detail-kv-list">
+              <div v-for="item in metaItems" :key="item.key" class="log-detail-kv">
+                <div class="log-detail-k">{{ item.label }}</div>
+                <div class="log-detail-v">
+                  <span
+                    v-if="item.key === 'status'"
+                    :class="['log-level-tag', severityClass(item.value)]">{{ item.value || '-' }}</span>
+                  <template v-else-if="item.key === 'traceId' && item.value">
+                    <span class="log-detail-mono">{{ item.value }}</span>
+                    <a
+                      v-if="canViewTrace"
+                      href="javascript:;"
+                      class="log-detail-link"
+                      @click.prevent.stop="onViewTrace">
+                      {{ $t('modules.views.metrics.list.s_607e7a4f') }}
+                    </a>
+                  </template>
+                  <span v-else :class="item.mono ? 'log-detail-mono' : ''">{{ item.value || '-' }}</span>
                 </div>
               </div>
-            </section>
+            </div>
+          </section>
 
-            <section v-if="attributeItems.length" class="log-detail-section">
-              <div class="log-detail-section-title">{{ $t('modules.views.appMonitor.logs.s_attributes') }}</div>
-              <div class="log-detail-kv-list">
-                <div v-for="item in attributeItems" :key="`attr-${item.key}`" class="log-detail-kv">
-                  <div class="log-detail-k">{{ item.key }}</div>
-                  <div class="log-detail-v log-detail-mono">{{ item.value }}</div>
-                </div>
+          <section v-if="attributeItems.length" class="log-detail-section">
+            <div class="log-detail-section-title">{{ $t('modules.views.appMonitor.logs.s_attributes') }}</div>
+            <div class="log-detail-kv-list">
+              <div v-for="item in attributeItems" :key="`attr-${item.key}`" class="log-detail-kv">
+                <div class="log-detail-k is-code">{{ item.key }}</div>
+                <div class="log-detail-v log-detail-mono">{{ item.value }}</div>
               </div>
-            </section>
+            </div>
+          </section>
 
-            <section v-if="resourceItems.length" class="log-detail-section">
-              <div class="log-detail-section-title">{{ $t('modules.views.appMonitor.logs.s_resources') }}</div>
-              <div class="log-detail-kv-list">
-                <div v-for="item in resourceItems" :key="`res-${item.key}`" class="log-detail-kv">
-                  <div class="log-detail-k">{{ item.key }}</div>
-                  <div class="log-detail-v log-detail-mono">{{ item.value }}</div>
-                </div>
+          <section v-if="resourceItems.length" class="log-detail-section">
+            <div class="log-detail-section-title">{{ $t('modules.views.appMonitor.logs.s_resources') }}</div>
+            <div class="log-detail-kv-list">
+              <div v-for="item in resourceItems" :key="`res-${item.key}`" class="log-detail-kv">
+                <div class="log-detail-k is-code">{{ item.key }}</div>
+                <div class="log-detail-v log-detail-mono">{{ item.value }}</div>
               </div>
-            </section>
-          </div>
-
-          <div v-else class="log-detail-body">
-            <pre class="log-detail-json">{{ jsonText }}</pre>
-          </div>
+            </div>
+          </section>
         </div>
-      </template>
+
+        <div v-else class="log-detail-body">
+          <pre class="log-detail-json">{{ jsonText }}</pre>
+        </div>
+      </div>
     </div>
   </el-drawer>
 </template>
@@ -95,6 +119,8 @@ import { getSeverityClass } from '@/utils/logSeverity';
 
 type KvItem = { key: string; label?: string; value: string; mono?: boolean };
 type MessageBody = { text: string; isJson: boolean; parsed?: any };
+
+const TIME_FMT = 'YYYY-MM-DD HH:mm:ss';
 
 @Component({ name: 'LogDetailDrawer' })
 export default class LogDetailDrawer extends Vue {
@@ -136,6 +162,20 @@ export default class LogDetailDrawer extends Vue {
     return this.messageBody.isJson;
   }
 
+  get severityLabel () {
+    const status = this.detail?.status || '';
+    const number = this.detail?.severityNumber;
+    if (number) {
+      return `${status || '-'} · ${number}`;
+    }
+    return status || '-';
+  }
+
+  get eventTimeText () {
+    return this.formatTime(this.detail?.timestamp)
+      || this.formatNanoTime(this.detail?.timeNs);
+  }
+
   get metaItems (): KvItem[] {
     const detail = this.detail || {};
     const severity = detail.status || '';
@@ -151,8 +191,8 @@ export default class LogDetailDrawer extends Vue {
       { key: 'hostname', label: i18n.t('modules.views.alarmCenter.alarm.s_65227369') as string, value: detail.hostname || '' },
       { key: 'traceId', label: 'Trace ID', value: detail.traceId || '', mono: true },
       { key: 'spanId', label: 'Span ID', value: detail.spanId || '', mono: true },
-      { key: 'timeNs', label: 'time_unix_nano', value: detail.timeNs || '', mono: true },
-      { key: 'observedTimeNs', label: 'observed_time_unix_nano', value: detail.observedTimeNs || '', mono: true },
+      { key: 'timeNs', label: 'time_unix_nano', value: this.formatNanoTime(detail.timeNs), mono: true },
+      { key: 'observedTimeNs', label: 'observed_time_unix_nano', value: this.formatNanoTime(detail.observedTimeNs), mono: true },
     ].filter((item) => item.key === 'status' || item.key === 'timestamp' || Boolean(item.value));
   }
 
@@ -171,9 +211,9 @@ export default class LogDetailDrawer extends Vue {
     const bodyFormatted = this.messageBody;
     const payload = {
       body: bodyFormatted.isJson ? bodyFormatted.parsed : (this.detail.message || ''),
-      timestamp: this.formatTimeIso(this.detail.timestamp),
-      time_unix_nano: this.detail.timeNs || '',
-      observed_time_unix_nano: this.detail.observedTimeNs || '',
+      timestamp: this.formatTime(this.detail.timestamp),
+      time_unix_nano: this.formatNanoTime(this.detail.timeNs) || '',
+      observed_time_unix_nano: this.formatNanoTime(this.detail.observedTimeNs) || '',
       severity_text: this.detail.status || '',
       severity_number: this.detail.severityNumber || 0,
       service: this.detail.service || '',
@@ -316,14 +356,25 @@ export default class LogDetailDrawer extends Vue {
       .filter((item) => item.value !== '');
   }
 
+  /** Epoch millis / ms-string → `YYYY-MM-DD HH:mm:ss`. */
   private formatTime (value: any) {
     const ms = this.toMillis(value);
-    return ms ? dayjs(ms).format('YYYY-MM-DD HH:mm:ss.SSS') : '';
+    return ms ? dayjs(ms).format(TIME_FMT) : '';
   }
 
-  private formatTimeIso (value: any) {
-    const ms = this.toMillis(value);
-    return ms ? new Date(ms).toISOString() : '';
+  /** OTel nano timestamp string → `YYYY-MM-DD HH:mm:ss` (no JS precision loss). */
+  private formatNanoTime (value: any) {
+    const text = value == null ? '' : String(value).trim();
+    if (!text || !/^\d+$/.test(text)) {
+      return '';
+    }
+    // ns → ms: drop last 6 digits
+    const msText = text.length > 6 ? text.slice(0, -6) : text;
+    const ms = Number(msText);
+    if (!Number.isFinite(ms) || ms <= 0) {
+      return '';
+    }
+    return dayjs(ms).format(TIME_FMT);
   }
 
   private toMillis (value: any) {
@@ -351,61 +402,158 @@ export default class LogDetailDrawer extends Vue {
   flex-direction: column;
   height: 100%;
   min-height: 0;
+  background: var(--bg-color-base);
 }
 
-.log-detail-state {
-  padding: 24px 16px;
+.log-detail-header {
+  flex: none;
+  padding: 18px 24px 0;
+  background: var(--bg-color);
+  border-bottom: 1px solid var(--border-color-light);
+}
+
+.log-detail-title-row {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 16px;
+}
+
+.log-detail-title-wrap {
+  min-width: 0;
+  flex: 1;
+}
+
+.log-detail-title {
+  margin: 0;
+  font-size: 16px;
+  font-weight: 600;
+  line-height: 24px;
+  color: var(--color-text-primary);
+}
+
+.log-detail-summary {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 6px;
+  margin-top: 10px;
+  min-width: 0;
+}
+
+.log-detail-summary-text {
+  font-size: 13px;
+  line-height: 20px;
+  color: var(--color-text-regular);
+
+  &.is-muted {
+    color: var(--color-text-secondary);
+  }
+
+  &.is-mono {
+    font-variant-numeric: tabular-nums;
+    font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, 'Liberation Mono', 'Courier New', monospace;
+  }
+}
+
+.log-detail-summary-sep {
+  color: var(--color-text-placeholder);
   font-size: 12px;
+  line-height: 18px;
+}
+
+.log-detail-close {
+  appearance: none;
+  border: none;
+  flex: none;
+  width: 28px;
+  height: 28px;
+  margin-top: -2px;
+  border-radius: 6px;
+  background: var(--bg-color03);
+  color: var(--color-text-secondary);
+  cursor: pointer;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+
+  &:hover {
+    color: var(--color-text-primary);
+    background: var(--bg-color02);
+  }
 }
 
 .log-detail-tabs {
   display: flex;
-  flex: none;
-  gap: 4px;
-  padding: 0 16px;
-  border-bottom: 1px solid var(--border-color-base);
+  gap: 24px;
+  margin-top: 14px;
 }
 
 .log-detail-tab {
   appearance: none;
   border: none;
   background: transparent;
-  padding: 10px 14px;
-  margin-bottom: -1px;
+  padding: 0 0 12px;
   font-size: 13px;
   line-height: 20px;
   color: var(--color-text-secondary);
   cursor: pointer;
-  border-bottom: 2px solid transparent;
+  position: relative;
 
   &.is-active {
-    color: var(--color-text-primary);
-    font-weight: 500;
-    border-bottom-color: var(--color-primary, #409eff);
+    color: var(--color-primary);
+    font-weight: 600;
+
+    &::after {
+      content: '';
+      position: absolute;
+      left: 0;
+      right: 0;
+      bottom: 0;
+      height: 2px;
+      background: var(--color-primary);
+      border-radius: 1px 1px 0 0;
+    }
   }
 
-  &:hover {
+  &:hover:not(.is-active) {
     color: var(--color-text-primary);
   }
+}
+
+.log-detail-state {
+  padding: 40px 24px;
+  font-size: 13px;
 }
 
 .log-detail-scroll {
   flex: 1;
   min-height: 0;
   overflow: auto;
-  padding: 16px;
+  padding: 20px 24px 28px;
 }
 
-.log-detail-section + .log-detail-section {
-  margin-top: 18px;
+.log-detail-body {
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+}
+
+.log-detail-section {
+  padding: 16px 18px;
+  background: var(--bg-color);
+  border: 1px solid var(--border-color-light);
+  border-radius: 10px;
 }
 
 .log-detail-section-title {
-  margin-bottom: 10px;
-  font-size: 12px;
-  font-weight: 500;
-  color: var(--color-text-secondary);
-  letter-spacing: 0.02em;
+  margin: 0 0 12px;
+  padding-left: 10px;
+  border-left: 3px solid var(--color-primary);
+  font-size: 13px;
+  font-weight: 600;
+  line-height: 18px;
+  color: var(--color-text-primary);
 }
 
 .log-detail-message,
@@ -416,10 +564,10 @@ export default class LogDetailDrawer extends Vue {
   overflow-wrap: anywhere;
   word-break: normal;
   font-size: 12px;
-  line-height: 1.55;
-  color: var(--color-text-primary);
+  line-height: 1.6;
+  color: var(--color-text-regular);
   background: var(--bg-color03);
-  border-radius: 4px;
+  border-radius: 6px;
   font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, 'Liberation Mono', 'Courier New', monospace;
 }
 
@@ -429,30 +577,41 @@ export default class LogDetailDrawer extends Vue {
   overflow: auto;
 }
 
+.log-detail-json {
+  max-height: calc(100vh - 180px);
+  border: 1px solid var(--border-color-light);
+  background: var(--bg-color);
+}
+
 .log-detail-kv-list {
   display: flex;
   flex-direction: column;
-  gap: 8px;
 }
 
 .log-detail-kv {
-  display: flex;
-  align-items: flex-start;
-  min-width: 0;
+  display: grid;
+  grid-template-columns: 156px minmax(0, 1fr);
+  gap: 16px;
+  align-items: start;
+  padding: 9px 0;
   font-size: 12px;
   line-height: 20px;
+
+  & + & {
+    border-top: 1px solid var(--border-color-extra-light);
+  }
 }
 
 .log-detail-k {
-  flex: none;
-  width: 160px;
-  padding-right: 12px;
   color: var(--color-text-secondary);
   overflow-wrap: anywhere;
+
+  &.is-code {
+    font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, 'Liberation Mono', 'Courier New', monospace;
+  }
 }
 
 .log-detail-v {
-  flex: 1;
   min-width: 0;
   color: var(--color-text-primary);
   overflow-wrap: anywhere;
@@ -460,52 +619,64 @@ export default class LogDetailDrawer extends Vue {
 
 .log-detail-mono {
   font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, 'Liberation Mono', 'Courier New', monospace;
+  font-variant-numeric: tabular-nums;
+  color: var(--color-text-regular);
 }
 
 .log-detail-link {
   margin-left: 8px;
+  color: var(--color-text-link);
+  text-decoration: none;
   font-size: 12px;
+  font-weight: 500;
+
+  &:hover {
+    text-decoration: underline;
+  }
 }
 
 .log-level-tag {
-  display: inline-block;
+  display: inline-flex;
+  align-items: center;
   padding: 0 8px;
-  line-height: 20px;
-  border-radius: 3px;
+  height: 20px;
+  border-radius: 4px;
   font-size: 12px;
+  font-weight: 600;
+  letter-spacing: 0.02em;
   background-color: var(--bg-color03);
   color: var(--color-text-regular);
 
   &.is-error {
     color: var(--color-danger);
-    background-color: rgba(var(--color-danger-rgb, 245, 108, 108), 0.12);
+    background-color: rgba(225, 40, 40, 0.1);
   }
   &.is-warn {
     color: var(--color-warning);
-    background-color: rgba(var(--color-warning-rgb, 230, 162, 60), 0.12);
+    background-color: rgba(247, 149, 50, 0.12);
   }
   &.is-info {
     color: var(--color-success);
-    background-color: rgba(var(--color-success-rgb, 103, 194, 58), 0.12);
+    background-color: rgba(8, 190, 126, 0.1);
   }
 }
 </style>
 
 <style lang="scss">
 .log-detail-drawer.el-drawer {
-  .el-drawer__header {
-    margin-bottom: 0;
-    padding: 14px 16px;
-    border-bottom: 1px solid var(--border-color-base);
-    color: var(--color-text-primary);
-    font-size: 14px;
-    font-weight: 500;
-  }
+  box-shadow: -12px 0 32px rgba(18, 19, 23, 0.1);
 
   .el-drawer__body {
     padding: 0;
-    height: calc(100% - 53px);
+    height: 100%;
     overflow: hidden;
+    background: var(--bg-color-base);
+  }
+}
+
+:root[data-theme=dark] {
+  .log-detail-drawer.el-drawer {
+    box-shadow: -12px 0 32px rgba(0, 0, 0, 0.45);
   }
 }
 </style>

@@ -42,7 +42,7 @@ export default class HostJava extends Vue {
     return `export OTEL_SERVICE_NAME=my-java-service
 export OTEL_TRACES_EXPORTER=otlp
 export OTEL_METRICS_EXPORTER=otlp
-export OTEL_LOGS_EXPORTER=none
+export OTEL_LOGS_EXPORTER=otlp
 export OTEL_EXPORTER_OTLP_PROTOCOL=grpc
 export OTEL_EXPORTER_OTLP_ENDPOINT=${this.resolvedIngestGrpcEndpoint}
 export OTEL_PROPAGATORS=tracecontext,baggage
@@ -59,6 +59,7 @@ java -javaagent:/path/to/opentelemetry-javaagent.jar \\
 | \`OTEL_EXPORTER_OTLP_ENDPOINT\` | Ingest OTLP 地址（gRPC 用 4317，HTTP 用 4318） |
 | \`OTEL_EXPORTER_OTLP_PROTOCOL\` | \`grpc\` 或 \`http/protobuf\` |
 | \`OTEL_TRACES_EXPORTER\` | 设为 \`otlp\` 启用 Trace 上报 |
+| \`OTEL_LOGS_EXPORTER\` | 设为 \`otlp\` 启用 Log 上报 |
 | \`OTEL_JAVAAGENT_DEBUG\` | 设为 \`true\` 可开启 Agent 调试日志 |
 `
 }
