@@ -52,11 +52,28 @@ def _http_json(
         return json.loads(resp.read().decode("utf-8"))
 
 
-def _submit_chat(base: str, token: str, message: str, expert_id: str = "data") -> str:
+def _submit_chat(
+    base: str,
+    token: str,
+    message: str,
+    expert_id: str = "data",
+    *,
+    model_provider_code: str | None = None,
+    model_name: str | None = None,
+) -> str:
+    body: dict[str, Any] = {
+        "expertId": expert_id,
+        "message": message,
+        "stream": False,
+    }
+    if model_provider_code:
+        body["modelProviderCode"] = model_provider_code
+    if model_name:
+        body["modelName"] = model_name
     payload = _http_json(
         "POST",
         f"{base}/webapi/api/v1/ai/chat/submit",
-        {"expertId": expert_id, "message": message, "stream": False},
+        body,
         token=token,
     )
     session_id = payload.get("sessionId")
@@ -130,15 +147,27 @@ def run_ai_chat_tool_loop(
     poll_interval_sec: float = 2.0,
     poll_timeout_sec: float = 180.0,
     expert_id: str = "data",
+    model_provider_code: str | None = None,
+    model_name: str | None = None,
+    questions: list[tuple[str, str]] | None = None,
+    name_prefix: str = "",
 ) -> list[AiChatCaseResult]:
     """Run multiple rounds of data-expert chat; fail when tool schema validation errors appear."""
+    question_list = questions if questions is not None else AI_CHAT_QUESTIONS
     results: list[AiChatCaseResult] = []
     for round_no in range(1, rounds + 1):
-        for tool_hint, question in AI_CHAT_QUESTIONS:
+        for tool_hint, question in question_list:
             started = time.time()
-            name = f"R{round_no} {tool_hint}"
+            name = f"{name_prefix}R{round_no} {tool_hint}" if name_prefix else f"R{round_no} {tool_hint}"
             try:
-                session_id = _submit_chat(base, token, question, expert_id=expert_id)
+                session_id = _submit_chat(
+                    base,
+                    token,
+                    question,
+                    expert_id=expert_id,
+                    model_provider_code=model_provider_code,
+                    model_name=model_name,
+                )
                 payload = _poll_session(
                     base,
                     token,

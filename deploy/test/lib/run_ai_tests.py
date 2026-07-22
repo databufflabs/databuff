@@ -1,8 +1,9 @@
 #!/usr/bin/env python3
-"""AI 集成测试统一 runner — 依次跑工具参数校验 / 会话记忆 / 大脑异步路由.
+"""AI 集成测试统一 runner — 依次跑工具参数校验 / 接入格式 / 会话记忆 / 大脑异步路由.
 
 环境变量门控：
   - 工具参数校验：只要存在已启用 LLM provider 就跑（TEST_SKIP_AI_CHAT=1 跳过）
+  - 接入格式：DEEPSEEK_API_KEY（OpenAI）/ MINIMAX_API_KEY（Anthropic）（TEST_SKIP_AI_PROVIDER_FORMATS=1 跳过）
   - 会话记忆 / 大脑异步路由：需 DEEPSEEK_API_KEY（TEST_SKIP_AI_MEMORY / TEST_SKIP_AI_BRAIN_ASYNC 跳过）
 """
 
@@ -20,6 +21,14 @@ from ai_chat_integration import (  # noqa: E402
     is_llm_ready,
     run_ai_chat_tool_loop,
     AiChatCaseResult,
+)
+from ai_provider_formats import (  # noqa: E402
+    FORMAT_QUESTIONS,
+    ENV_DEEPSEEK,
+    ENV_MINIMAX,
+    available_provider_formats,
+    provider_api_key,
+    run_ai_provider_format_cases,
 )
 from ai_session_memory import (  # noqa: E402
     ENV_API_KEY,
@@ -54,11 +63,14 @@ def main() -> int:
     timeout = float(os.environ.get("TEST_TIMEOUT", "60"))
 
     skip_chat = os.environ.get("TEST_SKIP_AI_CHAT", "0") == "1"
+    skip_formats = os.environ.get("TEST_SKIP_AI_PROVIDER_FORMATS", "0") == "1"
     skip_memory = os.environ.get("TEST_SKIP_AI_MEMORY", "0") == "1"
     skip_brain_async = os.environ.get("TEST_SKIP_AI_BRAIN_ASYNC", "0") == "1"
 
     chat_rounds = int(os.environ.get("TEST_AI_CHAT_ROUNDS", "2"))
     chat_poll_timeout = float(os.environ.get("TEST_AI_CHAT_POLL_TIMEOUT", "180"))
+    format_rounds = int(os.environ.get("TEST_AI_PROVIDER_FORMAT_ROUNDS", "1"))
+    format_poll_timeout = float(os.environ.get("TEST_AI_PROVIDER_FORMAT_POLL_TIMEOUT", "180"))
     memory_poll_timeout = float(os.environ.get("TEST_AI_MEMORY_POLL_TIMEOUT", "240"))
     brain_async_poll_timeout = float(os.environ.get("TEST_AI_BRAIN_ASYNC_POLL_TIMEOUT", "300"))
 
@@ -93,7 +105,38 @@ def main() -> int:
     else:
         print("[ai-tests] skip AI chat (TEST_SKIP_AI_CHAT=1)")
 
-    # --- 2) 会话记忆 ---
+    # --- 2) 两种接入格式（OpenAI / Anthropic）---
+    if not skip_formats:
+        _print_section("AI 接入格式（OpenAI Completions / Anthropic Messages）")
+        formats = available_provider_formats(base, token)
+        if formats:
+            labels = ", ".join(
+                f"{p.label}({p.env_key if provider_api_key(p.env_key) else 'server'})"
+                for p in formats
+            )
+            print(
+                f"  running {len(formats)} format(s) x {format_rounds} rounds x "
+                f"{len(FORMAT_QUESTIONS)} questions: {labels}"
+            )
+            format_results = run_ai_provider_format_cases(
+                base,
+                token,
+                rounds=format_rounds,
+                poll_timeout_sec=format_poll_timeout,
+            )
+            for item in format_results:
+                _print_result_row(item.question, item.ok, item.elapsed_ms, item.session_id, item.detail)
+                total += 1
+                if not item.ok:
+                    failed += 1
+        else:
+            print(
+                f"  skip: set {ENV_DEEPSEEK}/{ENV_MINIMAX}, or enable matching providers in UI"
+            )
+    else:
+        print("[ai-tests] skip AI provider formats (TEST_SKIP_AI_PROVIDER_FORMATS=1)")
+
+    # --- 3) 会话记忆 ---
     if not skip_memory:
         _print_section("AI 会话记忆")
         if has_deepseek:
@@ -113,7 +156,7 @@ def main() -> int:
     else:
         print("[ai-tests] skip AI session memory (TEST_SKIP_AI_MEMORY=1)")
 
-    # --- 3) 大脑异步路由 ---
+    # --- 4) 大脑异步路由 ---
     if not skip_brain_async:
         _print_section("AI 大脑异步路由（同 session 串行 fan-in / 跨 session 隔离）")
         if has_deepseek:

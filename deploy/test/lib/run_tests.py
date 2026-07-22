@@ -28,6 +28,14 @@ from ai_chat_integration import (  # noqa: E402
     is_llm_ready,
     run_ai_chat_tool_loop,
 )
+from ai_provider_formats import (  # noqa: E402
+    ENV_DEEPSEEK as PROVIDER_FORMAT_DEEPSEEK_ENV,
+    ENV_MINIMAX as PROVIDER_FORMAT_MINIMAX_ENV,
+    FORMAT_QUESTIONS,
+    GROUP_PROVIDER_FORMATS,
+    available_provider_formats,
+    run_ai_provider_format_cases,
+)
 from ai_session_memory import (  # noqa: E402
     ENV_API_KEY as DEEPSEEK_API_KEY_ENV,
     GROUP_SESSION_MEMORY,
@@ -459,6 +467,25 @@ def main() -> int:
         help="skip AI session memory integration tests (also skipped when DEEPSEEK_API_KEY unset)",
     )
     parser.add_argument(
+        "--skip-ai-provider-formats",
+        action="store_true",
+        default=os.environ.get("TEST_SKIP_AI_PROVIDER_FORMATS", "0") == "1",
+        help="skip OpenAI/Anthropic provider format tool-arg tests "
+        "(also skipped when DEEPSEEK_API_KEY and MINIMAX_API_KEY unset)",
+    )
+    parser.add_argument(
+        "--ai-provider-format-rounds",
+        type=int,
+        default=int(os.environ.get("TEST_AI_PROVIDER_FORMAT_ROUNDS", "1")),
+        help="rounds per provider-format tool case (default: 1)",
+    )
+    parser.add_argument(
+        "--ai-provider-format-poll-timeout",
+        type=float,
+        default=float(os.environ.get("TEST_AI_PROVIDER_FORMAT_POLL_TIMEOUT", "180")),
+        help="seconds to wait for each provider-format chat session",
+    )
+    parser.add_argument(
         "--ai-memory-poll-timeout",
         type=float,
         default=float(os.environ.get("TEST_AI_MEMORY_POLL_TIMEOUT", "240")),
@@ -540,6 +567,48 @@ def main() -> int:
                     report.failed += 1
         else:
             print("[test] skip AI chat: no enabled LLM provider with API key configured")
+
+    if not args.skip_ai_provider_formats:
+        formats = available_provider_formats(base, token)
+        if formats:
+            labels = ", ".join(f"{p.label}({p.provider_code})" for p in formats)
+            print(
+                f"[test] running AI provider format cases: {labels}; "
+                f"{args.ai_provider_format_rounds} rounds x "
+                f"{len(FORMAT_QUESTIONS)} questions ..."
+            )
+            format_results = run_ai_provider_format_cases(
+                base,
+                token,
+                rounds=args.ai_provider_format_rounds,
+                poll_timeout_sec=args.ai_provider_format_poll_timeout,
+            )
+            for item in format_results:
+                report.results.append(
+                    CaseResult(
+                        module=MODULE_AI_PLATFORM,
+                        group=GROUP_PROVIDER_FORMATS,
+                        name=item.question,
+                        path=f"/webapi/api/v1/ai/sessions/{item.session_id or '-'}/messages",
+                        method="CHAT",
+                        ok=item.ok,
+                        http_status=200 if item.ok else 0,
+                        elapsed_ms=item.elapsed_ms,
+                        detail=item.detail,
+                        expected_file="ai-provider-formats/no-parameter-validation-errors",
+                        expected_json="OpenAI/Anthropic formats: no Parameter validation failed",
+                    )
+                )
+                report.total += 1
+                if item.ok:
+                    report.passed += 1
+                else:
+                    report.failed += 1
+        else:
+            print(
+                f"[test] skip AI provider formats: set {PROVIDER_FORMAT_DEEPSEEK_ENV}/"
+                f"{PROVIDER_FORMAT_MINIMAX_ENV}, or enable matching providers in UI"
+            )
 
     if not args.skip_ai_memory:
         if deepseek_api_key():

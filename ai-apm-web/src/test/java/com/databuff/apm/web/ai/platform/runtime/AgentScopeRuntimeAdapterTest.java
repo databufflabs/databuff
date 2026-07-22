@@ -71,6 +71,7 @@ class AgentScopeRuntimeAdapterTest {
         assertThat(runtime).isInstanceOf(AgentScopeExpertRuntime.class);
         ReActAgent agent = ((AgentScopeExpertRuntime) runtime).agent();
         assertThat(agent.getName()).isEqualTo("data");
+        assertThat(agent.getMiddlewares()).contains(NormalizeToolCallArgsMiddleware.INSTANCE);
         assertThat(agent.getSysPrompt())
                 .contains("智能问数")
                 .contains("skill.data.metrics")

@@ -5,6 +5,7 @@ import com.databuff.apm.web.tools.local.DataTools;
 import com.databuff.apm.web.tools.local.TimeTool;
 import com.databuff.apm.web.ai.platform.runtime.AgentScopePermissionSupport;
 import com.databuff.apm.web.ai.platform.runtime.ExpertScopedSkillRepository;
+import com.databuff.apm.web.ai.platform.runtime.NormalizeToolCallArgsMiddleware;
 import io.agentscope.core.ReActAgent;
 import io.agentscope.core.message.Msg;
 import com.databuff.apm.web.ai.LlmChatModelFactory;
@@ -78,7 +79,8 @@ public class AgentScopeChatService {
                 .maxIters(runtime.resolvedMaxIters())
                 .modelExecutionConfig(runtime.llmModelExecutionConfig())
                 .checkRunning(false)
-                .permissionContext(AgentScopePermissionSupport.autoAllowContext());
+                .permissionContext(AgentScopePermissionSupport.autoAllowContext())
+                .middleware(NormalizeToolCallArgsMiddleware.INSTANCE);
 
         if (hasFilesystemSkills(runtime)) {
             builder.skillRepository(runtime.layeredSkillRepository());
@@ -132,7 +134,8 @@ public class AgentScopeChatService {
                 .maxIters(runtime.resolvedMaxIters())
                 .modelExecutionConfig(runtime.llmModelExecutionConfig())
                 .checkRunning(false)
-                .permissionContext(AgentScopePermissionSupport.autoAllowContext());
+                .permissionContext(AgentScopePermissionSupport.autoAllowContext())
+                .middleware(NormalizeToolCallArgsMiddleware.INSTANCE);
         if (hasSkill(runtime, skillId)) {
             AgentSkillRepository repository = new ExpertScopedSkillRepository(
                     runtime.layeredSkillRepository(),

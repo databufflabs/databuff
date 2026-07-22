@@ -172,7 +172,8 @@ public class AgentScopeRuntimeAdapter {
                 .maxIters(agentRuntimeConfig.resolvedMaxIters())
                 .modelExecutionConfig(agentRuntimeConfig.llmModelExecutionConfig())
                 .checkRunning(false)
-                .permissionContext(AgentScopePermissionSupport.autoAllowContext());
+                .permissionContext(AgentScopePermissionSupport.autoAllowContext())
+                .middleware(NormalizeToolCallArgsMiddleware.INSTANCE);
 
         if (chatSessionId != null && !chatSessionId.isBlank()) {
             // Abort/timeout mid-tool leaves ToolUse without ToolResult in stateStore memory.
