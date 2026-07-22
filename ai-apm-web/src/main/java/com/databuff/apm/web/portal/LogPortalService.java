@@ -80,6 +80,37 @@ public class LogPortalService {
         return response;
     }
 
+    public Map<String, Object> detail(Map<String, Object> body) {
+        Map<String, Object> request = body == null ? Map.of() : body;
+        long timeNs = parseTimeNs(request.get("timeNs"));
+        String serviceId = ServicePortalService.stringValue(request.get("serviceId"), null);
+
+        Map<String, Object> response = new LinkedHashMap<>();
+        response.put("status", 200);
+        response.put("message", "success");
+        try {
+            response.put("data", logQueryService.detail(timeNs, serviceId));
+        } catch (Exception ignored) {
+            response.put("data", Map.of());
+        }
+        return response;
+    }
+
+    private static long parseTimeNs(Object value) {
+        if (value == null) {
+            return 0L;
+        }
+        String text = String.valueOf(value).trim();
+        if (text.isEmpty() || "NaN".equalsIgnoreCase(text) || "null".equalsIgnoreCase(text)) {
+            return 0L;
+        }
+        try {
+            return Long.parseLong(text);
+        } catch (NumberFormatException ignored) {
+            return 0L;
+        }
+    }
+
     private static LogQueryService.LogSearchCriteria toCriteria(Map<String, Object> body, int offset, int size) {
         long now = System.currentTimeMillis();
         Map<String, Object> request = body == null ? Map.of() : body;

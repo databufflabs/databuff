@@ -60,6 +60,11 @@ curl -fsSL https://databuff.ai/databuff/ai-apm-install.sh | bash
 - [告警](架构设计/告警.md)
 - [日志分析](架构设计/日志分析.md)
 
+### 业界对比
+
+- [DataBuff vs SkyWalking](业界对比/vs-skywalking.md)
+- [DataBuff vs SigNoz](业界对比/vs-signoz.md)
+
 ## 核心链路
 
 ```mermaid

@@ -1,106 +1,129 @@
 # DataBuff vs Pinpoint
 
-> Objective comparison · [Switch to Chinese](./vs-pinpoint.md)
+> Comparison · [中文](./vs-pinpoint.md)
 
-This comparison is based on same-environment hands-on testing: DataBuff v0.1.4 and Pinpoint 3.0.1 deployed locally via Docker, with the same Spring Boot demo application instrumented by both OTel Agent and Pinpoint Agent, screenshots taken page by page.
+Side-by-side lab comparison of **DataBuff v0.1.4** and **Pinpoint 3.1.0** on `192.168.50.140`. Both stacks run on the same host: DataBuff ingests OTLP on `:4318` (`service-a` / `service-b`); Pinpoint uses the official quickstart Java Agent (`application=pinpoint-quickapp`, Web `:18080` / Demo `:18085`). Legend: ✅ verified in this lab · △ entry exists but limited depth here · ❌ no equivalent capability.
 
-## Architecture Comparison
+## Capability matrix
 
-Pinpoint is an APM system open-sourced by NAVER (Korea). It uses a proprietary Java Agent with bytecode enhancement, reports data via Thrift/gRPC to Collector, stores in HBase, and provides topology/Trace/call stack visualization in Web UI.
+**7 AI capabilities** (v0.1.4)
 
-DataBuff is an AI Native OpenTelemetry APM platform. It receives telemetry via standard OTLP protocol, stores in Doris columnar storage, and provides topology/Trace/metrics/logs/AI troubleshooting in an integrated Web UI.
+| Capability | Pinpoint 3.1.0 | DataBuff v0.1.4 |
+|------------|----------------|-----------------|
+| ① Ask the system in natural language | ❌ | ✅ Chinese Q&A over services / topology / anomalies |
+| ② Multi-agent collaboration | ❌ | ✅ Parallel experts with shared context |
+| ③ Inspection reports | ❌ | ✅ One-shot inspection with evidence |
+| ④ Diagnosis / root-cause evidence | ❌ | ✅ Trace + metrics + topology evidence |
+| ⑤ Remediation (ops expert) | ❌ | ✅ Policy-gated, human-authorized fixes |
+| ⑥ Prediction / capacity | ❌ | ✅ Trend & capacity analysis |
+| ⑦ Product Q&A expert | ❌ | ✅ Answers deploy / ingest / config questions |
+| Extensibility · MCP / Skill / custom experts | ❌ | ✅ External MCP / Skill + custom experts |
 
-| Dimension | Pinpoint | DataBuff |
-|-----------|----------|----------|
-| Positioning | Java APM (Agent bytecode) | AI Native OTel APM |
-| Data Protocol | Thrift / gRPC (proprietary) | OTLP (OpenTelemetry standard) + SW gRPC |
-| Agent | Java only (bytecode enhancement) | Multi-language OTel SDK + Java Agent |
-| Storage | HBase | Doris |
-| Components | HBase + Collector + Web | Ingest + Web + Doris |
-| AI | ❌ | ✅ AI-driven troubleshooting, topology correlation, NL query |
-| Topology | ✅ Static topology | ✅ Topology + metric drill-down |
-| Trace | ✅ Call stack list | ✅ Trace list + flame graph + AI analysis |
-| Metrics | ❌ Not built-in | ✅ Built-in JVM/app/DB metrics |
-| Logs | ❌ Not built-in | ✅ OTLP logs + AI log analysis |
-| Self-healing | ❌ | ✅ Install troubleshooting + runtime diagnostics |
+Largest gap: Pinpoint has no AI platform; DataBuff uses APM telemetry as AI context.
 
-![DataBuff Service Topology](/docs/images/screenshots/global-topology.jpg)
+**APM**
 
-*DataBuff service topology page showing inter-service call relationships and health status*
+| Capability | Pinpoint 3.1.0 | DataBuff v0.1.4 |
+|------------|----------------|-----------------|
+| 1. Global topology | ✅ Server Map (USER→App, throughput/latency) | ✅ Topology + health colors + drill-down |
+| 2. Service list & golden signals | ✅ Apdex / Success·Failed / Response Summary | ✅ Service list + charts |
+| 3. Service-level topology | ✅ Server Map node view | ✅ Service topology |
+| 4. Service call analysis → Trace | ❌ No upstream/downstream contribution page | ✅ Call structure + latency contribution → Trace |
+| 5. Instance golden signals | △ VIEW SERVERS shows agents; Inspector API not ready in this lab | ✅ Instance metrics |
+| 6. Instance topology | ❌ | ✅ |
+| 7. Instance call analysis → Trace | ❌ | ✅ |
+| 8. API-level topology | ❌ | ✅ |
+| 9. API call analysis → Trace | △ URL Statistic entry; API 404 in this lab | ✅ |
+| 10. Service flow / response contribution | ❌ Server Map answers “who connects / how many” | ✅ Contribution by downstream → Trace |
+| 11. Middleware specialty pages | △ Nodes may appear on map; no deep pages | ✅ DB / cache / MQ / external |
+| 12. Error analysis | △ Error Analysis entry; API 404 in this lab | ✅ |
+| 13. Trace list / search | ✅ Scatter brush → Transaction List | ✅ Charts + filters |
+| 14. Trace detail | ✅ Call Tree / Server Map / Flame Graph (method-level) | ✅ Waterfall + span attrs |
+| 15. Span ↔ logs | ❌ | ✅ |
+| 16–18. Logs & log↔trace | ❌ No log platform | ✅ including span-level link |
+| 19. Profiling | △ Java call stacks / active threads | ❌ not yet |
+| 20. Custom dashboards | ❌ | ❌ not yet |
+| Protocol / languages | Proprietary Java Agent | OTLP multi-language + SkyWalking gRPC |
 
-## Data Collection
+Pinpoint leads on **Java method-level Call Tree** and the classic **Server Map + Scatter + Apdex** workspace. DataBuff leads on **multi-language OTel**, **call analysis / service flow**, **middleware pages**, **log↔trace**, and **AI**.
 
-Pinpoint uses a proprietary Java Agent with bytecode enhancement. The Agent reports data to Collector via Thrift or gRPC protocol. It supports 40+ plugins (Tomcat, Spring Boot, Dubbo, gRPC, Kafka, JDBC, etc.) but **Java only**.
+**Alerting**
 
-DataBuff is based on the OpenTelemetry standard, supporting Java, Python, Go, Node.js, .NET, and more languages via OTLP protocol. It also supports SkyWalking native gRPC protocol for existing SW Agent users without replacing the agent.
+| Capability | Pinpoint 3.1.0 | DataBuff v0.1.4 |
+|------------|----------------|-----------------|
+| Rule authoring | △ Administration → Alarm / Webhook | ✅ In-product alert center |
+| Threshold alerts | △ Admin-side | ✅ |
+| Smart alerts | ❌ | ✅ |
+| Alert event list | △ | ✅ non-empty in this lab |
+| Jump back to service / middleware | △ mostly via notifications | ✅ |
 
-| Dimension | Pinpoint | DataBuff |
-|-----------|----------|----------|
-| Languages | Java only | Java / Python / Go / Node.js / .NET / etc. |
-| Protocol | Thrift / gRPC (proprietary) | OTLP (open standard) |
-| Agent hot upgrade | Requires JVM restart | Requires JVM restart (OTel Agent) |
-| Bytecode enhancement | ✅ Mature and stable | ✅ OTel built-in Instrumentation |
-| Pinpoint API manual instrumentation | ✅ Supported | ❌ Requires migration to OTel API |
+**When to choose which**
 
-![DataBuff Service List](/docs/images/screenshots/service-list.jpg)
+| Scenario | Better fit | Note |
+|----------|------------|------|
+| Pure Java, need method-level Call Tree / Flame Graph | Pinpoint | Verified in this lab |
+| Server Map + Scatter + Apdex in one page | Pinpoint | Brush into transactions |
+| Deep Pinpoint plugin / manual API lock-in | Pinpoint | Agent swap cost is high |
+| Need the 7 AI capabilities | DataBuff | No Pinpoint equivalent |
+| Multi-language / existing OTel or SW agents | DataBuff | OTLP + SW gRPC |
+| Service flow / call analysis → Trace | DataBuff | No Pinpoint equivalent page |
+| Slow SQL / cache / MQ pages + logs | DataBuff | No Pinpoint log platform |
+| Java traces only, no AI | Either | No need to migrate for brand |
 
-*DataBuff service list page showing connected services and key metrics*
+**Boundary:** Pinpoint remains solid for deep Java call stacks and classic Server Map UX. Moving to DataBuff means swapping the proprietary agent for OTel — higher cost than “only change SkyWalking collector host”.
 
-## Trace Comparison
+## Screenshot evidence
 
-Pinpoint's Trace view is primarily a call stack list showing execution time and call depth for each Span. Users can click nodes to drill down to more detailed call information.
+All shots from **192.168.50.140**.
 
-DataBuff provides three perspectives: Trace list, flame graph, and AI analysis. The Trace list shows request paths and latency distribution; the flame graph visualizes Span time proportions; the AI diagnostics directly analyzes root causes of slow Traces.
+![DataBuff AI home](../images/vs-pp-databuff-ai-home.png)
 
-Pinpoint lacks metric correlation—users need to deploy separate Prometheus/Grafana for CPU/memory metrics. DataBuff directly correlates service metrics, logs, and alerts within the Trace details page for full-path observability.
+![DataBuff AI chat](../images/vs-pp-databuff-ai-chat.png)
 
-## Deployment Comparison
+![DataBuff AI experts](../images/vs-pp-databuff-ai-experts.png)
 
-| Dimension | Pinpoint | DataBuff |
-|-----------|----------|----------|
-| Runtime | HBase + Java 8+ | Docker Compose / K8s |
-| Hardware | 4C8G+ (HBase is heavy) | 4C8G+ |
-| Start time | 5–10 min (HBase initialization) | 2–3 min |
-| Storage dependency | External HBase | Built-in Doris |
-| Components | HBase + Collector + Web | Ingest + Web + Doris |
-| Configuration | Multiple `.properties` files | Single `application.yml` |
+![Pinpoint Server Map](../images/vs-pp-pinpoint-server-map.png)
 
-## Migration to DataBuff
+![DataBuff topology](../images/vs-pp-databuff-topology.png)
 
-For Pinpoint users migrating to DataBuff, the recommended path:
+![Pinpoint VIEW SERVERS](../images/vs-pp-pinpoint-app-overview.png)
 
-1. **Prerequisites**: Deploy DataBuff and verify Ingest `:4317` / `:4318` is reachable
-2. **Canary validation** (recommended): Select 1–2 non-critical Java services, replace JVM args from Pinpoint Agent to OTel Java Agent pointing to DataBuff Ingest
-3. **Batch rollout**: Replace service by service batch, verify Traces visible and error rate normal before expanding
-4. **Read-only retention**: Keep Pinpoint Collector + Web read-only for comparison and rollback during migration
+![DataBuff services](../images/vs-pp-databuff-services.png)
 
-See [Migration: From Pinpoint to DataBuff](/docs/en/migration/from-pinpoint) for detailed steps and gates.
+![Pinpoint Call Tree](../images/vs-pp-pinpoint-call-tree.png)
 
-### JVM Argument Comparison
+![DataBuff trace detail](../images/vs-pp-databuff-trace-detail.png)
 
-**Before (Pinpoint)**
-```bash
--javaagent:/path/to/pinpoint-bootstrap.jar
--Dpinpoint.agentId=${HOSTNAME}
--Dpinpoint.applicationName=my-service
-```
+![DataBuff trace list](../images/vs-pp-databuff-trace-list.png)
 
-**After (OTel Java Agent pointing to DataBuff)**
-```bash
--javaagent:/path/to/opentelemetry-javaagent.jar
--Dotel.service.name=my-service
--Dotel.exporter.otlp.endpoint=http://<ingest-host>:4317
--Dotel.exporter.otlp.protocol=grpc
-```
+![DataBuff service call analysis](../images/vs-pp-databuff-service-call-analysis.png)
 
-## When to Choose Which
+![DataBuff API call analysis](../images/vs-pp-databuff-api-call-analysis.png)
 
-- **Pinpoint for**: Pure Java stack, heavy use of Pinpoint API manual instrumentation, no multi-language need, willing to maintain HBase cluster
-- **DataBuff for**: Multi-language monitoring needed, want AI-driven troubleshooting, want built-in metrics/logs/topology full-path capability, want self-service features (install troubleshooting/auto-recovery), want reduced operational complexity
-- **Migration recommendation**: DataBuff is the natural evolution for Pinpoint users—Pinpoint lacks AI, metric/log correlation, and self-healing capabilities that DataBuff provides through the open OTel standard
+![DataBuff service flow](../images/vs-pp-databuff-service-flow.png)
 
-## See Also
+![DataBuff logs](../images/vs-pp-databuff-logs.png)
 
-- [Quick Start: Docker Installation](/docs/en/guide/docker-install)
-- [Agent Integration: Java OTel](/docs/en/manual/agent-integration)
-- [Migration: From Pinpoint to DataBuff](/docs/en/migration/from-pinpoint) (Coming Soon)
+![Database](../images/vs-pp-databuff-database.png)
+
+![Cache](../images/vs-pp-databuff-cache.png)
+
+![MQ](../images/vs-pp-databuff-mq.png)
+
+![External](../images/vs-pp-databuff-external.png)
+
+![API](../images/vs-pp-databuff-api.png)
+
+![Errors](../images/vs-pp-databuff-errors.png)
+
+![Pinpoint Administration](../images/vs-pp-pinpoint-administration.png)
+
+![DataBuff alerts](../images/vs-pp-databuff-alerts.png)
+
+## Further reading
+
+- [Docker install](/docs/en/guide/docker-install)
+- [Java OTel agent](/docs/en/manual/agent-integration)
+- [Migrate from Pinpoint](/docs/en/migration/from-pinpoint) (coming soon)
+
+Star us: https://github.com/databufflabs/databuff

@@ -47,6 +47,29 @@ public final class LogQueryBuilder {
         return sql.toString();
     }
 
+    /**
+     * Full log record for expand/detail panel. List search stays lightweight; only this path reads
+     * {@code attributes_json} / {@code resource_json}.
+     */
+    public static String detailSql(String database, long timeNs, String serviceId) {
+        long millis = timeNs / 1_000_000L;
+        long fromMillis = Math.max(0L, millis - 60_000L);
+        long toMillis = millis + 60_000L;
+        StringBuilder sql = new StringBuilder(320);
+        sql.append("SELECT log_time, hostname, service_instance, service, service_id, trace_id, span_id, ");
+        sql.append("severity AS status, severity_number, body AS message, attributes_json, resource_json, ");
+        sql.append("time_ns, observed_time_ns ");
+        sql.append("FROM ").append(database).append('.').append(DorisTableNames.LOG_DC_RECORD);
+        sql.append(" WHERE time_ns = ").append(timeNs);
+        if (serviceId != null && !serviceId.isBlank()) {
+            sql.append(" AND service_id = '").append(escape(serviceId)).append("'");
+        }
+        sql.append(" AND log_time >= '").append(formatTime(fromMillis)).append("'");
+        sql.append(" AND log_time < '").append(formatTime(toMillis)).append("'");
+        sql.append(" LIMIT 1");
+        return sql.toString();
+    }
+
     public static String countSql(
             String database,
             String traceId,

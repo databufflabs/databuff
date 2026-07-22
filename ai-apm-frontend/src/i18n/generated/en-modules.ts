@@ -855,6 +855,14 @@ export default {
         "s_a70c4620": "DatabaseConnection pool",
         "s_b8403584": "MetricName"
       },
+      "logs": {
+        "s_overview": "Overview",
+        "s_meta": "Metadata",
+        "s_attributes": "Attributes",
+        "s_resources": "Resource",
+        "s_load_failed": "Failed to load log detail",
+        "s_detail_title": "Log Detail"
+      },
       "errorDetail": {
         "s_4eb644dc": "Error Request Trend",
         "s_5c7753a2": "Error Requests",

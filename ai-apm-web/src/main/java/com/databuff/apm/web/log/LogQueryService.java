@@ -1,5 +1,6 @@
 package com.databuff.apm.web.log;
 
+import com.databuff.apm.common.meta.OtelAttributeMaps;
 import com.databuff.apm.common.query.TimeSeriesFillUtil;
 import com.databuff.apm.common.storage.ApmReadRepository;
 import com.databuff.apm.common.storage.LogQueryBuilder;
@@ -48,6 +49,19 @@ public class LogQueryService {
             out.add(toPortalRow(row));
         }
         return out;
+    }
+
+    /** Full record for a single log (attributes / resource JSON included). */
+    public Map<String, Object> detail(long timeNs, String serviceId) throws SQLException {
+        if (timeNs <= 0) {
+            return Map.of();
+        }
+        String sql = LogQueryBuilder.detailSql(logDatabase, timeNs, serviceId);
+        List<Map<String, Object>> rows = readRepository.queryRows(sql, 1);
+        if (rows.isEmpty()) {
+            return Map.of();
+        }
+        return toDetailRow(rows.get(0));
     }
 
     public long count(LogSearchCriteria criteria) throws SQLException {
@@ -213,6 +227,8 @@ public class LogQueryService {
         Object logTime = row.get("log_time");
         Object timeNs = row.get("time_ns");
         out.put("timestamp", formatTimestamp(logTime, timeNs));
+        // String: nanoseconds exceed JS Number.MAX_SAFE_INTEGER.
+        out.put("timeNs", stringValue(timeNs));
         out.put("hostname", stringValue(row.get("hostname")));
         out.put("serviceInstance", stringValue(row.get("service_instance")));
         out.put("service", stringValue(row.get("service")));
@@ -221,6 +237,15 @@ public class LogQueryService {
         out.put("spanId", stringValue(row.get("span_id")));
         out.put("status", stringValue(row.get("status")));
         out.put("message", stringValue(row.get("message")));
+        return out;
+    }
+
+    private static Map<String, Object> toDetailRow(Map<String, Object> row) {
+        Map<String, Object> out = toPortalRow(row);
+        out.put("severityNumber", intValue(row.get("severity_number")));
+        out.put("observedTimeNs", stringValue(row.get("observed_time_ns")));
+        out.put("attributes", OtelAttributeMaps.parse(stringValue(row.get("attributes_json"))));
+        out.put("resources", OtelAttributeMaps.parse(stringValue(row.get("resource_json"))));
         return out;
     }
 
@@ -281,6 +306,20 @@ public class LogQueryService {
             return Long.parseLong(String.valueOf(value).trim());
         } catch (NumberFormatException ignored) {
             return 0L;
+        }
+    }
+
+    private static int intValue(Object value) {
+        if (value instanceof Number number) {
+            return number.intValue();
+        }
+        if (value == null) {
+            return 0;
+        }
+        try {
+            return Integer.parseInt(String.valueOf(value).trim());
+        } catch (NumberFormatException ignored) {
+            return 0;
         }
     }
 

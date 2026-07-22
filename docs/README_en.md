@@ -60,6 +60,11 @@ Online docs: [databuff.ai/docs](https://databuff.ai/docs/en/)
 - [Alerting](架构设计/告警_en.md)
 - [Log Analytics](架构设计/日志分析_en.md)
 
+### Comparisons
+
+- [DataBuff vs SkyWalking](业界对比/vs-skywalking_en.md)
+- [DataBuff vs SigNoz](业界对比/vs-signoz_en.md)
+
 ## Core Pipeline
 
 ```mermaid

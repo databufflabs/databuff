@@ -32,4 +32,9 @@ public class LogPortalController {
     public Map<String, Object> trend(@RequestBody(required = false) Map<String, Object> body) {
         return logPortalService.trend(body);
     }
+
+    @PostMapping("/detail")
+    public Map<String, Object> detail(@RequestBody Map<String, Object> body) {
+        return logPortalService.detail(body);
+    }
 }

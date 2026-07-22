@@ -1,106 +1,147 @@
 # DataBuff vs Pinpoint
 
-> 对比文档 · [切换到英文](./vs-pinpoint_en.md)
+> 对比文档 · [English](./vs-pinpoint_en.md)
 
-本文基于同环境实测对比：本地部署 DataBuff v0.1.4 与 Pinpoint 3.0.1（Docker），同一 Spring Boot Demo 应用分别接入 OTel Agent 和 Pinpoint Agent，逐页截图比对。
+同机实测对比 **DataBuff v0.1.4** 与 **Pinpoint 3.1.0**（192.168.50.140）。同机双跑：DataBuff 走 OTLP `:4318`（service-a / service-b）；Pinpoint 走官方 quickstart Java Agent（application=`pinpoint-quickapp`，Web `:18080` / Demo `:18085`）。标记：✅ 本环境可验证 · △ 有入口但本 lab 深度有限 · ❌ 无等价能力。
 
-## 架构对比
+博客成稿（HTML + 全量截图）：Epic 本地 `compare-vs-pinpoint.html`。
 
-Pinpoint 是韩国 NAVER 开源的 APM 系统，核心思路是 Java Agent 字节码增强，通过专有 Thrift/gRPC 协议上报到 Collector，数据存储在 HBase。Web UI 展示拓扑、Trace 列表与调用栈。
+## 一、能力对照全表
 
-DataBuff 是 AI Native OpenTelemetry APM 平台，基于 OTLP 标准协议接收遥测数据，内置 Doris 列式存储，Web UI 集成拓扑/Trace/指标/日志/AI 排障。
+**7 大 AI 能力**（v0.1.4：看得见 → 军团协同 → 会巡检 → 会诊断 → 会修复 → 会预测 → 会答疑）
 
-| 维度 | Pinpoint | DataBuff |
-|------|----------|----------|
-| 定位 | Java APM（Agent 字节码增强） | AI Native OTel APM |
-| 数据协议 | Thrift / gRPC（专有） | OTLP（OpenTelemetry 标准） + SW gRPC |
-| Agent | 仅 Java（字节码增强） | 多语言 OTel SDK + Java Agent |
-| 存储 | HBase | Doris |
-| 部署组件数 | HBase + Collector + Web（3 组件） | Ingest + Web + Doris（3 组件） |
-| AI 能力 | ❌ | ✅ AI 驱动排障、拓扑关联、自然语言查询 |
-| 拓扑视图 | ✅ 静态拓扑 | ✅ 拓扑 + 指标联动下钻 |
-| Trace 查询 | ✅ 调用栈列表 | ✅ Trace 列表 + 火焰图 + AI 分析 |
-| 指标 | ❌ 不内置 | ✅ 内置 JVM/应用/DB 指标 |
-| 日志 | ❌ 不内置 | ✅ OTLP 日志 + AI 日志分析 |
-| 自运维 | ❌ | ✅ 安装排障 + 运行时排查 |
+| 能力项 | Pinpoint 3.1.0 | DataBuff v0.1.4 |
+|--------|----------------|-----------------|
+| ① 看得见 · 自然语言问系统 | ❌ | ✅ 中文问服务 / 拓扑 / 异常趋势，AI 直接读遥测作答 |
+| ② 军团协同 · 多 Agent 协同 | ❌ | ✅ 多专家并行取证、串行保上下文；任务可编排复用 |
+| ③ 会巡检 · 服务巡检 + 报告 | ❌ | ✅ 一句话巡检，输出带证据与处置建议的报告 |
+| ④ 会诊断 · 瓶颈 / 根因取证 | ❌ | ✅ 结合 Trace / 指标 / 拓扑拼诊断证据 |
+| ⑤ 会修复 · 运维专家处置 | ❌ | ✅ 策略允许 + 人工授权下执行修复 |
+| ⑥ 会预测 · 容量 / 趋势 | ❌ | ✅ 容量与趋势分析 |
+| ⑦ 会答疑 · 答疑专家 | ❌ | ✅ 检索产品文档与代码回答部署 / 接入问题 |
+| 外部拓展 · MCP / Skill / 自定义专家 | ❌ | ✅ 外接 MCP、Skill，并可自定义数字专家 |
 
-![DataBuff 服务拓扑](/docs/images/screenshots/global-topology.jpg)
+这是差距最大的一组：Pinpoint 无 AI 平台；DataBuff 把 APM 数据直接当作 AI 上下文。
 
-*DataBuff 服务拓扑页，展示服务间调用关系与健康状态*
+**应用性能（APM）**
 
-## 数据采集方式
+| 能力项 | Pinpoint 3.1.0 | DataBuff v0.1.4 |
+|--------|----------------|-----------------|
+| 1. 全局拓扑 | ✅ Server Map（含 USER→App、链路吞吐/耗时） | ✅ 全局拓扑 + 健康色标 + 节点下钻 |
+| 2. 服务列表和黄金指标 | ✅ Apdex / Success·Failed / Response Summary | ✅ 服务列表 + 曲线；同 demo 可见 service-a / b |
+| 3. 服务级拓扑 | ✅ Server Map 节点视角 | ✅ 服务级拓扑 |
+| 4. 服务级调用分析（上下游指标 + 关联 Trace） | ❌ Scatter/Call Tree 偏单请求，无「上下游贡献」分析页 | ✅ 上下游调用结构与耗时 / 贡献；可直接落到 Trace |
+| 5. 实例级黄金指标 | △ VIEW SERVERS 可见 Agent；Inspector 本 lab API 未就绪 | ✅ 实例级黄金指标曲线 / 列表 |
+| 6. 实例级拓扑 | ❌ | ✅ 独立实例级拓扑 |
+| 7. 实例级调用分析（上下游指标 + 关联 Trace） | ❌ | ✅ 按实例看上下游调用与耗时；可落到 Trace |
+| 8. 接口级拓扑 | ❌ | ✅ 独立接口级拓扑 |
+| 9. 接口级调用分析（上下游指标 + 关联 Trace） | △ URL Statistic 有入口；本 lab API 404 | ✅ 按接口看调用方 / 被调与耗时；可落到 Trace |
+| 10. 服务流（服务级 / 接口级 Trace 链路分析） | ❌ Server Map 回答「连谁 / 多少次」 | ✅ 按入口展开下游响应贡献度；可关联 Trace |
+| 11. 中间件 / 外部调用专页（库 / 缓存 / MQ / 外部服务） | △ 拓扑可出现中间件节点，无专页纵深 | ✅ 独立专页：数据库 / 缓存 / MQ / 外部服务 |
+| 12. 错误分析（统计 + 接口级） | △ Error Analysis 有入口；本 lab API 404 | ✅ 独立错误分析统计 + 接口级错误下钻 |
+| 13. Trace 列表 / 搜索 | ✅ Scatter 框选 → Transaction List | ✅ 图表 + 列表，多维过滤 |
+| 14. Trace 详情 | ✅ Call Tree / Server Map / Flame Graph；方法级字节码栈深 | ✅ 调用次序瀑布图 + Span 属性 |
+| 15. Trace Span 关联日志 | ❌ | ✅ 顶栏「日志分析」+ Span Logs / 「日志」Tab |
+| 16. 日志列表 / 搜索 | ❌ 无 OTLP/业务日志平台 | ✅ |
+| 17. 日志详情 | ❌ | ✅ |
+| 18. 日志关联 Trace | ❌ | ✅ Log → Trace，并可落到具体 Span |
+| 19. Profiling | △ 侧重 Java 调用栈 / Active Thread 等 | ❌ 暂不支持 |
+| 20. 仪表盘（可定制 Dashboard） | ❌ 无等价可定制大盘 | ❌ 暂不支持 |
+| 接入协议 / 语言 | 专有 Java Agent（字节码增强） | OTLP 多语言 + SkyWalking gRPC |
 
-Pinpoint 使用专有 Java Agent 通过字节码增强技术注入采集代码。Agent 通过 Thrift 或 gRPC 协议将数据上报到 Collector。采集的框架广泛（Tomcat、Spring Boot、Dubbo、gRPC、Kafka、JDBC 等 40+ 插件），但**仅限 Java**。
+Pinpoint 明显更强在 **Java 方法级 Call Tree** 与 **Server Map + Scatter + Apdex 一体视图**。DataBuff 领先在 **多语言 OTel**、**服务/实例/接口调用分析与服务流**、**中间件专页**、**日志↔Trace** 与 **AI**。Inspector / URL Statistic / Error Analysis 本 lab 最小 compose 入口在、API 未就绪，按 △ 计。
 
-DataBuff 基于 OpenTelemetry 标准，支持 Java、Python、Go、Node.js、.NET 等多语言，通过 OTLP 协议上报。也支持 SkyWalking 原生 gRPC 协议接入，已有 SW Agent 的用户无需更换 Agent。
+**告警**
 
-| 维度 | Pinpoint | DataBuff |
-|------|----------|----------|
-| 支持语言 | 仅 Java | Java / Python / Go / Node.js / .NET / 等 |
-| 采集协议 | Thrift / gRPC（专有） | OTLP（开放标准） |
-| Agent 热升级 | 需重启 JVM | 需重启 JVM（OTel Agent） |
-| 字节码增强 | ✅ 成熟稳定 | ✅ OTel 内置 Instrumentation |
-| Pinpoint API 手动埋点 | ✅ 支持 | ❌ 需迁移至 OTel API |
+| 能力项 | Pinpoint 3.1.0 | DataBuff v0.1.4 |
+|--------|----------------|-----------------|
+| 规则怎么配 | △ Administration 下有 Alarm / Webhook 等入口 | ✅ 告警中心内配置，产品化入口 |
+| 阈值告警 | △ 依赖管理端配置 | ✅ 阈值规则可在平台内管理 |
+| 智能告警 | ❌ | ✅ 智能告警入口，与 APM 指标联动 |
+| 告警事件列表 | △ | ✅ 告警列表（等级 / 服务 / 时间）；本环境非空 |
+| 告警落到服务 / 中间件 | △ 多靠通知通道 | ✅ 列表直接挂服务 / 中间件，可回 APM 下钻 |
 
-![DataBuff 服务列表](/docs/images/screenshots/service-list.jpg)
+**适用场景速查**
 
-*DataBuff 服务列表页，展示接入的服务概览与关键指标*
+| 场景 | 更适合 | 说明 |
+|------|--------|------|
+| 纯 Java，要方法级 Call Tree / Flame Graph | Pinpoint | 字节码增强栈深，本环境 Call Tree 可证 |
+| 要 Server Map + Scatter + Apdex 一体排查 | Pinpoint | 拓扑与散点同页，框选进 Transaction |
+| 已深度绑定 Pinpoint 插件 / 手动埋点 API | Pinpoint | 换 Agent 成本高，继续用合理 |
+| 需要 7 大 AI 能力 | DataBuff | Pinpoint 无等价 AI 平台 |
+| 多语言 / 已有 OTel 或 SW Agent | DataBuff | OTLP + SW gRPC；Pinpoint 以 Java 为主 |
+| 要服务流 / 调用分析落到 Trace | DataBuff | Pinpoint 无等价贡献度分析页 |
+| 要慢 SQL / 缓存 / MQ 专页 + 日志关联 | DataBuff | Pinpoint 无日志平台与专页纵深 |
+| 只要看 Java 调用链，不要 AI | 两者皆可 | 不必为换品牌硬迁 |
 
-## Trace 对比
+**客观边界：** Pinpoint 在 Java 深度调用栈与经典 Server Map 体验上仍然扎实。DataBuff 适合「多语言 OTel + AI + APM 纵深」；从 Pinpoint 迁出意味着换 Agent（专有 → OTel），迁移成本高于「只改 SW 上报地址」。
 
-Pinpoint 的 Trace 查询以调用栈列表为主，展示每个 Span 的执行时间、调用深度。用户可通过点击节点下钻到更详细的调用信息。
+## 二、截图证据（解释上表）
 
-DataBuff 提供 Trace 列表、火焰图、AI 分析三重视角。Trace 列表展示请求路径与耗时分布；火焰图可视化 Span 时间占比；AI 排障直接分析慢 Trace 根因。
+下列截图均来自 **192.168.50.140**。
 
-Pinpoint 不提供指标关联——需要单独部署 Prometheus/Grafana 来查看 CPU/内存等指标。DataBuff 在 Trace 详情页直接关联服务指标、日志与告警，实现全链路关联。
+**7 大 AI 能力**（Pinpoint 无等价界面，以 DataBuff 举证）
 
-## 部署对比
+![DataBuff 7 大 AI 能力首页](../images/vs-pp-databuff-ai-home.png)
 
-| 维度 | Pinpoint | DataBuff |
-|------|----------|----------|
-| 基础环境 | HBase + Java 8+ | Docker Compose / K8s |
-| 机器需求 | 4C8G+（HBase 较重） | 4C8G+ |
-| 启动时间 | 5–10 分钟（HBase 初始化） | 2–3 分钟 |
-| 存储依赖 | 外部 HBase | 内置 Doris |
-| 组件数 | HBase + Collector + Web | Ingest + Web + Doris |
-| 配置文件 | `.properties` 多文件 | `application.yml` 单文件 |
+![DataBuff AI 对话](../images/vs-pp-databuff-ai-chat.png)
 
-## 迁移到 DataBuff
+![DataBuff 数字专家](../images/vs-pp-databuff-ai-experts.png)
 
-对于正在使用 Pinpoint 的用户，迁移到 DataBuff 的推荐路径如下：
+**拓扑 / Server Map / 实例**
 
-1. **前提条件**：部署 DataBuff 并确认 Ingest `:4317` / `:4318` 可达
-2. **金丝雀验证**（建议）：选择 1–2 个非核心 Java 服务，将 JVM 参数从 Pinpoint Agent 替换为 OTel Java Agent，指向 DataBuff Ingest
-3. **分批扩量**：按服务批次替换，每批验证 Trace 可查、错误率正常后再扩下一批
-4. **保留只读**：迁移期间保留 Pinpoint Collector + Web 只读，用于对照和回滚
+![Pinpoint Server Map](../images/vs-pp-pinpoint-server-map.png)
 
-详细迁移步骤和门禁见[迁移指南：从 Pinpoint 到 DataBuff](/docs/zh/migration/from-pinpoint)。
+![DataBuff 全局拓扑](../images/vs-pp-databuff-topology.png)
 
-### JVM 参数对照
+![Pinpoint VIEW SERVERS](../images/vs-pp-pinpoint-app-overview.png)
 
-**切换前（Pinpoint）**
-```bash
--javaagent:/path/to/pinpoint-bootstrap.jar
--Dpinpoint.agentId=${HOSTNAME}
--Dpinpoint.applicationName=my-service
-```
+![DataBuff 服务列表](../images/vs-pp-databuff-services.png)
 
-**切换后（OTel Java Agent 指向 DataBuff）**
-```bash
--javaagent:/path/to/opentelemetry-javaagent.jar
--Dotel.service.name=my-service
--Dotel.exporter.otlp.endpoint=http://<ingest-host>:4317
--Dotel.exporter.otlp.protocol=grpc
-```
+**Trace：Call Tree vs 瀑布图**
 
-## 适用场景
+![Pinpoint Call Tree](../images/vs-pp-pinpoint-call-tree.png)
 
-- **Pinpoint 适合**：纯 Java 技术栈、已深度使用 Pinpoint API 手动埋点、对多语言监控无需求、愿意维护 HBase 集群的团队
-- **DataBuff 适合**：需要多语言监控、需要 AI 驱动排障、希望内置指标/日志/拓扑全链路能力、需要自运维功能（安装排障/自动修复）、希望降低运维复杂度的团队
-- **迁移建议**：DataBuff 是 Pinpoint 的演进方向——Pinpoint 当前没有 AI 能力、指标/日志关联、自运维等核心能力，而 DataBuff 通过 OTel 标准协议实现了更开放的生态
+![DataBuff Trace 详情](../images/vs-pp-databuff-trace-detail.png)
+
+![DataBuff 链路追踪](../images/vs-pp-databuff-trace-list.png)
+
+**服务级 / 接口级调用分析 + 服务流**（Pinpoint 无等价页）
+
+![DataBuff 服务级调用分析](../images/vs-pp-databuff-service-call-analysis.png)
+
+![DataBuff 接口级调用分析](../images/vs-pp-databuff-api-call-analysis.png)
+
+![DataBuff 服务流](../images/vs-pp-databuff-service-flow.png)
+
+**日志**（Pinpoint 无日志平台）
+
+![DataBuff 日志分析](../images/vs-pp-databuff-logs.png)
+
+**DataBuff 专页纵深**
+
+![数据库](../images/vs-pp-databuff-database.png)
+
+![缓存](../images/vs-pp-databuff-cache.png)
+
+![消息队列](../images/vs-pp-databuff-mq.png)
+
+![外部服务](../images/vs-pp-databuff-external.png)
+
+![接口分析](../images/vs-pp-databuff-api.png)
+
+![错误分析](../images/vs-pp-databuff-errors.png)
+
+**告警**
+
+![Pinpoint Administration](../images/vs-pp-pinpoint-administration.png)
+
+![DataBuff 告警中心](../images/vs-pp-databuff-alerts.png)
 
 ## 延伸阅读
 
 - [快速入门：Docker 安装部署](/docs/zh/guide/docker-install)
 - [Agent 集成：Java OTel](/docs/zh/manual/agent-integration)
 - [迁移指南：从 Pinpoint 到 DataBuff](/docs/zh/migration/from-pinpoint)（即将发布）
+
+欢迎 Star：https://github.com/databufflabs/databuff

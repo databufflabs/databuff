@@ -71,6 +71,42 @@ class LogPortalAnalysisIntegrationTest {
         assertThat(severityTotal(trend, "INFO")).isEqualTo(8);
         assertThat(severityTotal(trend, "WARN")).isEqualTo(2);
         assertThat(severityTotal(trend, "ERROR")).isEqualTo(ERROR_ROWS);
+        @SuppressWarnings("unchecked")
+        List<Map<String, Object>> rows = (List<Map<String, Object>>) search.get("data");
+        assertThat(rows).allMatch(row -> row.get("timeNs") != null && !String.valueOf(row.get("timeNs")).isBlank());
+        assertThat(rows).allMatch(row -> !row.containsKey("attributes"));
+        assertThat(rows).allMatch(row -> !row.containsKey("resources"));
+    }
+
+    @Test
+    void detailLoadsAttributesAndResourcesForExpandedRow() {
+        Map<String, Object> search = logPortalService.search(baseBody());
+        @SuppressWarnings("unchecked")
+        List<Map<String, Object>> rows = (List<Map<String, Object>>) search.get("data");
+        Map<String, Object> listRow = rows.stream()
+                .filter(row -> "Available stock below threshold (2 units)".equals(row.get("message")))
+                .findFirst()
+                .orElseThrow();
+
+        Map<String, Object> detailBody = new LinkedHashMap<>();
+        detailBody.put("timeNs", listRow.get("timeNs"));
+        detailBody.put("serviceId", listRow.get("serviceId"));
+
+        Map<String, Object> detail = logPortalService.detail(detailBody);
+        @SuppressWarnings("unchecked")
+        Map<String, Object> data = (Map<String, Object>) detail.get("data");
+
+        assertThat(data.get("message")).isEqualTo("Available stock below threshold (2 units)");
+        assertThat(data.get("status")).isEqualTo("WARN");
+        assertThat(data.get("severityNumber")).isEqualTo(13);
+        assertThat(data.get("traceId")).isEqualTo(DemoLogFixture.TRACE_CHECKOUT);
+        @SuppressWarnings("unchecked")
+        Map<String, String> attributes = (Map<String, String>) data.get("attributes");
+        assertThat(attributes).containsEntry("order.id", "10001");
+        @SuppressWarnings("unchecked")
+        Map<String, String> resources = (Map<String, String>) data.get("resources");
+        assertThat(resources).containsEntry("k8s.namespace.name", "demo");
+        assertThat(resources).containsEntry("host.name", DemoLogFixture.HOST_B);
     }
 
     @Test

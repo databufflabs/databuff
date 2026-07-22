@@ -17,5 +17,5 @@
 - [DataBuff vs SkyWalking](./vs-skywalking_en.md) — Same-host lab: 7 AI capabilities / APM 20 rows / alerting + screenshots
 - [DataBuff vs Jaeger](./vs-jaeger.md)
 - [DataBuff vs Pinpoint](./vs-pinpoint.md)
-- [DataBuff vs SigNoz](./vs-signoz.md)
+- [DataBuff vs SigNoz](./vs-signoz_en.md) — Same-host lab: 7 AI capabilities / APM 19 rows / alerting + screenshots
 - [DataBuff vs OpenObserve](./vs-openobserve.md)

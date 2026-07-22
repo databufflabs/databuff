@@ -1,138 +1,149 @@
 # DataBuff vs SigNoz
 
-> Objective comparison · [Switch to Chinese](./vs-signoz.md)
+> Comparison · [中文](./vs-signoz.md)
 
-Side-by-side comparison based on the same environment: two independent `ai-apm-demo` containers sending identical OTLP HTTP data (service-a → service-b call chain with MySQL / Redis / Kafka / ES / external HTTP) to DataBuff (v0.1.4, Doris storage) and SigNoz (v0.133.0, ClickHouse 25.12.5 storage). Server: 192.168.50.140 (8 cores / 32GB RAM). Both products are open source.
+Same-host lab on `192.168.50.140`: **DataBuff v0.1.4** vs **SigNoz v0.133.0**, same Demo (`service-a` / `service-b`). DataBuff uses OTLP `:4318`; SigNoz uses OTLP `:24318`. Marks: ✅ verified in this lab · △ present but limited · ❌ no equivalent.
 
-## Capability Boundary
+Full HTML article with screenshots: [DataBuff vs SigNoz (lab compare)](https://databuff.ai/blog/en/databuff-vs-signoz)
 
-| Dimension | SigNoz | DataBuff |
-|-----------|--------|----------|
-| **Positioning** | OTel backend (Traces + Metrics + Logs) | AI Native OTel APM (Trace + Metrics + Log + AI) |
-| **AI Capability** | ❌ No built-in AI | ✅ AI chat troubleshooting, smart query, smart inspection, digital experts |
-| **APM Modules** | Services / Traces / Service Map / Logs / Dashboards | 12+ dedicated pages: topology/services/database/cache/MQ/external/API/errors/traces/logs/AI platform |
-| **Middleware Pages** | ❌ No dedicated pages (Service Map can show middleware nodes) | ✅ Database / Cache / MQ / External Service dedicated pages |
-| **Built-in Storage** | ClickHouse 25.12.5 | Doris 4.1.1 (columnar storage) |
-| **Deployment** | Docker Compose / Foundry / K8s | Docker Compose / K8s |
-| **Protocol Support** | OTLP gRPC + HTTP | OTel + SkyWalking gRPC + Jaeger Thrift |
-| **Alerting** | ✅ Built-in Alertmanager | ✅ Built-in alert rules |
-| **Dashboards** | ✅ Dashboards V2 (Perses) | ✅ Built-in dashboards + custom |
-| **Open Source** | ✅ | ✅ |
+## 1. Capability matrix
 
-## Objective Differences
+**Seven AI capabilities** (v0.1.4: See → Squad → Inspect → Diagnose → Repair → Predict → Answer)
 
-### 1. AI: DataBuff has it, SigNoz doesn't
+| Capability | SigNoz v0.133.0 | DataBuff v0.1.4 |
+|------------|-----------------|-----------------|
+| ① See · natural-language questions | ❌ | ✅ Ask about services / topology / trends; AI reads telemetry |
+| ② Squad · multi-agent collaboration | ❌ | ✅ Parallel evidence gathering; reusable task orchestration |
+| ③ Inspect · service inspection + report | ❌ | ✅ One-shot inspection with evidence and actions |
+| ④ Diagnose · bottleneck / RCA evidence | ❌ | ✅ Trace / metrics / topology evidence |
+| ⑤ Repair · Ops Expert actions | ❌ | ✅ Repair under policy + human approval |
+| ⑥ Predict · capacity / trends | ❌ | ✅ Capacity and trend analysis |
+| ⑦ Answer · product Q&A | ❌ | ✅ Answers deploy / ingest / config from docs and code |
+| Extend · MCP / Skill / custom experts | ❌ | ✅ External MCP / Skill and custom digital experts |
 
-This is the most significant gap. DataBuff includes a **full AI platform** where APM data serves as AI context, enabling natural language troubleshooting across the entire topology → metrics → traces pipeline. SigNoz v0.133.0 home page only offers Traces / Metrics / Logs Explorer entry points.
+Largest gap: SigNoz home is Traces / Metrics / Logs Explorer — no AI platform.
 
-![DataBuff AI Chat](../images/databuff-ai-chat.png)
+**APM**
 
-DataBuff AI platform provides preset quick questions like "list services", "show topology", "check trends", and "find anomalies".
+| Capability | SigNoz v0.133.0 | DataBuff v0.1.4 |
+|------------|-----------------|-----------------|
+| 1. Global topology | ✅ Service Map (incl. middleware nodes) | ✅ Topology + health colors + drill-down |
+| 2. Service list & golden metrics | ✅ Services (P99 / Error / OPS) | ✅ Service list + charts |
+| 3. Service-level topology | △ Via Service Map only | ✅ Dedicated service topology |
+| 4. Service call analysis (up/downstream + Trace) | ❌ | ✅ |
+| 5. Instance golden metrics | ❌ | ✅ Instance charts / list |
+| 6. Instance topology | ❌ | ✅ |
+| 7. Instance call analysis | ❌ | ✅ |
+| 8. Endpoint topology | ❌ | ✅ |
+| 9. Endpoint call analysis | ❌ Mostly Traces filters | ✅ |
+| 10. Service flow | ❌ Map answers “who connects” | ✅ Response contribution from entry |
+| 11. Middleware / external pages | ❌ Nodes only | ✅ DB / cache / MQ / external pages |
+| 12. Error analysis | ❌ Mostly Traces filters | ✅ |
+| 13. Trace list / search | ✅ Traces Explorer | ✅ |
+| 14. Trace detail | ✅ | ✅ |
+| 15. Trace Span → logs | ✅ From Trace detail | ✅ |
+| 16. Log list / search | ✅ Logs Explorer | ✅ |
+| 17. Log detail | ✅ | ✅ |
+| 18. Log → Trace | ✅ | ✅ Down to Span |
+| 19. Custom dashboards | ✅ Dashboards V2 (Perses / PromQL) | ❌ Not yet |
 
-![DataBuff AI Experts](../images/databuff-ai-experts.png)
+**Alerting**
 
-The **Digital Expert** system makes APM troubleshooting orchestrated and reusable—a capability layer entirely absent in SigNoz.
+| Capability | SigNoz v0.133.0 | DataBuff v0.1.4 |
+|------------|-----------------|-----------------|
+| How rules are configured | ✅ Alert Rules UI | ✅ Alert center |
+| Threshold alerts | ✅ | ✅ |
+| Period-over-period (WoW/MoM) alerts | ❌ | ✅ |
+| Alert event list | ✅ Triggered Alerts; firing in this lab | ✅ Non-empty |
+| Alerts linked to service / middleware | △ Notifications; stitch APM yourself | ✅ List links into APM |
 
-### 2. APM Module Breadth
+**When to pick which**
 
-DataBuff offers 12+ dedicated menu items under "APM", with specialized pages for each middleware type and analysis scenario. SigNoz compresses equivalent information into Services / Traces / Service Map.
+| Scenario | Better fit | Note |
+|----------|------------|------|
+| Same OTel data, want AI / APM pages first | DataBuff (side-by-side) | Point OTLP at DataBuff |
+| Need the seven AI capabilities | DataBuff | No SigNoz AI platform |
+| MCP / Skill / custom experts | DataBuff | No such layer in SigNoz |
+| See who slows the entry response | DataBuff | Service flow |
+| Call analysis → Trace | DataBuff | No SigNoz path |
+| Slow SQL / cache / MQ pages | DataBuff | SigNoz mostly map nodes |
+| Custom dashboards / PromQL boards | SigNoz | DataBuff not yet |
+| Mature Trace / Logs Explorer only | Either / lean SigNoz | No need to migrate for brand |
 
-| Module | DataBuff | SigNoz |
-|--------|----------|--------|
-| Global Topology | ✅ Virtual nodes (MySQL/Redis/Kafka/ES/External) | △ Service Map can show middleware nodes; no dedicated drill-down pages |
-| Service List/Detail | ✅ Upstream/downstream + instances + API drill-down | △ Service list table |
-| Database | ✅ Dedicated page + slow SQL drill-down | ❌ No dedicated page |
-| Cache | ✅ Dedicated page | ❌ No dedicated page |
-| Message Queue | ✅ Dedicated page | ❌ No dedicated page |
-| External Service | ✅ Dedicated page | ❌ No dedicated page |
-| API Analysis | ✅ Aggregated P99 / error rate per endpoint | △ Must filter in Traces |
-| Error Analysis | ✅ Error clustering | △ Must filter in Traces |
-| Logs | △ Log panel (still being enhanced) | ✅ Logs Explorer |
+**Boundary:** Deep SigNoz Dashboard / PromQL workflows → stay on SigNoz. DataBuff fits same OTel data + AI + APM depth, side-by-side or gradual switch.
 
-### 3. Global Topology vs Service Map
+## 2. Screenshot evidence (explains the tables)
 
-![DataBuff Global Topology](../images/databuff-topology.png)
+Screenshots from **192.168.50.140**.
 
-DataBuff automatically identifies virtual service nodes like `[mysql]` `[redis]` `[kafka]` `[elasticsearch]` and `[remote]`, providing a complete call chain in one view with drill-down into middleware pages.
+**Seven AI capabilities**
 
-![SigNoz Service Map](../images/signoz-service-map.png)
+![DataBuff AI home](../images/vs-sn-databuff-ai-home.png)
 
-SigNoz Service Map **also shows** middleware nodes such as `mysql` / `redis` / `kafka` / `elasticsearch` (verified in screenshots; mysql can appear highlighted). The gap is depth: DataBuff provides dedicated middleware pages (slow SQL, cache, MQ, external HTTP) and richer topology interactions; SigNoz stays at graph-level dependencies without equivalent page drill-downs.
+![DataBuff AI chat](../images/vs-sn-databuff-ai-chat.png)
 
-### 4. Service Views
+![DataBuff digital experts](../images/vs-sn-databuff-ai-experts.png)
 
-![DataBuff Services](../images/databuff-services.png)
+**Services & topology**
 
-DataBuff service list supports click-through to service detail pages (instances, API analysis, service flow).
+![SigNoz Services](../images/vs-sn-signoz-services.png)
 
-![SigNoz Services](../images/signoz-services.png)
+![DataBuff services](../images/vs-sn-databuff-services.png)
 
-SigNoz Services is a table-level view with P99 / Error Rate / OPS, lacking an aggregated service detail page.
+![SigNoz Service Map](../images/vs-sn-signoz-service-map.png)
 
-### 5. Middleware Pages (DataBuff Exclusive)
+![DataBuff topology](../images/vs-sn-databuff-topology.png)
 
-The same Demo's MySQL / Redis / Kafka / external HTTP calls are automatically split into independent monitoring targets in DataBuff.
+**Call analysis & service flow**
 
-![DataBuff Database](../images/databuff-database.png)
-![DataBuff Cache](../images/databuff-cache.png)
-![DataBuff MQ](../images/databuff-mq.png)
-![DataBuff External Service](../images/databuff-external.png)
+![DataBuff service call analysis](../images/vs-sn-databuff-service-call-analysis.png)
 
-SigNoz receives the same traces and can show middleware nodes on the Service Map, but **has no dedicated middleware pages**.
+![DataBuff API call analysis](../images/vs-sn-databuff-api-call-analysis.png)
 
-### 6. API Analysis & Error Analysis
+![DataBuff service flow](../images/vs-sn-databuff-service-flow.png)
 
-![DataBuff API Analysis](../images/databuff-api-analysis.png)
+**Trace**
 
-DataBuff aggregates P99 latency / request volume / error rate per endpoint for quick bottleneck identification.
+![SigNoz Traces](../images/vs-sn-signoz-traces.png)
 
-![DataBuff Error Analysis](../images/databuff-errors.png)
+![DataBuff Trace list](../images/vs-sn-databuff-trace-list.png)
 
-DataBuff error analysis automatically clusters by exception type without requiring hand-written ClickHouse SQL.
+![SigNoz Trace detail](../images/vs-sn-signoz-trace-detail.png)
 
-### 7. Trace Explorer
+![DataBuff Trace detail](../images/vs-sn-databuff-trace-detail.png)
 
-![DataBuff Traces](../images/databuff-traces.png)
-![SigNoz Traces](../images/signoz-traces.png)
+**Log**
 
-Both platforms offer feature-equivalent Traces Explorers with filtering by service name, operation, and time range. Live screenshots show real service-a / service-b spans.
+![SigNoz Logs](../images/vs-sn-signoz-logs.png)
 
-### 8. Logs
+![DataBuff logs](../images/vs-sn-databuff-logs.png)
 
-![SigNoz Logs Explorer](../images/signoz-logs.png)
+**Dashboards (SigNoz strength)**
 
-This demo sends application logs to SigNoz; Logs Explorer can retrieve real checkout / inventory entries. DataBuff's log panel is still being enhanced, so logs are not the primary comparison axis here.
+![SigNoz Dashboards](../images/vs-sn-signoz-dashboards.png)
 
-### 9. Alerting
+**DataBuff dedicated pages**
 
-![SigNoz Alerts](../images/signoz-alerts.png)
+![Database](../images/vs-sn-databuff-database.png)
 
-Both platforms expose built-in alerting engines. This demo environment does not pre-configure production-grade alert rules, so we avoid overstating "out-of-the-box alerting".
+![Cache](../images/vs-sn-databuff-cache.png)
 
-## When to Choose Which
+![MQ](../images/vs-sn-databuff-mq.png)
 
-| Scenario | Recommendation | Rationale |
-|----------|---------------|-----------|
-| Need AI-driven troubleshooting | **DataBuff** | AI-native APM with natural language support |
-| Pure OTel trace / log storage & query | **SigNoz** | Lightweight OTel backend with mature Traces/Logs Explorer |
-| Multi-middleware performance analysis | **DataBuff** | Dedicated database/cache/MQ/external pages out of the box |
-| Existing SkyWalking Agent | **DataBuff** | Native SW gRPC protocol support, no Agent change needed |
-| Prometheus ecosystem integration | **SigNoz** | Dashboards V2 with Perses/PromQL support |
-| Prefer open source | Either | Both are open source — choose by feature depth |
+![External](../images/vs-sn-databuff-external.png)
 
-## When NOT to Use
+![API](../images/vs-sn-databuff-api.png)
 
-- **SigNoz**: Not suitable for scenarios requiring APM depth analysis (database/cache/MQ details) or AI-automated troubleshooting; debugging depends more on manual ClickHouse SQL or PromQL.
-- **DataBuff**: Not suitable for teams that need only lightweight Trace/Logs storage/query and do not need AI or middleware pages; log panel is still being enhanced.
+![Errors](../images/vs-sn-databuff-errors.png)
 
-## Try It
+**Alerting**
 
-Star DataBuff or try the live demo:
+![SigNoz Alerts](../images/vs-sn-signoz-alerts.png)
 
-- GitHub: https://github.com/databufflabs/databuff
-- Live Demo: https://demo.databuff.ai (account admin / Databuff@123)
+![DataBuff alerts](../images/vs-sn-databuff-alerts.png)
 
-## See Also
+## Further reading
 
-- [Comparison Overview](./总览_en.md)
-- [Migration: From SigNoz to DataBuff](/docs/en/migration/from-signoz) (Coming Soon)
+- [Migrate from SigNoz](/docs/en/migration/from-signoz) (coming soon)
+
+Star us: https://github.com/databufflabs/databuff

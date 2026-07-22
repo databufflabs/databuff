@@ -21,27 +21,30 @@
       @sort-change="tableRefresh"
       @row-click="rowClickHandle"
       class="detail-log-list">
-      <el-table-column slot="suffix" type="expand" width="60" class-name="table-expand-col-items">
-        <template slot-scope="{ row }">
-          <div class="describe" style='font-size: 13px;'>{{ $t('modules.views.alarmCenter.eventDetail.s_a19a72d2') }}</div>
-          <pre class="log-pre">{{ row.message || '-' }}</pre>
-        </template>
-      </el-table-column>
     </db-table>
+
+    <log-detail-drawer
+      :visible.sync="detailVisible"
+      :row="detailRow" />
   </div>
   <div v-else class="event-detail-log empty">{{ $t('modules.components.charts.s_21efd88b') }}</div>
 </template>
 
 <script lang="ts">
-import { Vue, Component, Prop, Watch } from 'vue-property-decorator';
+import { Vue, Component, Prop } from 'vue-property-decorator';
 import i18n from '@/i18n';
 import LogApi from '@/api/log';
+import LogDetailDrawer from '@/views/appMonitor/logs/logDetailDrawer.vue';
 
-@Component
+@Component({
+  components: { LogDetailDrawer },
+})
 export default class TabLog extends Vue {
   @Prop({ default: {} }) private detail!: any;
 
   private queryText = ''
+  private detailVisible = false
+  private detailRow: any = null
 
   private queryApi = LogApi.getLogList
   private columnConfig = [
@@ -91,7 +94,8 @@ export default class TabLog extends Vue {
   }
 
   private rowClickHandle (row: any) {
-    (this.$refs.listTable as any)?.toggleRowExpansion(row)
+    this.detailRow = row
+    this.detailVisible = true
   }
 }
 </script>
@@ -109,23 +113,6 @@ export default class TabLog extends Vue {
 
   .detail-log-list {
     height: calc(100% - 32px);
-  }
-
-  :deep(.table-expand-col-items .el-table__expand-icon .el-icon) {
-    color: var(--color-text-secondary);
-    font-weight: bold;
-    &:hover {
-      color: var(--color-text-primary);
-    }
-  }
-
-  .log-pre {
-    font-family: Roboto,Helvetica Neue,Arial,sans-serif;
-    margin: 8px 0;
-    color: var(--color-text-primary);
-    font-size: 13px;
-    word-break: break-all;
-    white-space:break-spaces;
   }
 }
 </style>

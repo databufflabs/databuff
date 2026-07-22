@@ -40,6 +40,7 @@ public final class DemoLogFixture {
     private static final Pattern TRACE_ID = Pattern.compile("trace_id = '([^']+)'");
     private static final Pattern SPAN_ID = Pattern.compile("span_id = '([^']+)'");
     private static final Pattern SERVICE_ID = Pattern.compile("service_id = '([^']+)'");
+    private static final Pattern TIME_NS = Pattern.compile("time_ns = (\\d+)");
     private static final Pattern IN_CLAUSE = Pattern.compile("(\\w+) IN \\(([^)]+)\\)");
     private static final Pattern LIKE_BODY = Pattern.compile("body LIKE '%([^']*)%'");
     private static final Pattern BUCKET_SEC = Pattern.compile("FLOOR\\(time_ns / 1000000000 / (\\d+)\\)");
@@ -67,6 +68,13 @@ public final class DemoLogFixture {
         if (sql.contains("SELECT DISTINCT severity")) {
             return distinctColumn(filtered, "severity", maxRows);
         }
+        if (sql.contains("attributes_json")) {
+            return filtered.stream()
+                    .sorted((left, right) -> Long.compare(left.timeNs, right.timeNs))
+                    .limit(Math.max(1, maxRows))
+                    .map(this::toDetailRow)
+                    .collect(Collectors.toList());
+        }
         return filtered.stream()
                 .sorted((left, right) -> Long.compare(left.timeNs, right.timeNs))
                 .limit(Math.max(1, maxRows))
@@ -90,6 +98,7 @@ public final class DemoLogFixture {
         Set<String> hosts = inValues(sql, "hostname");
         Set<String> severities = inValues(sql, "severity");
         String query = extract(LIKE_BODY, sql);
+        Long timeNs = extractLong(TIME_NS, sql);
 
         List<Row> out = new ArrayList<>();
         for (Row row : rows) {
@@ -97,6 +106,9 @@ public final class DemoLogFixture {
                 continue;
             }
             if (to != null && row.logTime.compareTo(to) >= 0) {
+                continue;
+            }
+            if (timeNs != null && row.timeNs != timeNs) {
                 continue;
             }
             if (traceId != null && !traceId.equals(row.traceId)) {
@@ -217,6 +229,15 @@ public final class DemoLogFixture {
         return out;
     }
 
+    private Map<String, Object> toDetailRow(Row row) {
+        Map<String, Object> out = toSearchRow(row);
+        out.put("severity_number", row.severityNumber);
+        out.put("observed_time_ns", Long.toString(row.timeNs));
+        out.put("attributes_json", row.attributesJson);
+        out.put("resource_json", row.resourceJson);
+        return out;
+    }
+
     private static String columnValue(Row row, String column) {
         return switch (column) {
             case "service_instance" -> row.serviceInstance;
@@ -229,6 +250,18 @@ public final class DemoLogFixture {
     private static String extract(Pattern pattern, String sql) {
         Matcher matcher = pattern.matcher(sql);
         return matcher.find() ? matcher.group(1) : null;
+    }
+
+    private static Long extractLong(Pattern pattern, String sql) {
+        String text = extract(pattern, sql);
+        if (text == null) {
+            return null;
+        }
+        try {
+            return Long.parseLong(text);
+        } catch (NumberFormatException ignored) {
+            return null;
+        }
     }
 
     private static Set<String> inValues(String sql, String column) {
@@ -255,17 +288,35 @@ public final class DemoLogFixture {
             long epochMs = ApmTimeZones.wallClockToEpochMilli(logTime);
             long timeNs = epochMs * 1_000_000L;
             out.add(row(logTime, timeNs, HOST_A, INSTANCE_A, SERVICE_A, SERVICE_A_ID, TRACE_CHECKOUT,
-                    "span-a-" + minute, "INFO", "Received checkout request orderId=10001 channel=web"));
+                    "span-a-" + minute, "INFO", 9, "Received checkout request orderId=10001 channel=web",
+                    "{\"order.id\":\"10001\",\"channel\":\"web\"}",
+                    "{\"host.name\":\"" + HOST_A + "\",\"service.name\":\"" + SERVICE_A
+                            + "\",\"service.instance.id\":\"" + INSTANCE_A + "\"}"));
             out.add(row(logTime, timeNs + 1, HOST_A, INSTANCE_A, SERVICE_A, SERVICE_A_ID, TRACE_CHECKOUT,
-                    "span-a-" + minute, "INFO", "Validating cart contents for user demo-user"));
+                    "span-a-" + minute, "INFO", 9, "Validating cart contents for user demo-user",
+                    "{\"user.id\":\"demo-user\"}",
+                    "{\"host.name\":\"" + HOST_A + "\",\"service.name\":\"" + SERVICE_A
+                            + "\",\"service.instance.id\":\"" + INSTANCE_A + "\"}"));
             out.add(row(logTime, timeNs + 2, HOST_A, INSTANCE_A, SERVICE_A, SERVICE_A_ID, TRACE_CHECKOUT,
-                    "span-a-" + minute, "INFO", "Checkout started orderId=10001"));
+                    "span-a-" + minute, "INFO", 9, "Checkout started orderId=10001",
+                    "{\"order.id\":\"10001\"}",
+                    "{\"host.name\":\"" + HOST_A + "\",\"service.name\":\"" + SERVICE_A
+                            + "\",\"service.instance.id\":\"" + INSTANCE_A + "\"}"));
             out.add(row(logTime, timeNs + 3, HOST_B, INSTANCE_B, SERVICE_B, SERVICE_B_ID, TRACE_CHECKOUT,
-                    "span-b-" + minute, "INFO", "Inventory lookup sku DEMO-10001"));
+                    "span-b-" + minute, "INFO", 9, "Inventory lookup sku DEMO-10001",
+                    "{\"sku\":\"DEMO-10001\"}",
+                    "{\"host.name\":\"" + HOST_B + "\",\"service.name\":\"" + SERVICE_B
+                            + "\",\"service.instance.id\":\"" + INSTANCE_B + "\",\"k8s.namespace.name\":\"demo\"}"));
             out.add(row(logTime, timeNs + 4, HOST_B, INSTANCE_B, SERVICE_B, SERVICE_B_ID, TRACE_CHECKOUT,
-                    "span-b-" + minute, "WARN", "Available stock below threshold (2 units)"));
+                    "span-b-" + minute, "WARN", 13, "Available stock below threshold (2 units)",
+                    "{\"order.id\":\"10001\",\"stock\":\"2\"}",
+                    "{\"host.name\":\"" + HOST_B + "\",\"service.name\":\"" + SERVICE_B
+                            + "\",\"service.instance.id\":\"" + INSTANCE_B + "\",\"k8s.namespace.name\":\"demo\"}"));
             out.add(row(logTime, timeNs + 5, HOST_B, INSTANCE_B, SERVICE_B, SERVICE_B_ID, TRACE_CHECKOUT,
-                    "span-b-" + minute, "ERROR", "InsufficientStockException: inventory unavailable for sku DEMO-10001"));
+                    "span-b-" + minute, "ERROR", 17, "InsufficientStockException: inventory unavailable for sku DEMO-10001",
+                    "{\"sku\":\"DEMO-10001\",\"exception.type\":\"InsufficientStockException\"}",
+                    "{\"host.name\":\"" + HOST_B + "\",\"service.name\":\"" + SERVICE_B
+                            + "\",\"service.instance.id\":\"" + INSTANCE_B + "\",\"k8s.namespace.name\":\"demo\"}"));
         }
         return List.copyOf(out);
     }
@@ -280,8 +331,24 @@ public final class DemoLogFixture {
             String traceId,
             String spanId,
             String severity,
-            String message) {
-        return new Row(logTime, timeNs, hostname, serviceInstance, service, serviceId, traceId, spanId, severity, message);
+            int severityNumber,
+            String message,
+            String attributesJson,
+            String resourceJson) {
+        return new Row(
+                logTime,
+                timeNs,
+                hostname,
+                serviceInstance,
+                service,
+                serviceId,
+                traceId,
+                spanId,
+                severity,
+                severityNumber,
+                message,
+                attributesJson,
+                resourceJson);
     }
 
     private record Row(
@@ -294,6 +361,9 @@ public final class DemoLogFixture {
             String traceId,
             String spanId,
             String severity,
-            String message) {
+            int severityNumber,
+            String message,
+            String attributesJson,
+            String resourceJson) {
     }
 }

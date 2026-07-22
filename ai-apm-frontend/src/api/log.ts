@@ -9,6 +9,14 @@ export default {
       data
     })
   },
+  /** Full log record (attributes / resources); call only on row expand. */
+  getLogDetail (data: { timeNs: string; serviceId?: string }) {
+    return http.request({
+      url: '/log/detail',
+      method: 'POST',
+      data,
+    })
+  },
   /**
    * 获取日志筛选条件
    */

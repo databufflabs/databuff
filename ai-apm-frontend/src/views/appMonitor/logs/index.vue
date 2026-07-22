@@ -180,11 +180,6 @@
           <template slot="status" slot-scope="{ row }">
             <span :class="['log-level-tag', severityClass(row.status)]">{{ row.status || '-' }}</span>
           </template>
-          <el-table-column slot="suffix" type="expand" width="48" class-name="table-expand-col-items">
-            <template slot-scope="{ row }">
-              <pre class="log-pre">{{ row.message || '-' }}</pre>
-            </template>
-          </el-table-column>
           <el-table-column slot="suffix" label="Trace" width="88" align="center">
             <template slot-scope="{ row }">
               <span
@@ -197,6 +192,11 @@
         </db-table>
       </div>
     </div>
+
+    <log-detail-drawer
+      :visible.sync="detailVisible"
+      :row="detailRow"
+      @view-trace="viewTraceHandle" />
   </div>
 </template>
 
@@ -211,6 +211,7 @@ import LogApi from '@/api/log';
 import { toAsyncWait } from '@/utils/common';
 import { v4 as uuidv4 } from 'uuid';
 import ChartGroup from './overviewChart.vue';
+import LogDetailDrawer from './logDetailDrawer.vue';
 import { DEFAULT_CHART_LIST_LIMIT, resolveRecentRangeFromCounts } from '@/utils/chartListRange';
 import { formatCompactTimeRange } from '@/utils/timeFormat';
 import {
@@ -220,7 +221,7 @@ import {
 } from '@/utils/logSeverity';
 
 @Component({
-  components: { simplebar, ChartGroup },
+  components: { simplebar, ChartGroup, LogDetailDrawer },
 })
 export default class LogsAnalysis extends Vue {
   @Getter('globalTime') private globalTimeFunc!: any;
@@ -253,6 +254,8 @@ export default class LogsAnalysis extends Vue {
   private refreshToken = 0;
   private refreshRetryTimer: number | null = null;
   private syncReloadSeq = 0;
+  private detailVisible = false;
+  private detailRow: any = null;
 
   private static readonly ROUTE_PRESERVE_KEYS = ['__ps', 'durationRange', 'sf', 'st', 'fromTime', 'toTime'];
 
@@ -784,13 +787,15 @@ export default class LogsAnalysis extends Vue {
   }
 
   private rowClickHandle (row: any) {
-    this.$refs.listTable?.toggleRowExpansion(row);
+    this.detailRow = row;
+    this.detailVisible = true;
   }
 
   private viewTraceHandle (row: any) {
     if (!row.traceId) {
       return;
     }
+    this.detailVisible = false;
     this.$router.push({
       path: '/appMonitor/traceDetail',
       query: {
@@ -1024,26 +1029,6 @@ export default class LogsAnalysis extends Vue {
   &.is-info {
     color: var(--color-success);
     background-color: rgba(var(--color-success-rgb, 103, 194, 58), 0.12);
-  }
-}
-
-.log-pre {
-  margin: 0;
-  padding: 8px 12px;
-  white-space: pre-wrap;
-  word-break: break-word;
-  font-size: 12px;
-  line-height: 1.5;
-  background: var(--bg-color03);
-  border-radius: 4px;
-  font-family: Roboto, Helvetica Neue, Arial, sans-serif;
-}
-
-:deep(.table-expand-col-items .el-table__expand-icon .el-icon) {
-  color: var(--color-text-secondary);
-  font-weight: bold;
-  &:hover {
-    color: var(--color-text-primary);
   }
 }
 </style>

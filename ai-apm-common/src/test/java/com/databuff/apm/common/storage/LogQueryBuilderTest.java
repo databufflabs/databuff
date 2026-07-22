@@ -100,6 +100,21 @@ class LogQueryBuilderTest {
         assertThat(sql).contains("service_instance");
         assertThat(sql).contains("service_instance IN ('pod-1')");
         assertThat(sql).contains("severity IN ('ERROR')");
+        assertThat(sql).doesNotContain("attributes_json");
+        assertThat(sql).doesNotContain("resource_json");
+    }
+
+    @Test
+    void detailSqlSelectsFullRecordByTimeNs() {
+        String sql = LogQueryBuilder.detailSql("databuff", 1_720_000_000_000_000_000L, "svc-1");
+
+        assertThat(sql).contains("attributes_json");
+        assertThat(sql).contains("resource_json");
+        assertThat(sql).contains("severity_number");
+        assertThat(sql).contains("observed_time_ns");
+        assertThat(sql).contains("time_ns = 1720000000000000000");
+        assertThat(sql).contains("service_id = 'svc-1'");
+        assertThat(sql).contains("LIMIT 1");
     }
 
     @Test

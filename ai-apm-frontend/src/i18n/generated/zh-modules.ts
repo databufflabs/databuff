@@ -855,6 +855,14 @@ export default {
         "s_a70c4620": "数据库连接池",
         "s_b8403584": "指标名称"
       },
+      "logs": {
+        "s_overview": "概览",
+        "s_meta": "基础信息",
+        "s_attributes": "Attributes",
+        "s_resources": "Resource",
+        "s_load_failed": "加载日志详情失败",
+        "s_detail_title": "日志详情"
+      },
       "errorDetail": {
         "s_4eb644dc": "错误请求趋势",
         "s_5c7753a2": "错误请求",
