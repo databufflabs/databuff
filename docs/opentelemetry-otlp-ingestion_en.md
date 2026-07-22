@@ -16,6 +16,29 @@ DataBuff is an open-source, AI-native OpenTelemetry APM backend. The **Ingest** 
 | Metrics | Yes | Yes (`/v1/metrics`) |
 | Logs | Yes | Yes (`/v1/logs`) |
 
+## Compression
+
+OTLP exporters / the OpenTelemetry Collector enable **`gzip` by default**. DataBuff Ingest accepts the encodings below — you do **not** need `compression: none`.
+
+| Protocol | Supported compression |
+|----------|------------------------|
+| OTLP/gRPC | `none`, `gzip` (default), `snappy`, `zstd` |
+| OTLP/HTTP | `none`, `gzip` (default), `zstd`, `zlib`, `deflate`, `snappy`, `x-snappy-framed`, `lz4` |
+
+Collector example (`compression` can be omitted to use default gzip):
+
+```yaml
+exporters:
+  otlp:
+    endpoint: "<ingest-host>:4317"
+    tls:
+      insecure: true
+    # compression: gzip   # default; or snappy / zstd / none
+  otlphttp:
+    endpoint: "http://<ingest-host>:4318"
+    # compression: gzip
+```
+
 ## Prerequisites
 
 Install DataBuff (Docker or Kubernetes). After installation, note the host where **Ingest** is reachable and the OTLP ports (default **4317** gRPC, **4318** HTTP).

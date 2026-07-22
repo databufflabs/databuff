@@ -1,6 +1,11 @@
 package com.databuff.apm.ingest.receiver;
 
 import com.databuff.apm.ingest.otel.OtlpIngestService;
+import com.databuff.apm.ingest.receiver.compression.GrpcSnappyCodec;
+import com.databuff.apm.ingest.receiver.compression.GrpcZstdCodec;
+import io.grpc.Codec;
+import io.grpc.CompressorRegistry;
+import io.grpc.DecompressorRegistry;
 import io.grpc.Server;
 import io.grpc.ServerBuilder;
 import io.grpc.stub.StreamObserver;
@@ -39,7 +44,18 @@ public class OtlpGrpcServer implements ApplicationListener<ApplicationReadyEvent
     }
 
     public void start() throws IOException {
+        // gzip is built into gRPC; register snappy/zstd to match otel-collector exporters.
+        CompressorRegistry compressors = CompressorRegistry.newEmptyInstance();
+        compressors.register(new Codec.Gzip());
+        compressors.register(GrpcSnappyCodec.INSTANCE);
+        compressors.register(GrpcZstdCodec.INSTANCE);
+        DecompressorRegistry decompressors = DecompressorRegistry.getDefaultInstance()
+                .with(GrpcSnappyCodec.INSTANCE, true)
+                .with(GrpcZstdCodec.INSTANCE, true);
+
         server = ServerBuilder.forPort(grpcPort)
+                .compressorRegistry(compressors)
+                .decompressorRegistry(decompressors)
                 .addService(new TraceServiceGrpc.TraceServiceImplBase() {
                     @Override
                     public void export(ExportTraceServiceRequest request, StreamObserver<ExportTraceServiceResponse> observer) {
@@ -66,7 +82,7 @@ public class OtlpGrpcServer implements ApplicationListener<ApplicationReadyEvent
                 })
                 .build()
                 .start();
-        log.info("OTLP gRPC listening on port {}", grpcPort);
+        log.info("OTLP gRPC listening on port {} (compression: gzip, snappy, zstd)", grpcPort);
     }
 
     @Override
