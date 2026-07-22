@@ -1,169 +1,178 @@
-# DataBuff vs OpenObserve：AI Native APM 与统一可观测平台的选型对比
+# DataBuff vs OpenObserve
 
-## 概述
+> 对比文档 · [English](./vs-openobserve_en.md)
 
-DataBuff 和 OpenObserve 是当前开源可观测性领域两款定位不同的产品。  
-**DataBuff** 是 **AI Native OpenTelemetry APM 平台**，专注于 Trace 驱动的应用性能监控，在服务拓扑、链路下钻、AI 排障方面有深度构建。  
-**OpenObserve** 是 **Rust 编写的统一可观测性平台**（Logs/Metrics/Traces/RUM），以对象存储 + Parquet 列存架构降低日志存储成本为核心卖点。
+同机实测对比 **DataBuff v0.1.4** 与 **OpenObserve v0.91.0-rc1**（192.168.50.140）。同一 Demo（service-a / service-b）分别上报 OTLP：DataBuff `:4318`，OpenObserve OTLP HTTP `:5080/api/default`。标记：✅ 本环境可验证 · △ 有入口但深度有限 · ❌ 无等价能力。
 
-本文基于同环境实测，从架构、部署、功能、AI 能力等维度进行客观对比。
+博客成稿（HTML + 全量截图）：[DataBuff vs OpenObserve：同环境实测对比](https://databuff.ai/blog/databuff-vs-openobserve)
 
-## 架构对比
+## 一、能力对照全表
 
-| 维度 | DataBuff | OpenObserve |
-|------|----------|-------------|
-| 开发语言 | Java | Rust |
-| 存储引擎 | Apache Doris（列存 MPP） | Parquet + S3/GCS/对象存储 |
-| 数据模型 | Trace 衍生模型（服务流、接口、虚拟服务、组件指标等） | 标准 Logs / Metrics / Traces 三支柱 |
-| 接入协议 | OTel gRPC/HTTP + SkyWalking gRPC | OTel gRPC/HTTP + Fluent Bit / Vector 等 |
-| AI 能力 | 架构级内置（AI 专家协同排障） | 无内置 AI（需外部集成） |
-| 部署形态 | Docker Compose / K8s | 单二进制 / Docker / K8s |
+7 大 AI 能力 （v0.1.4：看得见 → 军团协同 → 会巡检 → 会诊断 → 会修复 → 会预测 → 会答疑）
 
-## 环境信息
+| 能力项 | OpenObserve v0.91.0-rc1 | DataBuff v0.1.4 |
+|------|------|------|
+| ① 看得见 · 自然语言问系统 | ❌ | ✅ 中文问服务 / 拓扑 / 异常趋势，AI 直接读遥测作答 |
+| ② 军团协同 · 多 Agent 协同 | ❌ | ✅ 多专家并行取证、串行保上下文；任务可编排复用 |
+| ③ 会巡检 · 服务巡检 + 报告 | ❌ | ✅ 一句话巡检，输出带证据与处置建议的报告 |
+| ④ 会诊断 · 瓶颈 / 根因取证 | ❌ | ✅ 结合 Trace / 指标 / 拓扑拼诊断证据 |
+| ⑤ 会修复 · 运维专家处置 | ❌ | ✅ 策略允许 + 人工授权下执行修复；危险命令 denylist |
+| ⑥ 会预测 · 容量 / 趋势 | ❌ | ✅ 容量与趋势分析，从事后排障拉到事前预判 |
+| ⑦ 会答疑 · 答疑专家 | ❌ | ✅ 检索产品文档与代码，回答部署 / 接入 / 配置问题 |
+| 外部拓展 · MCP / Skill / 自定义专家 | ❌ | ✅ 外接 MCP、Skill，并可自定义数字专家 |
 
-本对比基于同一 Mac 开发机（4C/8GB）Docker 部署：
+这是差距最大的一组：OpenObserve 无等价 AI 平台（Traces 页有 LLM Insights 入口，本环境未作为 APM 排障能力验证）；DataBuff 把 7 大能力做成可配置首页入口，APM 数据直接作 AI 上下文。
 
-| 系统 | 版本 | 部署方式 | 端口 |
-|------|------|----------|------|
-| DataBuff | v0.1.4（开发版） | Docker Compose（5 服务） | 27403 Web / 4317 OTLP gRPC |
-| OpenObserve | v0.91.1 | Docker 单容器 | 5080 Web / 5081 gRPC |
+应用性能（APM）
 
-两系统通过 demo-seeder（`ai-apm-demo` → DataBuff Ingest；`ai-apm-demo-openobserve` → OpenObserve `/api/default/v1/*`）分别发送 OTLP 数据进行截图对比。实测时 OpenObserve `default` streams 的 traces / logs `doc_num > 0`。
+| 能力项 | OpenObserve v0.91.0-rc1 | DataBuff v0.1.4 |
+|------|------|------|
+| 1. 全局拓扑 | ❌ 无服务依赖拓扑 | ✅ 全局拓扑 + 健康色标 + 节点下钻 |
+| 2. 服务列表和黄金指标 | ✅ Service Catalog（Requests / Error Rate / P99 等） | ✅ 服务列表 + 曲线；同 demo 可见 service-a / b |
+| 3. 服务级拓扑 | ❌ | ✅ 服务级拓扑 |
+| 4. 服务级调用分析（上下游指标 + 关联 Trace） | ❌ | ✅ 上下游调用结构与耗时 / 贡献；可直接落到 Trace |
+| 5. 实例级黄金指标 | ❌ | ✅ 实例级黄金指标曲线 / 列表 |
+| 6. 实例级拓扑 | ❌ | ✅ 独立实例级拓扑 |
+| 7. 实例级调用分析（上下游指标 + 关联 Trace） | ❌ | ✅ 按实例看上下游调用与耗时；可直接落到 Trace |
+| 8. 接口级拓扑 | ❌ | ✅ 独立接口级拓扑 |
+| 9. 接口级调用分析（上下游指标 + 关联 Trace） | ❌ | ✅ 按接口看调用方 / 被调与耗时；可直接落到 Trace |
+| 10. 服务流（服务级 / 接口级 Trace 链路分析） | ❌ | ✅ 按入口展开下游响应贡献度；支持服务级 / 接口级 Trace 链路视角 |
+| 11. 中间件 / 外部调用专页（库 / 缓存 / MQ / 外部服务） | ❌ Span 字段可见 db/http，无专页纵深 | ✅ 独立专页：数据库 / 缓存 / MQ / 外部服务 |
+| 12. 错误分析（统计 + 接口级） | △ 可按 ERROR Span / 日志过滤 | ✅ 独立错误分析统计 + 接口级错误下钻 |
+| 13. Trace 列表 / 搜索 | ✅ Spans/Traces + 灵活查询；本环境可见 service-a · GET /demo/checkout | ✅ 图表 + 列表，多维过滤 |
+| 14. Trace 详情 | ✅ Waterfall / Flame Graph / Trace Graph | ✅ 调用次序瀑布图 + Span 属性 |
+| 15. Trace Span 关联日志 | ✅ Trace / Span 可关联到日志 | ✅ 顶栏「日志分析」+ Span Logs / 「日志」Tab |
+| 16. 日志列表 / 搜索 | ✅ 强项：SQL / 全文 + 直方图；本环境数百 events | ✅ |
+| 17. 日志详情 | ✅ | ✅ |
+| 18. 日志关联 Trace | ✅ Log → Trace（可落到 Span） | ✅ Log → Trace，并可落到具体 Span |
+| 19. Metrics 灵活查询（SQL / PromQL） | ✅ Metrics 页 SQL / PromQL / Builder | △ 内部 SQL；无对外 PromQL 入口 |
+| 20. 可定制仪表盘 | ✅ Dashboards 可自建（本环境列表可为空，能力入口在） | ❌ 暂不支持 |
+| 21. 统一存储成本（对象存储 + 压缩） | ✅ Home 可见 Ingested / Compressed（本环境约 96MB → 10.5MB） | △ Doris 列存；非对象存储降本叙事 |
+| 22. RUM | ✅ 内置 RUM（Real User Monitoring） | ❌ 暂不支持 |
+| 23. 数据流水线（Pipelines） | ✅ Realtime / Scheduled：接入后对数据做转换 / 富化 / 过滤 / 路由（VRL）；可做日志转指标等 | ❌ 暂不支持 |
+| 24. 报表（Reports） | ✅ Scheduled / Cached 报表；可定时生成与分发 | ❌ 暂不支持 |
 
-## 功能对比
+基础面：两端都有服务列表与黄金指标、Trace 列表 / 瀑布图、日志，以及 Span↔日志双向关联。DataBuff 领先在 拓扑 / 服务·实例·接口级调用分析 / 服务流 / 中间件专页 。OpenObserve 领先在 日志检索与成本、SQL/PromQL、可定制仪表盘、数据流水线、报表、统一三支柱 + RUM 。
 
-### 1. 仪表盘与概览
+告警
 
-**DataBuff**：提供全局 APM 概览，展示服务健康状态、吞吐量、错误率、响应时间等核心指标，从宏观到微观可逐层下钻。
+| 能力项 | OpenObserve v0.91.0-rc1 | DataBuff v0.1.4 |
+|------|------|------|
+| 规则怎么配 | ✅ Alerts UI（需先建 Destination / Template） | ✅ 告警中心内配置，产品化入口 |
+| 阈值告警 | ✅ Scheduled / Realtime | ✅ 阈值规则可在平台内管理 |
+| 智能告警 | ❌ 无等价「智能告警」产品能力 | ✅ 智能告警入口，与 APM 指标联动 |
+| 告警事件列表 | ✅ Alerts UI 可查已触发告警 / 规则列表 | ✅ 告警列表（等级 / 服务 / 时间等） |
+| 告警落到服务 / 中间件 | △ 偏数据流告警，回 APM 服务上下文要自串 | ✅ 列表直接挂服务 / 中间件，可回 APM 下钻 |
 
-**OpenObserve**：默认仪表盘以日志为中心，展示数据接入量、存储使用情况，APM/Trace 视图需额外创建。
+两边都能在 UI 配告警；差异在 智能告警 与 告警 → APM 服务上下文 。OpenObserve 告警更贴近 Logs/Metrics 流；DataBuff 更贴近应用性能排障闭环。
 
-**结论**：DataBuff 提供开箱即用的 APM 仪表盘，OpenObserve 更加通用但需要用户自行配置。
+适用场景速查
 
-### 2. 服务拓扑
+| 场景 | 更适合 | 说明 |
+|------|------|------|
+| 已有 OTLP，想先看 AI / APM 纵深 | DataBuff | 改上报地址即可；不必先迁走 OpenObserve |
+| 需要 7 大 AI 能力（问数 / 巡检 / 诊断 / 修复 / 预测 / 答疑） | DataBuff | OpenObserve 无等价 AI 平台 |
+| 要外接 MCP / Skill 或自定义数字专家 | DataBuff | AI 平台可外部拓展；OO 无此层 |
+| 要全局拓扑 + 健康色标，一眼看依赖与异常节点 | DataBuff | OO 无服务依赖拓扑 |
+| 要按入口服务看「谁拖慢了响应」 | DataBuff | 服务流 + 响应贡献度；OO 无等价页 |
+| 要从服务 / 实例 / 接口调用分析落到 Trace | DataBuff | 三级调用分析均可关联 Trace；OO 无此路径 |
+| 要实例级黄金指标 / 实例级拓扑 | DataBuff | OO 无对位实例页 |
+| 要查慢 SQL / 缓存 / MQ / 外部服务专页 | DataBuff | OO 多为 Span 字段级，无专页纵深 |
+| 要独立错误分析（统计 + 接口级下钻） | DataBuff | OO 需自行按 ERROR 过滤 |
+| 要智能告警，且告警直接挂回服务 / 中间件 | DataBuff | OO 告警偏数据流；无智能告警与 APM 闭环 |
+| 日志量巨大、要对象存储降成本 | OpenObserve | 压缩比与存储叙事是强项 |
+| 要 SQL / PromQL 灵活查 Metrics + 自建大盘 | OpenObserve | DataBuff 暂无可定制仪表盘 |
+| 要接入后做数据转换 / 富化 / 过滤 / 路由（流水线） | OpenObserve | Pipelines（Realtime / Scheduled + VRL） |
+| 要定时报表 / 报表缓存分发 | OpenObserve | Reports（Scheduled / Cached） |
+| 要 Logs + Metrics + Traces + RUM 统一数据面 | OpenObserve | DataBuff 侧重 APM 纵深 |
+| 只要看同一条 Demo Trace 瀑布图 | 两者皆可 | 不必为换品牌迁移 |
 
-| 特性 | DataBuff | OpenObserve |
-|------|----------|-------------|
-| 拓扑自动生成 | ✅ 基于 Trace 自动构建服务依赖图 | ❌ 无拓扑视图 |
-| 层级展示 | 服务层 → 接口层 → 组件层 多级下钻 | ❌ |
-| 健康状态着色 | ✅ 绿/黄/红标识 | ❌ |
-| 拓扑交互 | 点击节点跳转对应指标/Trace | ❌ |
+客观边界： 已深度绑定 OpenObserve 日志管道 / 大盘 / 流水线 / 报表 / 降本方案时，继续用完全合理。DataBuff 适合「OTLP + 7 大 AI + 拓扑 / 调用分析 / 服务流 / 专页 / 智能告警」的 APM 纵深；仪表盘、Pipelines、Reports 与大规模日志成本目前不是对位能力。
 
-**DataBuff 的拓扑视图是同环境测试中唯一具备服务拓扑能力的系统。** OpenObserve 定位为统一可观测平台，没有 APM 拓扑概念。
+## 二、截图证据（解释上表）
 
-### 3. Trace 查询
+下列截图均来自 192.168.50.140 。图注标明对应能力项；重点展示 DataBuff 多出来的 7 大 AI / 拓扑 / 专页 / 告警，以及 OpenObserve 的日志 / Trace / Metrics / 大盘入口。
 
-| 特性 | DataBuff | OpenObserve |
-|------|----------|-------------|
-| Trace 列表 | ✅ 按服务/时间/延迟/错误过滤 | ✅ 基础 Trace 列表 |
-| Span 详情 | ✅ 完整属性/事件/标签 | ✅ 基础详情 |
-| 服务流（Service Flow） | ✅ 跨服务调用链可视化 | ❌ |
-| 慢 Trace 分析 | ✅ 内置 | ❌ |
-| Trace × 日志关联 | ✅ 一键跳转 | ❌ |
+7 大 AI 能力 （对应上表；OpenObserve 无等价界面，以 DataBuff 举证）
 
-### 4. 指标与告警
+![DataBuff 7 大 AI 能力首页](../images/vs-oo-databuff-ai-home.png)
 
-| 特性 | DataBuff | OpenObserve |
-|------|----------|-------------|
-| 内置指标大盘 | ✅ 应用/服务/JVM 等 | ✅ 可创建自定义大盘 |
-| PromQL 查询 | ❌（内部 SQL） | ✅ |
-| SQL 查询 | ✅ Doris SQL | ✅ |
-| 告警规则 | ✅ 基于指标/Trace | ✅ 基于日志/指标 |
-| 告警通知 | ✅ 邮件/钉钉/Webhook | ✅ Webhook |
+![DataBuff AI 对话](../images/vs-oo-databuff-ai-chat.png)
 
-### 5. 日志
+![DataBuff 数字专家](../images/vs-oo-databuff-ai-experts.png)
 
-| 特性 | DataBuff | OpenObserve |
-|------|----------|-------------|
-| 日志采集 | ✅ OTel Logs | ✅ OTel / Fluent Bit / Vector |
-| 日志查询 | ✅ SQL + 关键字搜索 | ✅ SQL + 全文搜索 |
-| 日志与 Trace 关联 | ✅ 全链路一键跳转 | ❌ |
-| AI 日志分析 | ✅ 自然语言查询 | ❌ |
-| 存储成本 | Doris 列存 | **Parquet + S3 对象存储，成本显著更低** |
+概览与数据面
 
-### 6. AI 能力
+![OpenObserve Home](../images/vs-oo-openobserve-dashboard.png)
 
-这是 DataBuff 与 OpenObserve **最大的差异化方向**：
+![OpenObserve Streams](../images/vs-oo-openobserve-ingestion.png)
 
-| 特性 | DataBuff | OpenObserve |
-|------|----------|-------------|
-| AI 排障模式 | ✅ 内置运维专家 AI agent | ❌ |
-| 自然语言查询 | ✅ 白话描述问题 → 自动排查 | ❌ |
-| 多专家协同 | ✅ 场景入口 + 多 AI 专家分工 | ❌ |
-| 自运维能力 | ✅ 安装排障、运行时诊断 | ❌ |
-| AI 模型集成 | ✅ 内置 LLM 编排引擎 | ❌（需外部自建） |
+服务与拓扑
 
-## 部署体验对比
+![DataBuff 服务列表](../images/vs-oo-databuff-services.png)
 
-### DataBuff 部署
+![DataBuff 全局拓扑](../images/vs-oo-databuff-topology.png)
 
-```bash
-# Docker Compose 一键启动
-git clone https://github.com/databufflabs/databuff.git
-cd databuff/deploy/local
-./start.sh
-```
+服务级 / 接口级调用分析 + 服务流（对应上表 4 / 9 / 10）
 
-5 个容器（Doris FE/BE + Ingest + Web + Demo），启动约 3 分钟后可通过 `http://localhost:27403` 访问，Demo 自动发送 Trace 数据。
+OpenObserve 能列出 Trace / Span，但 没有 服务级 / 实例级 / 接口级「调用分析」，也 没有 服务流上的响应贡献度视图。DataBuff 从「看见连谁」到「谁拖慢、再点进 Trace」。
 
-### OpenObserve 部署
+![DataBuff 服务级调用分析](../images/vs-oo-databuff-service-call-analysis.png)
 
-```bash
-# Docker 单容器启动
-docker run -d --name openobserve -p 5080:5080 -p 5081:5081 \
-  -e ZO_ROOT_USER_EMAIL=admin@example.com \
-  -e ZO_ROOT_USER_PASSWORD=<password> \
-  openobserve/openobserve:latest
-```
+![DataBuff 接口级调用分析](../images/vs-oo-databuff-api-call-analysis.png)
 
-单容器秒级启动，需通过 Web UI 注册/登录后手动接入数据。数据接入需要额外配置采集端。
+![DataBuff 服务流](../images/vs-oo-databuff-service-flow.png)
 
-### 资源消耗（同机 idle 状态）
+Trace
 
-| 系统 | 容器数 | 总内存 |
-|------|--------|--------|
-| DataBuff | 5（含 Doris + Demo） | ~2.5 GiB |
-| OpenObserve | 1（单二进制） | ~120 MiB |
+![OpenObserve Trace 列表](../images/vs-oo-openobserve-traces.png)
 
-> OpenObserve 单二进制部署非常轻量；DataBuff 包含分布式存储 Doris，资源占用更高但能力也更丰富。
+![DataBuff 链路追踪](../images/vs-oo-databuff-trace-list.png)
 
-## 适用场景
+![OpenObserve Trace 详情](../images/vs-oo-openobserve-trace-detail.png)
 
-### 选 DataBuff
+![DataBuff Trace 详情](../images/vs-oo-databuff-trace-detail.png)
 
-- 需要 **APM 深度能力**（服务拓扑、Trace 下钻、服务流）
-- AI 排障是刚需：运维专家、自然语言排查、自运维
-- 团队正在或准备采用 OpenTelemetry 标准
-- 需要 Trace × 指标 × 日志全链路关联
+Log / Metric
 
-### 选 OpenObserve
+![OpenObserve Logs](../images/vs-oo-openobserve-logs.png)
 
-- **日志量巨大**，需要对象存储降成本
-- 需要一个统一的可观测性数据平台，不局限于 APM
-- 团队熟悉 Rust / Parquet / S3 技术栈
-- 需要灵活的 SQL/PromQL 查询
-- 资源受限（单容器低内存占用）
+![DataBuff 日志分析](../images/vs-oo-databuff-logs.png)
 
-## 总结
+![OpenObserve Metrics](../images/vs-oo-openobserve-metrics.png)
 
-| 维度 | DataBuff | OpenObserve |
-|------|----------|-------------|
-| 核心定位 | AI Native OTel APM | 统一可观测平台（日志优先） |
-| Trace 深度 | ⭐⭐⭐⭐⭐ | ⭐⭐⭐ |
-| 服务拓扑 | ⭐⭐⭐⭐⭐ | ⭐ |
-| AI 排障 | ⭐⭐⭐⭐⭐ | ⭐ |
-| 日志成本 | ⭐⭐⭐ | ⭐⭐⭐⭐⭐ |
-| 部署复杂度 | ⭐⭐⭐ | ⭐⭐⭐⭐⭐ |
-| 资源占用 | ⭐⭐⭐ | ⭐⭐⭐⭐⭐ |
-| 社区生态 | ⭐⭐⭐（快速成长） | ⭐⭐⭐⭐（19.8k Stars） |
+仪表盘 / 流水线 / 报表 （对应上表 20 / 23 / 24；OpenObserve 优势，DataBuff 暂不支持）
 
-**一句话总结**：如果你的核心诉求是 **APM 深度 + AI 排障**，DataBuff 是最佳选择；如果首要目标是 **低成本大规模日志存储**，OpenObserve 更合适。
+![OpenObserve Dashboards](../images/vs-oo-openobserve-dashboards.png)
 
----
+![OpenObserve Pipelines](../images/vs-oo-openobserve-pipelines.png)
 
-觉得有用？给我们一个 Star，本地 5 分钟跑起来：  
-https://github.com/databufflabs/databuff
+![OpenObserve Reports](../images/vs-oo-openobserve-reports.png)
 
-在线 Demo：https://demo.databuff.ai（账号 `admin` / `Databuff@123`）
+DataBuff 专页纵深 （对应上表数据库 / 缓存 / MQ / 外部 / 接口 / 错误；OpenObserve 无等价专页）
 
-> 本文基于实测环境（Mac Docker）于 2026-07-21 完成并返工复核。截图见同级 `assets/` 与 `compare-vs-openobserve.html`。
+![DataBuff 数据库](../images/vs-oo-databuff-database.png)
+
+![DataBuff 缓存](../images/vs-oo-databuff-cache.png)
+
+![DataBuff MQ](../images/vs-oo-databuff-mq.png)
+
+![DataBuff 外部服务](../images/vs-oo-databuff-external.png)
+
+![DataBuff 接口分析](../images/vs-oo-databuff-api.png)
+
+![DataBuff 错误分析](../images/vs-oo-databuff-errors.png)
+
+这些专页是「Trace 里能看见中间件 Span」之后的纵深——相对 OpenObserve 最值得对照验证的应用性能差异。
+
+告警
+
+![OpenObserve Alerts](../images/vs-oo-openobserve-alerts.png)
+
+![DataBuff 告警中心](../images/vs-oo-databuff-alerts.png)
+
+觉得有用的话，欢迎给我们一个 Star：
+
+GitHub：https://github.com/databufflabs/databuff
+
+在线 Demo：https://demo.databuff.ai
