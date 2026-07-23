@@ -37,14 +37,14 @@ Largest gap: SkyWalking has no equivalent AI platform; DataBuff exposes the seve
 | 12. Error analysis (stats + endpoint) | ❌ | ✅ Error stats + endpoint drill-down |
 | 13. Trace list / search | ✅ Service / endpoint / status / latency filters | ✅ Charts + list, multi-dimension filters |
 | 14. Trace detail | ✅ Span timeline / Tags | ✅ Call-order waterfall + Span attributes |
-| 15. Trace Span → logs | ❌ | ✅ Top “Log analysis” + Span Logs / Logs tab |
+| 15. Trace Span → logs | ✅ Trace / Span can link to logs | ✅ Top “Log analysis” + Span Logs / Logs tab |
 | 16. Log list / search | ✅ | ✅ |
 | 17. Log detail | ✅ | ✅ |
 | 18. Log → Trace | ✅ Log → Trace | ✅ Log → Trace, down to Span |
 | 19. Profiling (Tracing / AsyncProfiler / eBPF) | ✅ All three | ❌ Not yet |
 | 20. Custom dashboards | ✅ Built-in; service + middleware boards | ❌ Not yet |
 
-Basics exist on both sides; DataBuff leads on call analysis, instance/endpoint topology, service flow, dedicated pages, and Span↔log linkage. Profiling and custom dashboards are SkyWalking strengths DataBuff does not cover yet.
+Basics (incl. Span↔logs) exist on both sides; DataBuff leads on call analysis, instance/endpoint topology, service flow, dedicated pages and error depth, and Log→Trace down to Span. Profiling and custom dashboards are SkyWalking strengths DataBuff does not cover yet.
 
 **Alerting**
 

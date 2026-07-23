@@ -37,14 +37,14 @@
 | 12. 错误分析（统计 + 接口级） | ❌ | ✅ 独立错误分析统计 + 接口级错误下钻 |
 | 13. Trace 列表 / 搜索 | ✅ 服务 / 端点 / 状态 / 耗时过滤 | ✅ 图表 + 列表，多维过滤 |
 | 14. Trace 详情 | ✅ Span 时间轴 / Tags | ✅ 调用次序瀑布图 + Span 属性 |
-| 15. Trace Span 关联日志 | ❌ | ✅ 顶栏「日志分析」+ Span Logs / 「日志」Tab |
+| 15. Trace Span 关联日志 | ✅ Trace / Span 可关联到日志 | ✅ 顶栏「日志分析」+ Span Logs / 「日志」Tab |
 | 16. 日志列表 / 搜索 | ✅ | ✅ |
 | 17. 日志详情 | ✅ | ✅ |
 | 18. 日志关联 Trace | ✅ Log → Trace | ✅ Log → Trace，并可落到具体 Span |
 | 19. Profiling（Tracing / AsyncProfiler / eBPF） | ✅ 三类均支持 | ❌ 暂不支持 |
 | 20. 仪表盘（可定制 Dashboard） | ✅ 内置 Dashboard；支持服务及各类中间件大盘（如 DB / 缓存 / MQ 等） | ❌ 暂不支持 |
 
-基础面（拓扑 / 服务列表 / Trace / 日志）两侧都有；DataBuff 领先在**服务级·实例级·接口级调用分析（含关联 Trace）**、**实例 / 接口级拓扑**、**服务流**、**专页与错误分析纵深**、**Span↔日志双向**。Profiling 与**可定制仪表盘（含各类中间件大盘）**是 SkyWalking 明显更强、DataBuff 暂未覆盖的两块。
+基础面（拓扑 / 服务列表 / Trace / 日志 / Span↔日志）两侧都有；DataBuff 领先在**服务级·实例级·接口级调用分析（含关联 Trace）**、**实例 / 接口级拓扑**、**服务流**、**专页与错误分析纵深**，以及 Log→Trace **落到具体 Span**。Profiling 与**可定制仪表盘（含各类中间件大盘）**是 SkyWalking 明显更强、DataBuff 暂未覆盖的两块。
 
 **告警**
 
