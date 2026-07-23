@@ -23,6 +23,17 @@ ingest:
     aggregate-buffer-size: ${INGEST_AGGREGATE_BUFFER_SIZE:1024}
   trace:
     assembly-check-interval-ms: 2000
+    # Drop spans whose resource (or HTTP metaHttpUrl) matches before enrich/fill/metric/trace write.
+    # Regex uses full-string match (java.util.regex.Matcher#matches).
+    # Example:
+    #   ignore-resources:
+    #     - /actuator/prometheus
+    #     - PING
+    #   ignore-resource-regex:
+    #     - ^/actuator(/.*)?$
+    #     - ^SELECT 1$
+    ignore-resources: []
+    ignore-resource-regex: []
   metric:
     trace-minute-late-flush-grace-ms: 20000
   node-id: ingest-1

@@ -16,6 +16,7 @@ import com.databuff.apm.ingest.meta.MetaServiceCollector;
 import com.databuff.apm.ingest.meta.MetaServiceRegistry;
 import com.databuff.apm.ingest.meta.ServiceInstanceRegistry;
 import com.databuff.apm.ingest.meta.VirtualServiceInstanceRegistry;
+import com.databuff.apm.ingest.trace.SpanResourceIgnoreFilter;
 import com.databuff.apm.ingest.trace.VirtualServiceExtractor;
 import com.databuff.apm.ingest.trace.remote.RemoteAssociationStore;
 import com.databuff.apm.ingest.trace.remote.RemoteCallProcessor;
@@ -27,6 +28,8 @@ import com.databuff.apm.common.storage.DorisConnectionConfig;
 import com.databuff.apm.common.storage.DorisStreamLoadSink;
 import com.databuff.apm.common.storage.DorisStreamLoader;
 import com.databuff.apm.common.storage.DorisTableNames;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
@@ -37,6 +40,7 @@ import java.util.List;
 @Configuration
 public class IngestPipelineConfiguration {
 
+    private static final Logger log = LoggerFactory.getLogger(IngestPipelineConfiguration.class);
     @Bean
     ClusterCacheRegistry clusterCacheRegistry() {
         ClusterCacheRegistry registry = new ClusterCacheRegistry();
@@ -241,6 +245,17 @@ public class IngestPipelineConfiguration {
     }
 
     @Bean
+    SpanResourceIgnoreFilter spanResourceIgnoreFilter(
+            @Value("${ingest.trace.ignore-resources:}") List<String> ignoreResources,
+            @Value("${ingest.trace.ignore-resource-regex:}") List<String> ignoreResourceRegex) {
+        SpanResourceIgnoreFilter filter = new SpanResourceIgnoreFilter(ignoreResources, ignoreResourceRegex);
+        if (!filter.isEmpty()) {
+            log.info("Span resource ignore filter enabled: {}", filter);
+        }
+        return filter;
+    }
+
+    @Bean
     TraceComponent traceComponent(
             AggregateComponent aggregateComponent,
             DorisBatchWriter traceBatchWriter,
@@ -252,6 +267,7 @@ public class IngestPipelineConfiguration {
             ClusterInstanceCoordinator coordinator,
             ClusterPartialForwarder partialForwarder,
             DorisFlushScheduler dorisFlushScheduler,
+            SpanResourceIgnoreFilter spanResourceIgnoreFilter,
             @Value("${ingest.trace.assembly-check-interval-ms:2000}") long assemblyCheckIntervalMs,
             @Value("${ingest.pipeline.trace-tasks:4}") int traceTasks,
             @Value("${ingest.pipeline.trace-buffer-size:1024}") int traceBufferSize) {
@@ -266,6 +282,7 @@ public class IngestPipelineConfiguration {
                 coordinator,
                 partialForwarder,
                 dorisFlushScheduler,
+                spanResourceIgnoreFilter,
                 assemblyCheckIntervalMs,
                 traceBufferSize);
         component.start(Math.max(1, traceTasks));

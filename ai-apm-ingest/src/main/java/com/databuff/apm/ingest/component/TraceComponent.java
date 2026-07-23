@@ -15,6 +15,7 @@ import com.databuff.apm.ingest.pipeline.component.AbstractComponent;
 import com.databuff.apm.ingest.pipeline.pool.TaskPool;
 import com.databuff.apm.ingest.pipeline.shard.HashShardingStrategy;
 import com.databuff.apm.ingest.pipeline.task.AsyncTask;
+import com.databuff.apm.ingest.trace.SpanResourceIgnoreFilter;
 import com.databuff.apm.ingest.trace.TraceAssemblyBuffer;
 import com.databuff.apm.ingest.trace.TraceEnrichProcessor;
 import com.databuff.apm.ingest.trace.TraceFillProcessor;
@@ -33,6 +34,7 @@ import java.util.concurrent.atomic.AtomicLong;
  * Trace 处理组件，核心流水线：
  * <pre>
  * Step 1  DcSpan（OtlpIngestService 已转换，内存对象）
+ * Step 1b resource 忽略过滤（命中则后续 enrich/assemble/fill/metric/trace 均跳过）
  * Step 2  enrich（DTS 字段补全，内存原地修改）
  * Step 3  按 traceId 聚合（默认定时检测 2s，root 到达后连续 2 次无新 span 或连续 4 次无新 span 则 flush）
  *         · 单机 / owner：入 TraceAssemblyBuffer 等待收齐
@@ -46,6 +48,7 @@ public final class TraceComponent extends AbstractComponent<TraceComponent.Trace
 
     private static final Logger log = LoggerFactory.getLogger(TraceComponent.class);
     private static final LogRateLimiter TASK_FAILURE_LIMITER = new LogRateLimiter(10_000L);
+    private static final LogRateLimiter IGNORE_LIMITER = new LogRateLimiter(10_000L);
 
     /** 集群 trace 转发 stream，partition key = traceId。 */
     public static final String TRACE_STREAM = "ingest.trace.span";
@@ -60,9 +63,11 @@ public final class TraceComponent extends AbstractComponent<TraceComponent.Trace
     private final ClusterPartitionMembership partitionMembership;
     private final ClusterPartialForwarder partialForwarder;
     private final DorisFlushScheduler metricFlushScheduler;
+    private final SpanResourceIgnoreFilter resourceIgnoreFilter;
     private final long assemblyCheckIntervalMs;
     private final int bufferSize;
     private final AtomicLong received = new AtomicLong();
+    private final AtomicLong ignored = new AtomicLong();
 
     public TraceComponent(
             AggregateComponent aggregateComponent,
@@ -87,6 +92,7 @@ public final class TraceComponent extends AbstractComponent<TraceComponent.Trace
                 partitionMembership,
                 partialForwarder,
                 metricFlushScheduler,
+                SpanResourceIgnoreFilter.NOOP,
                 assemblyCheckIntervalMs,
                 1024);
     }
@@ -104,6 +110,36 @@ public final class TraceComponent extends AbstractComponent<TraceComponent.Trace
             DorisFlushScheduler metricFlushScheduler,
             long assemblyCheckIntervalMs,
             int bufferSize) {
+        this(
+                aggregateComponent,
+                traceWriter,
+                metaCache,
+                metaServiceCollector,
+                serviceInstanceRegistry,
+                virtualServiceExtractor,
+                remoteCallProcessor,
+                partitionMembership,
+                partialForwarder,
+                metricFlushScheduler,
+                SpanResourceIgnoreFilter.NOOP,
+                assemblyCheckIntervalMs,
+                bufferSize);
+    }
+
+    public TraceComponent(
+            AggregateComponent aggregateComponent,
+            DorisBatchWriter traceWriter,
+            IngestMetaCache metaCache,
+            MetaServiceCollector metaServiceCollector,
+            ServiceInstanceRegistry serviceInstanceRegistry,
+            VirtualServiceExtractor virtualServiceExtractor,
+            RemoteCallProcessor remoteCallProcessor,
+            ClusterPartitionMembership partitionMembership,
+            ClusterPartialForwarder partialForwarder,
+            DorisFlushScheduler metricFlushScheduler,
+            SpanResourceIgnoreFilter resourceIgnoreFilter,
+            long assemblyCheckIntervalMs,
+            int bufferSize) {
         this.aggregateComponent = aggregateComponent;
         this.traceWriter = traceWriter;
         this.metaCache = metaCache;
@@ -114,6 +150,9 @@ public final class TraceComponent extends AbstractComponent<TraceComponent.Trace
         this.partitionMembership = partitionMembership;
         this.partialForwarder = partialForwarder;
         this.metricFlushScheduler = metricFlushScheduler;
+        this.resourceIgnoreFilter = resourceIgnoreFilter == null
+                ? SpanResourceIgnoreFilter.NOOP
+                : resourceIgnoreFilter;
         this.assemblyCheckIntervalMs = assemblyCheckIntervalMs;
         this.bufferSize = Math.max(16, bufferSize);
     }
@@ -134,6 +173,10 @@ public final class TraceComponent extends AbstractComponent<TraceComponent.Trace
 
     public long receivedCount() {
         return received.get();
+    }
+
+    public long ignoredCount() {
+        return ignored.get();
     }
 
     /**
@@ -225,6 +268,11 @@ public final class TraceComponent extends AbstractComponent<TraceComponent.Trace
                 log.warn("Trace single span event ignored because span is null key={}", serviceKey);
                 return;
             }
+            // Step 1b：按 resource 忽略（精确 / 正则），命中则后续一律不处理
+            if (TraceComponent.this.resourceIgnoreFilter.shouldIgnore(span)) {
+                recordIgnored(span.resource);
+                return;
+            }
             // Step 2：DTS enrich（内存，无 serde）
             if (!traceEvent.skipEnrich()) {
                 enrichProcessor.enrich(span);
@@ -250,28 +298,46 @@ public final class TraceComponent extends AbstractComponent<TraceComponent.Trace
                 log.warn("Trace batch ignored because spans empty traceKey={}", shortTraceId(traceKey));
                 return;
             }
+            List<DcSpan> kept = new java.util.ArrayList<>(spans.size());
             for (DcSpan span : spans) {
-                if (span != null) {
-                    enrichProcessor.enrich(span);
+                if (span == null) {
+                    continue;
                 }
+                if (TraceComponent.this.resourceIgnoreFilter.shouldIgnore(span)) {
+                    recordIgnored(span.resource);
+                    continue;
+                }
+                enrichProcessor.enrich(span);
+                kept.add(span);
+            }
+            if (kept.isEmpty()) {
+                return;
             }
             Optional<String> forwardTarget = partitionMembership.forwardPartialTarget(traceKey);
             if (forwardTarget.isPresent()) {
-                for (DcSpan span : spans) {
-                    if (span != null) {
-                        TraceComponent.this.partialForwarder.forward(
-                                forwardTarget.get(),
-                                TRACE_STREAM,
-                                span.trace_id,
-                                0,
-                                0,
-                                DCSpanJsonEncoder.encode(span));
-                    }
+                for (DcSpan span : kept) {
+                    TraceComponent.this.partialForwarder.forward(
+                            forwardTarget.get(),
+                            TRACE_STREAM,
+                            span.trace_id,
+                            0,
+                            0,
+                            DCSpanJsonEncoder.encode(span));
                 }
                 return;
             }
-            List<DcSpan> nonNullSpans = spans.stream().filter(java.util.Objects::nonNull).toList();
-            assembleSpans(traceKey, nonNullSpans);
+            assembleSpans(traceKey, kept);
+        }
+
+        private void recordIgnored(String resource) {
+            ignored.incrementAndGet();
+            if (log.isDebugEnabled()) {
+                log.debug("Ignored span by resource filter resource={}", resource);
+            }
+            long count = IGNORE_LIMITER.record();
+            if (count > 0) {
+                log.info("Ignored {} spans by resource filter in last 10s; latest resource={}", count, resource);
+            }
         }
 
         private void assembleSpans(String serviceKey, List<DcSpan> spans) throws Exception {

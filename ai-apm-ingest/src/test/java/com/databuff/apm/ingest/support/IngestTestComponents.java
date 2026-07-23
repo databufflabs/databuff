@@ -6,6 +6,7 @@ import com.databuff.apm.ingest.meta.IngestMetaCache;
 import com.databuff.apm.common.storage.DorisBatchWriter;
 import com.databuff.apm.ingest.component.AggregateComponent;
 import com.databuff.apm.ingest.component.TraceComponent;
+import com.databuff.apm.ingest.trace.SpanResourceIgnoreFilter;
 
 /** Shared ingest component wiring for unit tests. */
 public final class IngestTestComponents {
@@ -29,13 +30,22 @@ public final class IngestTestComponents {
             AggregateComponent aggregateComponent,
             DorisBatchWriter traceWriter,
             long assemblyCheckIntervalMs) {
-        return trace(aggregateComponent, traceWriter, null, assemblyCheckIntervalMs);
+        return trace(aggregateComponent, traceWriter, null, SpanResourceIgnoreFilter.NOOP, assemblyCheckIntervalMs);
     }
 
     public static TraceComponent trace(
             AggregateComponent aggregateComponent,
             DorisBatchWriter traceWriter,
             IngestMetaCache metaCache,
+            long assemblyCheckIntervalMs) {
+        return trace(aggregateComponent, traceWriter, metaCache, SpanResourceIgnoreFilter.NOOP, assemblyCheckIntervalMs);
+    }
+
+    public static TraceComponent trace(
+            AggregateComponent aggregateComponent,
+            DorisBatchWriter traceWriter,
+            IngestMetaCache metaCache,
+            SpanResourceIgnoreFilter resourceIgnoreFilter,
             long assemblyCheckIntervalMs) {
         return new TraceComponent(
                 aggregateComponent,
@@ -48,6 +58,8 @@ public final class IngestTestComponents {
                 TestClusterMembership.standalone("n1"),
                 ClusterPartialForwarder.NOOP,
                 null,
-                assemblyCheckIntervalMs);
+                resourceIgnoreFilter,
+                assemblyCheckIntervalMs,
+                1024);
     }
 }

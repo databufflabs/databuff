@@ -9,6 +9,7 @@ import com.databuff.apm.ingest.meta.IngestMetaCache;
 import com.databuff.apm.ingest.meta.MetaServiceRegistry;
 import com.databuff.apm.ingest.otel.OtlMetricLine;
 import com.databuff.apm.ingest.support.IngestTestComponents;
+import com.databuff.apm.ingest.trace.SpanResourceIgnoreFilter;
 import com.databuff.apm.common.storage.ApmReadRepository;
 import com.databuff.apm.common.storage.DorisBatchWriter;
 import org.junit.jupiter.api.AfterEach;
@@ -154,5 +155,52 @@ class TraceComponentTest {
         assertThat(traceComponent.emit("k", new TraceEvent(child))).isTrue();
         await().atMost(Duration.ofSeconds(2)).untilAsserted(() ->
                 assertThat(traceComponent.receivedCount()).isEqualTo(2));
+    }
+
+    @Test
+    void dropsSpansMatchingResourceIgnoreFilter() throws Exception {
+        DorisBatchWriter traceWriter = new DorisBatchWriter(10);
+        SpanResourceIgnoreFilter filter = new SpanResourceIgnoreFilter(
+                List.of("/actuator/prometheus"),
+                List.of("^/health$"));
+        aggregateComponent = IngestTestComponents.aggregate(new DorisBatchWriter(10));
+        traceComponent = IngestTestComponents.trace(
+                aggregateComponent, traceWriter, null, filter, 200L);
+        aggregateComponent.start(1);
+        traceComponent.start(1);
+
+        DcSpan ignoredExact = sampleSpan("trace-ignore-1", "s1", "/actuator/prometheus");
+        DcSpan ignoredRegex = sampleSpan("trace-ignore-2", "s2", "/health");
+        DcSpan kept = sampleSpan("trace-keep", "s3", "/api/orders");
+
+        assertThat(traceComponent.emit("k", new TraceEvent(ignoredExact))).isTrue();
+        assertThat(traceComponent.emit("k", new TraceEvent(ignoredRegex))).isTrue();
+        assertThat(traceComponent.emit("k", new TraceEvent(kept))).isTrue();
+
+        await().atMost(Duration.ofSeconds(2)).untilAsserted(() -> {
+            assertThat(traceComponent.receivedCount()).isEqualTo(3);
+            assertThat(traceComponent.ignoredCount()).isEqualTo(2);
+        });
+
+        traceComponent.close();
+        await().atMost(Duration.ofSeconds(2)).untilAsserted(() ->
+                assertThat(traceWriter.pendingCount()).isEqualTo(1));
+    }
+
+    private static DcSpan sampleSpan(String traceId, String spanId, String resource) {
+        DcSpan span = new DcSpan();
+        span.trace_id = traceId;
+        span.span_id = spanId;
+        span.parent_id = "";
+        span.service = "demo";
+        span.serviceId = "demo-id";
+        span.resource = resource;
+        span.name = resource;
+        span.hostName = "host";
+        span.error = 0;
+        span.duration = 1;
+        span.start = 1_700_000_000_000_000_000L;
+        span.end = span.start + 1;
+        return span;
     }
 }
