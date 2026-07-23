@@ -22,4 +22,4 @@ if [ "${INGEST_CLUSTER_ENABLED:-false}" = "true" ]; then
   fi
 fi
 
-exec java ${JAVA_TOOL_OPTIONS} -jar ./*.jar --spring.config.additional-location=file:./application.yml
+exec java ${JAVA_TOOL_OPTIONS} -XX:+ExitOnOutOfMemoryError -jar ./*.jar --spring.config.additional-location=file:./application.yml

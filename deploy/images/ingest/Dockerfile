@@ -8,7 +8,7 @@ COPY *.jar ./
 RUN chmod +x start.sh
 
 ENV TZ=Asia/Shanghai
-ENV JAVA_TOOL_OPTIONS="-Xms512m -Xmx1536m -Duser.timezone=Asia/Shanghai"
+ENV JAVA_TOOL_OPTIONS="-Xms512m -Xmx1536m -XX:+ExitOnOutOfMemoryError -Duser.timezone=Asia/Shanghai"
 
 EXPOSE 4317 4318 8081 18112
 

@@ -902,7 +902,7 @@ write_compose_env() {
   cat >"$env_file" <<EOF
 APM_INGEST_IMAGE=$(ingest_image_ref "$release_version")
 APM_WEB_IMAGE=$(web_image_ref "$release_version")
-INGEST_JAVA_TOOL_OPTIONS="-Xms512m -Xmx1536m -Duser.timezone=Asia/Shanghai"
+INGEST_JAVA_TOOL_OPTIONS="-Xms512m -Xmx1536m -XX:+ExitOnOutOfMemoryError -Duser.timezone=Asia/Shanghai"
 WEB_JAVA_TOOL_OPTIONS="-Xms256m -Xmx700m -Duser.timezone=Asia/Shanghai"
 INGEST_MEM_LIMIT=2g
 WEB_MEM_LIMIT=1g

@@ -69,7 +69,7 @@ spec:
                 fieldRef:
                   fieldPath: status.podIP
             - name: JAVA_TOOL_OPTIONS
-              value: "-Xms1g -Xmx4g -Duser.timezone=Asia/Shanghai"
+              value: "-Xms1g -Xmx4g -XX:+ExitOnOutOfMemoryError -Duser.timezone=Asia/Shanghai"
           livenessProbe:
             httpGet:
               path: /health

@@ -215,6 +215,7 @@ public final class BuiltInExpertCatalog {
                     ## DataBuff 背景（按需参考）
                     DataBuff 是 AI 原生开源 APM（OpenTelemetry 采集 Trace/指标/日志）。架构：ingest（ai-apm-ingest，4317/4318/11800）→ Doris（ai-apm-doris-fe/be，库 databuff）→ web（ai-apm-web，27403）。
                     默认 Docker 安装于 /opt/databuff-ai-apm；启动顺序 Doris → init SQL → migrate-schema → ingest/web。Doris 4.1.1（FE 9030/8030，BE 8040），数据在 data/。健康检查：27403/health、4318/health；Doris 不可达时 web 进入排障模式（JDBC 快速失败，AI 平台仍可用），约每分钟自动重探，Doris 恢复后无需重启 web 即可退出排障模式。
+                    排查 DataBuff 部署/配置时，可在 /app/databuff 检索文档与脚本（与产品答疑共用；运行态仍以 shell/docker/日志实查为准）。对用户不要暴露该绝对路径。
 
                     必须基于命令真实输出回答，不要编造。用中文回答。
                     """;

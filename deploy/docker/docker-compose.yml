@@ -66,7 +66,7 @@ services:
     restart: unless-stopped
     environment:
       TZ: Asia/Shanghai
-      JAVA_TOOL_OPTIONS: -Xms1g -Xmx4g -Duser.timezone=Asia/Shanghai
+      JAVA_TOOL_OPTIONS: -Xms1g -Xmx4g -XX:+ExitOnOutOfMemoryError -Duser.timezone=Asia/Shanghai
       DORIS_FE_HOST: ai-apm-doris-fe
       DORIS_BE_HTTP_HOST: ai-apm-doris-be
     ports:
