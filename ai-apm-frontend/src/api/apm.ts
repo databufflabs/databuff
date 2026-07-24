@@ -80,7 +80,7 @@ export default {
    */
   getSpanParams: (data?: any) => {
     return http.request({
-      url: '/trace/query_parames_v2',
+      url: '/trace/query_params',
       method: 'post',
       data
     })
@@ -228,18 +228,6 @@ export default {
   mannualAi (data: { service: string, serviceId: string, fromTime: number, toTime: number, serviceInstance?: string }) {
     return http.request({
       url: '/root/syncAnalyse',
-      method: 'post',
-      data
-    })
-  },
-  /**
-   * 查询服务详情页签是否有小红点（基于 trace 数据）
-   */
-  serviceTabnavStatus (data: {
-    serviceId: string, fromTime: number, toTime: number, serviceInstance?: string, resource?: string, componentType?: string
-  }) {
-    return http.request({
-      url: '/trace/tabnavStatus',
       method: 'post',
       data
     })

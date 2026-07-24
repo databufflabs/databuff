@@ -1,14 +1,10 @@
 package com.databuff.apm.ingest.metric;
 
-import com.databuff.apm.common.serde.ReusableJson;
+import com.databuff.apm.common.serde.MetricDorisJsonRow;
 import com.databuff.apm.common.storage.DorisTableNames;
 import com.databuff.apm.ingest.meta.MetaServiceCollector;
 import com.databuff.apm.ingest.otel.OtlMetricLine;
 import com.databuff.apm.ingest.otel.OtlpMetricDebugLogger;
-import com.fasterxml.jackson.core.JsonProcessingException;
-import com.fasterxml.jackson.databind.ObjectMapper;
-import org.slf4j.Logger;
-import org.slf4j.LoggerFactory;
 
 import java.util.LinkedHashMap;
 import java.util.List;
@@ -24,10 +20,8 @@ import java.util.TreeSet;
  */
 public final class OtlpMetricDirectWriter {
 
-    private static final Logger log = LoggerFactory.getLogger(OtlpMetricDirectWriter.class);
     private static final List<String> JVM_KEY_COLUMNS = List.of(
             "metric_time", "ts", "instance", "service", "service_id", "service_instance", "tag_host");
-    private static final ObjectMapper JSON = new ObjectMapper();
 
     private final MetricWriteRouter metricWriteRouter;
     private final MetaServiceCollector metaServiceCollector;
@@ -87,12 +81,7 @@ public final class OtlpMetricDirectWriter {
                     String.valueOf(row.getOrDefault("service_id", "")),
                     jvmPartialCounts.getOrDefault(entry.getKey(), 0),
                     metricFields);
-            try {
-                byte[] bytes = ReusableJson.writeValueAsBytes(JSON, row);
-                metricWriteRouter.offerJvmRow(bytes);
-            } catch (JsonProcessingException e) {
-                log.warn("Failed to serialize merged JVM row: {}", e.getMessage());
-            }
+            metricWriteRouter.offerJvmRow(MetricDorisJsonRow.ofMap(row));
         }
     }
 

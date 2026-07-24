@@ -71,9 +71,9 @@ services:
       DORIS_FE_HOST: ai-apm-doris-fe
       DORIS_BE_HTTP_HOST: ai-apm-doris-be
     ports:
-      - "4317:4317"
-      - "4318:4318"
-      - "11800:11800"   # SkyWalking Agent gRPC
+      - "${INGEST_GRPC_PORT:-4317}:4317"
+      - "${INGEST_HTTP_PORT:-4318}:4318"
+      - "${INGEST_SKYWALKING_PORT:-11800}:11800"   # SkyWalking Agent gRPC
     depends_on:
       - ai-apm-doris-fe
       - ai-apm-doris-be
@@ -98,7 +98,7 @@ services:
     volumes:
       - ./data/web:/app/data
     ports:
-      - "27403:27403"
+      - "${WEB_HTTP_PORT:-27403}:27403"
     depends_on:
       - ai-apm-doris-fe
       - ai-apm-doris-be

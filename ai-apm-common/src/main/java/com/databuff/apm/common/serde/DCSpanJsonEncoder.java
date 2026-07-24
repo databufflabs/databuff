@@ -8,31 +8,45 @@ import com.fasterxml.jackson.core.JsonGenerator;
 
 import java.io.ByteArrayOutputStream;
 import java.io.IOException;
+import java.io.OutputStream;
 
 /**
  * Hand-rolled NDJSON encoder for {@link DcSpan}.
  * Avoids bean-introspection / {@code ObjectMapper.writeValue} cost on the Stream Load hot path.
  * <p>
- * The {@code meta} field is written via Jackson's native {@link JsonGenerator#writeStringField},
- * which uses the optimized {@code UTF8JsonGenerator._writeStringSegment} escaper. The
- * stringified-JSON content is produced once in {@code OtelConverter.buildDcSpan} (via
- * {@link OtelAttributeMaps#encode}) and re-escaped by Jackson here; profiling showed Jackson's
- * native escaper beats a hand-rolled {@code StringBuilder}+{@code writeRawValue} path.
+ * {@code meta} is a Doris VARCHAR holding JSON text. The working {@link DcSpan#metaMap} is
+ * stringified once via lightweight {@link OtelAttributeMaps#encode} (no ObjectMapper), then
+ * written with Jackson's {@link JsonGenerator#writeString} so the outer NDJSON escapes it as a
+ * JSON string field. Nested-object wire form was rejected: decoder / Stream Load expect a string.
  */
 public final class DCSpanJsonEncoder {
 
     private static final JsonFactory JSON_FACTORY = new JsonFactory();
     private static final ThreadLocal<ByteArrayOutputStream> BUFFERS =
             ThreadLocal.withInitial(() -> new ByteArrayOutputStream(2048));
+    private static final ThreadLocal<char[]> META_CHARS =
+            ThreadLocal.withInitial(() -> new char[512]);
 
     private DCSpanJsonEncoder() {
     }
 
+    /**
+     * Encode into a fresh {@code byte[]} (tests / cluster forward). Prefer {@link #encodeTo}
+     * on the Stream Load path to avoid an extra copy.
+     */
     public static byte[] encode(DcSpan span) throws IOException {
-        OtelAttributeMaps.materialize(span);
         ByteArrayOutputStream buffer = BUFFERS.get();
         buffer.reset();
-        try (JsonGenerator gen = JSON_FACTORY.createGenerator(buffer)) {
+        encodeTo(span, buffer);
+        return buffer.toByteArray();
+    }
+
+    /** Write one JSON object (no trailing newline) to {@code out}. Does not close {@code out}. */
+    public static void encodeTo(DcSpan span, OutputStream out) throws IOException {
+        OtelAttributeMaps.materialize(span);
+        JsonGenerator gen = JSON_FACTORY.createGenerator(out);
+        gen.disable(JsonGenerator.Feature.AUTO_CLOSE_TARGET);
+        try {
             gen.writeStartObject();
             gen.writeNumberField("minutes", span.minutes);
             writeString(gen, "serviceId", span.serviceId);
@@ -60,7 +74,7 @@ public final class DCSpanJsonEncoder {
             gen.writeNumberField("duration", span.duration);
             gen.writeNumberField("start", span.start);
             writeString(gen, "host_id", span.host_id);
-            writeString(gen, "meta", DorisVarcharLimits.truncate(span.meta, DorisVarcharLimits.SPAN_META));
+            writeMeta(gen, span.meta);
             writeString(gen, "name", span.name);
             gen.writeNumberField("isOut", span.isOut);
             writeString(gen, "metrics", DorisVarcharLimits.truncate(span.metrics, DorisVarcharLimits.SPAN_METRICS));
@@ -73,8 +87,25 @@ public final class DCSpanJsonEncoder {
             writeString(gen, "meta.http.url",
                     DorisVarcharLimits.truncate(span.metaHttpUrl, DorisVarcharLimits.URL));
             gen.writeEndObject();
+        } finally {
+            gen.close();
         }
-        return buffer.toByteArray();
+    }
+
+    private static void writeMeta(JsonGenerator gen, String meta) throws IOException {
+        String truncated = DorisVarcharLimits.truncate(meta, DorisVarcharLimits.SPAN_META);
+        if (truncated == null) {
+            return;
+        }
+        int len = truncated.length();
+        char[] buf = META_CHARS.get();
+        if (buf.length < len) {
+            buf = new char[len];
+            META_CHARS.set(buf);
+        }
+        truncated.getChars(0, len, buf, 0);
+        gen.writeFieldName("meta");
+        gen.writeString(buf, 0, len);
     }
 
     private static void writeString(JsonGenerator gen, String field, String value) throws IOException {

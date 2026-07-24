@@ -41,8 +41,8 @@ class TraceComponentTest {
 
     @Test
     void ignoresNonTraceEvents() {
-        aggregateComponent = IngestTestComponents.aggregate(new DorisBatchWriter(10));
-        traceComponent = IngestTestComponents.trace(aggregateComponent, new DorisBatchWriter(10));
+        aggregateComponent = IngestTestComponents.aggregate(new DorisBatchWriter());
+        traceComponent = IngestTestComponents.trace(aggregateComponent, new DorisBatchWriter());
         aggregateComponent.start(1);
         traceComponent.start(1);
 
@@ -55,8 +55,8 @@ class TraceComponentTest {
 
     @Test
     void countsTraceEvents() throws Exception {
-        aggregateComponent = IngestTestComponents.aggregate(new DorisBatchWriter(10));
-        traceComponent = IngestTestComponents.trace(aggregateComponent, new DorisBatchWriter(10));
+        aggregateComponent = IngestTestComponents.aggregate(new DorisBatchWriter());
+        traceComponent = IngestTestComponents.trace(aggregateComponent, new DorisBatchWriter());
         aggregateComponent.start(1);
         traceComponent.start(1);
 
@@ -81,8 +81,8 @@ class TraceComponentTest {
 
     @Test
     void flushesPendingSpansOnClose() throws Exception {
-        DorisBatchWriter traceWriter = new DorisBatchWriter(10);
-        aggregateComponent = IngestTestComponents.aggregate(new DorisBatchWriter(10));
+        DorisBatchWriter traceWriter = new DorisBatchWriter();
+        aggregateComponent = IngestTestComponents.aggregate(new DorisBatchWriter());
         traceComponent = IngestTestComponents.trace(aggregateComponent, traceWriter, 200L);
         aggregateComponent.start(1);
         traceComponent.start(1);
@@ -119,8 +119,8 @@ class TraceComponentTest {
         serviceRegistry.start();
         IngestMetaCache metaCache = new IngestMetaCache(registry, serviceRegistry);
 
-        aggregateComponent = IngestTestComponents.aggregate(new DorisBatchWriter(10));
-        traceComponent = IngestTestComponents.trace(aggregateComponent, new DorisBatchWriter(10), metaCache, 200L);
+        aggregateComponent = IngestTestComponents.aggregate(new DorisBatchWriter());
+        traceComponent = IngestTestComponents.trace(aggregateComponent, new DorisBatchWriter(), metaCache, 200L);
         aggregateComponent.start(1);
         traceComponent.start(1);
 
@@ -159,11 +159,11 @@ class TraceComponentTest {
 
     @Test
     void dropsSpansMatchingResourceIgnoreFilter() throws Exception {
-        DorisBatchWriter traceWriter = new DorisBatchWriter(10);
+        DorisBatchWriter traceWriter = new DorisBatchWriter();
         SpanResourceIgnoreFilter filter = new SpanResourceIgnoreFilter(
                 List.of("/actuator/prometheus"),
                 List.of("^/health$"));
-        aggregateComponent = IngestTestComponents.aggregate(new DorisBatchWriter(10));
+        aggregateComponent = IngestTestComponents.aggregate(new DorisBatchWriter());
         traceComponent = IngestTestComponents.trace(
                 aggregateComponent, traceWriter, null, filter, 200L);
         aggregateComponent.start(1);

@@ -25,7 +25,7 @@ class TraceMinuteMetricAggregatorTest {
 
     @Test
     void mergesSameMinuteBucketLocallyBeforeFlush() throws Exception {
-        DorisBatchWriter writer = new DorisBatchWriter(64);
+        DorisBatchWriter writer = new DorisBatchWriter();
         aggregator = new TraceMinuteMetricAggregator(
                 new ClusterAggregator("n1"),
                 TestClusterMembership.standalone("n1"),
@@ -53,7 +53,7 @@ class TraceMinuteMetricAggregatorTest {
                 new ClusterAggregator("n2"),
                 membership,
                 forwarder,
-                MetricWriteRouter.singleTable(new DorisBatchWriter(64)));
+                MetricWriteRouter.singleTable(new DorisBatchWriter()));
 
         long windowMs = 1_700_000_040_000L;
         String partitionKey = TraceMetricMinuteBucket.aggregationPartitionKey(sampleServiceMetric(windowMs, 1, 0, 10));
@@ -69,7 +69,7 @@ class TraceMinuteMetricAggregatorTest {
 
     @Test
     void flushTickWaitsLateFlushGraceBeforeReFlush() throws Exception {
-        DorisBatchWriter writer = new DorisBatchWriter(64);
+        DorisBatchWriter writer = new DorisBatchWriter();
         aggregator = new TraceMinuteMetricAggregator(
                 new ClusterAggregator("n1"),
                 TestClusterMembership.standalone("n1"),
@@ -92,7 +92,7 @@ class TraceMinuteMetricAggregatorTest {
 
     @Test
     void reFlushesClosedWindowWhenLateMetricsArrive() throws Exception {
-        DorisBatchWriter writer = new DorisBatchWriter(64);
+        DorisBatchWriter writer = new DorisBatchWriter();
         aggregator = new TraceMinuteMetricAggregator(
                 new ClusterAggregator("n1"),
                 TestClusterMembership.standalone("n1"),
@@ -115,7 +115,7 @@ class TraceMinuteMetricAggregatorTest {
         membership.setMembers(java.util.List.of("n1", "n2"));
         membership.setEndpoint("n1", "127.0.0.1:18112");
         membership.setEndpoint("n2", "127.0.0.1:18113");
-        DorisBatchWriter writer = new DorisBatchWriter(64);
+        DorisBatchWriter writer = new DorisBatchWriter();
         aggregator = new TraceMinuteMetricAggregator(
                 new ClusterAggregator("n1"),
                 membership,

@@ -96,15 +96,12 @@ export default class ServiceDetail extends Vue {
 
   private serviceInstanceList: any[] = [];
 
-  private tabStatus: any[] = [];
-
-
   private tabnavs: any[] = [
     { label: i18n.t('modules.views.appMonitor.serviceDetail.s_718e0b79') as string, labelKey: 'modules.views.appMonitor.serviceDetail.s_718e0b79', value: 'tab-relation' },
-    { label: i18n.t('modules.views.appMonitor.resourceDetail.s_6ea1fe6b') as string, labelKey: 'modules.views.appMonitor.resourceDetail.s_6ea1fe6b', value: 'tab-baseinfo', dot: false },
+    { label: i18n.t('modules.views.appMonitor.resourceDetail.s_6ea1fe6b') as string, labelKey: 'modules.views.appMonitor.resourceDetail.s_6ea1fe6b', value: 'tab-baseinfo' },
     { label: i18n.t('modules.views.appMonitor.serviceDetail.s_1ff73929') as string, labelKey: 'modules.views.appMonitor.serviceDetail.s_1ff73929', value: 'tab-alarm' },
-    { label: i18n.t('modules.views.appMonitor.serviceDetail.s_244b8532') as string, labelKey: 'modules.views.appMonitor.serviceDetail.s_244b8532', value: 'tab-resource', match: ['web'], dot: false },
-    { label: i18n.t('modules.views.appMonitor.serviceDetail.s_84d31a52') as string, labelKey: 'modules.views.appMonitor.serviceDetail.s_84d31a52', value: 'tab-jvm', match: ['web'], dot: false },
+    { label: i18n.t('modules.views.appMonitor.serviceDetail.s_244b8532') as string, labelKey: 'modules.views.appMonitor.serviceDetail.s_244b8532', value: 'tab-resource', match: ['web'] },
+    { label: i18n.t('modules.views.appMonitor.serviceDetail.s_84d31a52') as string, labelKey: 'modules.views.appMonitor.serviceDetail.s_84d31a52', value: 'tab-jvm', match: ['web'] },
     { label: i18n.t('modules.views.appMonitor.serviceDetail.s_5248c536') as string, labelKey: 'modules.views.appMonitor.serviceDetail.s_5248c536', value: 'tab-sql', match: ['db'] },
     { label: i18n.t('modules.views.appMonitor.serviceDetail.s_828d5325') as string, labelKey: 'modules.views.appMonitor.serviceDetail.s_828d5325', value: 'tab-threadpool', match: ['web'] },
   ];
@@ -246,7 +243,6 @@ export default class ServiceDetail extends Vue {
         })
       })
     }
-    await this.serviceTabnavStatus();
     this.detailLoading = false;
   }
 
@@ -358,21 +354,6 @@ export default class ServiceDetail extends Vue {
     })
   }
 
-  // 服务页签状态
-  private async serviceTabnavStatus () {
-    const { fromTime, toTime } = this.getGlobalTimeV2();
-    const { sid, si } = this.$route.query;
-    const serviceInstance = decodeURIComponent(String(si));
-    const { error, result } = await toAsyncWait(ApmApi.serviceTabnavStatus({ serviceId: decodeURIComponent(String(sid)), fromTime: new Date(fromTime).valueOf(), toTime: new Date(toTime).valueOf(), serviceInstance }));
-    if (!error) {
-      this.tabStatus = Array.isArray(result?.data) ? result?.data : [];
-    } else {
-      this.tabStatus = []
-    }
-    this.tabnavs.forEach((t) => {
-      t.dot = this.tabStatus.includes(t.value)
-    })
-  }
 }
 </script>
 <style lang="scss" scoped>

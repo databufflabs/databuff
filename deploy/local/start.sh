@@ -151,17 +151,17 @@ if [ "${START_SKIP_READY:-0}" != "1" ]; then
   for _svc in "${UP_SERVICES[@]}"; do
     case "$_svc" in
       "$INGEST_SERVICE")
-        wait_for_http_ready "http://127.0.0.1:4318/health" "ingest" "${APM_READY_TIMEOUT:-300}" &
+        wait_for_container_ready "$INGEST_SERVICE" "ingest" "${APM_READY_TIMEOUT:-300}" &
         _wait_pids+=("$!")
         ;;
       "$WEB_SERVICE")
-        wait_for_http_ready "http://127.0.0.1:27403/health" "web" "${APM_READY_TIMEOUT:-300}" &
+        wait_for_container_ready "$WEB_SERVICE" "web" "${APM_READY_TIMEOUT:-300}" &
         _wait_pids+=("$!")
         ;;
     esac
   done
   if [ ${#_wait_pids[@]} -gt 0 ]; then
-    echo "[start] waiting for selected services to become ready ..."
+    echo "[start] waiting for selected services container health ..."
     for _pid in "${_wait_pids[@]}"; do
       wait "$_pid" || _wait_failed=1
     done

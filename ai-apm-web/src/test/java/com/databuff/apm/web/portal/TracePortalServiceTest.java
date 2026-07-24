@@ -316,65 +316,68 @@ class TracePortalServiceTest {
     }
 
     @Test
-    void buildsTabnavStatusFromSpans() {
-        TraceQueryService traceQuery = mock(TraceQueryService.class);
-        when(traceQuery.spanList(any())).thenReturn(List.of(
-                new SpanSummary(
-                        "t1", "s1", "demo-order", null, "GET /orders",
-                        "2026-06-01 12:00:00", 2_000_000_000L, 1,
-                        "host-1", "GET /orders", "host-1", 500, "timeout")));
+    void queryParamsUsesMetricFacetsWithoutTraceId() throws Exception {
+        ApmReadRepository reader = mock(ApmReadRepository.class);
+        when(reader.queryStringMap(anyString(), anyString(), anyString())).thenAnswer(invocation -> {
+            String sql = invocation.getArgument(0, String.class);
+            assertThat(sql).contains("metric_service_trace");
+            assertThat(sql).contains("map_key");
+            return Map.of("demo-order", "demo-order-id");
+        });
+        when(reader.queryIntMap(anyString(), anyString(), anyString())).thenAnswer(invocation -> {
+            String sql = invocation.getArgument(0, String.class);
+            assertThat(sql).contains("`resource`");
+            return Map.of("GET /orders", 12);
+        });
+        when(reader.queryRows(anyString(), org.mockito.ArgumentMatchers.anyInt())).thenReturn(List.of(
+                Map.of("min_duration", 1_000_000L, "max_duration", 3_000_000L)));
 
+        TraceQueryService traceQuery = mock(TraceQueryService.class);
         TracePortalService service = new TracePortalService(
-                traceQuery, mock(ServiceFlowService.class), mock(ApmReadRepository.class), TestStorageSupport.storage());
-        List<String> tabs = service.tabnavStatus(Map.of(
+                traceQuery, mock(ServiceFlowService.class), reader, TestStorageSupport.storage());
+        Map<String, Object> data = service.queryParams(Map.of(
                 "serviceId", "demo-order",
-                "resource", "GET /orders",
+                "componentType", "service.trace",
                 "fromTime", "2026-06-01 11:00:00",
                 "toTime", "2026-06-01 13:00:00"));
 
-        assertThat(tabs).contains("tab-error", "tab-slow", "tab-log");
-        assertThat(tabs).doesNotContain("tab-relation", "tab-baseinfo");
+        verify(traceQuery, never()).spanList(any());
+        verify(traceQuery, never()).traceDetail(any());
+        assertThat(data.get("status")).isEqualTo(Map.of("0", 1, "1", 1));
+        assertThat(data.get("service")).isEqualTo(Map.of("demo-order", "demo-order-id"));
+        assertThat(data.get("resource")).isEqualTo(Map.of("GET /orders", 12));
+        assertThat(data.get("duration")).isEqualTo(Map.of("min", 1_000_000L, "max", 3_000_000L));
     }
 
     @Test
-    void tabnavStatusReturnsEmptyWhenNoSpans() {
+    void queryParamsFallsBackToTraceDetailWhenTraceIdPresent() {
         TraceQueryService traceQuery = mock(TraceQueryService.class);
-        when(traceQuery.spanList(any())).thenReturn(List.of());
+        when(traceQuery.traceDetail(any())).thenReturn(List.of(
+                new SpanDetail(
+                        "t1", "s1", "0", "demo-order", "demo-order", "GET /orders",
+                        "2026-06-01 12:00:00", 1_000_000_000L, 2_000_000L, 1,
+                        "host-1", "inst-1", "GET /orders", "http", 1, 0, "{}", "{}",
+                        500, "GET", "http://demo/orders", "timeout")));
 
         TracePortalService service = new TracePortalService(
                 traceQuery, mock(ServiceFlowService.class), mock(ApmReadRepository.class), TestStorageSupport.storage());
-        List<String> tabs = service.tabnavStatus(Map.of(
-                "serviceId", "demo-order",
-                "fromTime", "2026-06-01 11:00:00",
-                "toTime", "2026-06-01 13:00:00"));
+        Map<String, Object> data = service.queryParams(Map.of(
+                "traceId", "t1",
+                "queryParams", List.of("status", "service", "resource", "errorType")));
 
-        assertThat(tabs).isEmpty();
-    }
-
-    @Test
-    void computesResourcePercentFromSpans() {
-        TraceQueryService traceQuery = mock(TraceQueryService.class);
-        when(traceQuery.spanList(any())).thenReturn(List.of(
-                new SpanSummary(
-                        "t1", "s1", "demo-order", null, "GET /orders",
-                        "2026-06-01 12:00:00", 1_000_000L, 0,
-                        "host-1", "GET /orders", "host-1", 200, null),
-                new SpanSummary(
-                        "t2", "s2", "demo-order", null, "GET /orders",
-                        "2026-06-01 12:00:01", 3_000_000L, 0,
-                        "host-1", "GET /orders", "host-1", 200, null)));
-
-        TracePortalService service = new TracePortalService(
-                traceQuery, mock(ServiceFlowService.class), mock(ApmReadRepository.class), TestStorageSupport.storage());
-        Map<String, Object> percent = service.resourcePercent(Map.of(
-                "serviceId", "demo-order",
-                "resource", "GET /orders",
-                "duration", 2_000_000L,
-                "fromTime", "2026-06-01 11:00:00",
-                "toTime", "2026-06-01 13:00:00"));
-
-        assertThat(percent.get("max")).isEqualTo(3_000_000L);
-        assertThat(percent.get("this")).isEqualTo(50);
+        verify(traceQuery).traceDetail(any());
+        @SuppressWarnings("unchecked")
+        Map<String, Integer> status = (Map<String, Integer>) data.get("status");
+        assertThat(status.get("1")).isEqualTo(1);
+        @SuppressWarnings("unchecked")
+        Map<String, String> services = (Map<String, String>) data.get("service");
+        assertThat(services).containsKey("demo-order");
+        @SuppressWarnings("unchecked")
+        Map<String, Integer> resources = (Map<String, Integer>) data.get("resource");
+        assertThat(resources).containsKey("GET /orders");
+        @SuppressWarnings("unchecked")
+        Map<String, Integer> errorTypes = (Map<String, Integer>) data.get("errorType");
+        assertThat(errorTypes).containsKey("timeout");
     }
 
     @Test

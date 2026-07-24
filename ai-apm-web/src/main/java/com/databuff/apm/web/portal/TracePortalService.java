@@ -290,36 +290,108 @@ public class TracePortalService {
         }
     }
 
-    public Map<String, Object> queryParamsV2(Map<String, Object> body) {
-        final List<Map<String, Object>> spans;
+    /**
+     * Portal filter facets for the trace page.
+     * <p>Default path reads {@code metric_service_*} (fast). When {@code traceId}/{@code traceIds}
+     * are present, falls back to span detail for those traces (metrics cannot filter by trace id).
+     */
+    public Map<String, Object> queryParams(Map<String, Object> body) {
         try {
-            spans = loadPortalSpans(body);
+            if (hasTraceIdFilter(body)) {
+                return queryParamsFromSpans(body);
+            }
+            return queryParamsFromMetrics(body);
         } catch (Exception e) {
             return PortalQueryErrors.fail("查询调用链筛选参数", e);
         }
+    }
+
+    private static boolean hasTraceIdFilter(Map<String, Object> body) {
+        String traceId = decodeTraceId(body.get("traceId"));
+        if (traceId != null && !traceId.isBlank()) {
+            return true;
+        }
+        return !parseStringList(body.get("traceIds")).isEmpty();
+    }
+
+    private Map<String, Object> queryParamsFromMetrics(Map<String, Object> body) throws Exception {
+        long now = System.currentTimeMillis();
+        long from = PortalTimeParser.rangeFrom(body, now - 3_600_000L);
+        long to = PortalTimeParser.rangeTo(body, now);
+        String table = resolveQueryParamsMetricTable(body);
+        String extraFilters = buildQueryParamsMetricFilters(body);
+        List<String> fields = resolveQueryParamsFields(body);
+
+        Map<String, Object> data = new LinkedHashMap<>();
+        for (String field : fields) {
+            switch (field) {
+                case "status" -> data.put("status", Map.of("0", 1, "1", 1));
+                case "service" -> data.put("service", readRepository.queryStringMap(
+                        MetricQueryBuilder.metricServiceNameIdMapSql(
+                                metricDatabase, table, from, to, extraFilters, 500),
+                        "map_key",
+                        "map_value"));
+                case "srcService" -> data.put("srcService", loadSrcServiceFacetMap(table, from, to, extraFilters));
+                case "duration" -> data.put("duration", loadMetricDurationRange(table, from, to, extraFilters));
+                default -> {
+                    String column = resolveQueryParamsMetricColumn(field, table);
+                    if (column == null) {
+                        data.put(field, Map.of());
+                    } else {
+                        data.put(field, readRepository.queryIntMap(
+                                MetricQueryBuilder.metricTagCountMapSql(
+                                        metricDatabase, table, column, from, to, extraFilters, 500),
+                                "map_key",
+                                "map_value"));
+                    }
+                }
+            }
+        }
+        return data;
+    }
+
+    private Map<String, Object> queryParamsFromSpans(Map<String, Object> body) {
+        List<Map<String, Object>> spans = loadQueryParamsSpans(body);
+        List<String> fields = resolveQueryParamsFields(body);
 
         Map<String, Integer> status = new LinkedHashMap<>();
         status.put("0", 0);
         status.put("1", 0);
         Map<String, String> services = new LinkedHashMap<>();
-        Map<String, Integer> resources = new LinkedHashMap<>();
+        Map<String, String> srcServices = new LinkedHashMap<>();
+        Map<String, Map<String, Integer>> facetCounts = new LinkedHashMap<>();
         long minDuration = Long.MAX_VALUE;
-        long maxDuration = 0;
+        long maxDuration = 0L;
 
         for (Map<String, Object> span : spans) {
             int error = ServicePortalService.intValue(span.get("error"), 0);
-            status.merge(String.valueOf(error), 1, Integer::sum);
+            status.merge(String.valueOf(error == 0 ? 0 : 1), 1, Integer::sum);
 
             String service = ServicePortalService.stringValue(span.get("service"), null);
             String serviceId = ServicePortalService.stringValue(span.get("serviceId"), service);
-            if (serviceId != null) {
+            if (service != null && serviceId != null) {
                 services.putIfAbsent(service, serviceId);
             }
 
-            String resource = ServicePortalService.stringValue(span.get("resource"), null);
-            if (resource != null) {
-                resources.merge(resource, 1, Integer::sum);
+            String srcService = ServicePortalService.stringValue(span.get("srcService"), null);
+            String srcServiceId = ServicePortalService.stringValue(span.get("srcServiceId"), srcService);
+            if (srcService != null && srcServiceId != null) {
+                srcServices.putIfAbsent(srcService, srcServiceId);
             }
+
+            bumpFacet(facetCounts, "resource", ServicePortalService.stringValue(span.get("resource"), null));
+            bumpFacet(facetCounts, "serviceInstance",
+                    ServicePortalService.stringValue(span.get("serviceInstance"), null));
+            bumpFacet(facetCounts, "srcServiceInstance",
+                    ServicePortalService.stringValue(span.get("srcServiceInstance"), null));
+            bumpFacet(facetCounts, "hostName", ServicePortalService.stringValue(span.get("hostName"), null));
+            bumpFacet(facetCounts, "type", ServicePortalService.stringValue(span.get("type"), null));
+            if (error != 0) {
+                bumpFacet(facetCounts, "errorType", resolvePortalErrorType(span));
+            }
+            bumpFacet(facetCounts, "httpMethod", portalMetaString(span, "http.method"));
+            bumpFacet(facetCounts, "httpStatusCode", portalMetaString(span, "http.status_code"));
+            bumpFacet(facetCounts, "url", portalMetaString(span, "http.url"));
 
             long duration = toLong(span.get("duration"));
             if (duration > 0) {
@@ -329,15 +401,208 @@ public class TracePortalService {
         }
 
         Map<String, Object> data = new LinkedHashMap<>();
-        data.put("status", status);
-        data.put("service", services);
-        data.put("resource", resources);
-        if (spans.isEmpty()) {
-            data.put("duration", Map.of("min", 0, "max", 0));
-        } else {
-            data.put("duration", Map.of("min", minDuration, "max", maxDuration));
+        for (String field : fields) {
+            switch (field) {
+                case "status" -> data.put("status", status);
+                case "service" -> data.put("service", services);
+                case "srcService" -> data.put("srcService", srcServices);
+                case "duration" -> data.put(
+                        "duration",
+                        spans.isEmpty()
+                                ? Map.of("min", 0, "max", 0)
+                                : Map.of("min", minDuration, "max", maxDuration));
+                default -> data.put(field, facetCounts.getOrDefault(field, Map.of()));
+            }
         }
         return data;
+    }
+
+    private List<Map<String, Object>> loadQueryParamsSpans(Map<String, Object> body) {
+        LinkedHashSet<String> traceIds = new LinkedHashSet<>();
+        String traceId = decodeTraceId(body.get("traceId"));
+        if (traceId != null && !traceId.isBlank()) {
+            traceIds.add(traceId);
+        }
+        for (String id : parseStringList(body.get("traceIds"))) {
+            String decoded = decodeTraceId(id);
+            if (decoded != null && !decoded.isBlank()) {
+                traceIds.add(decoded);
+            }
+        }
+        if (traceIds.isEmpty()) {
+            return List.of();
+        }
+        List<Map<String, Object>> spans = new ArrayList<>();
+        int limit = Math.min(traceIds.size(), 100);
+        int i = 0;
+        for (String id : traceIds) {
+            if (i++ >= limit) {
+                break;
+            }
+            spans.addAll(loadTraceDetailPortalSpans(id));
+        }
+        return spans;
+    }
+
+    private Map<String, String> loadSrcServiceFacetMap(
+            String table, long from, long to, String extraFilters) throws Exception {
+        if (!tableHasSrcService(table)) {
+            return Map.of();
+        }
+        List<Map<String, String>> rows = readRepository.queryDistinctSrcServices(
+                MetricQueryBuilder.distinctSrcServicesSql(
+                        metricDatabase, table, from, to, extraFilters, 500));
+        Map<String, String> map = new LinkedHashMap<>();
+        for (Map<String, String> row : rows) {
+            String name = row.get("srcService");
+            String id = row.get("srcServiceId");
+            if (name != null && !name.isBlank()) {
+                map.putIfAbsent(name, id == null || id.isBlank() ? name : id);
+            }
+        }
+        return map;
+    }
+
+    private Map<String, Object> loadMetricDurationRange(
+            String table, long from, long to, String extraFilters) throws Exception {
+        List<Map<String, Object>> rows = readRepository.queryRows(
+                MetricQueryBuilder.metricDurationRangeSql(metricDatabase, table, from, to, extraFilters),
+                1);
+        if (rows.isEmpty()) {
+            return Map.of("min", 0, "max", 0);
+        }
+        Map<String, Object> row = rows.get(0);
+        return Map.of(
+                "min", toLong(row.get("min_duration")),
+                "max", toLong(row.get("max_duration")));
+    }
+
+    private static List<String> resolveQueryParamsFields(Map<String, Object> body) {
+        List<String> requested = parseStringList(body.get("queryParams"));
+        if (!requested.isEmpty()) {
+            return requested.stream()
+                    .filter(field -> field != null && !field.isBlank())
+                    .distinct()
+                    .toList();
+        }
+        return List.of("status", "service", "resource", "duration");
+    }
+
+    private static String resolveQueryParamsMetricTable(Map<String, Object> body) {
+        String componentType = ServicePortalService.stringValue(body.get("componentType"), "service.trace");
+        return switch (componentType) {
+            case "service.http" -> DorisTableNames.METRIC_SERVICE_HTTP;
+            case "service.rpc" -> DorisTableNames.METRIC_SERVICE_RPC;
+            case "service.db" -> DorisTableNames.METRIC_SERVICE_DB;
+            case "service.mq" -> DorisTableNames.METRIC_SERVICE_MQ;
+            case "service.redis" -> DorisTableNames.METRIC_SERVICE_REDIS;
+            default -> DorisTableNames.METRIC_SERVICE_TRACE;
+        };
+    }
+
+    private String buildQueryParamsMetricFilters(Map<String, Object> body) {
+        StringBuilder filters = new StringBuilder();
+        List<String> serviceKeys = resolveTraceServiceKeys(body);
+        if (serviceKeys.size() == 1) {
+            filters.append(" AND `service_id` = '")
+                    .append(escapeSqlLiteral(serviceKeys.get(0)))
+                    .append("' ");
+        } else if (serviceKeys.size() > 1) {
+            filters.append(" AND `service_id` IN (")
+                    .append(serviceKeys.stream()
+                            .map(id -> "'" + escapeSqlLiteral(id) + "'")
+                            .collect(Collectors.joining(", ")))
+                    .append(") ");
+        }
+        String serviceInstance = ServicePortalService.stringValue(body.get("serviceInstance"), null);
+        if (serviceInstance == null) {
+            serviceInstance = ServicePortalService.stringValue(body.get("si"), null);
+        }
+        if (serviceInstance != null && !serviceInstance.isBlank()) {
+            filters.append(" AND `service_instance` = '")
+                    .append(escapeSqlLiteral(serviceInstance))
+                    .append("' ");
+        }
+        List<String> serviceInstances = parseStringList(body.get("serviceInstances"));
+        if (!serviceInstances.isEmpty()) {
+            filters.append(" AND `service_instance` IN (")
+                    .append(serviceInstances.stream()
+                            .map(id -> "'" + escapeSqlLiteral(id) + "'")
+                            .collect(Collectors.joining(", ")))
+                    .append(") ");
+        }
+        return filters.toString();
+    }
+
+    private static String resolveQueryParamsMetricColumn(String field, String table) {
+        return switch (field) {
+            case "resource" -> "resource";
+            case "serviceInstance" -> "service_instance";
+            case "srcServiceInstance" -> tableHasSrcService(table) ? "srcServiceInstance" : null;
+            case "hostName" -> DorisTableNames.METRIC_SERVICE_TRACE.equals(table) ? "hostName" : null;
+            case "httpMethod" -> columnIfPresent(table, "httpMethod",
+                    DorisTableNames.METRIC_SERVICE_TRACE,
+                    DorisTableNames.METRIC_SERVICE_HTTP);
+            case "httpStatusCode" -> {
+                if (DorisTableNames.METRIC_SERVICE_HTTP.equals(table)) {
+                    yield "httpCode";
+                }
+                if (DorisTableNames.METRIC_SERVICE_TRACE.equals(table)) {
+                    yield "httpStatusCode";
+                }
+                yield null;
+            }
+            case "errorType" -> DorisTableNames.METRIC_SERVICE_TRACE.equals(table) ? "errorType" : null;
+            case "url" -> DorisTableNames.METRIC_SERVICE_HTTP.equals(table) ? "url" : null;
+            case "type" -> DorisTableNames.METRIC_SERVICE_MQ.equals(table) ? "type" : null;
+            case "topic" -> DorisTableNames.METRIC_SERVICE_MQ.equals(table) ? "topic" : null;
+            case "group" -> DorisTableNames.METRIC_SERVICE_MQ.equals(table) ? "group" : null;
+            case "partition" -> DorisTableNames.METRIC_SERVICE_MQ.equals(table) ? "partition" : null;
+            case "broker" -> DorisTableNames.METRIC_SERVICE_MQ.equals(table) ? "broker" : null;
+            case "sqlDatabase" -> DorisTableNames.METRIC_SERVICE_DB.equals(table) ? "sqlDatabase" : null;
+            case "dbType" -> DorisTableNames.METRIC_SERVICE_DB.equals(table) ? "dbType" : null;
+            case "sqlOperation" -> DorisTableNames.METRIC_SERVICE_DB.equals(table) ? "sqlOperation" : null;
+            default -> null;
+        };
+    }
+
+    private static String columnIfPresent(String table, String column, String... allowedTables) {
+        for (String allowed : allowedTables) {
+            if (allowed.equals(table)) {
+                return column;
+            }
+        }
+        return null;
+    }
+
+    private static boolean tableHasSrcService(String table) {
+        return DorisTableNames.METRIC_SERVICE_HTTP.equals(table)
+                || DorisTableNames.METRIC_SERVICE_RPC.equals(table)
+                || DorisTableNames.METRIC_SERVICE_DB.equals(table)
+                || DorisTableNames.METRIC_SERVICE_MQ.equals(table)
+                || DorisTableNames.METRIC_SERVICE_REDIS.equals(table);
+    }
+
+    private static void bumpFacet(
+            Map<String, Map<String, Integer>> facetCounts, String field, String value) {
+        if (value == null || value.isBlank()) {
+            return;
+        }
+        facetCounts.computeIfAbsent(field, ignored -> new LinkedHashMap<>())
+                .merge(value, 1, Integer::sum);
+    }
+
+    private static String portalMetaString(Map<String, Object> span, String key) {
+        Object metaObj = span.get("meta");
+        if (!(metaObj instanceof Map<?, ?> meta)) {
+            return null;
+        }
+        Object value = meta.get(key);
+        return value == null ? null : String.valueOf(value);
+    }
+
+    private static String escapeSqlLiteral(String value) {
+        return value == null ? "" : value.replace("'", "''");
     }
 
     public Map<String, Object> cntGraphStats(Map<String, Object> body) {
@@ -661,72 +926,6 @@ public class TracePortalService {
                 new TraceQueryService.SpanListRequest(null, from, to, limit));
     }
 
-    public List<String> tabnavStatus(Map<String, Object> body) {
-        Map<String, Object> query = new LinkedHashMap<>(body);
-        applyInterfaceFilterToQuery(query);
-        List<Map<String, Object>> spans = filterPortalSpans(loadPortalSpans(query), query);
-
-        List<String> tabs = new ArrayList<>();
-        if (spans.stream().anyMatch(span -> ServicePortalService.intValue(span.get("error"), 0) == 1)) {
-            tabs.add("tab-error");
-        }
-        if (spans.stream().anyMatch(span -> toLong(span.get("duration")) >= 1_000_000_000L)) {
-            tabs.add("tab-slow");
-        }
-        if (!spans.isEmpty()) {
-            tabs.add("tab-log");
-        }
-        return tabs;
-    }
-
-    public Map<String, Object> resourcePercent(Map<String, Object> body) {
-        long duration = toLong(body.get("duration"));
-        Map<String, Object> query = new LinkedHashMap<>(body);
-        applyInterfaceFilterToQuery(query);
-        String serviceId = resolveService(body);
-        if (serviceId != null && !serviceId.isBlank()) {
-            query.put("serviceId", serviceId);
-        }
-
-        List<Long> durations = filterPortalSpans(loadPortalSpans(query), query).stream()
-                .map(span -> toLong(span.get("duration")))
-                .filter(value -> value > 0)
-                .sorted()
-                .toList();
-
-        if (durations.isEmpty()) {
-            Map<String, Object> fallback = new LinkedHashMap<>();
-            fallback.put("this", 50);
-            fallback.put("p99", duration);
-            fallback.put("p95", duration);
-            fallback.put("p90", duration);
-            fallback.put("p75", duration);
-            fallback.put("p50", duration);
-            fallback.put("max", duration);
-            return fallback;
-        }
-
-        Map<String, Object> result = new LinkedHashMap<>();
-        result.put("max", durations.get(durations.size() - 1));
-        result.put("p50", percentile(durations, 0.5));
-        result.put("p75", percentile(durations, 0.75));
-        result.put("p90", percentile(durations, 0.9));
-        result.put("p95", percentile(durations, 0.95));
-        result.put("p99", percentile(durations, 0.99));
-        result.put("this", percentileRank(duration, durations));
-        return result;
-    }
-
-    private static int percentileRank(long value, List<Long> sortedDurations) {
-        int lessOrEqual = 0;
-        for (long current : sortedDurations) {
-            if (current <= value) {
-                lessOrEqual++;
-            }
-        }
-        return (int) Math.round(100.0 * lessOrEqual / sortedDurations.size());
-    }
-
     private Map<String, Object> buildFlowNode(
             String serviceId,
             List<ServiceFlowEdge> edges,
@@ -956,19 +1155,6 @@ public class TracePortalService {
             }
         }
         return ServicePortalService.decodeResourceValue(decodeQueryValue(body.get("resource")));
-    }
-
-    private static void applyInterfaceFilterToQuery(Map<String, Object> query) {
-        String filterKey = resolveInterfaceUrlFilter(query);
-        if (filterKey == null || filterKey.isBlank()) {
-            return;
-        }
-        if ("service.http".equals(ServicePortalService.stringValue(query.get("componentType"), null))) {
-            query.put("url", filterKey);
-            query.remove("resource");
-        } else {
-            query.put("resource", filterKey);
-        }
     }
 
     private List<String> resolveTraceServiceKeys(Map<String, Object> body) {
@@ -1503,15 +1689,6 @@ public class TracePortalService {
         graphs.put("errorCnts", TimeSeriesFillUtil.fillStringKeyObjectMap(errorCnts, from, to, interval));
         graphs.put("avgLatencys", TimeSeriesFillUtil.fillStringKeyMap(avgLatencys, from, to, interval));
         return graphs;
-    }
-
-    private static long percentile(List<Long> values, double ratio) {
-        if (values.isEmpty()) {
-            return 0L;
-        }
-        List<Long> sorted = values.stream().sorted().toList();
-        int index = Math.min(sorted.size() - 1, (int) Math.floor((sorted.size() - 1) * ratio));
-        return sorted.get(index);
     }
 
     private static Map<String, Object> emptyGraphs(long from, long to, int interval) {

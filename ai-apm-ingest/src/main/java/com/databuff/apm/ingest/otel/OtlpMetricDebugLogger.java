@@ -17,6 +17,10 @@ public final class OtlpMetricDebugLogger {
     private OtlpMetricDebugLogger() {
     }
 
+    public static boolean isDebugEnabled() {
+        return log.isDebugEnabled();
+    }
+
     public static void receivedBatch(int resourceCount, int metricPointCount) {
         if (!log.isDebugEnabled()) {
             return;

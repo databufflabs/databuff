@@ -17,8 +17,6 @@ import org.apache.skywalking.apm.network.language.agent.v3.SpanType;
 import org.apache.skywalking.apm.network.language.agent.v3.SpanLayer;
 
 import java.io.IOException;
-import java.time.Instant;
-import java.time.format.DateTimeFormatter;
 import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.LinkedHashMap;
@@ -27,8 +25,6 @@ import java.util.Map;
 
 /** SkyWalking SegmentObject → {@link DcSpan} list. */
 public final class SkyWalkingConverter {
-
-    private static final DateTimeFormatter DATETIME = ApmTimeZones.WALL_CLOCK;
 
     public List<ConvertedTrace> convertSegment(SegmentObject segment) {
         if (segment == null || segment.getService().isBlank()) {
@@ -82,7 +78,7 @@ public final class SkyWalkingConverter {
         dc.start = start;
         dc.end = end;
         dc.duration = duration;
-        dc.startTime = DATETIME.format(Instant.ofEpochSecond(0, start));
+        dc.startTime = ApmTimeZones.formatWallClock(start / 1_000_000L);
         dc.error = span.getIsError() ? 1 : 0;
         dc.slow = duration > 500_000_000L ? 1 : 0;
         dc.type = mapSpanType(span.getSpanType());
@@ -97,7 +93,6 @@ public final class SkyWalkingConverter {
         normalizeSkyWalkingRpcMeta(span, meta);
         SkyWalkingMetaNormalizer.normalize(span, meta);
         applyNormalizedDbResource(dc, meta);
-        dc.meta = OtelAttributeMaps.encode(meta);
         OtelAttributeMaps.cache(dc, meta);
         return dc;
     }

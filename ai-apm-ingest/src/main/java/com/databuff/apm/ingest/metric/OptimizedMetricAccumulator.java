@@ -1,22 +1,17 @@
 package com.databuff.apm.ingest.metric;
 
-import com.databuff.apm.common.metric.MetricSchemaRegistry;
 import com.databuff.apm.common.model.OptimizedMetric;
+import com.databuff.apm.common.serde.MetricDorisJsonRow;
 import com.databuff.apm.common.serde.OptimizedMetricUtil;
-import com.databuff.apm.common.serde.ReusableJson;
-import com.databuff.apm.common.storage.MetricRowTimeUtil;
-import com.fasterxml.jackson.core.JsonProcessingException;
-import com.fasterxml.jackson.databind.ObjectMapper;
+import com.databuff.apm.common.storage.DorisJsonRow;
 
-import java.util.HashMap;
+import java.util.ArrayList;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
 
-/** Merges optimized metrics and encodes Doris JSON rows via {@link MetricSchemaRegistry}. */
+/** Merges optimized metrics; Doris encoding is deferred via {@link MetricDorisJsonRow}. */
 public final class OptimizedMetricAccumulator {
-
-    private static final ObjectMapper JSON = new ObjectMapper();
 
     private final Map<Integer, OptimizedMetric> byTsId = new LinkedHashMap<>();
 
@@ -39,15 +34,16 @@ public final class OptimizedMetricAccumulator {
     }
 
     public List<OptimizedMetric> drainMetrics() {
-        List<OptimizedMetric> metrics = new java.util.ArrayList<>(byTsId.values());
+        List<OptimizedMetric> metrics = new ArrayList<>(byTsId.values());
         byTsId.clear();
         return metrics;
     }
 
-    public List<byte[]> drainRows() throws JsonProcessingException {
-        List<byte[]> rows = new java.util.ArrayList<>(byTsId.size());
+    /** Test helper: materialize NDJSON bytes (production offer path stays lazy). */
+    public List<byte[]> drainRows() {
+        List<byte[]> rows = new ArrayList<>(byTsId.size());
         for (OptimizedMetric metric : byTsId.values()) {
-            rows.add(toDorisRow(metric));
+            rows.add(DorisJsonRow.toByteArray(toDorisJsonRow(metric)));
         }
         byTsId.clear();
         return rows;
@@ -57,11 +53,7 @@ public final class OptimizedMetricAccumulator {
         return byTsId.size();
     }
 
-    static byte[] toDorisRow(OptimizedMetric metric) throws JsonProcessingException {
-        Map<String, Object> row = new HashMap<>();
-        MetricRowTimeUtil.putTsAndMetricTime(row, metric.timestamp() / 1_000_000L);
-        MetricSchemaRegistry.applyTagValues(row, metric.measurement(), metric.tagValuesRef());
-        MetricSchemaRegistry.applyFieldValues(row, metric.measurement(), metric.fieldValuesRef());
-        return ReusableJson.writeValueAsBytes(JSON, row);
+    static DorisJsonRow toDorisJsonRow(OptimizedMetric metric) {
+        return MetricDorisJsonRow.of(metric);
     }
 }

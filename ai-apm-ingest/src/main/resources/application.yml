@@ -15,7 +15,7 @@ management:
 
 ingest:
   pipeline:
-    trace-tasks: ${INGEST_TRACE_TASKS:16}
+    trace-tasks: ${INGEST_TRACE_TASKS:8}
     metric-tasks: ${INGEST_METRIC_TASKS:4}
     aggregate-tasks: ${INGEST_AGGREGATE_TASKS:4}
     trace-buffer-size: ${INGEST_TRACE_BUFFER_SIZE:8192}
@@ -67,7 +67,18 @@ ingest:
     log-body-max-length: ${INGEST_DORIS_LOG_BODY_MAX_LENGTH:1048576}
     # Consecutive Stream Load failures per sink before dropping the batch (fail-soft). Env: INGEST_DORIS_STREAM_LOAD_MAX_FAILURES
     stream-load-max-failures: ${INGEST_DORIS_STREAM_LOAD_MAX_FAILURES:3}
-    flush-interval-ms: ${INGEST_DORIS_FLUSH_INTERVAL_MS:8000}
-    flush-timeout-ms: ${INGEST_DORIS_FLUSH_TIMEOUT_MS:45000}
+    # Parallel in-flight Stream Loads for trace_dc_span (ready-queue consumers). Env: INGEST_DORIS_TRACE_FLUSH_CONCURRENCY
+    # Default 1: each load adds tablet versions; parallel loads blow past Doris's ~2000 version cap on single BE.
+    trace-flush-concurrency: ${INGEST_DORIS_TRACE_FLUSH_CONCURRENCY:1}
+    # Primary flush trigger: per-thread buffer hand-off at this estimated NDJSON size (default 32 MiB).
+    # Prefer large/infrequent loads over small/frequent ones (BE: "Please reduce the frequency of loading data").
+    flush-batch-bytes: ${INGEST_DORIS_FLUSH_BATCH_BYTES:33554432}
+    # Safety poll for leftover ready-queue batches (size flush is mostly async on hand-off).
+    # Only sinks with hasReady() are touched; default 5s to cut idle scheduler noise.
+    flush-check-interval-ms: ${INGEST_DORIS_FLUSH_CHECK_INTERVAL_MS:5000}
+    # Time fallback: rotate thread-local buffers and flush remaining rows (default 30s).
+    flush-interval-ms: ${INGEST_DORIS_FLUSH_INTERVAL_MS:30000}
+    # Larger batches need a longer Stream Load wait (default 60s).
+    flush-timeout-ms: ${INGEST_DORIS_FLUSH_TIMEOUT_MS:60000}
     username: ${DORIS_USER:root}
     password: ${DORIS_PASSWORD:}

@@ -167,6 +167,21 @@ class SerdeRoundTripTest {
     }
 
     @Test
+    void spanEncoderMaterializesMetaMapWithoutObjectMapperShape() throws Exception {
+        DcSpan span = sampleSpan();
+        span.meta = null;
+        java.util.LinkedHashMap<String, String> meta = new java.util.LinkedHashMap<>();
+        meta.put("http.method", "GET");
+        meta.put("quote", "say \"hi\"");
+        com.databuff.apm.common.meta.OtelAttributeMaps.cache(span, meta);
+
+        byte[] encoded = DCSpanJsonEncoder.encode(span);
+        DcSpan decoded = DCSpanJsonDecoder.decode(encoded, true);
+        assertThat(decoded.meta).isEqualTo("{\"http.method\":\"GET\",\"quote\":\"say \\\"hi\\\"\"}");
+        assertThat(span.meta).isEqualTo(decoded.meta);
+    }
+
+    @Test
     void spanDecoderWithoutIgnoreMap() throws Exception {
         DcSpan span = sampleSpan();
         span.meta = "{\"k\":\"v\"}";

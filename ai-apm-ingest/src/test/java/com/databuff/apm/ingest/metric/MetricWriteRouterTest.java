@@ -1,5 +1,7 @@
 package com.databuff.apm.ingest.metric;
 
+import com.databuff.apm.common.storage.DorisJsonRow;
+
 import com.databuff.apm.common.model.OptimizedMetric;
 import com.databuff.apm.common.storage.DorisBatchWriter;
 import com.databuff.apm.common.storage.DorisTableNames;
@@ -14,10 +16,10 @@ class MetricWriteRouterTest {
 
     @Test
     void routesByMeasurementTableName() throws Exception {
-        DorisBatchWriter service = new DorisBatchWriter(10);
-        DorisBatchWriter trace = new DorisBatchWriter(10);
-        DorisBatchWriter flow = new DorisBatchWriter(10);
-        DorisBatchWriter http = new DorisBatchWriter(10);
+        DorisBatchWriter service = new DorisBatchWriter();
+        DorisBatchWriter trace = new DorisBatchWriter();
+        DorisBatchWriter flow = new DorisBatchWriter();
+        DorisBatchWriter http = new DorisBatchWriter();
         MetricWriteRouter router = new MetricWriteRouter(Map.of(
                 DorisTableNames.METRIC_SERVICE, service,
                 DorisTableNames.METRIC_SERVICE_TRACE, trace,
@@ -37,7 +39,7 @@ class MetricWriteRouterTest {
 
     @Test
     void routesJvmGcOtlpLine() {
-        DorisBatchWriter jvm = new DorisBatchWriter(10);
+        DorisBatchWriter jvm = new DorisBatchWriter();
         MetricWriteRouter router = new MetricWriteRouter(Map.of(
                 DorisTableNames.METRIC_JVM, jvm));
 
@@ -57,13 +59,13 @@ class MetricWriteRouterTest {
                 null));
 
         assertThat(jvm.pendingCount()).isEqualTo(1);
-        assertThat(new String(jvm.flushAll().get(0))).contains("gc_minor_collection_count");
+        assertThat(new String(DorisJsonRow.toByteArray(jvm.flushAll().get(0)))).contains("gc_minor_collection_count");
     }
 
     @Test
     void routesRawOtlpMetricRows() {
-        DorisBatchWriter service = new DorisBatchWriter(10);
-        DorisBatchWriter jvm = new DorisBatchWriter(10);
+        DorisBatchWriter service = new DorisBatchWriter();
+        DorisBatchWriter jvm = new DorisBatchWriter();
         MetricWriteRouter router = new MetricWriteRouter(Map.of(
                 DorisTableNames.METRIC_SERVICE, service,
                 DorisTableNames.METRIC_JVM, jvm));
@@ -78,7 +80,7 @@ class MetricWriteRouterTest {
 
     @Test
     void fallsBackToServiceWriterForUnknownMeasurement() throws Exception {
-        DorisBatchWriter service = new DorisBatchWriter(10);
+        DorisBatchWriter service = new DorisBatchWriter();
         MetricWriteRouter router = MetricWriteRouter.singleTable(service);
         router.offer(new OptimizedMetric().withMeasurement("custom.metric").withFieldValues(1).initTsId());
         assertThat(service.pendingCount()).isEqualTo(1);

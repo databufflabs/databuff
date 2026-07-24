@@ -121,8 +121,6 @@ public final class VirtualServiceExtractor {
     }
 
     private static void markRemote(DcSpan span) {
-        Map<String, String> meta = OtelAttributeMaps.mutableCopy(span);
-        meta.put("remote", "true");
-        OtelAttributeMaps.replace(span, meta);
+        OtelAttributeMaps.put(span, "remote", "true");
     }
 }

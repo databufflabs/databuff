@@ -1,5 +1,7 @@
 package com.databuff.apm.ingest.metric;
 
+import com.databuff.apm.common.storage.DorisJsonRow;
+
 import com.databuff.apm.common.storage.DorisBatchWriter;
 import com.databuff.apm.common.storage.DorisTableNames;
 import com.databuff.apm.ingest.otel.OtlMetricLine;
@@ -14,7 +16,7 @@ class OtlpMetricDirectWriterTest {
 
     @Test
     void mergesJvmRowsFromSameExportBeforeWriting() {
-        DorisBatchWriter jvm = new DorisBatchWriter(10);
+        DorisBatchWriter jvm = new DorisBatchWriter();
         MetricWriteRouter router = new MetricWriteRouter(Map.of(DorisTableNames.METRIC_JVM, jvm));
         OtlpMetricDirectWriter writer = new OtlpMetricDirectWriter(router);
         OtlMetricLine base = new OtlMetricLine(
@@ -37,7 +39,7 @@ class OtlpMetricDirectWriterTest {
                 withMetric(base, "jvm.gc.major_collection_count", 2)));
 
         assertThat(jvm.pendingCount()).isEqualTo(1);
-        String json = new String(jvm.flushAll().get(0));
+        String json = new String(DorisJsonRow.toByteArray(jvm.flushAll().get(0)));
         assertThat(json).contains("thread_count");
         assertThat(json).contains("gc_major_collection_count");
     }

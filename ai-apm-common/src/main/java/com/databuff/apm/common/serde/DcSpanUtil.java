@@ -679,9 +679,9 @@ public final class DcSpanUtil {
 
     private static final class SpanAnalysis {
         private static final SpanAnalysis EMPTY = new SpanAnalysis(
-                null, null, null, null, false, false, false, false, false, false, false, false);
+                0, null, null, null, false, false, false, false, false, false, false, false);
 
-        private final String metaSource;
+        private final int metaRevision;
         private final String httpMethod;
         private final String httpUrl;
         private final Integer httpStatusCode;
@@ -695,7 +695,7 @@ public final class DcSpanUtil {
         private final boolean hasDbSystem;
 
         private SpanAnalysis(
-                String metaSource,
+                int metaRevision,
                 String httpMethod,
                 String httpUrl,
                 Integer httpStatusCode,
@@ -707,7 +707,7 @@ public final class DcSpanUtil {
                 boolean es,
                 boolean config,
                 boolean hasDbSystem) {
-            this.metaSource = metaSource;
+            this.metaRevision = metaRevision;
             this.httpMethod = httpMethod;
             this.httpUrl = httpUrl;
             this.httpStatusCode = httpStatusCode;
@@ -746,7 +746,7 @@ public final class DcSpanUtil {
                     && dbSystem != null
                     && !isRedisDbSystem(dbSystem);
             return new SpanAnalysis(
-                    span.meta,
+                    span.metaRevision,
                     span.metaHttpMethod,
                     span.metaHttpUrl,
                     span.metaHttpStatusCode,
@@ -761,7 +761,7 @@ public final class DcSpanUtil {
         }
 
         private boolean matches(DcSpan span) {
-            return Objects.equals(metaSource, span.meta)
+            return metaRevision == span.metaRevision
                     && Objects.equals(httpMethod, span.metaHttpMethod)
                     && Objects.equals(httpUrl, span.metaHttpUrl)
                     && Objects.equals(httpStatusCode, span.metaHttpStatusCode);

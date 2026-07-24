@@ -107,10 +107,10 @@ export default class ServiceDetail extends Vue {
 
   private tabnavs: any[] = [
     { label: i18n.t('modules.views.appMonitor.serviceDetail.s_718e0b79') as string, labelKey: 'modules.views.appMonitor.serviceDetail.s_718e0b79', value: 'tab-relation' },
-    { label: i18n.t('modules.views.appMonitor.resourceDetail.s_6ea1fe6b') as string, labelKey: 'modules.views.appMonitor.resourceDetail.s_6ea1fe6b', value: 'tab-baseinfo', dot: false },
+    { label: i18n.t('modules.views.appMonitor.resourceDetail.s_6ea1fe6b') as string, labelKey: 'modules.views.appMonitor.resourceDetail.s_6ea1fe6b', value: 'tab-baseinfo' },
     { label: i18n.t('modules.views.appMonitor.serviceDetail.s_1ff73929') as string, labelKey: 'modules.views.appMonitor.serviceDetail.s_1ff73929', value: 'tab-alarm' },
-    { label: i18n.t('modules.views.appMonitor.serviceDetail.s_244b8532') as string, labelKey: 'modules.views.appMonitor.serviceDetail.s_244b8532', value: 'tab-resource', match: ['web'], dot: false },
-    { label: i18n.t('modules.views.appMonitor.serviceDetail.s_84d31a52') as string, labelKey: 'modules.views.appMonitor.serviceDetail.s_84d31a52', value: 'tab-jvm', match: ['web'], dot: false },
+    { label: i18n.t('modules.views.appMonitor.serviceDetail.s_244b8532') as string, labelKey: 'modules.views.appMonitor.serviceDetail.s_244b8532', value: 'tab-resource', match: ['web'] },
+    { label: i18n.t('modules.views.appMonitor.serviceDetail.s_84d31a52') as string, labelKey: 'modules.views.appMonitor.serviceDetail.s_84d31a52', value: 'tab-jvm', match: ['web'] },
     { label: i18n.t('modules.views.appMonitor.serviceDetail.s_5248c536') as string, labelKey: 'modules.views.appMonitor.serviceDetail.s_5248c536', value: 'tab-sql', match: ['db'] },
     { label: i18n.t('modules.views.appMonitor.serviceDetail.s_828d5325') as string, labelKey: 'modules.views.appMonitor.serviceDetail.s_828d5325', value: 'tab-threadpool', match: ['web'] },
     { label: i18n.t('modules.views.appMonitor.serviceDetail.s_7ddbe15c') as string, labelKey: 'modules.views.appMonitor.serviceDetail.s_7ddbe15c', value: 'tab-network', match: ['web'] },
@@ -136,8 +136,6 @@ export default class ServiceDetail extends Vue {
   }
 
   private activeName = '';
-
-  private tabStatus: any[] = [];
 
   get getServiceType () {
     return resolveServiceDisplayIcon(
@@ -223,7 +221,6 @@ export default class ServiceDetail extends Vue {
     const { error, result } = await toAsyncWait(ApmApi.getServiceDetail(params));
     if (!error && result.data) {
       this.serviceDetail = result?.data || { serviceId: decodeURIComponent(String(sid)), name: decodeURIComponent(String(sn)) };
-      await this.serviceTabnavStatus();
     } else {
       this.$confirm(i18n.t('modules.views.appMonitor.serviceDetail.s_2ea3c0cd') as string, i18n.t('common.hint') as string, {
         confirmButtonText: i18n.t('modules.views.alarmCenter.alarmDetail.s_38cf16f2') as string, confirmButtonTextKey: 'modules.views.alarmCenter.alarmDetail.s_38cf16f2',
@@ -239,21 +236,6 @@ export default class ServiceDetail extends Vue {
       })
     }
     this.detailLoading = false;
-  }
-
-  // 服务页签状态
-  private async serviceTabnavStatus () {
-    const { fromTime, toTime } = this.getGlobalTimeV2();
-    const { sid } = this.$route.query;
-    const { error, result } = await toAsyncWait(ApmApi.serviceTabnavStatus({ serviceId: decodeURIComponent(String(sid)), fromTime: new Date(fromTime).valueOf(), toTime: new Date(toTime).valueOf() }));
-    if (!error) {
-      this.tabStatus = Array.isArray(result?.data) ? result?.data : [];
-    } else {
-      this.tabStatus = []
-    }
-    this.tabnavs.forEach((t) => {
-      t.dot = this.tabStatus.includes(t.value)
-    })
   }
 
   // tab change

@@ -5,19 +5,21 @@ import com.databuff.apm.common.query.ApmQueryModels;
 import java.util.List;
 
 /**
- * Metric-first trace list: verify {@code databuff.service} activity before scanning {@code dc_span}.
+ * Trace list / count against {@code trace_dc_span}.
  */
 public final class TraceSpanMetricDrilldownService {
 
     private final ApmReadRepository readRepository;
     private final String traceDatabase;
-    private final String metricDatabase;
 
     public TraceSpanMetricDrilldownService(
             ApmReadRepository readRepository, String traceDatabase, String metricDatabase) {
+        this(readRepository, traceDatabase);
+    }
+
+    public TraceSpanMetricDrilldownService(ApmReadRepository readRepository, String traceDatabase) {
         this.readRepository = readRepository;
         this.traceDatabase = traceDatabase;
-        this.metricDatabase = metricDatabase;
     }
 
     public List<ApmQueryModels.SpanSummary> spanList(
@@ -70,29 +72,6 @@ public final class TraceSpanMetricDrilldownService {
         int safeLimit = limit <= 0 ? 50 : Math.min(limit, 500);
         java.util.List<String> serviceKeys = resolveServiceKeys(service, serviceIds);
         try {
-            if (!serviceKeys.isEmpty()) {
-                String metricService = serviceKeys.get(0);
-                ApmQueryModels.ErrorRateSnapshot activity = readRepository.queryErrorRate(
-                        MetricQueryBuilder.serviceErrorRateSql(metricDatabase, metricService, fromMillis, toMillis));
-                if (activity.totalCount() <= 0) {
-                    // Metrics may lag behind trace_dc_span; still allow trace list when spans exist.
-                    return readRepository.querySpanSummaries(spanListSql(
-                            serviceKeys,
-                            fromMillis,
-                            toMillis,
-                            safeLimit,
-                            offset,
-                            fromTimeText,
-                            toTimeText,
-                            isParent,
-                            parentId,
-                            sortField,
-                            sortOrder,
-                            resourceExact,
-                            minDurationNs,
-                            error));
-                }
-            }
             return readRepository.querySpanSummaries(spanListSql(
                     serviceKeys,
                     fromMillis,

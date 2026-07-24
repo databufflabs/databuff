@@ -31,6 +31,13 @@ if [ -f "${ROOT}/env.sh" ]; then
   . "${ROOT}/env.sh"
   set +a
 fi
+# Optional local overrides (host publish ports, timeouts, etc.).
+if [ -f "${ROOT}/.env" ]; then
+  set -a
+  # shellcheck disable=SC1091
+  . "${ROOT}/.env"
+  set +a
+fi
 if [ -f "${ROOT}/VERSION" ]; then
   export APM_VERSION
   APM_VERSION="$(tr -d '[:space:]' <"${ROOT}/VERSION")"

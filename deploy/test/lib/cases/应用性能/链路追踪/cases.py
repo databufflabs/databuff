@@ -16,12 +16,11 @@ def build_cases(frm_ms: int, to_ms: int) -> list[ApiCase]:
     # v1 SpanListRequest 用 limit；portal 列表用 size。此处 v1 span 列表 expected 为 20 条
     sb_limit = service_body(frm_ms, to_ms, size=20, limit=20)
     return [
-        ApiCase(page, "筛选参数", "POST", "/webapi/trace/query_parames_v2", sb, CASE_DIR),
+        ApiCase(page, "筛选参数", "POST", "/webapi/trace/query_params", sb, CASE_DIR),
         ApiCase(page, "调用链列表", "POST", "/webapi/trace/list", sb_limit, CASE_DIR),
         ApiCase(page, "请求数量图", "POST", "/webapi/trace/cnt_graph_stats", sb, CASE_DIR),
         ApiCase(page, "错误数量图", "POST", "/webapi/trace/error_cnt_graph_stats", sb, CASE_DIR),
         ApiCase(page, "响应时间图", "POST", "/webapi/trace/graph_stats", sb, CASE_DIR),
-        ApiCase(page, "页签状态", "POST", "/webapi/trace/tabnavStatus", sb, CASE_DIR),
         ApiCase(page, "v1 span 列表", "POST", "/webapi/api/v1/apm/trace/spanList", sb_limit, CASE_DIR),
         ApiCase(
             page,

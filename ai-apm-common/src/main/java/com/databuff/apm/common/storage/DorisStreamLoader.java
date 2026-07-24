@@ -12,14 +12,18 @@ import java.net.http.HttpResponse;
 import java.nio.charset.StandardCharsets;
 import java.time.Duration;
 import java.util.Base64;
+import java.util.List;
 import java.util.Map;
 import java.util.Objects;
 import java.util.UUID;
 
 /**
- * Doris FE HTTP Stream Load ({@code PUT /api/{db}/{table}/_stream_load}).
+ * Doris FE/BE HTTP Stream Load ({@code PUT /api/{db}/{table}/_stream_load}).
  * Follows FE→BE redirects manually so {@code Authorization} is preserved (unlike
  * {@link HttpClient.Redirect#ALWAYS} which strips it on cross-host redirects).
+ * <p>
+ * Body is streamed as NDJSON via {@link NdjsonRowsInputStream} so rows can encode lazily
+ * and are not joined into one contiguous {@code byte[]} before send.
  */
 public final class DorisStreamLoader {
 
@@ -49,21 +53,35 @@ public final class DorisStreamLoader {
 
     public StreamLoadResult loadJsonLines(
             String database, String table, byte[] jsonLines, DorisStreamLoadProfile profile) throws IOException {
+        Objects.requireNonNull(jsonLines);
+        return loadNdjsonRows(database, table, List.of(DorisJsonRow.ofBytes(jsonLines)), profile);
+    }
+
+    public StreamLoadResult loadNdjsonRows(String database, String table, List<? extends DorisJsonRow> rows)
+            throws IOException {
+        return loadNdjsonRows(database, table, rows, DorisStreamLoadProfile.forTable(table));
+    }
+
+    public StreamLoadResult loadNdjsonRows(
+            String database,
+            String table,
+            List<? extends DorisJsonRow> rows,
+            DorisStreamLoadProfile profile) throws IOException {
         Objects.requireNonNull(database);
         Objects.requireNonNull(table);
-        Objects.requireNonNull(jsonLines);
+        Objects.requireNonNull(rows);
         DorisStreamLoadProfile effective = profile == null ? DorisStreamLoadProfile.forTable(table) : profile;
         String label = "apm_" + UUID.randomUUID().toString().replace("-", "");
         String auth = basicAuth();
         if (config.preferDirectBeStreamLoad()) {
             String beUrl = "http://" + config.effectiveBeHttpHost() + ":" + config.beHttpPort()
                     + "/api/" + database + "/" + table + "/_stream_load";
-            HttpResponse<String> beResponse = putJsonLines(beUrl, label, auth, jsonLines, effective, false, BE_TIMEOUT);
+            HttpResponse<String> beResponse = putNdjson(beUrl, label, auth, rows, effective, BE_TIMEOUT);
             return toResult(beResponse);
         }
         String feUrl = "http://" + config.feHost() + ":" + config.httpPort()
                 + "/api/" + database + "/" + table + "/_stream_load";
-        HttpResponse<String> feResponse = putJsonLines(feUrl, label, auth, jsonLines, effective, true, FE_TIMEOUT);
+        HttpResponse<String> feResponse = putNdjson(feUrl, label, auth, rows, effective, FE_TIMEOUT);
         int status = feResponse.statusCode();
         if (status == 307 || status == 308) {
             String location = feResponse.headers().firstValue("Location").orElse("");
@@ -71,7 +89,7 @@ public final class DorisStreamLoader {
                 throw new IOException("Stream load redirect missing Location header");
             }
             String beUrl = rewriteRedirectLocation(location);
-            HttpResponse<String> beResponse = putJsonLines(beUrl, label, auth, jsonLines, effective, false, BE_TIMEOUT);
+            HttpResponse<String> beResponse = putNdjson(beUrl, label, auth, rows, effective, BE_TIMEOUT);
             return toResult(beResponse);
         }
         return toResult(feResponse);
@@ -85,14 +103,16 @@ public final class DorisStreamLoader {
         return new StreamLoadResult(ok, response.statusCode(), response.body());
     }
 
-    private HttpResponse<String> putJsonLines(
+    private HttpResponse<String> putNdjson(
             String url,
             String label,
             String auth,
-            byte[] jsonLines,
+            List<? extends DorisJsonRow> rows,
             DorisStreamLoadProfile profile,
-            boolean expectContinue,
             Duration timeout) throws IOException {
+        // Supplier creates a fresh stream per subscribe (HttpClient may retry).
+        HttpRequest.BodyPublisher body = HttpRequest.BodyPublishers.ofInputStream(
+                () -> new NdjsonRowsInputStream(rows));
         HttpRequest.Builder builder = HttpRequest.newBuilder()
                 .uri(URI.create(url))
                 .timeout(timeout)
@@ -100,15 +120,14 @@ public final class DorisStreamLoader {
                 .header("label", label)
                 .header("format", "json")
                 .header("read_json_by_line", "true")
-                .PUT(HttpRequest.BodyPublishers.ofByteArray(jsonLines));
+                .PUT(body);
         if (profile != null) {
             for (Map.Entry<String, String> header : profile.headers().entrySet()) {
                 builder.header(header.getKey(), header.getValue());
             }
         }
-        if (expectContinue) {
-            builder.expectContinue(true);
-        }
+        // Chunked streaming body + Expect: 100-continue breaks on FE 307 with JDK HttpClient.
+        // Direct-BE path already skips expectContinue; keep FE redirects on a plain PUT.
         try {
             return httpClient.send(builder.build(), HttpResponse.BodyHandlers.ofString());
         } catch (InterruptedException e) {

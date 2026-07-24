@@ -18,13 +18,12 @@
 | `getServiceDetail` | `POST` | `/service/serviceInfo` | 服务详情 |
 | `getServiceReqTop` | `POST` | `/service/reqTop` | 服务请求贡献 Top |
 | `getReqContributorService` | `POST` | `/service/reqContributorService` | 资源来源服务 |
-| `serviceTabnavStatus` | `POST` | `/trace/tabnavStatus` | 查询服务详情页签红点状态 |
 
 ### 调用链
 
 | 方法 | HTTP | 路径 | 说明 |
 |------|------|------|------|
-| `getSpanParams` | `POST` | `/trace/query_parames_v2` | 调用链筛选参数 |
+| `getSpanParams` | `POST` | `/trace/query_params` | 调用链筛选参数 |
 | `getSpanList` | `POST` | `/trace/list` | 调用链列表 |
 | `getEventSpanList` | `POST` | `/trace/search/list` | 事件调用链列表 |
 | `getSpanRequestGraph` | `POST` | `/trace/cnt_graph_stats` | 请求数量图 |
@@ -32,7 +31,6 @@
 | `getSpanResponseTimeGraph` | `POST` | `/trace/graph_stats` | 响应时间图 |
 | `getTraceSpans` | `POST` | `/trace/spans` | 调用链拓扑/节点明细 |
 | `getSpanFlow` | `POST` | `/trace/serviceFlow` | 调用链服务流 |
-| `getResourcePercent` | `POST` | `/trace/resource_percentile` | 接口分位值数据 |
 
 ### 慢接口与 SQL
 

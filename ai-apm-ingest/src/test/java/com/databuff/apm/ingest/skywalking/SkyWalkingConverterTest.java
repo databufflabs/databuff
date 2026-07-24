@@ -123,7 +123,7 @@ class SkyWalkingConverterTest {
         assertThat(DcSpanUtil.resolvePortalSpanDisplay(span))
                 .isEqualTo(new DcSpanUtil.PortalSpanDisplay("custom", "dubbo"));
 
-        Map<String, String> meta = OtelAttributeMaps.parse(span.meta);
+        Map<String, String> meta = OtelAttributeMaps.meta(span);
         assertThat(meta.get("rpc.system")).isEqualTo("dubbo");
         assertThat(meta.get("skywalking.componentId")).isEqualTo("3");
         assertThat(meta.get("skywalking.spanLayer")).isEqualTo("RPCFramework");
@@ -152,7 +152,7 @@ class SkyWalkingConverterTest {
         DcSpan span = converter.convertSegment(segment).get(0).span();
         assertThat(span.metaHttpUrl).isNull();
         assertThat(DcSpanUtil.isRpcSpan(span)).isTrue();
-        assertThat(OtelAttributeMaps.parse(span.meta).get("rpc.system")).isEqualTo("grpc");
+        assertThat(OtelAttributeMaps.meta(span).get("rpc.system")).isEqualTo("grpc");
     }
 
     @Test

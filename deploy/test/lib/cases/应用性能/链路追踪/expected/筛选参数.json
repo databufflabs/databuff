@@ -3,18 +3,18 @@
   "message": "success",
   "data": {
     "status": {
-      "0": 10,
-      "1": 0
+      "0": 1,
+      "1": 1
     },
     "service": {
       "service-a": "9bf61532d56eb7b5"
     },
     "resource": {
-      "GET /demo/checkout": 10
+      "$containsKeys": ["GET /demo/checkout"]
     },
     "duration": {
-      "max": 240000000,
-      "min": 240000000
+      "min": {"$range": [0, 999999999999]},
+      "max": {"$range": [0, 999999999999]}
     }
   }
 }

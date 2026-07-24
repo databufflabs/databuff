@@ -1,5 +1,6 @@
 package com.databuff.apm.ingest.trace;
 
+import com.databuff.apm.common.meta.OtelAttributeMaps;
 import com.databuff.apm.common.model.DcSpan;
 import com.databuff.apm.common.model.OptimizedMetric;
 import com.databuff.apm.common.serde.DcSpanUtil;
@@ -25,7 +26,7 @@ class VirtualServiceExtractorTest {
 
     @Test
     void extractMarksRemoteMetaForExternalHttpVirtualService() {
-        DorisBatchWriter writer = new DorisBatchWriter(16);
+        DorisBatchWriter writer = new DorisBatchWriter();
         VirtualServiceInstanceRegistry registry = new VirtualServiceInstanceRegistry(
                 new MetricWriteRouter(Map.of(DorisTableNames.METRIC_SERVICE_INSTANCE, writer)), 60_000L);
         VirtualServiceExtractor extractor = new VirtualServiceExtractor(registry);
@@ -49,7 +50,7 @@ class VirtualServiceExtractorTest {
         remoteProcessor.processAfterFill(List.of(span));
         assertThat(span.service).isEqualTo("[remote]api.example.com:443");
         assertThat(span.dstService).isEqualTo("[remote]api.example.com:443");
-        assertThat(span.meta).contains("\"remote\":\"true\"");
+        assertThat(OtelAttributeMaps.meta(span)).containsEntry("remote", "true");
 
         List<OptimizedMetric> metrics = DcSpanUtil.parseSpanData(span);
         assertThat(metrics.stream().map(OptimizedMetric::measurement)).contains("service.remote");
@@ -57,7 +58,7 @@ class VirtualServiceExtractorTest {
 
     @Test
     void extractThenParseSpanDataEmitsInboundVirtualMetrics() throws Exception {
-        DorisBatchWriter writer = new DorisBatchWriter(16);
+        DorisBatchWriter writer = new DorisBatchWriter();
         VirtualServiceInstanceRegistry registry = new VirtualServiceInstanceRegistry(
                 new MetricWriteRouter(Map.of(DorisTableNames.METRIC_SERVICE_INSTANCE, writer)), 60_000L);
         VirtualServiceExtractor extractor = new VirtualServiceExtractor(registry);
@@ -88,7 +89,7 @@ class VirtualServiceExtractorTest {
 
     @Test
     void extractClearsPeerHostnameForMqAndEsVirtualServices() {
-        DorisBatchWriter writer = new DorisBatchWriter(16);
+        DorisBatchWriter writer = new DorisBatchWriter();
         VirtualServiceInstanceRegistry registry = new VirtualServiceInstanceRegistry(
                 new MetricWriteRouter(Map.of(DorisTableNames.METRIC_SERVICE_INSTANCE, writer)), 60_000L);
         VirtualServiceExtractor extractor = new VirtualServiceExtractor(registry);
@@ -118,7 +119,7 @@ class VirtualServiceExtractorTest {
 
     @Test
     void extractKeepsPeerHostnameForDbVirtualService() {
-        DorisBatchWriter writer = new DorisBatchWriter(16);
+        DorisBatchWriter writer = new DorisBatchWriter();
         VirtualServiceInstanceRegistry registry = new VirtualServiceInstanceRegistry(
                 new MetricWriteRouter(Map.of(DorisTableNames.METRIC_SERVICE_INSTANCE, writer)), 60_000L);
         VirtualServiceExtractor extractor = new VirtualServiceExtractor(registry);

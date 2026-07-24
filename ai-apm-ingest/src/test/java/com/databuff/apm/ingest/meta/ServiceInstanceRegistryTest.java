@@ -1,5 +1,7 @@
 package com.databuff.apm.ingest.meta;
 
+import com.databuff.apm.common.storage.DorisJsonRow;
+
 import com.databuff.apm.common.model.DcSpan;
 import com.databuff.apm.ingest.metric.MetricWriteRouter;
 import com.databuff.apm.common.storage.DorisBatchWriter;
@@ -14,7 +16,7 @@ class ServiceInstanceRegistryTest {
 
     @Test
     void cachesInstanceAndFlushesHeartbeatMetric() throws Exception {
-        DorisBatchWriter instanceWriter = new DorisBatchWriter(16);
+        DorisBatchWriter instanceWriter = new DorisBatchWriter();
         MetricWriteRouter router = new MetricWriteRouter(
                 Map.of(DorisTableNames.METRIC_SERVICE_INSTANCE, instanceWriter));
         ServiceInstanceRegistry registry = new ServiceInstanceRegistry(router, 60_000L);
@@ -33,7 +35,7 @@ class ServiceInstanceRegistryTest {
         assertThat(registry.cachedSize()).isZero();
         assertThat(instanceWriter.pendingCount()).isEqualTo(1);
 
-        String json = new String(instanceWriter.flushAll().get(0));
+        String json = new String(DorisJsonRow.toByteArray(instanceWriter.flushAll().get(0)));
         assertThat(json).contains("\"service\":\"demo-order\"");
         assertThat(json).contains("\"service_instance\":\"demo-order-1\"");
         assertThat(json).contains("\"metricsVal\":1");
@@ -42,7 +44,7 @@ class ServiceInstanceRegistryTest {
 
     @Test
     void mergesHostNameWhenLaterSpanProvidesIt() throws Exception {
-        DorisBatchWriter writer = new DorisBatchWriter(16);
+        DorisBatchWriter writer = new DorisBatchWriter();
         ServiceInstanceRegistry registry = new ServiceInstanceRegistry(
                 new MetricWriteRouter(Map.of(DorisTableNames.METRIC_SERVICE_INSTANCE, writer)), 60_000L);
 
@@ -61,6 +63,6 @@ class ServiceInstanceRegistryTest {
         registry.remember(second);
         registry.flushHeartbeats();
 
-        assertThat(new String(writer.flushAll().get(0))).contains("\"hostname\":\"host-2\"");
+        assertThat(new String(DorisJsonRow.toByteArray(writer.flushAll().get(0)))).contains("\"hostname\":\"host-2\"");
     }
 }

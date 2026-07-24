@@ -28,7 +28,7 @@ public class TraceQueryService {
         this.traceDatabase = storageProperties.traceDatabase();
         this.metricDatabase = storageProperties.metricDatabase();
         this.drilldownService = new TraceSpanMetricDrilldownService(
-                readRepository, storageProperties.traceDatabase(), storageProperties.metricDatabase());
+                readRepository, storageProperties.traceDatabase());
     }
 
     public List<SpanSummary> spanList(SpanListRequest request) {

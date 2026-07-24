@@ -45,7 +45,7 @@ class ClusterCoordinationGrpcServiceTest {
 
     @Test
     void acceptsForwardedPartial() {
-        component = IngestTestComponents.aggregate(new DorisBatchWriter(100));
+        component = IngestTestComponents.aggregate(new DorisBatchWriter());
         component.start(1);
         ClusterCoordinationGrpcService service = newService(component, leaderCoordinator("n1"));
 

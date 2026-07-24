@@ -396,13 +396,17 @@ public final class OtelConverter {
 
         // Single merged attribute map: resource attributes first, span attributes overlay.
         // Span-level keys win, which matches the previous spanAttributes + metaAttributes semantics.
-        Map<String, String> metaAttributes = new LinkedHashMap<>();
+        List<KeyValue> spanAttributes = span.getAttributesList();
+        int attrEstimate = (resourceAttributes == null ? 0 : resourceAttributes.size())
+                + (spanAttributes == null ? 0 : spanAttributes.size());
+        Map<String, String> metaAttributes = new LinkedHashMap<>(mapCapacity(attrEstimate));
         collectAttributes(metaAttributes, resourceAttributes);
-        collectAttributes(metaAttributes, span.getAttributesList());
+        collectAttributes(metaAttributes, spanAttributes);
 
         DcSpan dc = new DcSpan();
-        dc.minutes = toMinutesBucket(start);
-        dc.hours = toHoursBucket(start);
+        long epochSec = start / 1_000_000_000L;
+        dc.minutes = ApmTimeZones.wallClockMinuteBucket((epochSec / 60) * 60);
+        dc.hours = ApmTimeZones.wallClockHourBucket((epochSec / 3600) * 3600);
         dc.serviceId = serviceKey;
         dc.service = serviceName;
         dc.serviceInstance = metaAttributes.get("service.instance.id");
@@ -420,7 +424,8 @@ public final class OtelConverter {
         dc.start = start;
         dc.end = end;
         dc.duration = duration;
-        dc.startTime = DATETIME.format(Instant.ofEpochSecond(0, start));
+        // Second precision only (WALL_CLOCK_PATTERN); avoid Instant.ofEpochSecond(0, nanos).
+        dc.startTime = ApmTimeZones.formatWallClock(start / 1_000_000L);
         dc.error = errored ? 1 : 0;
         dc.slow = duration > 500_000_000L ? 1 : 0;
         dc.hostName = hostName.isEmpty() ? "unknown" : hostName;
@@ -433,9 +438,8 @@ public final class OtelConverter {
         if (!elasticsearchSpan) {
             applyHttpAttributes(dc, metaAttributes);
         }
-        // meta is materialized here once via Jackson (native MapSerializer); DCSpanJsonEncoder
-        // re-escapes it via Jackson's optimized UTF8 string writer at flush time.
-        dc.meta = OtelAttributeMaps.encode(metaAttributes);
+        // Working map is the single source of truth in the pipeline; meta string is
+        // materialized once at the encoder boundary (DCSpanJsonEncoder).
         OtelAttributeMaps.cache(dc, metaAttributes);
         dc.metaPeerHostname = firstNonBlank(
                 metaAttributes.get("server.address"),
@@ -479,10 +483,19 @@ public final class OtelConverter {
     }
 
     private static Map<String, String> buildAttributeMap(List<KeyValue> resourceAttributes, List<KeyValue> spanAttributes) {
-        Map<String, String> meta = new LinkedHashMap<>();
+        int attrEstimate = (resourceAttributes == null ? 0 : resourceAttributes.size())
+                + (spanAttributes == null ? 0 : spanAttributes.size());
+        Map<String, String> meta = new LinkedHashMap<>(mapCapacity(attrEstimate));
         collectAttributes(meta, resourceAttributes);
         collectAttributes(meta, spanAttributes);
         return meta;
+    }
+
+    private static int mapCapacity(int expectedSize) {
+        if (expectedSize <= 0) {
+            return 16;
+        }
+        return Math.max(16, (int) (expectedSize / 0.75f) + 1);
     }
 
     private static void collectAttributes(Map<String, String> target, List<KeyValue> attributes) {
@@ -491,22 +504,26 @@ public final class OtelConverter {
         }
         for (KeyValue kv : attributes) {
             String value = anyValue(kv.getValue());
-            if (value != null && !value.isBlank()) {
-                target.put(kv.getKey(), value.trim());
+            if (value == null) {
+                continue;
+            }
+            String trimmed = trimIfNeeded(value);
+            if (!trimmed.isBlank()) {
+                target.put(kv.getKey(), trimmed);
             }
         }
     }
 
-    private static long toMinutesBucket(long startNanos) {
-        long epochSec = startNanos / 1_000_000_000L;
-        long minute = epochSec / 60;
-        return Long.parseLong(ApmTimeZones.formatBucket(minute * 60L, "yyyyMMddHHmm"));
-    }
-
-    private static long toHoursBucket(long startNanos) {
-        long epochSec = startNanos / 1_000_000_000L;
-        long hour = epochSec / 3600;
-        return Long.parseLong(ApmTimeZones.formatBucket(hour * 3600L, "yyyyMMddHH"));
+    /** Avoid allocating a new String when the value has no leading/trailing whitespace. */
+    private static String trimIfNeeded(String value) {
+        int len = value.length();
+        if (len == 0) {
+            return value;
+        }
+        if (value.charAt(0) > ' ' && value.charAt(len - 1) > ' ') {
+            return value;
+        }
+        return value.trim();
     }
 
     private static boolean isEmptyParentSpanId(com.google.protobuf.ByteString parentSpanId) {

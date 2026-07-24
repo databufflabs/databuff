@@ -61,7 +61,7 @@ class ExtractedMetricRoutingTest {
     @Test
     void httpSpanMetricsRouteToMetricServiceHttpWriter() throws Exception {
         DorisStreamLoader loader = mock(DorisStreamLoader.class);
-        when(loader.loadJsonLines(any(), any(), any()))
+        when(loader.loadNdjsonRows(any(), any(), any()))
                 .thenReturn(new DorisStreamLoader.StreamLoadResult(true, 200, "Success"));
 
         MetricTableWriterRegistry registry = MetricTableWriterRegistry.create(loader, "databuff");
@@ -91,13 +91,13 @@ class ExtractedMetricRoutingTest {
                 .orElseThrow()
                 .flushAll();
 
-        verify(loader).loadJsonLines(eq("databuff"), eq(DorisTableNames.METRIC_SERVICE_TRACE), any());
+        verify(loader).loadNdjsonRows(eq("databuff"), eq(DorisTableNames.METRIC_SERVICE_TRACE), any());
     }
 
     @Test
     void otlpHttpTraceRoutesExtractedMetricsToWriters() throws Exception {
         DorisStreamLoader loader = mock(DorisStreamLoader.class);
-        when(loader.loadJsonLines(any(), any(), any()))
+        when(loader.loadNdjsonRows(any(), any(), any()))
                 .thenReturn(new DorisStreamLoader.StreamLoadResult(true, 200, "Success"));
 
         MetricTableWriterRegistry registry = MetricTableWriterRegistry.create(loader, "databuff");
@@ -106,7 +106,7 @@ class ExtractedMetricRoutingTest {
                 TestClusterMembership.standalone("n1"),
                 new MetricWriteRouter(registry.writersByTable()));
         metricComponent = new MetricComponent(aggregateComponent);
-        traceComponent = IngestTestComponents.trace(aggregateComponent, new DorisBatchWriter(128), 200L);
+        traceComponent = IngestTestComponents.trace(aggregateComponent, new DorisBatchWriter(), 200L);
         aggregateComponent.start(1);
         metricComponent.start(1);
         traceComponent.start(1);
@@ -115,7 +115,7 @@ class ExtractedMetricRoutingTest {
                 new OtelConverter(),
                 new PipelineGateway(traceComponent, metricComponent),
                 new OtlpMetricDirectWriter(new MetricWriteRouter(registry.writersByTable())),
-                new OtlpLogDirectWriter(new DorisBatchWriter(128), null));
+                new OtlpLogDirectWriter(new DorisBatchWriter(), null));
         long end = System.currentTimeMillis() * 1_000_000L;
         long start = end - 50_000_000L;
         ExportTraceServiceRequest request = ExportTraceServiceRequest.newBuilder()

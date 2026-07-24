@@ -87,18 +87,24 @@ public class IngestPipelineConfiguration {
     }
 
     @Bean
-    DorisBatchWriter traceBatchWriter() {
-        return new DorisBatchWriter(2048);
+    DorisBatchWriter traceBatchWriter(
+            @Value("${ingest.doris.flush-batch-bytes:33554432}") long flushBatchBytes,
+            @Value("${ingest.doris.flush-interval-ms:30000}") long flushIntervalMs) {
+        return new DorisBatchWriter(flushBatchBytes, flushIntervalMs);
     }
 
     @Bean
-    DorisBatchWriter logBatchWriter() {
-        return new DorisBatchWriter(1024);
+    DorisBatchWriter logBatchWriter(
+            @Value("${ingest.doris.flush-batch-bytes:33554432}") long flushBatchBytes,
+            @Value("${ingest.doris.flush-interval-ms:30000}") long flushIntervalMs) {
+        return new DorisBatchWriter(flushBatchBytes, flushIntervalMs);
     }
 
     @Bean
-    DorisBatchWriter metaServiceBatchWriter() {
-        return new DorisBatchWriter(256);
+    DorisBatchWriter metaServiceBatchWriter(
+            @Value("${ingest.doris.flush-batch-bytes:33554432}") long flushBatchBytes,
+            @Value("${ingest.doris.flush-interval-ms:30000}") long flushIntervalMs) {
+        return new DorisBatchWriter(flushBatchBytes, flushIntervalMs);
     }
 
     @Bean
@@ -172,8 +178,15 @@ public class IngestPipelineConfiguration {
             DorisStreamLoader loader,
             @Value("${ingest.doris.trace-database:databuff}") String database,
             @Value("${ingest.doris.trace-table:trace_dc_span}") String table,
-            @Value("${ingest.doris.stream-load-max-failures:3}") int streamLoadMaxFailures) {
-        return new DorisStreamLoadSink(traceBatchWriter, loader, database, table, streamLoadMaxFailures);
+            @Value("${ingest.doris.stream-load-max-failures:3}") int streamLoadMaxFailures,
+            @Value("${ingest.doris.trace-flush-concurrency:1}") int traceFlushConcurrency) {
+        return new DorisStreamLoadSink(
+                traceBatchWriter,
+                loader,
+                database,
+                table,
+                streamLoadMaxFailures,
+                Math.max(1, traceFlushConcurrency));
     }
 
     @Bean
@@ -190,8 +203,11 @@ public class IngestPipelineConfiguration {
     MetricTableWriterRegistry metricTableWriterRegistry(
             DorisStreamLoader loader,
             @Value("${ingest.doris.metric-database:databuff}") String database,
-            @Value("${ingest.doris.stream-load-max-failures:3}") int streamLoadMaxFailures) {
-        return MetricTableWriterRegistry.create(loader, database, streamLoadMaxFailures);
+            @Value("${ingest.doris.stream-load-max-failures:3}") int streamLoadMaxFailures,
+            @Value("${ingest.doris.flush-batch-bytes:33554432}") long flushBatchBytes,
+            @Value("${ingest.doris.flush-interval-ms:30000}") long flushIntervalMs) {
+        return MetricTableWriterRegistry.create(
+                loader, database, streamLoadMaxFailures, flushBatchBytes, flushIntervalMs);
     }
 
     @Bean

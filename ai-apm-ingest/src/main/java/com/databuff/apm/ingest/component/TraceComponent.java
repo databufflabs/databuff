@@ -371,8 +371,8 @@ public final class TraceComponent extends AbstractComponent<TraceComponent.Trace
             TraceFillProcessor.FillResult result = fillProcessor.processTrace(spans);
             // Step 5：提取 service / service.flow / service.http 等 → 指标聚合 → Doris
             aggregateComponent.acceptExtractedMetrics(serviceKey, result.metrics());
-            // Step 6：fill 后 span 仅此一次序列化，写入 trace_dc_span
-            traceWriter.offerAll(result.filledSpanBytes());
+            // Step 6：fill 后挂 lazy 行，Stream Load flush 时才序列化写入 trace_dc_span
+            traceWriter.offerAll(result.filledSpanRows());
         }
     }
 

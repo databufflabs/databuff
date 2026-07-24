@@ -34,7 +34,7 @@ class AggregateComponentTest {
     @Test
     void mergeBytesCombinesOptimizedMetrics() {
         ClusterAggregator aggregator = new ClusterAggregator("n1");
-        DorisBatchWriter writer = new DorisBatchWriter(10_000);
+        DorisBatchWriter writer = new DorisBatchWriter();
         component = IngestTestComponents.aggregate(aggregator, writer);
         component.start(1);
 
@@ -50,7 +50,7 @@ class AggregateComponentTest {
     @Test
     void ignoresUnknownPayload() {
         ClusterAggregator aggregator = new ClusterAggregator("n1");
-        DorisBatchWriter writer = new DorisBatchWriter(10_000);
+        DorisBatchWriter writer = new DorisBatchWriter();
         component = IngestTestComponents.aggregate(aggregator, writer);
         component.start(1);
         assertThat(component.emit("svc", "not-an-event")).isTrue();
@@ -61,7 +61,7 @@ class AggregateComponentTest {
     @Test
     void extractedServiceMetricsUseMinuteAggregationBeforeFlush() {
         ClusterAggregator aggregator = new ClusterAggregator("n1");
-        DorisBatchWriter writer = new DorisBatchWriter(10_000);
+        DorisBatchWriter writer = new DorisBatchWriter();
         component = IngestTestComponents.aggregate(aggregator, writer);
         component.start(1);
 
@@ -79,7 +79,7 @@ class AggregateComponentTest {
     @Test
     void acceptsTraceAndMetricSources() {
         ClusterAggregator aggregator = new ClusterAggregator("n1");
-        DorisBatchWriter writer = new DorisBatchWriter(10_000);
+        DorisBatchWriter writer = new DorisBatchWriter();
         component = IngestTestComponents.aggregate(aggregator, writer);
         component.start(1);
 
@@ -100,7 +100,7 @@ class AggregateComponentTest {
         membership.setEndpoint("n1", "127.0.0.1:18112");
         membership.setEndpoint("n2", "127.0.0.1:18113");
         RecordingClusterPartialForwarder forwarder = new RecordingClusterPartialForwarder();
-        DorisBatchWriter writer = new DorisBatchWriter(10_000);
+        DorisBatchWriter writer = new DorisBatchWriter();
         component = new AggregateComponent(
                 aggregator, membership, MetricWriteRouter.singleTable(writer), forwarder);
         component.start(1);
@@ -122,7 +122,7 @@ class AggregateComponentTest {
     @Test
     void acceptsJsonPassthroughMetrics() {
         ClusterAggregator aggregator = new ClusterAggregator("n1");
-        DorisBatchWriter writer = new DorisBatchWriter(10_000);
+        DorisBatchWriter writer = new DorisBatchWriter();
         component = IngestTestComponents.aggregate(aggregator, writer);
         component.start(1);
 
@@ -134,7 +134,7 @@ class AggregateComponentTest {
     @Test
     void acceptForwardedPartialUsesSamePipeline() {
         ClusterAggregator aggregator = new ClusterAggregator("n1");
-        DorisBatchWriter writer = new DorisBatchWriter(10_000);
+        DorisBatchWriter writer = new DorisBatchWriter();
         component = IngestTestComponents.aggregate(aggregator, writer);
         component.start(1);
 
@@ -147,7 +147,7 @@ class AggregateComponentTest {
     @Test
     void flushPendingMetricsDrainsMergedAgentMetricsBeforeBatchThreshold() throws Exception {
         ClusterAggregator aggregator = new ClusterAggregator("n1");
-        DorisBatchWriter writer = new DorisBatchWriter(10_000);
+        DorisBatchWriter writer = new DorisBatchWriter();
         component = IngestTestComponents.aggregate(aggregator, writer);
         component.start(1);
 

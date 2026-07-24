@@ -1,5 +1,7 @@
 package com.databuff.apm.ingest.meta;
 
+import com.databuff.apm.common.storage.DorisJsonRow;
+
 import com.databuff.apm.common.meta.MetaServiceInfo;
 import com.databuff.apm.common.query.ApmQueryModels.MetaServicePoint;
 import com.databuff.apm.common.storage.ApmReadRepository;
@@ -43,7 +45,7 @@ class MetaServiceRegistryTest {
         registry = new MetaServiceRegistry(mock(ApmReadRepository.class), "databuff", 60_000L);
         registry.start();
 
-        DorisBatchWriter writer = new DorisBatchWriter(8);
+        DorisBatchWriter writer = new DorisBatchWriter();
         registry.remember(MetaServiceInfo.minimal("new-svc", "Checkout"));
         assertThat(registry.stagePending(writer)).isEqualTo(1);
         assertThat(writer.flushAll()).hasSize(1);
@@ -58,9 +60,9 @@ class MetaServiceRegistryTest {
         registry.start();
 
         registry.remember(MetaServiceInfo.minimal("svc-1", "New Name"));
-        DorisBatchWriter writer = new DorisBatchWriter(8);
+        DorisBatchWriter writer = new DorisBatchWriter();
         assertThat(registry.stagePending(writer)).isEqualTo(1);
-        String json = new String(writer.flushAll().get(0));
+        String json = new String(DorisJsonRow.toByteArray(writer.flushAll().get(0)));
         assertThat(json).contains("\"name\":\"New Name\"");
     }
 
@@ -81,9 +83,9 @@ class MetaServiceRegistryTest {
                         "process.runtime.name", "OpenJDK",
                         "process.runtime.version", "17"),
                 false));
-        DorisBatchWriter writer = new DorisBatchWriter(8);
+        DorisBatchWriter writer = new DorisBatchWriter();
         assertThat(registry.stagePending(writer)).isEqualTo(1);
-        String json = new String(writer.flushAll().get(0));
+        String json = new String(DorisJsonRow.toByteArray(writer.flushAll().get(0)));
         assertThat(json).contains("\"language\":\"java\"");
         assertThat(json).contains("\"technology\":\"jvm\"");
     }

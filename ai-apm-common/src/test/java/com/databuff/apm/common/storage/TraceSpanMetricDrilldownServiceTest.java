@@ -18,40 +18,30 @@ import static org.mockito.Mockito.when;
 class TraceSpanMetricDrilldownServiceTest {
 
     @Test
-    void fallsBackToDcSpanWhenMetricShowsNoActivity() throws Exception {
+    void queriesDcSpanDirectlyWithoutMetricProbe() throws Exception {
         ApmReadRepository reader = Mockito.mock(ApmReadRepository.class);
-        when(reader.queryErrorRate(anyString())).thenReturn(new ApmQueryModels.ErrorRateSnapshot(0, 0));
-        when(reader.querySpanSummaries(anyString())).thenReturn(List.of());
+        when(reader.querySpanSummaries(anyString())).thenReturn(java.util.List.of(
+                new ApmQueryModels.SpanSummary(
+                        "t1", "s1", "checkout", null, "GET", "2026-06-01", 1, 0, "", "GET", "", null, null)));
 
         TraceSpanMetricDrilldownService service =
-                new TraceSpanMetricDrilldownService(reader, "databuff", "databuff");
+                new TraceSpanMetricDrilldownService(reader, "databuff");
         assertThat(service.spanList("checkout", null, 0, 1000, 20, 0, null, null, null, null, null, null))
-                .isEmpty();
+                .hasSize(1);
+        verify(reader, never()).queryErrorRate(anyString());
         verify(reader).querySpanSummaries(anyString());
     }
 
     @Test
-    void queriesDcSpanWhenMetricHasActivity() throws Exception {
-        ApmReadRepository reader = Mockito.mock(ApmReadRepository.class);
-        when(reader.queryErrorRate(anyString())).thenReturn(new ApmQueryModels.ErrorRateSnapshot(1, 10));
-        when(reader.querySpanSummaries(anyString())).thenReturn(java.util.List.of(
-                new ApmQueryModels.SpanSummary("t1", "s1", "checkout", null, "GET", "2026-06-01", 1, 0, "", "GET", "", null, null)));
-
-        TraceSpanMetricDrilldownService service =
-                new TraceSpanMetricDrilldownService(reader, "databuff", "databuff");
-        assertThat(service.spanList("checkout", null, 0, 1000, 20, 0, null, null, null, null, null, null))
-                .hasSize(1);
-    }
-
-    @Test
-    void queriesDcSpanWithoutMetricGateWhenServiceBlank() throws Exception {
+    void queriesDcSpanWhenServiceBlank() throws Exception {
         ApmReadRepository reader = Mockito.mock(ApmReadRepository.class);
         when(reader.querySpanSummaries(anyString())).thenReturn(java.util.List.of());
 
         TraceSpanMetricDrilldownService service =
-                new TraceSpanMetricDrilldownService(reader, "databuff", "databuff");
+                new TraceSpanMetricDrilldownService(reader, "databuff");
         service.spanList(null, null, 0, 1000, 20, 0, null, null, null, null, null, null);
         verify(reader, never()).queryErrorRate(anyString());
+        verify(reader).querySpanSummaries(anyString());
     }
 
     @Test
@@ -60,7 +50,7 @@ class TraceSpanMetricDrilldownServiceTest {
         when(reader.querySpanSummaries(anyString())).thenReturn(List.of());
 
         TraceSpanMetricDrilldownService service =
-                new TraceSpanMetricDrilldownService(reader, "databuff", "databuff");
+                new TraceSpanMetricDrilldownService(reader, "databuff");
         service.spanList(
                 null,
                 null,

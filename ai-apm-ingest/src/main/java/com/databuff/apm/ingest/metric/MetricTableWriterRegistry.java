@@ -22,15 +22,24 @@ public final class MetricTableWriterRegistry {
     }
 
     public static MetricTableWriterRegistry create(DorisStreamLoader loader, String database) {
-        return create(loader, database, DorisStreamLoadSink.DEFAULT_MAX_CONSECUTIVE_FAILURES);
+        return create(
+                loader,
+                database,
+                DorisStreamLoadSink.DEFAULT_MAX_CONSECUTIVE_FAILURES,
+                DorisBatchWriter.DEFAULT_MAX_BATCH_BYTES,
+                DorisBatchWriter.DEFAULT_FLUSH_INTERVAL_MS);
     }
 
     public static MetricTableWriterRegistry create(
-            DorisStreamLoader loader, String database, int streamLoadMaxFailures) {
+            DorisStreamLoader loader,
+            String database,
+            int streamLoadMaxFailures,
+            long flushBatchBytes,
+            long flushIntervalMs) {
         Map<String, DorisBatchWriter> writers = new LinkedHashMap<>();
         List<DorisStreamLoadSink> sinkList = new ArrayList<>();
         for (String table : MetricSchemaRegistry.allTableNames()) {
-            DorisBatchWriter writer = new DorisBatchWriter(1024);
+            DorisBatchWriter writer = new DorisBatchWriter(flushBatchBytes, flushIntervalMs);
             writers.put(table, writer);
             sinkList.add(new DorisStreamLoadSink(writer, loader, database, table, streamLoadMaxFailures));
         }

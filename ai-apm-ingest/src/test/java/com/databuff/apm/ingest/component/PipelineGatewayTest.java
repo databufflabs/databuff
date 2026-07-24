@@ -39,10 +39,10 @@ class PipelineGatewayTest {
     @Test
     void routesTraceAndMetricThroughPipeline() throws Exception {
         ClusterAggregator aggregator = new ClusterAggregator("n1");
-        DorisBatchWriter writer = new DorisBatchWriter(10_000);
+        DorisBatchWriter writer = new DorisBatchWriter();
         aggregateComponent = IngestTestComponents.aggregate(aggregator, writer);
         metricComponent = new MetricComponent(aggregateComponent);
-        traceComponent = IngestTestComponents.trace(aggregateComponent, new DorisBatchWriter(10_000), 100L);
+        traceComponent = IngestTestComponents.trace(aggregateComponent, new DorisBatchWriter(), 100L);
         aggregateComponent.start(1);
         metricComponent.start(1);
         traceComponent.start(1);
@@ -82,8 +82,8 @@ class PipelineGatewayTest {
 
     @Test
     void componentRejectsWhenDisabled() {
-        aggregateComponent = IngestTestComponents.aggregate(new DorisBatchWriter(10));
-        traceComponent = IngestTestComponents.trace(aggregateComponent, new DorisBatchWriter(10_000));
+        aggregateComponent = IngestTestComponents.aggregate(new DorisBatchWriter());
+        traceComponent = IngestTestComponents.trace(aggregateComponent, new DorisBatchWriter());
         traceComponent.start(1);
         traceComponent.setEnabled(false);
         assertThat(traceComponent.emit("k", new TraceEvent(null))).isFalse();

@@ -12,6 +12,7 @@ import com.databuff.apm.common.cluster.aggregate.ClusterAggregator;
 import com.databuff.apm.common.model.DcSpan;
 import com.databuff.apm.common.serde.DCSpanJsonDecoder;
 import com.databuff.apm.common.storage.DorisBatchWriter;
+import com.databuff.apm.common.storage.DorisJsonRow;
 import com.databuff.apm.common.storage.DorisTableNames;
 import com.google.protobuf.ByteString;
 import io.opentelemetry.proto.collector.metrics.v1.ExportMetricsServiceRequest;
@@ -53,8 +54,8 @@ class OtlpIngestServiceTest {
     @Test
     void ingestsTracesThroughGateway() {
         ClusterAggregator aggregator = new ClusterAggregator("n1");
-        DorisBatchWriter metricWriter = new DorisBatchWriter(10_000);
-        DorisBatchWriter traceWriter = new DorisBatchWriter(10_000);
+        DorisBatchWriter metricWriter = new DorisBatchWriter();
+        DorisBatchWriter traceWriter = new DorisBatchWriter();
         aggregateComponent = IngestTestComponents.aggregate(aggregator, metricWriter);
         metricComponent = new MetricComponent(aggregateComponent);
         traceComponent = IngestTestComponents.trace(aggregateComponent, traceWriter, 200L);
@@ -91,8 +92,8 @@ class OtlpIngestServiceTest {
     @Test
     void ingestsMultiServiceTraceAsOneBatch() {
         ClusterAggregator aggregator = new ClusterAggregator("n1");
-        DorisBatchWriter metricWriter = new DorisBatchWriter(10_000);
-        DorisBatchWriter traceWriter = new DorisBatchWriter(10_000);
+        DorisBatchWriter metricWriter = new DorisBatchWriter();
+        DorisBatchWriter traceWriter = new DorisBatchWriter();
         aggregateComponent = IngestTestComponents.aggregate(aggregator, metricWriter);
         metricComponent = new MetricComponent(aggregateComponent);
         traceComponent = IngestTestComponents.trace(aggregateComponent, traceWriter, 200L);
@@ -137,9 +138,9 @@ class OtlpIngestServiceTest {
         await().atMost(Duration.ofSeconds(2)).untilAsserted(() ->
                 assertThat(traceWriter.pendingCount()).isEqualTo(2));
         DcSpan child = traceWriter.flushAll().stream()
-                .map(bytes -> {
+                .map(row -> {
                     try {
-                        return DCSpanJsonDecoder.decode(bytes, true);
+                        return DCSpanJsonDecoder.decode(DorisJsonRow.toByteArray(row), true);
                     } catch (Exception e) {
                         throw new AssertionError(e);
                     }
@@ -153,13 +154,13 @@ class OtlpIngestServiceTest {
 
     @Test
     void ingestsMetricsDirectlyToDoris() {
-        DorisBatchWriter jvm = new DorisBatchWriter(10_000);
+        DorisBatchWriter jvm = new DorisBatchWriter();
         MetricWriteRouter router = new MetricWriteRouter(Map.of(DorisTableNames.METRIC_JVM, jvm));
         OtlpMetricDirectWriter metricWriter = new OtlpMetricDirectWriter(router);
 
         ClusterAggregator aggregator = new ClusterAggregator("n1");
-        DorisBatchWriter metricWriterBuffer = new DorisBatchWriter(10_000);
-        DorisBatchWriter traceWriter = new DorisBatchWriter(10_000);
+        DorisBatchWriter metricWriterBuffer = new DorisBatchWriter();
+        DorisBatchWriter traceWriter = new DorisBatchWriter();
         aggregateComponent = IngestTestComponents.aggregate(aggregator, metricWriterBuffer);
         metricComponent = new MetricComponent(aggregateComponent);
         traceComponent = IngestTestComponents.trace(aggregateComponent, traceWriter);
@@ -191,11 +192,11 @@ class OtlpIngestServiceTest {
     }
 
     private static OtlpMetricDirectWriter noopMetricWriter() {
-        return new OtlpMetricDirectWriter(MetricWriteRouter.singleTable(new DorisBatchWriter(1)));
+        return new OtlpMetricDirectWriter(MetricWriteRouter.singleTable(new DorisBatchWriter()));
     }
 
     private static OtlpLogDirectWriter noopLogWriter() {
-        return new OtlpLogDirectWriter(new DorisBatchWriter(1), null);
+        return new OtlpLogDirectWriter(new DorisBatchWriter(), null);
     }
 
     private static KeyValue kv(String key, String value) {

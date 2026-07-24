@@ -78,9 +78,9 @@ services:
     volumes:
       - ./run/ingest:/app
     ports:
-      - "4317:4317"
-      - "4318:4318"
-      - "11800:11800"
+      - "${INGEST_GRPC_PORT:-4317}:4317"
+      - "${INGEST_HTTP_PORT:-4318}:4318"
+      - "${INGEST_SKYWALKING_PORT:-11800}:11800"
     depends_on:
       ai-apm-doris-fe:
         condition: service_healthy
@@ -112,7 +112,7 @@ services:
       - ../common/skills:/app/skills:ro
       - ../../ai-apm-web/data:/app/data
     ports:
-      - "27403:27403"
+      - "${WEB_HTTP_PORT:-27403}:27403"
     depends_on:
       ai-apm-doris-fe:
         condition: service_healthy

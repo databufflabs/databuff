@@ -771,6 +771,34 @@ class MetricQueryBuilderTest {
     }
 
     @Test
+    void buildsMetricServiceNameIdMapSql() {
+        String sql = MetricQueryBuilder.metricServiceNameIdMapSql(
+                "databuff", "metric_service_trace", 0L, 3_600_000L, " AND `service_id` = 'x' ", 100);
+        assertThat(sql).contains("metric_service_trace");
+        assertThat(sql).contains("map_key");
+        assertThat(sql).contains("map_value");
+        assertThat(sql).contains("`service_id` = 'x'");
+        assertThat(sql).contains("LIMIT 100");
+    }
+
+    @Test
+    void buildsMetricTagCountMapSql() {
+        String sql = MetricQueryBuilder.metricTagCountMapSql(
+                "databuff", "metric_service_trace", "resource", 0L, 3_600_000L, "", 50);
+        assertThat(sql).contains("`resource` AS map_key");
+        assertThat(sql).contains("SUM(`cnt`)");
+        assertThat(sql).contains("LIMIT 50");
+    }
+
+    @Test
+    void buildsMetricDurationRangeSql() {
+        String sql = MetricQueryBuilder.metricDurationRangeSql(
+                "databuff", "metric_service_trace", 0L, 3_600_000L, "");
+        assertThat(sql).contains("MIN(`minDuration`)");
+        assertThat(sql).contains("MAX(`maxDuration`)");
+    }
+
+    @Test
     void buildsComponentOutboundDownstreamSummarySql() {
         String sql = MetricQueryBuilder.componentOutboundDownstreamSummarySql(
                 "databuff", "metric_service_redis", java.util.Set.of("service-a"), null, 1, false, 0L, 3_600_000L, 50);

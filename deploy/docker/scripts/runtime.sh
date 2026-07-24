@@ -1,5 +1,12 @@
 #!/usr/bin/env bash
 # Runtime helpers shared by start/stop scripts in the deploy package.
+#
+# Readiness probes containers via Docker health (container-internal ports).
+# Do not curl host-mapped ports here — users may remap 4318/27403 on the host.
+
+# Listen ports inside containers (fixed; independent of host publish mapping).
+INGEST_CONTAINER_HTTP_PORT="${INGEST_CONTAINER_HTTP_PORT:-4318}"
+WEB_CONTAINER_HTTP_PORT="${WEB_CONTAINER_HTTP_PORT:-27403}"
 
 ensure_vm_max_map_count() {
   local required=2000000 current
@@ -29,6 +36,32 @@ detect_local_ip() {
   else
     echo "$ip"
   fi
+}
+
+# Host-published port for a container listen port (e.g. 4318/tcp -> 84318).
+# Falls back to env override or the container port itself.
+published_host_port() {
+  local container="$1"
+  local container_port="$2"
+  local fallback="${3:-$container_port}"
+  local mapping=""
+
+  if command -v docker >/dev/null 2>&1; then
+    mapping="$(docker port "$container" "${container_port}/tcp" 2>/dev/null | head -n1 || true)"
+  fi
+  if [ -n "$mapping" ]; then
+    echo "${mapping##*:}"
+    return 0
+  fi
+  echo "$fallback"
+}
+
+apm_web_host_port() {
+  published_host_port "${WEB_SERVICE:-ai-apm-web}" "$WEB_CONTAINER_HTTP_PORT" "${WEB_HTTP_PORT:-$WEB_CONTAINER_HTTP_PORT}"
+}
+
+apm_ingest_host_port() {
+  published_host_port "${INGEST_SERVICE:-ai-apm-ingest}" "$INGEST_CONTAINER_HTTP_PORT" "${INGEST_HTTP_PORT:-$INGEST_CONTAINER_HTTP_PORT}"
 }
 
 check_http_ready() {
@@ -72,14 +105,56 @@ wait_for_http_ready() {
   return 1
 }
 
+container_health_status() {
+  local name="$1"
+  docker inspect -f '{{if .State.Health}}{{.State.Health.Status}}{{else}}{{.State.Status}}{{end}}' "$name" 2>/dev/null || echo "missing"
+}
+
+# Probe readiness inside the container (compose healthcheck uses internal ports).
+check_container_ready() {
+  local name="$1"
+  local status
+  status="$(container_health_status "$name")"
+  [ "$status" = "healthy" ]
+}
+
+wait_for_container_ready() {
+  local name="$1"
+  local label="$2"
+  local timeout="${3:-300}"
+  local interval="${4:-3}"
+  local elapsed=0
+  local next_log=0
+  local status
+
+  while [ "$elapsed" -lt "$timeout" ]; do
+    status="$(container_health_status "$name")"
+    if [ "$status" = "healthy" ]; then
+      echo "[start] ${label} ready (${elapsed}s)"
+      return 0
+    fi
+    if [ "$elapsed" -ge "$next_log" ]; then
+      echo "[start] waiting for ${label} [${name}: ${status}] (${elapsed}s/${timeout}s) ..."
+      next_log=$((elapsed + 30))
+    fi
+    sleep "$interval"
+    elapsed=$((elapsed + interval))
+  done
+
+  echo "[start] timeout waiting for ${label} (container ${name}, last status=${status:-unknown}) after ${timeout}s" >&2
+  return 1
+}
+
 wait_for_apm_services_ready() {
   timeout="${APM_READY_TIMEOUT:-300}"
   failed=0
+  ingest_name="${INGEST_SERVICE:-ai-apm-ingest}"
+  web_name="${WEB_SERVICE:-ai-apm-web}"
 
-  echo "[start] waiting for ingest and web to become ready (timeout ${timeout}s) ..."
-  wait_for_http_ready "http://127.0.0.1:4318/health" "ingest" "$timeout" &
+  echo "[start] waiting for ingest and web container health (timeout ${timeout}s) ..."
+  wait_for_container_ready "$ingest_name" "ingest" "$timeout" &
   pid_ingest=$!
-  wait_for_http_ready "http://127.0.0.1:27403/health" "web" "$timeout" &
+  wait_for_container_ready "$web_name" "web" "$timeout" &
   pid_web=$!
 
   wait "$pid_ingest" || failed=1
@@ -93,6 +168,8 @@ wait_for_apm_services_ready() {
 
 print_apm_ready_summary() {
   host_ip="$(detect_local_ip)"
+  web_port="$(apm_web_host_port)"
+  ingest_port="$(apm_ingest_host_port)"
   CYN='\033[36m'
   GRN='\033[32m'
   YLW='\033[33m'
@@ -105,12 +182,12 @@ print_apm_ready_summary() {
   echo -e "${CYN}========================================================${RST}"
   echo ""
   echo -e "  ${CYN}Web UI${RST}"
-  echo "    http://${host_ip}:27403"
+  echo "    http://${host_ip}:${web_port}"
   echo -e "  ${CYN}登录账号${RST}"
   echo -e "    用户名: ${BLD}admin${RST}"
   echo -e "    密码:   ${YLW}Databuff@123${RST}"
   echo -e "  ${CYN}Ingest${RST}"
-  echo "    http://${host_ip}:4318/v1/traces"
+  echo "    http://${host_ip}:${ingest_port}/v1/traces"
   echo ""
   echo -e "${CYN}========================================================${RST}"
   echo ""
@@ -125,8 +202,7 @@ bootstrap_web_for_troubleshooting() {
   compose_cmd up -d --no-deps --force-recreate "$web_service"
 
   if [ "${START_SKIP_READY:-0}" != "1" ]; then
-    host_ip="$(detect_local_ip)"
-    wait_for_http_ready "http://${host_ip}:27403/health" "web" "$timeout" || true
+    wait_for_container_ready "$web_service" "web" "$timeout" || true
   fi
 
   if [ "${START_SKIP_SUMMARY:-0}" != "1" ]; then
@@ -137,6 +213,7 @@ bootstrap_web_for_troubleshooting() {
 print_web_bootstrap_summary() {
   local reason="${1:-Doris 未就绪}"
   host_ip="$(detect_local_ip)"
+  web_port="$(apm_web_host_port)"
   CYN='\033[36m'
   YLW='\033[33m'
   BLD='\033[1m'
@@ -148,7 +225,7 @@ print_web_bootstrap_summary() {
   echo -e "${CYN}========================================================${RST}"
   echo ""
   echo -e "  ${CYN}Web UI${RST}"
-  echo "    http://${host_ip}:27403"
+  echo "    http://${host_ip}:${web_port}"
   echo -e "  ${CYN}登录账号${RST}"
   echo -e "    用户名: ${BLD}admin${RST}"
   echo -e "    密码:   ${YLW}Databuff@123${RST}"

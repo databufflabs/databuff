@@ -32,11 +32,34 @@ APM_CONTAINERS=(
   ai-apm-doris-fe
 )
 
+# Build -f args from COMPOSE_FILE (colon-separated) + auto-include override.yml
+compose_f_args() {
+  local f override root
+  root="$(cd "$(dirname "${COMPOSE_FILE%%:*}")" && pwd)"
+  for f in $(echo "$COMPOSE_FILE" | tr ":" " "); do
+    printf -- "-f\0%s\0" "$f"
+  done
+  override="${root}/docker-compose.override.yml"
+  case ":${COMPOSE_FILE}:" in
+    *":${override}:"*) ;;
+    *)
+      if [ -f "$override" ]; then
+        printf -- "-f\0%s\0" "$override"
+      fi
+      ;;
+  esac
+}
+
 compose_cmd() {
+  local args=()
+  local f
+  while IFS= read -r -d "" f; do
+    args+=("$f")
+  done < <(compose_f_args)
   if docker compose version >/dev/null 2>&1; then
-    docker compose -f "$COMPOSE_FILE" "$@"
+    docker compose "${args[@]}" "$@"
   elif command -v docker-compose >/dev/null 2>&1; then
-    docker-compose -f "$COMPOSE_FILE" "$@"
+    docker-compose "${args[@]}" "$@"
   else
     echo "[compose] docker compose not found" >&2
     exit 1

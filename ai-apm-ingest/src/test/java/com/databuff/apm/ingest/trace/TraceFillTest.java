@@ -52,7 +52,7 @@ class TraceFillTest {
     void fillProcessorProducesMetrics() throws Exception {
         DcSpan span = span("trace-3", "s1", "", "billing");
         TraceFillProcessor.FillResult result = new TraceFillProcessor().processTrace(List.of(span));
-        assertThat(result.filledSpanBytes()).hasSize(1);
+        assertThat(result.filledSpanRows()).hasSize(1);
         assertThat(result.metrics()).isNotEmpty();
     }
 
@@ -410,7 +410,7 @@ class TraceFillTest {
         TraceFillProcessor.FillResult result = new TraceFillProcessor(
                 new VirtualServiceExtractor(new VirtualServiceInstanceRegistry(
                         new MetricWriteRouter(Map.of(
-                                DorisTableNames.METRIC_SERVICE_INSTANCE, new DorisBatchWriter(16))),
+                                DorisTableNames.METRIC_SERVICE_INSTANCE, new DorisBatchWriter())),
                         60_000L)))
                 .processTrace(List.of(httpServer, esClient));
 
@@ -451,7 +451,7 @@ class TraceFillTest {
 
         VirtualServiceExtractor extractor = new VirtualServiceExtractor(new VirtualServiceInstanceRegistry(
                 new MetricWriteRouter(Map.of(
-                        DorisTableNames.METRIC_SERVICE_INSTANCE, new DorisBatchWriter(16))),
+                        DorisTableNames.METRIC_SERVICE_INSTANCE, new DorisBatchWriter())),
                 60_000L));
         new TraceFillProcessor(extractor).processTrace(List.of(httpServer, kafkaPublish));
 

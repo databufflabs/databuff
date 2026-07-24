@@ -13,16 +13,16 @@ class AbstractComponentTest {
     @Test
     void emitFailsBeforeStart() {
         TraceComponent component = IngestTestComponents.trace(
-                IngestTestComponents.aggregate(new DorisBatchWriter(10)),
-                new DorisBatchWriter(10));
+                IngestTestComponents.aggregate(new DorisBatchWriter()),
+                new DorisBatchWriter());
         assertThat(component.emit("k", new TraceEvent(null))).isFalse();
     }
 
     @Test
     void closeIsSafeWhenNotStarted() {
         TraceComponent component = IngestTestComponents.trace(
-                IngestTestComponents.aggregate(new DorisBatchWriter(10)),
-                new DorisBatchWriter(10));
+                IngestTestComponents.aggregate(new DorisBatchWriter()),
+                new DorisBatchWriter());
         component.close();
     }
 }

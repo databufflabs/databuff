@@ -2,6 +2,7 @@ package com.databuff.apm.ingest.trace.remote;
 
 import com.databuff.apm.common.cluster.cache.CacheRegionPolicy;
 import com.databuff.apm.common.cluster.cache.ClusterCacheRegistry;
+import com.databuff.apm.common.meta.OtelAttributeMaps;
 import com.databuff.apm.common.model.DcSpan;
 import com.databuff.apm.common.model.OptimizedMetric;
 import com.databuff.apm.common.serde.DcSpanUtil;
@@ -32,7 +33,7 @@ class RemoteCallProcessorTest {
         processor.processAfterFill(List.of(span));
 
         assertThat(span.service).isEqualTo("[remote]api.example.com:443");
-        assertThat(span.meta).contains("\"remote\":\"true\"");
+        assertThat(OtelAttributeMaps.meta(span)).containsEntry("remote", "true");
         assertThat(DcSpanUtil.parseSpanData(span).stream().map(OptimizedMetric::measurement))
                 .contains("service.remote");
     }
@@ -72,7 +73,7 @@ class RemoteCallProcessorTest {
         processor.processAfterFill(List.of(span));
 
         assertThat(span.service).isEqualTo("service-a");
-        assertThat(span.meta).doesNotContain("\"remote\":\"true\"");
+        assertThat(OtelAttributeMaps.meta(span)).doesNotContainKey("remote");
     }
 
     @Test
@@ -96,7 +97,7 @@ class RemoteCallProcessorTest {
         processor.processAfterFill(List.of(span));
 
         assertThat(span.service).isEqualTo("[remote]api.example.com:443");
-        assertThat(span.meta).contains("\"remote\":\"true\"");
+        assertThat(OtelAttributeMaps.meta(span)).containsEntry("remote", "true");
     }
 
     @Test
@@ -121,7 +122,7 @@ class RemoteCallProcessorTest {
                 + "\"server.address\":\"service-b\",\"server.port\":\"8080\"}";
         processor.enrichSpan(error);
 
-        assertThat(error.meta).contains("\"server.service\":\"service-b\"");
+        assertThat(OtelAttributeMaps.meta(error)).containsEntry("server.service", "service-b");
     }
 
     @Test
@@ -159,7 +160,7 @@ class RemoteCallProcessorTest {
     private static VirtualServiceExtractor virtualServiceExtractor() {
         return new VirtualServiceExtractor(
                 new VirtualServiceInstanceRegistry(
-                        new MetricWriteRouter(Map.of(DorisTableNames.METRIC_SERVICE_INSTANCE, new DorisBatchWriter(8))),
+                        new MetricWriteRouter(Map.of(DorisTableNames.METRIC_SERVICE_INSTANCE, new DorisBatchWriter())),
                         60_000L),
                 null);
     }

@@ -30,9 +30,9 @@ public class TracePortalController {
         return tracePortalService.list(body);
     }
 
-    @PostMapping("/query_parames_v2")
-    public Map<String, Object> queryParamsV2(@RequestBody Map<String, Object> body) {
-        return portalEnvelope(tracePortalService.queryParamsV2(body));
+    @PostMapping("/query_params")
+    public Map<String, Object> queryParams(@RequestBody Map<String, Object> body) {
+        return portalEnvelope(tracePortalService.queryParams(body));
     }
 
     @PostMapping("/cnt_graph_stats")
@@ -113,16 +113,6 @@ public class TracePortalController {
     @PostMapping("/serviceInstanceCounts")
     public Map<String, Object> serviceInstanceCounts(@RequestBody Map<String, Object> body) {
         return portalEnvelope(tracePortalService.serviceInstanceCounts(body));
-    }
-
-    @PostMapping("/tabnavStatus")
-    public Map<String, Object> tabnavStatus(@RequestBody Map<String, Object> body) {
-        return portalEnvelope(tracePortalService.tabnavStatus(body));
-    }
-
-    @PostMapping("/resourcePercent")
-    public Map<String, Object> resourcePercent(@RequestBody Map<String, Object> body) {
-        return portalEnvelope(tracePortalService.resourcePercent(body));
     }
 
     @PostMapping("/serviceK8sNamespaces")

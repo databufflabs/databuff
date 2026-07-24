@@ -6,7 +6,6 @@ import com.databuff.apm.common.metric.MetricSchemaRegistry;
 import com.databuff.apm.common.model.OptimizedMetric;
 import com.databuff.apm.common.util.ServiceKeyUtil;
 import com.databuff.apm.ingest.metric.MetricWriteRouter;
-import com.fasterxml.jackson.core.JsonProcessingException;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -83,7 +82,7 @@ public final class VirtualServiceInstanceRegistry {
         }
     }
 
-    public void flushHeartbeats() throws JsonProcessingException {
+    public void flushHeartbeats() {
         if (cache.isEmpty()) {
             return;
         }

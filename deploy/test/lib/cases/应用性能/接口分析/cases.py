@@ -30,5 +30,4 @@ def build_cases(frm_ms: int, to_ms: int) -> list[ApiCase]:
         ApiCase(page, "span 列表", "POST", "/webapi/trace/spanList", sb_limit, CASE_DIR),
         ApiCase(page, "慢 span", "POST", "/webapi/trace/slowSpanList", sb_limit, CASE_DIR),
         ApiCase(page, "错误 span", "POST", "/webapi/trace/errorSpanList", sb_limit, CASE_DIR),
-        ApiCase(page, "接口分位", "POST", "/webapi/trace/resourcePercent", rb, CASE_DIR),
     ]

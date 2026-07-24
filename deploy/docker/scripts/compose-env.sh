@@ -54,11 +54,34 @@ remove_apm_containers() {
   done
 }
 
+# Build -f args from COMPOSE_FILE (colon-separated) + auto-include override.yml
+compose_f_args() {
+  local f override root
+  root="$(cd "$(dirname "${COMPOSE_FILE%%:*}")" && pwd)"
+  for f in $(echo "$COMPOSE_FILE" | tr ":" " "); do
+    printf -- "-f\0%s\0" "$f"
+  done
+  override="${root}/docker-compose.override.yml"
+  case ":${COMPOSE_FILE}:" in
+    *":${override}:"*) ;;
+    *)
+      if [ -f "$override" ]; then
+        printf -- "-f\0%s\0" "$override"
+      fi
+      ;;
+  esac
+}
+
 compose_cmd() {
+  local args=()
+  local f
+  while IFS= read -r -d "" f; do
+    args+=("$f")
+  done < <(compose_f_args)
   if docker compose version >/dev/null 2>&1; then
-    docker compose -f "$COMPOSE_FILE" "$@"
+    docker compose "${args[@]}" "$@"
   elif command -v docker-compose >/dev/null 2>&1; then
-    docker-compose -f "$COMPOSE_FILE" "$@"
+    docker-compose "${args[@]}" "$@"
   else
     echo "[compose] docker compose not found" >&2
     exit 1
@@ -118,10 +141,15 @@ compose_up_wait() {
       compose_cmd up -d --wait --wait-timeout "$wait_timeout" "$@"
     elif command -v timeout >/dev/null 2>&1; then
       # timeout(1) cannot invoke bash functions; call the compose binary directly.
+      local _cf_args=()
+      local _f
+      while IFS= read -r -d "" _f; do
+        _cf_args+=("$_f")
+      done < <(compose_f_args)
       if docker compose version >/dev/null 2>&1; then
-        timeout "$wait_timeout" docker compose -f "$COMPOSE_FILE" up -d --wait "$@"
+        timeout "$wait_timeout" docker compose "${_cf_args[@]}" up -d --wait "$@"
       else
-        timeout "$wait_timeout" docker-compose -f "$COMPOSE_FILE" up -d --wait "$@"
+        timeout "$wait_timeout" docker-compose "${_cf_args[@]}" up -d --wait "$@"
       fi
     else
       compose_cmd up -d --wait "$@"

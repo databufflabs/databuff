@@ -1,5 +1,7 @@
 package com.databuff.apm.ingest.meta;
 
+import com.databuff.apm.common.storage.DorisJsonRow;
+
 import com.databuff.apm.common.model.DcSpan;
 import com.databuff.apm.common.storage.ApmReadRepository;
 import com.databuff.apm.common.storage.DorisBatchWriter;
@@ -32,7 +34,7 @@ class MetaServiceCollectorTest {
         registry = new MetaServiceRegistry(reader, "databuff", 60_000L);
         registry.start();
 
-        DorisBatchWriter writer = new DorisBatchWriter(8);
+        DorisBatchWriter writer = new DorisBatchWriter();
         MetaServiceCollector collector = new MetaServiceCollector(registry, writer);
 
         DcSpan span = new DcSpan();
@@ -47,7 +49,7 @@ class MetaServiceCollectorTest {
         assertThat(collector.stagePending()).isEqualTo(1);
         assertThat(collector.stagePending()).isZero();
 
-        String json = new String(writer.flushAll().get(0), StandardCharsets.UTF_8);
+        String json = new String(DorisJsonRow.toByteArray(writer.flushAll().get(0)), StandardCharsets.UTF_8);
         assertThat(json).contains("\"id\":\"abc123\"");
         assertThat(json).contains("\"name\":\"checkout\"");
         assertThat(json).contains("\"language\":\"java\"");
@@ -62,7 +64,7 @@ class MetaServiceCollectorTest {
         registry = new MetaServiceRegistry(reader, "databuff", 60_000L);
         registry.start();
 
-        DorisBatchWriter writer = new DorisBatchWriter(8);
+        DorisBatchWriter writer = new DorisBatchWriter();
         MetaServiceCollector collector = new MetaServiceCollector(registry, writer);
 
         collector.remember("svc-1", "Old Name");
@@ -72,7 +74,7 @@ class MetaServiceCollectorTest {
 
         collector.remember("svc-1", "New Name");
         assertThat(collector.stagePending()).isEqualTo(1);
-        String json = new String(writer.flushAll().get(0), StandardCharsets.UTF_8);
+        String json = new String(DorisJsonRow.toByteArray(writer.flushAll().get(0)), StandardCharsets.UTF_8);
         assertThat(json).contains("\"name\":\"New Name\"");
     }
 }

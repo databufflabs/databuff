@@ -1,5 +1,6 @@
 package com.databuff.apm.ingest.otel;
 
+import com.databuff.apm.common.meta.OtelAttributeMaps;
 import com.databuff.apm.common.metric.MetricSchemaRegistry;
 import com.databuff.apm.common.model.DcSpan;
 import com.databuff.apm.common.model.OptimizedMetric;
@@ -256,7 +257,7 @@ class OtelConverterTest {
         assertThat(span.resource).isEqualTo("orders/_search");
         assertThat(span.metaHttpMethod).isNull();
         assertThat(span.metaHttpUrl).isNull();
-        assertThat(span.meta).contains("http.method");
+        assertThat(OtelAttributeMaps.meta(span)).containsKey("http.method");
         assertThat(DcSpanUtil.isEsSpan(span)).isTrue();
         assertThat(DcSpanUtil.parseSpanData(span).stream().map(m -> m.measurement()))
                 .contains("service.db")
@@ -307,8 +308,8 @@ class OtelConverterTest {
 
         DcSpan span = converter.convertTraces(request).get(0).span();
         assertThat(span.metaPeerHostname).isEqualTo("mysql");
-        assertThat(span.meta).contains("db.system");
-        assertThat(span.meta).contains("db.statement");
+        assertThat(OtelAttributeMaps.meta(span)).containsKey("db.system");
+        assertThat(OtelAttributeMaps.meta(span)).containsKey("db.statement");
         assertThat(span.type).isEqualTo("SPAN_KIND_CLIENT");
     }
 

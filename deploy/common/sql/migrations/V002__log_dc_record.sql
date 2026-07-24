@@ -21,7 +21,7 @@ CREATE TABLE IF NOT EXISTS log_dc_record (
 ) ENGINE=OLAP
 DUPLICATE KEY(`log_time`, `service_id`, `service`)
 PARTITION BY RANGE(`log_time`) ()
-DISTRIBUTED BY HASH(`trace_id`) BUCKETS 16
+DISTRIBUTED BY HASH(`trace_id`) BUCKETS 3
 PROPERTIES (
   "replication_num" = "1",
   "dynamic_partition.enable" = "true",

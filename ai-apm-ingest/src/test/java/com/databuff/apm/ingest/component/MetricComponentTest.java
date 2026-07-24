@@ -30,7 +30,7 @@ class MetricComponentTest {
 
     @Test
     void ignoresNonMetricEvents() {
-        aggregateComponent = IngestTestComponents.aggregate(new DorisBatchWriter(10));
+        aggregateComponent = IngestTestComponents.aggregate(new DorisBatchWriter());
         metricComponent = new MetricComponent(aggregateComponent);
         aggregateComponent.start(1);
         metricComponent.start(1);
@@ -42,7 +42,7 @@ class MetricComponentTest {
 
     @Test
     void countsMetricEvents() {
-        aggregateComponent = IngestTestComponents.aggregate(new DorisBatchWriter(10));
+        aggregateComponent = IngestTestComponents.aggregate(new DorisBatchWriter());
         metricComponent = new MetricComponent(aggregateComponent);
         aggregateComponent.start(1);
         metricComponent.start(1);

@@ -53,7 +53,7 @@ CREATE TABLE metric_jvm__v3 (
 ) ENGINE=OLAP
 AGGREGATE KEY(`metric_time`, `ts`, `instance`, `service`, `service_id`, `service_instance`, `tag_host`)
 PARTITION BY RANGE(`metric_time`) ()
-DISTRIBUTED BY HASH(`service_id`) BUCKETS 16
+DISTRIBUTED BY HASH(`service_id`) BUCKETS 3
 PROPERTIES (
   "replication_num" = "1",
   "dynamic_partition.enable" = "true",
@@ -98,7 +98,7 @@ CREATE TABLE metric_service__v3 (
 ) ENGINE=OLAP
 AGGREGATE KEY(`metric_time`, `ts`, `errorType`, `service`, `service_id`, `service_instance`)
 PARTITION BY RANGE(`metric_time`) ()
-DISTRIBUTED BY HASH(`service_id`) BUCKETS 16
+DISTRIBUTED BY HASH(`service_id`) BUCKETS 3
 PROPERTIES (
   "replication_num" = "1",
   "dynamic_partition.enable" = "true",
@@ -157,7 +157,7 @@ CREATE TABLE metric_service_config__v3 (
 ) ENGINE=OLAP
 AGGREGATE KEY(`metric_time`, `ts`, `config.type`, `durationRange`, `isIn`, `isOut`, `operation`, `resource`, `rootComponentType`, `rootResource`, `service`, `service_id`, `service_instance`, `srcService`, `srcServiceId`, `srcServiceInstance`)
 PARTITION BY RANGE(`metric_time`) ()
-DISTRIBUTED BY HASH(`service_id`) BUCKETS 16
+DISTRIBUTED BY HASH(`service_id`) BUCKETS 3
 PROPERTIES (
   "replication_num" = "1",
   "dynamic_partition.enable" = "true",
@@ -189,7 +189,7 @@ CREATE TABLE metric_service_cpu__v3 (
 ) ENGINE=OLAP
 AGGREGATE KEY(`metric_time`, `ts`, `service`, `serviceCode`, `service_id`, `service_instance`)
 PARTITION BY RANGE(`metric_time`) ()
-DISTRIBUTED BY HASH(`service_id`) BUCKETS 16
+DISTRIBUTED BY HASH(`service_id`) BUCKETS 3
 PROPERTIES (
   "replication_num" = "1",
   "dynamic_partition.enable" = "true",
@@ -259,7 +259,7 @@ CREATE TABLE metric_service_db__v3 (
 ) ENGINE=OLAP
 AGGREGATE KEY(`metric_time`, `ts`, `dbType`, `durationRange`, `isIn`, `isOut`, `isSlow`, `resource`, `rootComponentType`, `rootResource`, `service`, `service_id`, `service_instance`, `sqlContent`, `sqlDatabase`, `sqlOperation`, `srcService`, `srcServiceId`, `srcServiceInstance`)
 PARTITION BY RANGE(`metric_time`) ()
-DISTRIBUTED BY HASH(`service_id`) BUCKETS 16
+DISTRIBUTED BY HASH(`service_id`) BUCKETS 3
 PROPERTIES (
   "replication_num" = "1",
   "dynamic_partition.enable" = "true",
@@ -304,7 +304,7 @@ CREATE TABLE metric_service_db_connection_pool__v3 (
 ) ENGINE=OLAP
 AGGREGATE KEY(`metric_time`, `ts`, `connectionPoolDbType`, `connectionPoolName`, `connectionPoolType`, `connectionPoolUrl`, `connectionPoolUsername`, `driverClassName`, `service`, `service_id`, `service_instance`)
 PARTITION BY RANGE(`metric_time`) ()
-DISTRIBUTED BY HASH(`service_id`) BUCKETS 16
+DISTRIBUTED BY HASH(`service_id`) BUCKETS 3
 PROPERTIES (
   "replication_num" = "1",
   "dynamic_partition.enable" = "true",
@@ -337,7 +337,7 @@ CREATE TABLE metric_service_db_connection_pool_get__v3 (
 ) ENGINE=OLAP
 AGGREGATE KEY(`metric_time`, `ts`, `connectionPoolName`, `service`, `service_id`, `service_instance`)
 PARTITION BY RANGE(`metric_time`) ()
-DISTRIBUTED BY HASH(`service_id`) BUCKETS 16
+DISTRIBUTED BY HASH(`service_id`) BUCKETS 3
 PROPERTIES (
   "replication_num" = "1",
   "dynamic_partition.enable" = "true",
@@ -388,7 +388,7 @@ CREATE TABLE metric_service_exception__v3 (
 ) ENGINE=OLAP
 AGGREGATE KEY(`metric_time`, `ts`, `componentService`, `componentServiceId`, `componentServiceInstance`, `exceptionCode`, `exceptionName`, `isIn`, `isOut`, `resource`, `rootComponentType`, `rootResource`, `service`, `service_id`, `service_instance`)
 PARTITION BY RANGE(`metric_time`) ()
-DISTRIBUTED BY HASH(`service_id`) BUCKETS 16
+DISTRIBUTED BY HASH(`service_id`) BUCKETS 3
 PROPERTIES (
   "replication_num" = "1",
   "dynamic_partition.enable" = "true",
@@ -442,7 +442,7 @@ CREATE TABLE metric_service_flow__v3 (
 ) ENGINE=OLAP
 AGGREGATE KEY(`metric_time`, `ts`, `entryInterfacePathId`, `entryPathId`, `interfacePathId`, `isIn`, `parentInterfacePathId`, `parentPathId`, `parentResource`, `parentService`, `parentServiceId`, `pathId`, `resource`, `service`, `service_id`)
 PARTITION BY RANGE(`metric_time`) ()
-DISTRIBUTED BY HASH(`service_id`) BUCKETS 16
+DISTRIBUTED BY HASH(`service_id`) BUCKETS 3
 PROPERTIES (
   "replication_num" = "1",
   "dynamic_partition.enable" = "true",
@@ -486,7 +486,7 @@ CREATE TABLE metric_service_health_status__v3 (
 ) ENGINE=OLAP
 AGGREGATE KEY(`metric_time`, `ts`, `convergenceType`, `gid`, `host`, `level`, `policyId`, `policyName`, `problemId`, `service`, `service_id`, `service_instance`)
 PARTITION BY RANGE(`metric_time`) ()
-DISTRIBUTED BY HASH(`service_id`) BUCKETS 16
+DISTRIBUTED BY HASH(`service_id`) BUCKETS 3
 PROPERTIES (
   "replication_num" = "1",
   "dynamic_partition.enable" = "true",
@@ -552,7 +552,7 @@ CREATE TABLE metric_service_http__v3 (
 ) ENGINE=OLAP
 AGGREGATE KEY(`metric_time`, `ts`, `durationRange`, `httpCode`, `httpMethod`, `isIn`, `isOut`, `resource`, `rootComponentType`, `rootResource`, `service`, `service_id`, `service_instance`, `srcService`, `srcServiceId`, `srcServiceInstance`, `url`)
 PARTITION BY RANGE(`metric_time`) ()
-DISTRIBUTED BY HASH(`service_id`) BUCKETS 16
+DISTRIBUTED BY HASH(`service_id`) BUCKETS 3
 PROPERTIES (
   "replication_num" = "1",
   "dynamic_partition.enable" = "true",
@@ -587,7 +587,7 @@ CREATE TABLE metric_service_http_connection_pool__v3 (
 ) ENGINE=OLAP
 AGGREGATE KEY(`metric_time`, `ts`, `httpConnectionPoolName`, `service`, `service_id`, `service_instance`)
 PARTITION BY RANGE(`metric_time`) ()
-DISTRIBUTED BY HASH(`service_id`) BUCKETS 16
+DISTRIBUTED BY HASH(`service_id`) BUCKETS 3
 PROPERTIES (
   "replication_num" = "1",
   "dynamic_partition.enable" = "true",
@@ -620,7 +620,7 @@ CREATE TABLE metric_service_http_connection_pool_get__v3 (
 ) ENGINE=OLAP
 AGGREGATE KEY(`metric_time`, `ts`, `httpConnectionPoolName`, `service`, `service_id`, `service_instance`)
 PARTITION BY RANGE(`metric_time`) ()
-DISTRIBUTED BY HASH(`service_id`) BUCKETS 16
+DISTRIBUTED BY HASH(`service_id`) BUCKETS 3
 PROPERTIES (
   "replication_num" = "1",
   "dynamic_partition.enable" = "true",
@@ -682,7 +682,7 @@ CREATE TABLE metric_service_instance__v3 (
 ) ENGINE=OLAP
 AGGREGATE KEY(`metric_time`, `ts`, `biz_pid_id`, `containerId`, `containerName`, `hostIp`, `hostname`, `javaVendor`, `javaVersion`, `k8sClusterId`, `k8sContainerId`, `k8sNamespace`, `k8sPodName`, `pid`, `pname`, `ports`, `service`, `service_id`, `service_instance`, `service_type`, `virtualService`)
 PARTITION BY RANGE(`metric_time`) ()
-DISTRIBUTED BY HASH(`service_id`) BUCKETS 16
+DISTRIBUTED BY HASH(`service_id`) BUCKETS 3
 PROPERTIES (
   "replication_num" = "1",
   "dynamic_partition.enable" = "true",
@@ -715,7 +715,7 @@ CREATE TABLE metric_service_io__v3 (
 ) ENGINE=OLAP
 AGGREGATE KEY(`metric_time`, `ts`, `service`, `serviceCode`, `service_id`, `service_instance`)
 PARTITION BY RANGE(`metric_time`) ()
-DISTRIBUTED BY HASH(`service_id`) BUCKETS 16
+DISTRIBUTED BY HASH(`service_id`) BUCKETS 3
 PROPERTIES (
   "replication_num" = "1",
   "dynamic_partition.enable" = "true",
@@ -749,7 +749,7 @@ CREATE TABLE metric_service_mem__v3 (
 ) ENGINE=OLAP
 AGGREGATE KEY(`metric_time`, `ts`, `service`, `serviceCode`, `service_id`, `service_instance`)
 PARTITION BY RANGE(`metric_time`) ()
-DISTRIBUTED BY HASH(`service_id`) BUCKETS 16
+DISTRIBUTED BY HASH(`service_id`) BUCKETS 3
 PROPERTIES (
   "replication_num" = "1",
   "dynamic_partition.enable" = "true",
@@ -819,7 +819,7 @@ CREATE TABLE metric_service_mq__v3 (
 ) ENGINE=OLAP
 AGGREGATE KEY(`metric_time`, `ts`, `broker`, `durationRange`, `group`, `isConsume`, `isIn`, `isOut`, `partition`, `resource`, `rootComponentType`, `rootResource`, `service`, `service_id`, `service_instance`, `srcService`, `srcServiceId`, `srcServiceInstance`, `topic`, `type`)
 PARTITION BY RANGE(`metric_time`) ()
-DISTRIBUTED BY HASH(`service_id`) BUCKETS 16
+DISTRIBUTED BY HASH(`service_id`) BUCKETS 3
 PROPERTIES (
   "replication_num" = "1",
   "dynamic_partition.enable" = "true",
@@ -852,7 +852,7 @@ CREATE TABLE metric_service_net__v3 (
 ) ENGINE=OLAP
 AGGREGATE KEY(`metric_time`, `ts`, `service`, `serviceCode`, `service_id`, `service_instance`)
 PARTITION BY RANGE(`metric_time`) ()
-DISTRIBUTED BY HASH(`service_id`) BUCKETS 16
+DISTRIBUTED BY HASH(`service_id`) BUCKETS 3
 PROPERTIES (
   "replication_num" = "1",
   "dynamic_partition.enable" = "true",
@@ -890,7 +890,7 @@ CREATE TABLE metric_service_object_pool__v3 (
 ) ENGINE=OLAP
 AGGREGATE KEY(`metric_time`, `ts`, `objectPoolFairness`, `objectPoolName`, `objectPoolObjectClass`, `service`, `service_id`, `service_instance`)
 PARTITION BY RANGE(`metric_time`) ()
-DISTRIBUTED BY HASH(`service_id`) BUCKETS 16
+DISTRIBUTED BY HASH(`service_id`) BUCKETS 3
 PROPERTIES (
   "replication_num" = "1",
   "dynamic_partition.enable" = "true",
@@ -923,7 +923,7 @@ CREATE TABLE metric_service_object_pool_get__v3 (
 ) ENGINE=OLAP
 AGGREGATE KEY(`metric_time`, `ts`, `objectPoolName`, `service`, `service_id`, `service_instance`)
 PARTITION BY RANGE(`metric_time`) ()
-DISTRIBUTED BY HASH(`service_id`) BUCKETS 16
+DISTRIBUTED BY HASH(`service_id`) BUCKETS 3
 PROPERTIES (
   "replication_num" = "1",
   "dynamic_partition.enable" = "true",
@@ -982,7 +982,7 @@ CREATE TABLE metric_service_redis__v3 (
 ) ENGINE=OLAP
 AGGREGATE KEY(`metric_time`, `ts`, `command`, `durationRange`, `isIn`, `isOut`, `resource`, `rootComponentType`, `rootResource`, `service`, `service_id`, `service_instance`, `srcService`, `srcServiceId`, `srcServiceInstance`)
 PARTITION BY RANGE(`metric_time`) ()
-DISTRIBUTED BY HASH(`service_id`) BUCKETS 16
+DISTRIBUTED BY HASH(`service_id`) BUCKETS 3
 PROPERTIES (
   "replication_num" = "1",
   "dynamic_partition.enable" = "true",
@@ -1046,7 +1046,7 @@ CREATE TABLE metric_service_rpc__v3 (
 ) ENGINE=OLAP
 AGGREGATE KEY(`metric_time`, `ts`, `durationRange`, `isIn`, `isOut`, `resource`, `rootComponentType`, `rootResource`, `service`, `service_id`, `service_instance`, `srcService`, `srcServiceId`, `srcServiceInstance`, `statusCode`, `type`)
 PARTITION BY RANGE(`metric_time`) ()
-DISTRIBUTED BY HASH(`service_id`) BUCKETS 16
+DISTRIBUTED BY HASH(`service_id`) BUCKETS 3
 PROPERTIES (
   "replication_num" = "1",
   "dynamic_partition.enable" = "true",
@@ -1108,7 +1108,7 @@ CREATE TABLE metric_service_remote__v3 (
 ) ENGINE=OLAP
 AGGREGATE KEY(`metric_time`, `ts`, `durationRange`, `isIn`, `isOut`, `resource`, `rootComponentType`, `rootResource`, `service`, `service_id`, `service_instance`, `srcService`, `srcServiceId`, `srcServiceInstance`, `remoteType`)
 PARTITION BY RANGE(`metric_time`) ()
-DISTRIBUTED BY HASH(`service_id`) BUCKETS 16
+DISTRIBUTED BY HASH(`service_id`) BUCKETS 3
 PROPERTIES (
   "replication_num" = "1",
   "dynamic_partition.enable" = "true",
@@ -1141,7 +1141,7 @@ CREATE TABLE metric_service_tcp__v3 (
 ) ENGINE=OLAP
 AGGREGATE KEY(`metric_time`, `ts`, `service`, `serviceCode`, `service_id`, `service_instance`)
 PARTITION BY RANGE(`metric_time`) ()
-DISTRIBUTED BY HASH(`service_id`) BUCKETS 16
+DISTRIBUTED BY HASH(`service_id`) BUCKETS 3
 PROPERTIES (
   "replication_num" = "1",
   "dynamic_partition.enable" = "true",
@@ -1181,7 +1181,7 @@ CREATE TABLE metric_service_thread_pool__v3 (
 ) ENGINE=OLAP
 AGGREGATE KEY(`metric_time`, `ts`, `service`, `service_id`, `service_instance`, `threadPoolName`)
 PARTITION BY RANGE(`metric_time`) ()
-DISTRIBUTED BY HASH(`service_id`) BUCKETS 16
+DISTRIBUTED BY HASH(`service_id`) BUCKETS 3
 PROPERTIES (
   "replication_num" = "1",
   "dynamic_partition.enable" = "true",
@@ -1220,7 +1220,7 @@ CREATE TABLE metric_service_thread_pool_cost__v3 (
 ) ENGINE=OLAP
 AGGREGATE KEY(`metric_time`, `ts`, `rootResource`, `service`, `service_id`, `service_instance`, `threadPoolName`, `type`)
 PARTITION BY RANGE(`metric_time`) ()
-DISTRIBUTED BY HASH(`service_id`) BUCKETS 16
+DISTRIBUTED BY HASH(`service_id`) BUCKETS 3
 PROPERTIES (
   "replication_num" = "1",
   "dynamic_partition.enable" = "true",
@@ -1266,7 +1266,7 @@ CREATE TABLE metric_service_trace__v3 (
 ) ENGINE=OLAP
 AGGREGATE KEY(`metric_time`, `ts`, `errorType`, `hostName`, `httpMethod`, `httpStatusCode`, `resource`, `service`, `service_id`, `service_instance`)
 PARTITION BY RANGE(`metric_time`) ()
-DISTRIBUTED BY HASH(`service_id`) BUCKETS 16
+DISTRIBUTED BY HASH(`service_id`) BUCKETS 3
 PROPERTIES (
   "replication_num" = "1",
   "dynamic_partition.enable" = "true",

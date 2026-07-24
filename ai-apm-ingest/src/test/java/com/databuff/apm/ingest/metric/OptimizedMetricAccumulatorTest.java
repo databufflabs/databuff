@@ -14,7 +14,7 @@ import static org.assertj.core.api.Assertions.assertThat;
 class OptimizedMetricAccumulatorTest {
 
     @Test
-    void mergesAndEncodesDorisRow() throws Exception {
+    void mergesAndEncodesDorisRow() {
         OptimizedMetricAccumulator accumulator = new OptimizedMetricAccumulator();
         OptimizedMetric metric = new OptimizedMetric()
                 .withTsId(7)

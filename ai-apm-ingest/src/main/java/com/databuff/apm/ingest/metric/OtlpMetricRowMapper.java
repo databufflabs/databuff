@@ -4,9 +4,9 @@ import com.databuff.apm.common.metric.MetricSchemaRegistry;
 import com.databuff.apm.common.meta.OtelAttributeMaps;
 import com.databuff.apm.common.model.DcSpan;
 import com.databuff.apm.common.serde.DcSpanUtil;
-import com.databuff.apm.common.serde.ReusableJson;
+import com.databuff.apm.common.serde.MetricDorisJsonRow;
 import com.databuff.apm.ingest.otel.OtlMetricLine;
-import com.databuff.apm.common.storage.DorisTableNames;
+import com.databuff.apm.common.storage.DorisJsonRow;
 import com.databuff.apm.common.storage.MetricIdentifierParser;
 import com.databuff.apm.common.storage.MetricRowTimeUtil;
 import com.databuff.apm.ingest.otel.OtlpMetricDebugLogger;
@@ -15,6 +15,7 @@ import com.fasterxml.jackson.databind.ObjectMapper;
 
 import java.util.HashMap;
 import java.util.Map;
+import java.util.Objects;
 import java.util.Optional;
 
 /** Maps raw OTLP metric JSON lines to Doris table rows for pool/JVM metrics. */
@@ -26,19 +27,22 @@ public final class OtlpMetricRowMapper {
     }
 
     /**
-     * @param row serialized NDJSON row (non-JVM)
-     * @param fields unserialized fields for JVM merge path (row may be null)
+     * Lazy row: field map is kept until Stream Load flush ({@link MetricDorisJsonRow}).
+     * JVM merge path reads {@link #fields()} before offer.
      */
-    public record MappedRow(String table, byte[] row, Map<String, Object> fields) {
-        public MappedRow(String table, byte[] row) {
-            this(table, row, null);
+    public record MappedRow(String table, Map<String, Object> fields) {
+        public MappedRow {
+            Objects.requireNonNull(table, "table");
+            Objects.requireNonNull(fields, "fields");
         }
 
-        public byte[] rowBytes() throws com.fasterxml.jackson.core.JsonProcessingException {
-            if (row != null) {
-                return row;
-            }
-            return ReusableJson.writeValueAsBytes(JSON, fields);
+        public DorisJsonRow toDorisJsonRow() {
+            return MetricDorisJsonRow.ofMap(fields);
+        }
+
+        /** Materialize for tests / debug logging. */
+        public byte[] rowBytes() {
+            return DorisJsonRow.toByteArray(toDorisJsonRow());
         }
     }
 
@@ -68,9 +72,7 @@ public final class OtlpMetricRowMapper {
             putIfPresent(row, "service_instance", line.serviceInstance());
             applyMeasurementTagsFromLine(row, parsed.measurement(), line);
             putFieldValue(row, parsed, line.value());
-            MappedRow mapped = DorisTableNames.METRIC_JVM.equals(table)
-                    ? new MappedRow(table, null, row)
-                    : new MappedRow(table, ReusableJson.writeValueAsBytes(JSON, row), null);
+            MappedRow mapped = new MappedRow(table, row);
             OtlpMetricDebugLogger.mappedRow(line, mapped);
             return Optional.of(mapped);
         } catch (Exception ex) {
@@ -107,10 +109,7 @@ public final class OtlpMetricRowMapper {
             putIfPresent(row, "service_instance", text(node, "service_instance"));
             applyMeasurementTags(row, parsed.measurement(), node);
             putFieldValue(row, parsed, numericValue(node));
-            if (DorisTableNames.METRIC_JVM.equals(table)) {
-                return Optional.of(new MappedRow(table, null, row));
-            }
-            return Optional.of(new MappedRow(table, ReusableJson.writeValueAsBytes(JSON, row), null));
+            return Optional.of(new MappedRow(table, row));
         } catch (Exception ex) {
             return Optional.empty();
         }

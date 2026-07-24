@@ -2,7 +2,6 @@ package com.databuff.apm.web.trace;
 
 import com.databuff.apm.web.TestStorageSupport;
 
-import com.databuff.apm.common.query.ApmQueryModels.ErrorRateSnapshot;
 import com.databuff.apm.common.storage.ApmReadRepository;
 import org.junit.jupiter.api.Test;
 
@@ -20,7 +19,6 @@ class TraceControllerTest {
     @Test
     void delegatesSpanList() throws Exception {
         ApmReadRepository reader = mock(ApmReadRepository.class);
-        when(reader.queryErrorRate(anyString())).thenReturn(new ErrorRateSnapshot(0, 0));
         when(reader.querySpanSummaries(anyString())).thenReturn(List.of());
         TraceController controller = new TraceController(new TraceQueryService(reader, TestStorageSupport.storage()));
         assertThat(controller.spanList(new TraceQueryService.SpanListRequest("demo", 0, 1, 10))).isEmpty();

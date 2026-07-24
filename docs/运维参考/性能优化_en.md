@@ -111,8 +111,10 @@ You should see `INGEST_TRACE_TASKS=8`, etc. If not, check YAML indentation under
 
 | YAML key | Environment variable (Spring binding) | Default | Meaning | Increase | Decrease |
 |----------|--------------------------------------|---------|---------|----------|----------|
-| `ingest.doris.flush-interval-ms` | `INGEST_DORIS_FLUSH_INTERVAL_MS` | `5000` | Scheduled flush interval (`DorisFlushScheduler`) | Larger batches, higher write latency | More frequent flushes, lower latency, more Doris load |
-| `ingest.doris.flush-timeout-ms` | `INGEST_DORIS_FLUSH_TIMEOUT_MS` | `45000` | Stream Load wait cap (min 5000) | Tolerate slow BE / large batches | Fail faster on timeouts |
+| `ingest.doris.flush-batch-bytes` | `INGEST_DORIS_FLUSH_BATCH_BYTES` | `33554432` (32 MiB) | Hand off thread buffer for Stream Load at this estimated NDJSON size | **Prefer larger on single-BE / load tests**: fewer Stream Loads, stay under tablet version ~2000 | Too-small batches → version pile-up, compaction lag, BE RSS blow-up |
+| `ingest.doris.flush-interval-ms` | `INGEST_DORIS_FLUSH_INTERVAL_MS` | `30000` | Time-fallback flush interval (`DorisFlushScheduler`) | Further cut load frequency; higher write latency | More frequent flushes (risk hitting version cap) |
+| `ingest.doris.trace-flush-concurrency` | `INGEST_DORIS_TRACE_FLUSH_CONCURRENCY` | `1` | In-flight Stream Loads for `trace_dc_span` | Parallel loads multiply versions / SegmentCache pressure | **Keep 1 on single BE** |
+| `ingest.doris.flush-timeout-ms` | `INGEST_DORIS_FLUSH_TIMEOUT_MS` | `60000` | Stream Load wait cap (min 5000) | Tolerate slow BE / large 32 MiB batches | Fail faster on timeouts |
 | `ingest.trace.assembly-check-interval-ms` | `INGEST_TRACE_ASSEMBLY_CHECK_INTERVAL_MS` | `2000` | Incomplete trace scan period | Less CPU scanning, longer partial traces | Faster cross-span assembly |
 | `ingest.metric.trace-minute-late-flush-grace-ms` | `INGEST_METRIC_TRACE_MINUTE_LATE_FLUSH_GRACE_MS` | `20000` | Grace for late traces before minute flush | Tolerate clock skew / slow traces | Earlier minute buckets, weaker late-span linkage |
 

@@ -4,6 +4,7 @@ import com.databuff.apm.common.cluster.cache.CacheRegionPolicy;
 import com.databuff.apm.common.cluster.cache.ClusterCacheRegistry;
 import com.databuff.apm.common.storage.DorisBatchWriter;
 import com.databuff.apm.common.storage.DorisTableNames;
+import com.databuff.apm.common.meta.OtelAttributeMaps;
 import com.databuff.apm.common.metric.MetricSchemaRegistry;
 import com.databuff.apm.common.model.DcSpan;
 import com.databuff.apm.common.model.OptimizedMetric;
@@ -196,7 +197,7 @@ class ServiceFlowExtractorTest {
         new VirtualServiceExtractor(new VirtualServiceInstanceRegistry(
                 new MetricWriteRouter(
                         java.util.Map.of(DorisTableNames.METRIC_SERVICE_INSTANCE,
-                                new DorisBatchWriter(16))),
+                                new DorisBatchWriter())),
                 60_000L))
                 .extractFromTrace(spans);
 
@@ -254,17 +255,15 @@ class ServiceFlowExtractorTest {
                 new VirtualServiceExtractor(new VirtualServiceInstanceRegistry(
                         new MetricWriteRouter(
                                 java.util.Map.of(DorisTableNames.METRIC_SERVICE_INSTANCE,
-                                        new DorisBatchWriter(16))),
+                                        new DorisBatchWriter())),
                         60_000L),
                         null));
-        remoteHttp.meta = remoteHttp.meta.replace(
-                "\"server.address\":\"payments.example.com\"",
-                "\"server.address\":\"payments.example.com\",\"data.source\":\"Databuff\"");
+        OtelAttributeMaps.put(remoteHttp, "data.source", "Databuff");
         processor.processAfterFill(spans);
         new VirtualServiceExtractor(new VirtualServiceInstanceRegistry(
                 new MetricWriteRouter(
                         java.util.Map.of(DorisTableNames.METRIC_SERVICE_INSTANCE,
-                                new DorisBatchWriter(16))),
+                                new DorisBatchWriter())),
                 60_000L))
                 .extractFromTrace(spans);
 

@@ -34,7 +34,7 @@ class ApmToolkitTest {
     void toleratesQueryFailures() throws Exception {
         ApmReadRepository reader = mock(ApmReadRepository.class);
         when(reader.queryTrafficLight(anyString())).thenThrow(new RuntimeException("down"));
-        when(reader.querySpanSummaries(anyString())).thenThrow(new RuntimeException("down"));
+        when(reader.queryCallSpanCount(anyString())).thenThrow(new RuntimeException("down"));
         ThresholdEvaluationService evaluation = mock(ThresholdEvaluationService.class);
         when(evaluation.currentErrorRate("demo", 60_000)).thenReturn(0.1);
         ApmToolkit toolkit = new ApmToolkit(reader, evaluation, TestStorageSupport.storage());
@@ -42,5 +42,21 @@ class ApmToolkitTest {
         assertThat(toolkit.listServiceHealth(60_000)).isEmpty();
         assertThat(toolkit.countRecentSpans(60_000)).isZero();
         assertThat(toolkit.serviceErrorRate("demo", 60_000)).isEqualTo(0.1);
+    }
+
+    @Test
+    void countRecentSpansUsesCountSql() throws Exception {
+        ApmReadRepository reader = mock(ApmReadRepository.class);
+        when(reader.queryCallSpanCount(anyString())).thenAnswer(invocation -> {
+            String sql = invocation.getArgument(0, String.class);
+            assertThat(sql).contains("COUNT(*)");
+            assertThat(sql).contains("trace_dc_span");
+            assertThat(sql).doesNotContain("LIMIT");
+            return 1_234L;
+        });
+        ApmToolkit toolkit = new ApmToolkit(
+                reader, mock(ThresholdEvaluationService.class), TestStorageSupport.storage());
+
+        assertThat(toolkit.countRecentSpans(60_000)).isEqualTo(1_234);
     }
 }

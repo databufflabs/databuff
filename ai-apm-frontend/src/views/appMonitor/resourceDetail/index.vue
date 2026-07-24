@@ -129,13 +129,12 @@ export default class ResourceDetail extends Vue {
 
   private tabnavs: any[] = [
     { label: i18n.t('modules.views.appMonitor.resourceDetail.s_dc93171c') as string, labelKey: 'modules.views.appMonitor.resourceDetail.s_dc93171c', value: 'tab-relation' },
-    { label: i18n.t('modules.views.appMonitor.resourceDetail.s_6ea1fe6b') as string, labelKey: 'modules.views.appMonitor.resourceDetail.s_6ea1fe6b', value: 'tab-baseinfo', dot: false },
+    { label: i18n.t('modules.views.appMonitor.resourceDetail.s_6ea1fe6b') as string, labelKey: 'modules.views.appMonitor.resourceDetail.s_6ea1fe6b', value: 'tab-baseinfo' },
     { label: i18n.t('modules.views.appMonitor.resourceDetail.s_7c71041e') as string, labelKey: 'modules.views.appMonitor.resourceDetail.s_7c71041e', value: 'tab-alarm' },
     { label: i18n.t('modules.views.appMonitor.resourceDetail.s_f446f220') as string, labelKey: 'modules.views.appMonitor.resourceDetail.s_f446f220', value: 'tab-log' },
     { label: i18n.t('modules.views.appMonitor.resourceDetail.s_9190f12c') as string, labelKey: 'modules.views.appMonitor.resourceDetail.s_9190f12c', value: 'tab-slow' },
     { label: i18n.t('modules.views.appMonitor.resourceDetail.s_83fca45a') as string, labelKey: 'modules.views.appMonitor.resourceDetail.s_83fca45a', value: 'tab-error' },
   ];
-  private tabStatus: any[] = [];
 
   get tabnavByDatasource () {
     if (this.isEbpfSource) {
@@ -196,11 +195,6 @@ export default class ResourceDetail extends Vue {
       this.refresh();
     });
     await this.getResourceDetail();
-    const tabnavs = [...this.tabnavs];
-    tabnavs.forEach((t) => {
-      t.dot = this.tabStatus.includes(t.value)
-    })
-    this.tabnavs = tabnavs;
     this.$nextTick(() => {
       const { activeName } = this.$route.query;
       const _activeName = decodeURIComponent(String(activeName));
@@ -260,7 +254,6 @@ export default class ResourceDetail extends Vue {
     } else {
       this.$message.error(i18n.t('modules.views.appMonitor.resourceDetail.s_6e019641') as string);
     }
-    await this.serviceTabnavStatus();
     this.detailLoading = false;
   }
 
@@ -310,32 +303,6 @@ export default class ResourceDetail extends Vue {
     })
   }
 
-  // 页签状态
-  private async serviceTabnavStatus () {
-    const { fromTime, toTime } = this.getGlobalTimeV2();
-    const { sid } = this.$route.query;
-    const endpoint = decodeRouteQuery(String(this.$route.query.endpoint));
-    const tabnavParams: any = {
-      serviceId: decodeRouteQuery(String(sid)),
-      fromTime: new Date(fromTime).valueOf(),
-      toTime: new Date(toTime).valueOf(),
-      componentType: this.componentType,
-    };
-    if (this.componentType === 'service.http') {
-      tabnavParams.url = endpoint;
-    } else {
-      tabnavParams.resource = endpoint;
-    }
-    const { error, result } = await toAsyncWait(ApmApi.serviceTabnavStatus(tabnavParams));
-    if (!error) {
-      this.tabStatus = Array.isArray(result?.data) ? result?.data : [];
-    } else {
-      this.tabStatus = []
-    }
-    this.tabnavs.forEach((t) => {
-      t.dot = this.tabStatus.includes(t.value)
-    })
-  }
 }
 </script>
 <style lang="scss" scoped>

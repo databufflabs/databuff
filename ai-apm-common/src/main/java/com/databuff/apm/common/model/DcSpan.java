@@ -39,12 +39,12 @@ public final class DcSpan {
     public long start;
     public String host_id;
     public String meta;
+    /** Ingest working copy of {@link #meta}; the single source of truth in the pipeline. */
     @JsonIgnore
-    public transient Map<String, String> metaAttributes;
+    public transient Map<String, String> metaMap;
+    /** Bumped on every metaMap mutation; used by SpanAnalysis cache invalidation. */
     @JsonIgnore
-    public transient String metaAttributesSource;
-    @JsonIgnore
-    public transient boolean metaAttributesDirty;
+    public transient int metaRevision;
     @JsonIgnore
     public transient Object analysisCache;
     public String name;

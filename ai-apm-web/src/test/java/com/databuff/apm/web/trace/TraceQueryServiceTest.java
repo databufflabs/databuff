@@ -4,7 +4,6 @@ import com.databuff.apm.web.TestStorageSupport;
 
 import com.databuff.apm.common.query.ApmQueryModels.SpanSummary;
 import com.databuff.apm.common.query.ApmQueryModels.SpanDetail;
-import com.databuff.apm.common.query.ApmQueryModels.ErrorRateSnapshot;
 
 import com.databuff.apm.common.storage.ApmReadRepository;
 import org.junit.jupiter.api.Test;
@@ -23,7 +22,6 @@ class TraceQueryServiceTest {
     @Test
     void returnsSpansFromDoris() throws Exception {
         ApmReadRepository reader = mock(ApmReadRepository.class);
-        when(reader.queryErrorRate(anyString())).thenReturn(new ErrorRateSnapshot(0, 5));
         when(reader.querySpanSummaries(anyString())).thenReturn(List.of(
                 new SpanSummary("t1", "s1", "checkout", null, "GET /", "2026-06-01 12:00:00", 10, 0, "", "GET /", "", null, null)));
 
@@ -44,7 +42,6 @@ class TraceQueryServiceTest {
     @Test
     void appliesDefaultLimit() throws Exception {
         ApmReadRepository reader = mock(ApmReadRepository.class);
-        when(reader.queryErrorRate(anyString())).thenReturn(new ErrorRateSnapshot(0, 0));
         when(reader.querySpanSummaries(anyString())).thenReturn(List.of());
         TraceQueryService service = new TraceQueryService(reader, TestStorageSupport.storage());
         assertThat(service.spanList(new TraceQueryService.SpanListRequest("svc", 0, 1000, 0))).isEmpty();

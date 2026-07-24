@@ -12,10 +12,10 @@ class ComponentNamingTest {
 
     @Test
     void componentNames() throws Exception {
-        AggregateComponent aggregate = IngestTestComponents.aggregate(new DorisBatchWriter(10));
+        AggregateComponent aggregate = IngestTestComponents.aggregate(new DorisBatchWriter());
         assertThat(componentName(aggregate)).isEqualTo("aggregate");
         assertThat(componentName(new MetricComponent(aggregate))).isEqualTo("metric");
-        assertThat(componentName(IngestTestComponents.trace(aggregate, new DorisBatchWriter(10)))).isEqualTo("trace");
+        assertThat(componentName(IngestTestComponents.trace(aggregate, new DorisBatchWriter()))).isEqualTo("trace");
     }
 
     private static String componentName(Object component) throws Exception {

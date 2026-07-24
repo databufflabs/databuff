@@ -197,16 +197,35 @@ verify_schema_version() {
 }
 
 verify_health_endpoints() {
-  if check_http_ready "http://127.0.0.1:4318/health"; then
-    verify_ok "ingest /health (4318)"
-  else
-    verify_fail "ingest /health not ready (http://127.0.0.1:4318/health)"
+  # Prefer Docker container health (container-internal ports). Host publish
+  # ports may be remapped via INGEST_HTTP_PORT / WEB_HTTP_PORT.
+  if declare -F check_container_ready >/dev/null 2>&1; then
+    if check_container_ready "ai-apm-ingest"; then
+      verify_ok "ingest container healthy"
+    else
+      verify_fail "ingest container not healthy (status=$(container_health_status ai-apm-ingest))"
+    fi
+
+    if check_container_ready "ai-apm-web"; then
+      verify_ok "web container healthy"
+    else
+      verify_fail "web container not healthy (status=$(container_health_status ai-apm-web))"
+    fi
+    return 0
   fi
 
-  if check_http_ready "http://127.0.0.1:27403/health"; then
-    verify_ok "web /health (27403)"
+  ingest_port="${INGEST_HTTP_PORT:-4318}"
+  web_port="${WEB_HTTP_PORT:-27403}"
+  if check_http_ready "http://127.0.0.1:${ingest_port}/health"; then
+    verify_ok "ingest /health (${ingest_port})"
   else
-    verify_fail "web /health not ready (http://127.0.0.1:27403/health)"
+    verify_fail "ingest /health not ready (http://127.0.0.1:${ingest_port}/health)"
+  fi
+
+  if check_http_ready "http://127.0.0.1:${web_port}/health"; then
+    verify_ok "web /health (${web_port})"
+  else
+    verify_fail "web /health not ready (http://127.0.0.1:${web_port}/health)"
   fi
 }
 

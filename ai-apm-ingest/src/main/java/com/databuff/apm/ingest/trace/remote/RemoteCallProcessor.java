@@ -10,7 +10,6 @@ import com.databuff.apm.common.util.ServiceKeyUtil;
 import com.databuff.apm.ingest.trace.VirtualServiceExtractor;
 import com.databuff.apm.ingest.meta.MetaServiceRegistry;
 
-import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.Objects;
@@ -58,7 +57,6 @@ public final class RemoteCallProcessor {
     /** Per-span enrich hook: cache/backfill {@code server.service}. */
     public void enrichSpan(DcSpan span) {
         peerServerServiceCache.cacheFillServerService(span);
-        OtelAttributeMaps.materialize(span);
     }
 
     /**
@@ -71,7 +69,6 @@ public final class RemoteCallProcessor {
         recordTraceRemoteAssociations(spans);
         for (DcSpan span : spans) {
             processClientSpan(span);
-            OtelAttributeMaps.materialize(span);
         }
     }
 
@@ -171,9 +168,7 @@ public final class RemoteCallProcessor {
                 extractPort(meta));
 
         span.isIn = 1;
-        Map<String, String> updatedMeta = new LinkedHashMap<>(meta);
-        updatedMeta.put("remote", "true");
-        OtelAttributeMaps.replace(span, updatedMeta);
+        OtelAttributeMaps.put(span, "remote", "true");
 
         if (virtualServiceExtractor != null) {
             virtualServiceExtractor.applyResolved(span, resolved, true);

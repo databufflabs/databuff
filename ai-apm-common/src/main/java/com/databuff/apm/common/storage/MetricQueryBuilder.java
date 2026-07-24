@@ -3776,6 +3776,83 @@ public final class MetricQueryBuilder {
                 Math.max(1, Math.min(limit, 1000)));
     }
 
+    /** Portal {@code /trace/query_params}: service display name → service_id. */
+    public static String metricServiceNameIdMapSql(
+            String database,
+            String table,
+            long fromMillis,
+            long toMillis,
+            String extraFilters,
+            int limit) {
+        return """
+                SELECT `service` AS map_key,
+                       COALESCE(NULLIF(MAX(`service_id`), ''), `service`) AS map_value
+                FROM %s.`%s`
+                WHERE %s
+                  AND `service` IS NOT NULL AND `service` != ''
+                %s
+                GROUP BY `service`
+                ORDER BY SUM(`cnt`) DESC
+                LIMIT %d
+                """.formatted(
+                database,
+                table,
+                metricTsWhere(fromMillis, toMillis),
+                extraFilters == null ? "" : extraFilters,
+                Math.max(1, Math.min(limit, 1000)));
+    }
+
+    /** Portal {@code /trace/query_params}: tag value → request count. */
+    public static String metricTagCountMapSql(
+            String database,
+            String table,
+            String tagColumn,
+            long fromMillis,
+            long toMillis,
+            String extraFilters,
+            int limit) {
+        String column = MetricIdentifierParser.toColumnName(tagColumn);
+        return """
+                SELECT `%s` AS map_key, CAST(SUM(`cnt`) AS INT) AS map_value
+                FROM %s.`%s`
+                WHERE %s
+                  AND `%s` IS NOT NULL AND `%s` != ''
+                %s
+                GROUP BY `%s`
+                ORDER BY map_value DESC
+                LIMIT %d
+                """.formatted(
+                column,
+                database,
+                table,
+                metricTsWhere(fromMillis, toMillis),
+                column,
+                column,
+                extraFilters == null ? "" : extraFilters,
+                column,
+                Math.max(1, Math.min(limit, 1000)));
+    }
+
+    /** Portal {@code /trace/query_params}: min/max duration from metric rollups. */
+    public static String metricDurationRangeSql(
+            String database,
+            String table,
+            long fromMillis,
+            long toMillis,
+            String extraFilters) {
+        return """
+                SELECT CAST(MIN(`minDuration`) AS BIGINT) AS min_duration,
+                       CAST(MAX(`maxDuration`) AS BIGINT) AS max_duration
+                FROM %s.`%s`
+                WHERE %s
+                %s
+                """.formatted(
+                database,
+                table,
+                metricTsWhere(fromMillis, toMillis),
+                extraFilters == null ? "" : extraFilters);
+    }
+
     private static final String CALL_SPAN_COLUMNS = """
             `trace_id`, `span_id`, `parent_id`, `start`, `end`, `resource`, `duration`, `error`, `slow`,
             `service`, COALESCE(NULLIF(`serviceId`, ''), `service`) AS service_id,

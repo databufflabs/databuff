@@ -28,16 +28,16 @@ class OtelAttributeMapsTest {
     }
 
     @Test
-    void mutableCopyReplaceAndMaterialize() {
+    void replaceAndMaterialize() {
         DcSpan span = new DcSpan();
         span.meta = "{\"k\":\"v\"}";
-        Map<String, String> copy = OtelAttributeMaps.mutableCopy(span);
+        Map<String, String> copy = new LinkedHashMap<>(OtelAttributeMaps.parse(span));
         copy.put("k2", "v2");
         OtelAttributeMaps.replace(span, copy);
-        assertThat(span.metaAttributesDirty).isTrue();
+        // replace clears meta; materialize re-encodes from the working map.
+        assertThat(span.meta).isNull();
         OtelAttributeMaps.materialize(span);
         assertThat(span.meta).contains("k2");
-        assertThat(span.metaAttributesDirty).isFalse();
     }
 
     @Test
@@ -47,6 +47,31 @@ class OtelAttributeMapsTest {
         Map<String, String> attrs = Map.of("service.name", "  checkout  ", "host.name", " ");
         assertThat(OtelAttributeMaps.firstNonBlank(attrs, "missing", "host.name", "service.name"))
                 .isEqualTo("checkout");
+    }
+
+    @Test
+    void encodeEscapesAndRoundTripsThroughParse() {
+        Map<String, String> attrs = new LinkedHashMap<>();
+        attrs.put("http.method", "GET");
+        attrs.put("quote", "say \"hi\"");
+        attrs.put("path", "a\\b");
+        attrs.put("multi", "line1\nline2\tend");
+        attrs.put("ctrl", "\u0001");
+        attrs.put("中文", "值");
+
+        String json = OtelAttributeMaps.encode(attrs);
+        assertThat(json).isEqualTo(
+                "{\"http.method\":\"GET\",\"quote\":\"say \\\"hi\\\"\",\"path\":\"a\\\\b\","
+                        + "\"multi\":\"line1\\nline2\\tend\",\"ctrl\":\"\\u0001\",\"中文\":\"值\"}");
+        assertThat(OtelAttributeMaps.parse(json)).isEqualTo(attrs);
+    }
+
+    @Test
+    void encodePreservesInsertionOrder() {
+        Map<String, String> attrs = new LinkedHashMap<>();
+        attrs.put("z", "1");
+        attrs.put("a", "2");
+        assertThat(OtelAttributeMaps.encode(attrs)).isEqualTo("{\"z\":\"1\",\"a\":\"2\"}");
     }
 
     @Test

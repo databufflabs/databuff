@@ -3,6 +3,7 @@ package com.databuff.apm.ingest.trace;
 import com.databuff.apm.common.cluster.cache.CacheRegionPolicy;
 import com.databuff.apm.common.cluster.cache.ClusterCacheRegistry;
 import com.databuff.apm.common.flow.ServiceFlowPathIds;
+import com.databuff.apm.common.meta.OtelAttributeMaps;
 import com.databuff.apm.common.metric.MetricSchemaRegistry;
 import com.databuff.apm.common.model.DcSpan;
 import com.databuff.apm.common.model.OptimizedMetric;
@@ -94,10 +95,8 @@ class ServiceFlowIntegrationTest {
                 null,
                 virtualServiceExtractor());
         for (DcSpan span : spans) {
-            if ("remote-http".equals(span.span_id) && span.meta != null) {
-                span.meta = span.meta.replace(
-                        "\"server.address\":\"payments.example.com\"",
-                        "\"server.address\":\"payments.example.com\",\"data.source\":\"Databuff\"");
+            if ("remote-http".equals(span.span_id)) {
+                OtelAttributeMaps.put(span, "data.source", "Databuff");
             }
         }
         remoteCallProcessor.processAfterFill(spans);
@@ -108,7 +107,7 @@ class ServiceFlowIntegrationTest {
     private static VirtualServiceExtractor virtualServiceExtractor() {
         return new VirtualServiceExtractor(new VirtualServiceInstanceRegistry(
                 new MetricWriteRouter(java.util.Map.of(
-                        DorisTableNames.METRIC_SERVICE_INSTANCE, new DorisBatchWriter(16))),
+                        DorisTableNames.METRIC_SERVICE_INSTANCE, new DorisBatchWriter())),
                 60_000L));
     }
 

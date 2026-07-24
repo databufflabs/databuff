@@ -9,13 +9,14 @@ import com.databuff.apm.common.util.ServiceKeyUtil;
 import com.databuff.apm.common.serde.DCSpanJsonDecoder;
 import com.databuff.apm.common.serde.DCSpanJsonEncoder;
 import com.databuff.apm.common.serde.DcSpanUtil;
+import com.databuff.apm.common.serde.SpanDorisJsonRow;
+import com.databuff.apm.common.storage.DorisJsonRow;
 import com.databuff.apm.common.trace.TraceParentUtil;
 
 import java.io.IOException;
 import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.HashSet;
-import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.Set;
@@ -181,26 +182,13 @@ public final class FillPathAndRelationUtil {
         if (child == null || parent == null || parent.service == null || parent.service.isBlank()) {
             return;
         }
-        Map<String, String> meta = new LinkedHashMap<>(OtelAttributeMaps.parse(child));
-        boolean changed = false;
-        if (OtelAttributeMaps.firstNonBlank(meta, "client.service") == null) {
-            meta.put("client.service", parent.service.trim());
-            changed = true;
-        }
-        if (OtelAttributeMaps.firstNonBlank(meta, "client.ip") == null) {
-            // Prefer caller instance (UI「客户端服务实例」), then peer address tags.
-            String clientIp = firstNonBlank(
-                    parent.serviceInstance,
-                    OtelAttributeMaps.firstNonBlank(
-                            meta, "net.peer.name", "network.peer.address", "client.address"));
-            if (clientIp != null) {
-                meta.put("client.ip", clientIp);
-                changed = true;
-            }
-        }
-        if (changed) {
-            OtelAttributeMaps.replace(child, meta);
-        }
+        OtelAttributeMaps.putIfBlank(child, "client.service", parent.service.trim());
+        // Prefer caller instance (UI「客户端服务实例」), then peer address tags.
+        String clientIp = firstNonBlank(
+                parent.serviceInstance,
+                OtelAttributeMaps.firstNonBlank(
+                        OtelAttributeMaps.parse(child), "net.peer.name", "network.peer.address", "client.address"));
+        OtelAttributeMaps.putIfBlank(child, "client.ip", clientIp);
     }
 
     /**
@@ -211,23 +199,12 @@ public final class FillPathAndRelationUtil {
         if (client == null || service == null || service.isBlank()) {
             return;
         }
-        Map<String, String> meta = new LinkedHashMap<>(OtelAttributeMaps.parse(client));
-        boolean changed = false;
-        if (OtelAttributeMaps.firstNonBlank(meta, "server.service") == null) {
-            meta.put("server.service", service.trim());
-            changed = true;
-        }
+        OtelAttributeMaps.putIfBlank(client, "server.service", service.trim());
         String serverIp = firstNonBlank(
                 serviceInstance,
                 OtelAttributeMaps.firstNonBlank(
-                        meta, "server.ip", "network.peer.address", "server.address", "net.peer.name"));
-        if (serverIp != null && OtelAttributeMaps.firstNonBlank(meta, "server.ip") == null) {
-            meta.put("server.ip", serverIp);
-            changed = true;
-        }
-        if (changed) {
-            OtelAttributeMaps.replace(client, meta);
-        }
+                        OtelAttributeMaps.parse(client), "server.ip", "network.peer.address", "server.address", "net.peer.name"));
+        OtelAttributeMaps.putIfBlank(client, "server.ip", serverIp);
     }
 
     private static boolean isOutboundCaller(DcSpan span) {
@@ -298,35 +275,27 @@ public final class FillPathAndRelationUtil {
     }
 
     private static void applyTraceContext(DcSpan span, DcSpan root, DcSpan entry) {
-            Map<String, String> currentMeta = OtelAttributeMaps.parse(span);
-            Map<String, String> updatedMeta = null;
-            if (root != null && OtelAttributeMaps.firstNonBlank(currentMeta, "root.resource") == null) {
+        OtelAttributeMaps.edit(span, e -> {
+            if (root != null && e.isBlank("root.resource")) {
                 String rootResource = entryResource(root);
                 if (rootResource != null && !rootResource.isBlank()) {
-                    updatedMeta = new LinkedHashMap<>(currentMeta);
-                    updatedMeta.put("root.resource", rootResource);
+                    e.put("root.resource", rootResource);
                     String rootType = entryComponentType(root);
                     if (rootType != null && !rootType.isBlank()) {
-                        updatedMeta.put("root.type", rootType);
+                        e.put("root.type", rootType);
                     }
-                    currentMeta = updatedMeta;
                 }
             }
-            if (OtelAttributeMaps.firstNonBlank(currentMeta, "entry.resource") == null) {
+            if (e.isBlank("entry.resource")) {
                 DcSpan effectiveEntry = entry != null ? entry : (DcSpanUtil.isServiceEntrySpan(span) ? span : null);
                 if (effectiveEntry != null) {
                     String entryResource = entryResource(effectiveEntry);
                     if (entryResource != null && !entryResource.isBlank()) {
-                        if (updatedMeta == null) {
-                            updatedMeta = new LinkedHashMap<>(currentMeta);
-                        }
-                        updatedMeta.put("entry.resource", entryResource);
+                        e.put("entry.resource", entryResource);
                     }
                 }
             }
-            if (updatedMeta != null) {
-                OtelAttributeMaps.replace(span, updatedMeta);
-            }
+        });
     }
 
     private static DcSpan findServiceEntry(DcSpan span, Map<String, DcSpan> bySpanId) {
@@ -417,7 +386,19 @@ public final class FillPathAndRelationUtil {
         return value == null ? "" : value;
     }
 
-    /** fill 完成后唯一 encode 点，输出 dc_span JSON 行。 */
+    /**
+     * fill 完成后挂 lazy 行：Stream Load flush 时才 {@link DCSpanJsonEncoder#encodeTo}，
+     * 避免先囤整批 {@code byte[]} 再 join。
+     */
+    public static List<DorisJsonRow> lazyEncodeFilled(List<DcSpan> spans) {
+        List<DorisJsonRow> out = new ArrayList<>(spans.size());
+        for (DcSpan span : spans) {
+            out.add(new SpanDorisJsonRow(span));
+        }
+        return out;
+    }
+
+    /** @deprecated use {@link #lazyEncodeFilled}; kept for tests that need eager bytes. */
     public static List<byte[]> encodeFilled(List<DcSpan> spans) throws IOException {
         List<byte[]> out = new ArrayList<>(spans.size());
         for (DcSpan span : spans) {

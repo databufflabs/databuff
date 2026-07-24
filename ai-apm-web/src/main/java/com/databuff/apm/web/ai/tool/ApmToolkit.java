@@ -56,8 +56,13 @@ public class ApmToolkit {
         long to = System.currentTimeMillis();
         long from = to - lookbackMillis;
         try {
-            String sql = MetricQueryBuilder.spanListSql(traceDatabase, null, from, to, 500);
-            return readRepository.querySpanSummaries(sql).size();
+            String sql = MetricQueryBuilder.spanListCountSql(
+                    traceDatabase, List.of(), from, to, null, null, null, null);
+            long total = readRepository.queryCallSpanCount(sql);
+            if (total <= 0L) {
+                return 0;
+            }
+            return total > Integer.MAX_VALUE ? Integer.MAX_VALUE : (int) total;
         } catch (Exception e) {
             return 0;
         }
