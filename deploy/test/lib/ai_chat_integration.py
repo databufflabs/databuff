@@ -3,9 +3,11 @@
 from __future__ import annotations
 
 import json
+import os
 import time
 import urllib.error
 import urllib.request
+from concurrent.futures import ThreadPoolExecutor, as_completed
 from dataclasses import dataclass
 from typing import Any
 
@@ -152,43 +154,56 @@ def run_ai_chat_tool_loop(
     questions: list[tuple[str, str]] | None = None,
     name_prefix: str = "",
 ) -> list[AiChatCaseResult]:
-    """Run multiple rounds of data-expert chat; fail when tool schema validation errors appear."""
+    """Run data-expert chat cases; each question is its own session.
+
+    Within a round, questions run **in parallel** (independent sessions).
+    Set ``AI_CHAT_CASES_PARALLEL=0`` only for local debug serial.
+    """
     question_list = questions if questions is not None else AI_CHAT_QUESTIONS
+    parallel = os.environ.get("AI_CHAT_CASES_PARALLEL", "1") != "0"
     results: list[AiChatCaseResult] = []
+
+    def _one(round_no: int, tool_hint: str, question: str) -> AiChatCaseResult:
+        started = time.time()
+        name = f"{name_prefix}R{round_no} {tool_hint}" if name_prefix else f"R{round_no} {tool_hint}"
+        try:
+            session_id = _submit_chat(
+                base,
+                token,
+                question,
+                expert_id=expert_id,
+                model_provider_code=model_provider_code,
+                model_name=model_name,
+            )
+            payload = _poll_session(
+                base,
+                token,
+                session_id,
+                poll_interval_sec,
+                poll_timeout_sec,
+            )
+            errors = _find_validation_errors(_collect_text(payload))
+            elapsed_ms = (time.time() - started) * 1000
+            if errors:
+                detail = "; ".join(errors[:3])
+                return AiChatCaseResult(tool_hint, name, session_id, False, elapsed_ms, detail)
+            return AiChatCaseResult(tool_hint, name, session_id, True, elapsed_ms, "no validation errors")
+        except (urllib.error.URLError, TimeoutError, RuntimeError) as error:
+            elapsed_ms = (time.time() - started) * 1000
+            return AiChatCaseResult(tool_hint, name, "", False, elapsed_ms, str(error))
+
     for round_no in range(1, rounds + 1):
-        for tool_hint, question in question_list:
-            started = time.time()
-            name = f"{name_prefix}R{round_no} {tool_hint}" if name_prefix else f"R{round_no} {tool_hint}"
-            try:
-                session_id = _submit_chat(
-                    base,
-                    token,
-                    question,
-                    expert_id=expert_id,
-                    model_provider_code=model_provider_code,
-                    model_name=model_name,
-                )
-                payload = _poll_session(
-                    base,
-                    token,
-                    session_id,
-                    poll_interval_sec,
-                    poll_timeout_sec,
-                )
-                errors = _find_validation_errors(_collect_text(payload))
-                elapsed_ms = (time.time() - started) * 1000
-                if errors:
-                    detail = "; ".join(errors[:3])
-                    results.append(
-                        AiChatCaseResult(tool_hint, name, session_id, False, elapsed_ms, detail)
-                    )
-                else:
-                    results.append(
-                        AiChatCaseResult(tool_hint, name, session_id, True, elapsed_ms, "no validation errors")
-                    )
-            except (urllib.error.URLError, TimeoutError, RuntimeError) as error:
-                elapsed_ms = (time.time() - started) * 1000
-                results.append(
-                    AiChatCaseResult(tool_hint, name, "", False, elapsed_ms, str(error))
-                )
+        if not parallel or len(question_list) <= 1:
+            for tool_hint, question in question_list:
+                results.append(_one(round_no, tool_hint, question))
+            continue
+        round_results: list[AiChatCaseResult | None] = [None] * len(question_list)
+        with ThreadPoolExecutor(max_workers=len(question_list)) as pool:
+            futs = {
+                pool.submit(_one, round_no, tool_hint, question): idx
+                for idx, (tool_hint, question) in enumerate(question_list)
+            }
+            for fut in as_completed(futs):
+                round_results[futs[fut]] = fut.result()
+        results.extend(r for r in round_results if r is not None)
     return results

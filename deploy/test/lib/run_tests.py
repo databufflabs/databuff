@@ -670,8 +670,8 @@ def main() -> int:
                         http_status=200 if item.ok else 0,
                         elapsed_ms=item.elapsed_ms,
                         detail=item.detail,
-                        expected_file="ai-brain-async/session-serial-fan-in",
-                        expected_json="same-session serial fan-in; cross-session isolation",
+                        expected_file="ai-brain-async/session-parallel-fan-in",
+                        expected_json="same-session parallel fan-in; cross-session isolation",
                     )
                 )
                 report.total += 1

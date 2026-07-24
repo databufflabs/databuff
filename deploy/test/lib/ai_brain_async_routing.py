@@ -1,15 +1,18 @@
-"""AI brain 异步路由集成测试 — 同 session 串行 fan-in、跨 session 隔离.
+"""AI brain 异步路由集成测试 — 同 session 并行 fan-in、跨 session 隔离.
 
 由 ``DEEPSEEK_API_KEY`` 门控（与会话记忆用例一致）：
   - 未设置 → 跳过
   - 已设置 → 配置 deepseek 后跑 brain 并行派发 / 双 session 并发
+
+用例彼此独立（各 session），默认 ThreadPool **并行**执行，禁止套件内串行叠跑。
 """
 
 from __future__ import annotations
 
+import os
 import time
 import urllib.error
-from concurrent.futures import ThreadPoolExecutor
+from concurrent.futures import ThreadPoolExecutor, as_completed
 from dataclasses import dataclass
 from typing import Any
 
@@ -147,7 +150,7 @@ def _run_parallel_dispatch_case(
     poll_interval_sec: float,
     poll_timeout_sec: float,
 ) -> BrainAsyncCaseResult:
-    """Brain 并行派发 ops+inspection；同 session 应串行 fan-in 并产出最终 TEXT。"""
+    """Brain 并行派发 ops+inspection；同 session 应并行 fan-in 并产出最终 TEXT。"""
     started = time.time()
     sid = ""
     try:
@@ -405,38 +408,28 @@ def run_ai_brain_async_routing_cases(
         return []
     ensure_deepseek_provider(base, token, api_key)
 
-    return [
-        _run_single_expert_dispatch_case(
-            base,
-            token,
-            poll_interval_sec=poll_interval_sec,
-            poll_timeout_sec=poll_timeout_sec,
-        ),
-        _run_parallel_dispatch_case(
-            base,
-            token,
-            poll_interval_sec=poll_interval_sec,
-            poll_timeout_sec=poll_timeout_sec,
-        ),
-        _run_expert_failure_case(
-            base,
-            token,
-            poll_interval_sec=poll_interval_sec,
-            poll_timeout_sec=poll_timeout_sec,
-        ),
-        _run_cross_session_isolation_case(
-            base,
-            token,
-            poll_interval_sec=poll_interval_sec,
-            poll_timeout_sec=poll_timeout_sec,
-        ),
-        _run_multi_round_dispatch_case(
-            base,
-            token,
-            poll_interval_sec=poll_interval_sec,
-            poll_timeout_sec=poll_timeout_sec,
-        ),
-    ]
+    case_fns = (
+        _run_single_expert_dispatch_case,
+        _run_parallel_dispatch_case,
+        _run_expert_failure_case,
+        _run_cross_session_isolation_case,
+        _run_multi_round_dispatch_case,
+    )
+    kwargs = {
+        "poll_interval_sec": poll_interval_sec,
+        "poll_timeout_sec": poll_timeout_sec,
+    }
+    # Default parallel; AI_BRAIN_CASES_PARALLEL=0 only for local debug.
+    parallel = os.environ.get("AI_BRAIN_CASES_PARALLEL", "1") != "0"
+    if not parallel:
+        return [fn(base, token, **kwargs) for fn in case_fns]
+
+    results: list[BrainAsyncCaseResult | None] = [None] * len(case_fns)
+    with ThreadPoolExecutor(max_workers=len(case_fns)) as pool:
+        futs = {pool.submit(fn, base, token, **kwargs): idx for idx, fn in enumerate(case_fns)}
+        for fut in as_completed(futs):
+            results[futs[fut]] = fut.result()
+    return [r for r in results if r is not None]
 
 
 __all__ = [
