@@ -70,6 +70,81 @@ Alerts auto-resolve when metrics recover.
 
 ---
 
+## Configuration Example
+
+The following example configures a critical alert when the average error rate of `order-service` exceeds 5% over the most recent 5-minute window.
+
+### Create the rule
+
+Go to **Configuration → Alert Config → New Rule** and enter the following values:
+
+| Field | Example | Description |
+|-------|---------|-------------|
+| Rule name | `order-service error rate too high` | Identifies the rule in the rule list and event records |
+| Status | Enabled | Only enabled rules are evaluated |
+| Metric | `service.error.pct` | Service entry error rate, expressed as a percentage |
+| Aggregation | Average | Averages the error rate over the evaluation window |
+| Evaluation window | 5 minutes | Stored as `period: 300` seconds and evaluated against the latest 5 minutes |
+| Comparison | Greater than `>` | Triggers when the metric is strictly above the threshold |
+| Critical threshold | `5%` | Fires a critical alert when the error rate exceeds 5% |
+| Scope | `service = order-service` | Limits the rule to the selected service |
+
+The equivalent JSON is shown below. In normal use, fill in the form and let the page generate and save this rule data:
+
+```json
+{
+  "classification": "singleMetric",
+  "ruleName": "order-service error rate too high",
+  "enabled": true,
+  "query": {
+    "1": {
+      "way": "threshold",
+      "period": 300,
+      "unit": "%",
+      "view_unit": "%",
+      "_scale": 1,
+      "time_aggregator": "avg",
+      "comparison": ">",
+      "thresholds": {
+        "critical": 5,
+        "warning": null
+      },
+      "A": {
+        "metric": "service.error.pct",
+        "aggs": "avg",
+        "by": ["service"],
+        "from": [
+          {
+            "connector": "AND",
+            "left": "service",
+            "operator": "=",
+            "right": "order-service"
+          }
+        ]
+      }
+    }
+  }
+}
+```
+
+Notes:
+
+- `period: 300` means 300 seconds, or 5 minutes. The current implementation uses this as the metric lookback window.
+- `service.error.pct` returns a percentage, so enter `5` as the threshold rather than `0.05`.
+- `by: ["service"]` groups results by service. To monitor every service, remove the service filter from `from`.
+- This example means “the average error rate in the most recent 5-minute window is above 5%”; it does not require all five individual samples to exceed the threshold.
+
+### What happens when it fires
+
+The system evaluates the rule every minute. When the condition is met:
+
+- The alert appears in **Alert Center → Alert List**;
+- The event record includes the rule name, service, severity, trigger status, and alert description;
+- Alert details show the abnormal metric trend and can be correlated with traces, logs, and AI analysis;
+- Once the metric returns below the threshold, the alert is automatically marked as resolved.
+
+---
+
 ## Working with AI
 
 From alert details or AI Platform:
