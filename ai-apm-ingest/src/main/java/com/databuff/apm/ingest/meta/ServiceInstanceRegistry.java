@@ -131,7 +131,7 @@ public final class ServiceInstanceRegistry {
                     span.service,
                     serviceInstance,
                     span.hostName,
-                    span.meta);
+                    captureMetaJson(span));
         }
 
         CachedInstance merge(DcSpan span, String instance) {
@@ -139,9 +139,10 @@ public final class ServiceInstanceRegistry {
             if ((host == null || host.isBlank()) && span.hostName != null && !span.hostName.isBlank()) {
                 host = span.hostName;
             }
+            // Pipeline spans keep attributes in metaMap; span.meta is often null until encode.
             String meta = metaJson;
-            if ((meta == null || meta.isBlank()) && span.meta != null && !span.meta.isBlank()) {
-                meta = span.meta;
+            if (meta == null || meta.isBlank()) {
+                meta = captureMetaJson(span);
             }
             return new CachedInstance(
                     serviceId,
@@ -149,6 +150,20 @@ public final class ServiceInstanceRegistry {
                     instance,
                     host,
                     meta);
+        }
+
+        /** Prefer working metaMap (ingest hot path); fall back to materialized meta JSON. */
+        private static String captureMetaJson(DcSpan span) {
+            if (span == null) {
+                return null;
+            }
+            if (span.metaMap != null && !span.metaMap.isEmpty()) {
+                return OtelAttributeMaps.encode(span.metaMap);
+            }
+            if (span.meta != null && !span.meta.isBlank()) {
+                return span.meta;
+            }
+            return null;
         }
 
         DcSpan toSpan() {

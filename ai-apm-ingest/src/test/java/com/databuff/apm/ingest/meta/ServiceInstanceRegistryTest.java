@@ -65,4 +65,29 @@ class ServiceInstanceRegistryTest {
 
         assertThat(new String(DorisJsonRow.toByteArray(writer.flushAll().get(0)))).contains("\"hostname\":\"host-2\"");
     }
+
+    @Test
+    void capturesK8sNamespaceFromMetaMapWhenMetaJsonIsNull() throws Exception {
+        DorisBatchWriter writer = new DorisBatchWriter();
+        ServiceInstanceRegistry registry = new ServiceInstanceRegistry(
+                new MetricWriteRouter(Map.of(DorisTableNames.METRIC_SERVICE_INSTANCE, writer)), 60_000L);
+
+        DcSpan span = new DcSpan();
+        span.service = "demo-order";
+        span.serviceId = "464a0a08964a061e";
+        span.serviceInstance = "demo-order-1";
+        span.hostName = "app-1";
+        // Ingest convert path: attributes live in metaMap; meta JSON stays null until encode.
+        span.metaMap = Map.of(
+                "host.ip", "10.0.0.8",
+                "k8s.namespace.name", "demo");
+        span.meta = null;
+
+        registry.remember(span);
+        registry.flushHeartbeats();
+
+        String json = new String(DorisJsonRow.toByteArray(writer.flushAll().get(0)));
+        assertThat(json).contains("\"k8sNamespace\":\"demo\"");
+        assertThat(json).contains("\"hostIp\":\"10.0.0.8\"");
+    }
 }
