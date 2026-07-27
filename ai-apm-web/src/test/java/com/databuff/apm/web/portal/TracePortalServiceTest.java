@@ -111,6 +111,10 @@ class TracePortalServiceTest {
         assertThat(list).hasSize(1);
         assertThat(list.get(0).get("trace_id")).isEqualTo("t1");
         assertThat(list.get(0).get("serviceId")).isEqualTo("464a0a08964a061e");
+        assertThat(list.get(0).get("metaHttpStatusCode")).isEqualTo(500);
+        @SuppressWarnings("unchecked")
+        Map<String, Object> meta = (Map<String, Object>) list.get(0).get("meta");
+        assertThat(meta.get("http.status_code")).isEqualTo(500);
     }
 
     @Test

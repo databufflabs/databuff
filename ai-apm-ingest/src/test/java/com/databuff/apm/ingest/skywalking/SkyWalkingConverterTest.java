@@ -3,6 +3,7 @@ package com.databuff.apm.ingest.skywalking;
 import com.databuff.apm.common.meta.OtelAttributeMaps;
 import com.databuff.apm.common.meta.SpanDirectionUtil;
 import com.databuff.apm.common.model.DcSpan;
+import com.databuff.apm.common.serde.DCSpanJsonEncoder;
 import com.databuff.apm.common.serde.DcSpanUtil;
 import com.databuff.apm.ingest.otel.OtlLogLine;
 import com.databuff.apm.ingest.otel.OtlMetricLine;
@@ -28,6 +29,7 @@ import org.apache.skywalking.apm.network.logging.v3.TextLog;
 import org.apache.skywalking.apm.network.logging.v3.TraceContext;
 import org.junit.jupiter.api.Test;
 
+import java.nio.charset.StandardCharsets;
 import java.util.List;
 import java.util.Map;
 
@@ -55,7 +57,7 @@ class SkyWalkingConverterTest {
                         .setSpanType(SpanType.Entry)
                         .addTags(tag("http.method", "GET"))
                         .addTags(tag("url", "http://example/orders"))
-                        .addTags(tag("status_code", "200")))
+                        .addTags(tag("http.status_code", "200")))
                 .build();
 
         DcSpan span = converter.convertSegment(segment).get(0).span();
@@ -65,8 +67,37 @@ class SkyWalkingConverterTest {
         assertThat(span.metaHttpMethod).isEqualTo("GET");
         assertThat(span.metaHttpUrl).isEqualTo("/orders");
         assertThat(span.metaHttpStatusCode).isEqualTo(200);
+        assertThat(OtelAttributeMaps.meta(span)).containsEntry("http.status_code", "200");
         assertThat(TraceDataSources.resolve(OtelAttributeMaps.parse(span))).isEqualTo(TraceDataSources.SKY_WALKING);
         assertThat(SpanDirectionUtil.resolve(span).isIn()).isEqualTo(1);
+    }
+
+    @Test
+    void canonicalizesLegacyHttpStatusCodeTag() throws Exception {
+        SegmentObject segment = SegmentObject.newBuilder()
+                .setTraceId("trace-legacy-status")
+                .setTraceSegmentId("segment-legacy-status")
+                .setService("legacy-http-service")
+                .addSpans(SpanObject.newBuilder()
+                        .setSpanId(0)
+                        .setParentSpanId(-1)
+                        .setStartTime(1_700_000_000_000L)
+                        .setEndTime(1_700_000_000_010L)
+                        .setOperationName("GET /legacy")
+                        .setSpanType(SpanType.Entry)
+                        .setSpanLayer(SpanLayer.Http)
+                        .addTags(tag("http.method", "GET"))
+                        .addTags(tag("status_code", "204")))
+                .build();
+
+        DcSpan span = converter.convertSegment(segment).get(0).span();
+
+        assertThat(span.metaHttpStatusCode).isEqualTo(204);
+        assertThat(OtelAttributeMaps.meta(span))
+                .containsEntry("status_code", "204")
+                .containsEntry("http.status_code", "204");
+        assertThat(new String(DCSpanJsonEncoder.encode(span), StandardCharsets.UTF_8))
+                .contains("\"meta.http.status_code\":204");
     }
 
     @Test
@@ -85,7 +116,7 @@ class SkyWalkingConverterTest {
                         .setPeer("payments.example.com:443")
                         .addTags(tag("http.method", "GET"))
                         .addTags(tag("url", "https://payments.example.com/api/risk/check"))
-                        .addTags(tag("status_code", "200")))
+                        .addTags(tag("http.status_code", "200")))
                 .build();
 
         DcSpan span = converter.convertSegment(segment).get(0).span();
@@ -93,6 +124,48 @@ class SkyWalkingConverterTest {
         Map<String, String> meta = OtelAttributeMaps.parse(span);
         assertThat(meta.get("server.address")).isEqualTo("payments.example.com");
         assertThat(meta.get("server.port")).isEqualTo("443");
+    }
+
+    @Test
+    void doesNotInventHttpStatusCodeWhenTagIsMissingOrInvalid() {
+        SegmentObject missingStatus = SegmentObject.newBuilder()
+                .setTraceId("trace-missing-status")
+                .setTraceSegmentId("segment-missing-status")
+                .setService("missing-status-service")
+                .addSpans(SpanObject.newBuilder()
+                        .setSpanId(0)
+                        .setParentSpanId(-1)
+                        .setStartTime(1_700_000_000_000L)
+                        .setEndTime(1_700_000_000_010L)
+                        .setOperationName("GET /missing")
+                        .setSpanType(SpanType.Entry)
+                        .setSpanLayer(SpanLayer.Http))
+                .build();
+        SegmentObject invalidStatus = SegmentObject.newBuilder()
+                .setTraceId("trace-invalid-status")
+                .setTraceSegmentId("segment-invalid-status")
+                .setService("invalid-status-service")
+                .addSpans(SpanObject.newBuilder()
+                        .setSpanId(0)
+                        .setParentSpanId(-1)
+                        .setStartTime(1_700_000_000_000L)
+                        .setEndTime(1_700_000_000_010L)
+                        .setOperationName("GET /invalid")
+                        .setSpanType(SpanType.Entry)
+                        .setSpanLayer(SpanLayer.Http)
+                        .addTags(tag("status_code", "not-a-number")))
+                .build();
+
+        DcSpan missingSpan = converter.convertSegment(missingStatus).get(0).span();
+        DcSpan invalidSpan = converter.convertSegment(invalidStatus).get(0).span();
+
+        assertThat(missingSpan.metaHttpStatusCode).isNull();
+        assertThat(OtelAttributeMaps.meta(missingSpan))
+                .doesNotContainKeys("status_code", "http.status_code");
+        assertThat(invalidSpan.metaHttpStatusCode).isNull();
+        assertThat(OtelAttributeMaps.meta(invalidSpan))
+                .containsEntry("status_code", "not-a-number")
+                .doesNotContainKey("http.status_code");
     }
 
     @Test

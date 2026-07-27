@@ -170,7 +170,11 @@ public final class SkyWalkingConverter {
             return;
         }
         dc.metaHttpMethod = firstNonBlank(meta.get("http.method"), meta.get("http.request.method"));
-        dc.metaHttpStatusCode = parseInt(firstNonBlank(meta.get("http.status_code"), meta.get("status_code")));
+        Integer httpStatusCode = parseInt(firstNonBlank(meta.get("http.status_code"), meta.get("status_code")));
+        dc.metaHttpStatusCode = httpStatusCode;
+        if (httpStatusCode != null) {
+            meta.put("http.status_code", String.valueOf(httpStatusCode));
+        }
         String url = firstNonBlank(meta.get("url"), meta.get("http.url"), meta.get("http.route"));
         if (url != null && !DcSpanUtil.isRpcProtocolUrl(url)) {
             dc.metaHttpUrl = DcSpanUtil.normalizeHttpUrl(url);

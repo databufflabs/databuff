@@ -39,7 +39,7 @@ public final class SkyWalkingTraceFixture {
                 t0, t0 + 240, false,
                 tag("http.method", "GET"),
                 tag("url", "/demo/checkout"),
-                tag("status_code", "200"));
+                tag("http.status_code", "200"));
 
         SpanObject redisClient = exitSpanA(1, 0, "GET cart",
                 t0 + 5, t0 + 18, "redis:6379",
@@ -50,13 +50,13 @@ public final class SkyWalkingTraceFixture {
                 t0 + 12, t0 + 19, "payments.example.com:443",
                 tag("http.method", "GET"),
                 tag("url", "https://payments.example.com/api/risk/check"),
-                tag("status_code", "200"));
+                tag("http.status_code", "200"));
 
         SpanObject httpClient = exitSpanA(3, 0, "HTTP GET service-b /api/orders",
                 t0 + 20, t0 + 120, "service-b:8080",
                 tag("http.method", "GET"),
                 tag("url", "http://service-b:8080/api/orders/10001"),
-                tag("status_code", "200"));
+                tag("http.status_code", "200"));
 
         SpanObject esClient = exitSpanA(4, 0, "/orders/_search",
                 t0 + 100, t0 + 118, "es:9200",
@@ -101,7 +101,7 @@ public final class SkyWalkingTraceFixture {
                 t0 + 30, t0 + 110, false,
                 tag("http.method", "GET"),
                 tag("url", "/api/orders/10001"),
-                tag("status_code", "200"))
+                tag("http.status_code", "200"))
                 .toBuilder()
                 .addRefs(crossRef(traceId, segmentAId, 3, SERVICE_A, "service-a-1",
                         "GET /demo/checkout", "service-b:8080"))
