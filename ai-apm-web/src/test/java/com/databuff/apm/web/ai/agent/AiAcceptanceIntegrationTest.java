@@ -4,8 +4,13 @@ import com.databuff.apm.web.ai.OpenAiCompatibleChatClient;
 import com.databuff.apm.web.ai.TestAiSupport;
 import com.databuff.apm.web.ai.TestBeanSupport;
 import com.databuff.apm.web.ai.UpdateLlmProviderRequest;
+import com.databuff.apm.web.ai.platform.BuiltInExpertCatalog;
 import com.databuff.apm.web.ai.platform.expert.AiExpertDefinition;
+import com.databuff.apm.web.ai.platform.expert.BrainRoutingCatalog;
 import com.databuff.apm.web.ai.platform.expert.ExpertManagementService;
+import com.databuff.apm.web.ai.platform.task.ExpertMessageConstants;
+import com.databuff.apm.web.ai.platform.task.ExpertMessageContractTest;
+import com.databuff.apm.web.ai.platform.task.ExpertMessageContext;
 import com.databuff.apm.web.ai.platform.task.ExpertTaskContext;
 import com.databuff.apm.web.ai.tool.ApmToolkit;
 import jakarta.servlet.http.HttpServletRequest;
@@ -13,6 +18,7 @@ import com.databuff.apm.web.support.WebTestClusterSupport;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.io.TempDir;
 
+import java.nio.file.Files;
 import java.nio.file.Path;
 import java.util.List;
 import java.util.Map;
@@ -90,6 +96,50 @@ class AiAcceptanceIntegrationTest {
         assertThat(poll.running()).isFalse();
         assertThat(poll.messages()).anyMatch(message ->
                 "assistant".equals(message.role()) && message.content().contains("9"));
+    }
+
+    @Test
+    void brainVisiblePromptsMustNotLeakAsyncProtocolCoaching() throws Exception {
+        TestAiSupport.PlatformRuntimeFixture fixture = platformFixture();
+        String brainPrompt = BuiltInExpertCatalog.brainPromptBase();
+        String routingSection = new BrainRoutingCatalog(fixture.expertManagementService())
+                .buildRoutableExpertsSection();
+        Path skillMd = Path.of("../deploy/common/skills/skill.brain.routing/SKILL.md");
+        if (!Files.isRegularFile(skillMd)) {
+            skillMd = Path.of("deploy/common/skills/skill.brain.routing/SKILL.md");
+        }
+        String skillBody = Files.readString(skillMd.toAbsolutePath().normalize());
+
+        for (String text : List.of(brainPrompt, routingSection, skillBody)) {
+            ExpertMessageContractTest.assertNoBanned(text, ExpertMessageContractTest.PROTOCOL_COACHING_BANNED);
+            assertThat(text).doesNotContain("pending=0").doesNotContain("系统注入");
+        }
+        assertThat(brainPrompt).contains("路由与汇总").contains("不要编造数据");
+        assertThat(routingSection).contains("`data`").contains("完整传递用户原请求");
+        assertThat(skillBody).contains("汇总与回答").doesNotContain("派发后行为");
+    }
+
+    @Test
+    void brainWakeAndDispatchReceiptsMustStayContentOnly() {
+        String accepted = ExpertMessageConstants.asyncWaitMessage("t-accept", "data");
+        String busy = ExpertMessageConstants.serialDispatchBusyMessage("t-busy", "data");
+        String wake = ExpertMessageContext.wrapBrainContinuation(
+                "s1", 1, "t1", "data", "交付：告警 3 条", false, true, "分析一下当前的告警");
+        String specialist = ExpertMessageContext.wrapTaskInput(
+                "s1", 1, "t1", "brain", "查询活跃告警");
+
+        ExpertMessageContractTest.assertNoBanned(accepted, ExpertMessageContractTest.PROTOCOL_COACHING_BANNED);
+        ExpertMessageContractTest.assertNoBanned(busy, ExpertMessageContractTest.PROTOCOL_COACHING_BANNED);
+        ExpertMessageContractTest.assertNoBanned(wake, ExpertMessageContractTest.PROTOCOL_COACHING_BANNED);
+        ExpertMessageContractTest.assertNoBanned(specialist, ExpertMessageContractTest.CONTEXT_HEADER_BANNED);
+
+        assertThat(accepted).isEqualTo("已派出：targetExpertId=data，taskId=t-accept");
+        assertThat(busy).isEqualTo("该专家当前占用中：targetExpertId=data，进行中 taskId=t-busy");
+        assertThat(specialist).isEqualTo("查询活跃告警");
+        assertThat(wake)
+                .contains("交付：告警 3 条")
+                .contains("[本轮用户原请求]\n分析一下当前的告警")
+                .doesNotContain("[Context:");
     }
 
     @Test

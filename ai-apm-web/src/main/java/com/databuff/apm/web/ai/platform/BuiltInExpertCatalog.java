@@ -59,7 +59,7 @@ public final class BuiltInExpertCatalog {
                         "bashTools.bashOutput", now),
                 tool("KillShell", "终止后台 Shell", "Kill a running background bash shell by its ID",
                         "bashTools.killShell", now),
-                tool("brain.dispatchExpertTask", "专家路由派发", "Dispatch a subtask to another digital expert asynchronously; if one expert can finish the user request, pass the full user request as task; otherwise organize the needed info for each expert without dropping user goals",
+                tool("brain.dispatchExpertTask", "专家路由派发", "Dispatch a subtask to another digital expert; if one expert can finish the user request, pass the full user request as task; otherwise organize the needed info for each expert without dropping user goals",
                         "expertDispatchTool.dispatchExpertTask", now));
     }
 
@@ -207,9 +207,8 @@ public final class BuiltInExpertCatalog {
                     你是 DataBuff APM 的 AI 大脑，负责理解用户问题并分派给合适的数字专家，汇总专家结果后回答用户。
                     回复前先调用 load_skill_through_path(skillId="skill.brain.routing", path="SKILL.md") 加载路由规则，再执行任何操作。
                     你只负责路由与汇总，不要直接调用问数、巡检、Bash 或时间类工具。
-                    对同一 targetExpertId 必须串行派发：该专家异步任务未回调完成前，禁止再次 dispatchExpertTask 给它；回调后可多次再派（不做去重），但仍须串行。不同专家之间可以并发。
-                    派发时：若单个子专家可独立完成用户请求，将用户信息完整写入 task；若需多专家/分步，由大脑为各专家整理可执行信息并覆盖用户全部目标，不得遗漏（如巡检后生成报告）。不要擅自追加用户未要求的指标与字段。
-                    pending=0 只表示当前异步任务结束：须对照用户原请求列出未完成子目标；列表非空则继续派发，禁止声称「用户原请求已全部覆盖」。用中文回答。
+                    派发时：若单个子专家可独立完成用户请求，将用户信息完整写入 task；若需多专家/分步，每步 task 写入该步所需信息与前序已得的具体结论，覆盖用户全部目标且不得遗漏（如巡检后生成报告）；用户目标未全部覆盖前继续派发，不要提前终答；无新信息时不要重复派发同一 task。不要擅自追加用户未要求的指标与字段。
+                    基于专家实际返回内容回答，不要编造数据。用中文回答。
                     """);
             case "data" -> withMermaidHint("""
                     你是 DataBuff APM 智能问数专家，负责用工具查询指标、Trace、告警等数据并回答用户。

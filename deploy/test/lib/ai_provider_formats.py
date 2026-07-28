@@ -193,6 +193,7 @@ def run_ai_provider_format_cases(
                 model_name=profile.model,
                 questions=FORMAT_QUESTIONS,
                 name_prefix=prefix,
+                max_workers=1,
             )
         )
     return results

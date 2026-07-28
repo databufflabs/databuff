@@ -1,8 +1,10 @@
 """AI 会话记忆集成测试 — (sessionId, expertId) 多轮上下文是否保留.
 
-由环境变量 ``DEEPSEEK_API_KEY`` 门控：
-  - 未设置 → 跳过（CI 安全）
-  - 已设置 → 写入 deepseek provider，再跑多轮追问 / 专家隔离 / 「生成」续写
+默认走 DeepSeek；可用环境变量切到 MiniMax：
+  - ``AI_TEST_PROVIDER=deepseek|minimax``（默认 deepseek）
+  - ``AI_TEST_MODEL`` 可选覆盖模型名
+  - 对应 API Key：``DEEPSEEK_API_KEY`` / ``MINIMAX_API_KEY``
+  - 未设置对应 Key → 跳过（CI 安全）
 """
 
 from __future__ import annotations
@@ -18,11 +20,40 @@ from ai_chat_integration import _http_json
 MODULE_AI_PLATFORM = "AI平台"
 GROUP_SESSION_MEMORY = "会话记忆"
 
-PROVIDER = "deepseek"
-MODEL = "deepseek-v4-flash"
-BASE_URL = "https://api.deepseek.com"
+_PROVIDER_PROFILES: dict[str, dict[str, str]] = {
+    "deepseek": {
+        "model": "deepseek-v4-flash",
+        "base_url": "https://api.deepseek.com",
+        "api_type": "openai-completions",
+        "env_key": "DEEPSEEK_API_KEY",
+    },
+    "minimax": {
+        "model": "MiniMax-M3",
+        "base_url": "https://api.minimaxi.com/anthropic",
+        "api_type": "anthropic-messages",
+        "env_key": "MINIMAX_API_KEY",
+    },
+}
 
-ENV_API_KEY = "DEEPSEEK_API_KEY"
+
+def _selected_provider_code() -> str:
+    code = os.environ.get("AI_TEST_PROVIDER", "deepseek").strip().lower() or "deepseek"
+    if code not in _PROVIDER_PROFILES:
+        raise RuntimeError(
+            f"unsupported AI_TEST_PROVIDER={code!r}; expected one of {sorted(_PROVIDER_PROFILES)}"
+        )
+    return code
+
+
+def _profile() -> dict[str, str]:
+    return _PROVIDER_PROFILES[_selected_provider_code()]
+
+
+PROVIDER = _selected_provider_code()
+MODEL = os.environ.get("AI_TEST_MODEL", "").strip() or _profile()["model"]
+BASE_URL = _profile()["base_url"]
+API_TYPE = _profile()["api_type"]
+ENV_API_KEY = _profile()["env_key"]
 
 
 @dataclass
@@ -34,32 +65,54 @@ class MemoryCaseResult:
     detail: str
 
 
-def deepseek_api_key() -> str | None:
+def test_llm_api_key() -> str | None:
+    """API key for the selected AI_TEST_PROVIDER."""
     value = os.environ.get(ENV_API_KEY, "").strip()
     return value or None
 
 
-def ensure_deepseek_provider(base: str, token: str, api_key: str, timeout: float = 30.0) -> None:
-    """Configure / enable DeepSeek from env key so local/demo stacks can run memory cases."""
+def deepseek_api_key() -> str | None:
+    """Backward-compatible alias for ``test_llm_api_key``."""
+    return test_llm_api_key()
+
+
+def ensure_test_llm_provider(base: str, token: str, api_key: str, timeout: float = 30.0) -> None:
+    """Configure / enable selected provider and set it as default."""
+    provider = PROVIDER
     _http_json(
         "PUT",
-        f"{base.rstrip('/')}/webapi/api/v1/config/ai/providers/{PROVIDER}",
+        f"{base.rstrip('/')}/webapi/api/v1/config/ai/providers/{provider}/detail",
         {
+            "providerCode": provider,
+            "apiType": API_TYPE,
             "baseUrl": BASE_URL,
             "apiKey": api_key,
-            "defaultModel": MODEL,
             "enabled": True,
+            "defaultProvider": True,
+            "defaultModelId": MODEL,
+            "models": [
+                {
+                    "modelId": MODEL,
+                    "displayName": MODEL,
+                    "defaultModel": True,
+                }
+            ],
         },
         token=token,
         timeout=timeout,
     )
     _http_json(
         "PUT",
-        f"{base.rstrip('/')}/webapi/api/v1/config/ai/providers/{PROVIDER}/default",
+        f"{base.rstrip('/')}/webapi/api/v1/config/ai/providers/{provider}/default",
         {},
         token=token,
         timeout=timeout,
     )
+
+
+def ensure_deepseek_provider(base: str, token: str, api_key: str, timeout: float = 30.0) -> None:
+    """Backward-compatible alias for ``ensure_test_llm_provider``."""
+    ensure_test_llm_provider(base, token, api_key, timeout=timeout)
 
 
 def _submit_chat(

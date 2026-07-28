@@ -8,19 +8,16 @@ public final class ExpertMessageContext {
     private ExpertMessageContext() {
     }
 
+    /**
+     * Specialist user message: task body only. Session/task ids stay in metadata, not model text.
+     */
     public static String wrapTaskInput(
             String sessionId,
             int roundIndex,
             String taskId,
             String sourceExpertId,
             String body) {
-        StringBuilder sb = new StringBuilder();
-        appendContextLine(sb, ExpertMessageConstants.CONTEXT_SESSION_PREFIX, sessionId);
-        appendContextLine(sb, ExpertMessageConstants.CONTEXT_ROUND_PREFIX, String.valueOf(roundIndex));
-        appendContextLine(sb, ExpertMessageConstants.CONTEXT_TASK_PREFIX, taskId);
-        appendContextLine(sb, ExpertMessageConstants.CONTEXT_SOURCE_EXPERT_PREFIX, sourceExpertId);
-        sb.append(body == null ? "" : body.trim());
-        return sb.toString();
+        return body == null ? "" : body.trim();
     }
 
     public static String wrapBrainContinuation(
@@ -34,7 +31,7 @@ public final class ExpertMessageContext {
     }
 
     /**
-     * @param allAsyncComplete after pending-1 for this response, whether session pending reached 0
+     * @param allAsyncComplete unused; kept for call-site compatibility. Wait/finalize is runtime-owned.
      */
     public static String wrapBrainContinuation(
             String sessionId,
@@ -49,8 +46,10 @@ public final class ExpertMessageContext {
     }
 
     /**
-     * @param allAsyncComplete after pending-1 for this response, whether session pending reached 0
-     * @param originalUserRequest verbatim user message for this round (helps multi-step follow-up)
+     * Deliver expert result to brain: content only, no protocol coaching.
+     *
+     * @param allAsyncComplete unused; kept for call-site compatibility
+     * @param originalUserRequest optional verbatim user message for this round (context fact only)
      */
     public static String wrapBrainContinuation(
             String sessionId,
@@ -65,9 +64,12 @@ public final class ExpertMessageContext {
                 ? "[数字专家 " + targetExpertId + " · taskId=" + taskId + " · 失败]\n---\n"
                 : "[数字专家 " + targetExpertId + " · taskId=" + taskId + " · 已完成]\n---\n";
         String body = text == null ? "" : text;
-        return wrapTaskInput(sessionId, roundIndex, taskId, targetExpertId, header + body)
-                + ExpertMessageConstants.expertResultContinueHint(
-                        failure, allAsyncComplete, originalUserRequest);
+        StringBuilder sb = new StringBuilder();
+        sb.append(header).append(body);
+        if (originalUserRequest != null && !originalUserRequest.isBlank()) {
+            sb.append("\n\n[本轮用户原请求]\n").append(originalUserRequest.trim());
+        }
+        return sb.toString();
     }
 
     public static Map<String, Object> taskMetadata(
@@ -84,13 +86,6 @@ public final class ExpertMessageContext {
         putIfNotBlank(metadata, ExpertMessageConstants.META_RUNTIME_SESSION_ID, runtimeSessionId);
         metadata.put(ExpertMessageConstants.META_TRIGGER_SOURCE, ExpertMessageConstants.TRIGGER_EXPERT_DISPATCH);
         return Map.copyOf(metadata);
-    }
-
-    private static void appendContextLine(StringBuilder sb, String prefix, String value) {
-        if (value == null || value.isBlank()) {
-            return;
-        }
-        sb.append(prefix).append(value.trim()).append("]\n");
     }
 
     private static void putIfNotBlank(Map<String, Object> map, String key, String value) {

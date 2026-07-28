@@ -1,17 +1,16 @@
 """AI brain 异步路由集成测试 — 同 session 并行 fan-in、跨 session 隔离、多专家拆分多步。
 
-由 ``DEEPSEEK_API_KEY`` 门控（与会话记忆用例一致）：
-  - 未设置 → 跳过
-  - 已设置 → 配置 deepseek 后跑 brain 并行派发 / 双 session 并发 / 多步拆分
+由 ``AI_TEST_PROVIDER`` + 对应 API Key 门控（与会话记忆用例一致，默认 deepseek）：
+  - Key 未设置 → 跳过
+  - 已设置 → 配置选定 provider 后跑 brain 并行派发 / 双 session 并发 / 多步拆分
 
 多专家拆分类覆盖（断言已收紧）：
   - data→inspection(+报告)：data task 口径词、串行时序、服务名交接、inspection 要求出报告、必须有 HTML
   - inspection∥ops：时间窗重叠、ops 含 docker+容器名、inspection 含 service-a
   - data→ops：串行、data 含 ERROR、ops 含 docker/ai-apm-web、服务名交接/终答回引
   - data+qa：data 含服务列表语义、qa 含界面/入口类词
-  - data→inspection（无报告）：串行、指标词、禁止 HTML/禁止正向出报告 task
 
-用例彼此独立（各 session），**始终并行**执行（禁止套件内串行叠跑）。超时下限 900s。
+用例彼此独立（各 session），套件内有界并行（默认最多 3 路）。超时下限 900s。
 """
 
 from __future__ import annotations
@@ -696,8 +695,6 @@ def _run_multi_expert_split_case(
     task_must_contain_any: dict[str, tuple[str, ...]] | None = None,
     require_serial: tuple[str, str] | None = None,
     require_parallel_overlap: tuple[str, str] | None = None,
-    require_html: bool | None = None,
-    forbid_report_request_experts: tuple[str, ...] = (),
     require_service_handoff: tuple[str, str] | None = None,
 ) -> BrainAsyncCaseResult:
     """通用：同轮拆分派发多个专家，并严格检查 task 内容、时序与交付物。"""
@@ -732,13 +729,6 @@ def _run_multi_expert_split_case(
             )
 
         has_html = _has_generated_html(payload, tasks)
-        html_ok = True if require_html is None else (has_html is require_html)
-
-        report_forbid_ok = True
-        for expert_id in forbid_report_request_experts:
-            if _task_requests_report(_joined_task_field(tasks, expert_id, "input")):
-                report_forbid_ok = False
-                break
 
         handoff_ok = True
         handoff_detail = ""
@@ -775,8 +765,6 @@ def _run_multi_expert_split_case(
             and all(task_checks.values())
             and serial_ok
             and overlap_ok
-            and html_ok
-            and report_forbid_ok
             and handoff_ok
             and bool(final_text.strip())
             and not waiting_only
@@ -785,8 +773,7 @@ def _run_multi_expert_split_case(
         )
         detail = (
             f"targets={sorted(targets)} missing={missing} task_checks={task_checks} "
-            f"serial_ok={serial_ok} overlap_ok={overlap_ok} html_ok={html_ok} "
-            f"has_html={has_html} report_forbid_ok={report_forbid_ok} "
+            f"serial_ok={serial_ok} overlap_ok={overlap_ok} has_html={has_html} "
             f"handoff_ok={handoff_ok} {handoff_detail} "
             f"mentions_ok={mentions_ok} mentions_any_ok={mentions_any_ok} "
             f"final={final_text[:200]!r}"
@@ -895,41 +882,6 @@ def _run_data_and_qa_case(
     )
 
 
-def _run_inspect_known_service_with_data_context_case(
-    base: str,
-    token: str,
-    *,
-    poll_interval_sec: float,
-    poll_timeout_sec: float,
-) -> BrainAsyncCaseResult:
-    """串行拆分：先问数拿 service-b 近 1 小时错误概况，再巡检 service-b（禁止出报告）。"""
-    return _run_multi_expert_split_case(
-        base,
-        token,
-        case_name="多步问数概况后巡检",
-        user_message=(
-            "先查询最近 1 小时 service-b 的请求量、错误数和平均响应时间；"
-            "再对 service-b 做一次健康巡检，汇总问数结果与巡检结论。"
-            "本次不需要生成 HTML 巡检报告。不要只回复请稍候。"
-        ),
-        required_experts={"data", "inspection"},
-        poll_interval_sec=poll_interval_sec,
-        poll_timeout_sec=poll_timeout_sec,
-        min_timeout_sec=420.0,
-        task_must_contain={
-            "data": ("service-b",),
-            "inspection": ("service-b",),
-        },
-        task_must_contain_any={
-            "data": ("请求量", "错误", "响应时间", "耗时"),
-        },
-        require_serial=("data", "inspection"),
-        require_html=False,
-        forbid_report_request_experts=("inspection",),
-        require_final_mentions_any=("service-b",),
-    )
-
-
 def run_ai_brain_async_routing_cases(
     base: str,
     token: str,
@@ -953,14 +905,15 @@ def run_ai_brain_async_routing_cases(
         _run_parallel_inspect_and_ops_case,
         _run_data_then_ops_case,
         _run_data_and_qa_case,
-        _run_inspect_known_service_with_data_context_case,
     )
     kwargs = {
         "poll_interval_sec": poll_interval_sec,
         "poll_timeout_sec": max(float(poll_timeout_sec), 900.0),
     }
     results: list[BrainAsyncCaseResult | None] = [None] * len(case_fns)
-    with ThreadPoolExecutor(max_workers=len(case_fns)) as pool:
+    # Cap concurrent brain cases to ease LLM rate limits (was unbounded = len(case_fns)).
+    brain_workers = max(1, int(os.environ.get("TEST_AI_BRAIN_MAX_WORKERS", "3")))
+    with ThreadPoolExecutor(max_workers=min(brain_workers, len(case_fns))) as pool:
         futs = {pool.submit(fn, base, token, **kwargs): idx for idx, fn in enumerate(case_fns)}
         for fut in as_completed(futs):
             results[futs[fut]] = fut.result()

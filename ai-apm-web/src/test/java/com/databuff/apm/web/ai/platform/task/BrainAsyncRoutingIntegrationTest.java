@@ -91,13 +91,11 @@ class BrainAsyncRoutingIntegrationTest {
                 brainPrompts.add(message);
             }
             brainStreamCalls.incrementAndGet();
-            if (message.contains("pending=0") || message.contains("均已结束")) {
-                return Flux.just(ExpertRuntimeEvent.text("终稿：已汇总 ops 与 inspection"));
-            }
-            if (message.contains("pending>0") || message.contains("仍有未完成")) {
-                return Flux.just(ExpertRuntimeEvent.text("中间：已收到部分专家结果，继续等待"));
-            }
-            if (message.contains("已完成")) {
+            if (message.contains("数字专家")
+                    && (message.contains("已完成") || message.contains("失败"))) {
+                if (message.contains("ops") || message.contains("inspection")) {
+                    return Flux.just(ExpertRuntimeEvent.text("终稿：已汇总 ops 与 inspection"));
+                }
                 return Flux.just(ExpertRuntimeEvent.text("整合后的终稿：共 3 个服务"));
             }
             return Flux.empty();
@@ -239,10 +237,20 @@ class BrainAsyncRoutingIntegrationTest {
 
         assertThat(brainStreamCalls.get()).isGreaterThanOrEqualTo(2);
         synchronized (brainPrompts) {
-            assertThat(brainPrompts.stream().anyMatch(p -> p.contains("pending>0") || p.contains("仍有未完成")))
+            assertThat(brainPrompts.stream().anyMatch(p -> p.contains("数字专家") && p.contains("已完成")))
                     .isTrue();
-            assertThat(brainPrompts.stream().anyMatch(p -> p.contains("pending=0") || p.contains("均已结束")))
+            assertThat(brainPrompts.stream().anyMatch(p -> p.contains("本轮用户原请求")))
                     .isTrue();
+            assertThat(brainPrompts.stream().noneMatch(p -> p.contains("pending=") || p.contains("[系统]")))
+                    .isTrue();
+            assertThat(brainPrompts.stream().noneMatch(p -> p.contains("[Context:")))
+                    .isTrue();
+            assertThat(brainPrompts).allSatisfy(prompt -> {
+                ExpertMessageContractTest.assertNoBanned(
+                        prompt, ExpertMessageContractTest.PROTOCOL_COACHING_BANNED);
+                ExpertMessageContractTest.assertNoBanned(
+                        prompt, ExpertMessageContractTest.CONTEXT_HEADER_BANNED);
+            });
         }
     }
 

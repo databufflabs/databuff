@@ -83,7 +83,8 @@ class ExpertDispatchToolTest {
         taskService.waitFor(finished.taskId(), Duration.ofSeconds(5));
 
         assertThat(result).contains("taskId=" + finished.taskId());
-        assertThat(result).contains("请静静等待");
+        assertThat(result).contains("已派出").contains("targetExpertId=data");
+        ExpertMessageContractTest.assertNoBanned(result, ExpertMessageContractTest.PROTOCOL_COACHING_BANNED);
         Assertions.assertThat(events).isNotEmpty();
         assertThat(events.get(0).type()).isEqualTo("subtask.created");
         assertThat(finished.status()).isIn(
@@ -134,9 +135,16 @@ class ExpertDispatchToolTest {
             String otherExpert = ExpertTaskContext.run(sessionId, "brain", ignored -> {}, () ->
                     dispatchTool.dispatchExpertTask("inspection", "inspect service-a", "{}", ctx));
 
-            assertThat(first).contains("异步任务已受理").contains("targetExpertId=data");
-            assertThat(second).contains("禁止并行重复派发").contains("targetExpertId=data");
-            assertThat(otherExpert).contains("异步任务已受理").contains("targetExpertId=inspection");
+            assertThat(first).contains("已派出").contains("targetExpertId=data");
+            assertThat(second).contains("该专家当前占用中").contains("targetExpertId=data");
+            assertThat(otherExpert).contains("已派出").contains("targetExpertId=inspection");
+            ExpertMessageContractTest.assertNoBanned(first, ExpertMessageContractTest.PROTOCOL_COACHING_BANNED);
+            ExpertMessageContractTest.assertNoBanned(second, ExpertMessageContractTest.PROTOCOL_COACHING_BANNED);
+            ExpertMessageContractTest.assertNoBanned(otherExpert, ExpertMessageContractTest.PROTOCOL_COACHING_BANNED);
+            assertThat(second)
+                    .doesNotContain("请等待")
+                    .doesNotContain("系统注入")
+                    .doesNotContain("稍后再试");
             assertThat(taskService.listBySession(sessionId).stream()
                     .filter(t -> "data".equals(t.targetExpertId()))
                     .count()).isEqualTo(1);
@@ -171,8 +179,8 @@ class ExpertDispatchToolTest {
             String second = ExpertTaskContext.run(sessionId, "brain", ignored -> {}, () ->
                     dispatchTool.dispatchExpertTask("data", "count spans again", "{}", ctx));
 
-            assertThat(first).contains("异步任务已受理");
-            assertThat(second).contains("异步任务已受理");
+            assertThat(first).contains("已派出");
+            assertThat(second).contains("已派出");
             assertThat(taskService.listBySession(sessionId).stream()
                     .filter(t -> "data".equals(t.targetExpertId()))
                     .count()).isEqualTo(2);
@@ -195,7 +203,7 @@ class ExpertDispatchToolTest {
             ExpertTask created = taskService.listBySession(sessionId).stream()
                     .findFirst()
                     .orElseThrow();
-            assertThat(result).contains("异步任务已受理").contains("targetExpertId=qa");
+            assertThat(result).contains("已派出").contains("targetExpertId=qa");
             assertThat(created.sourceExpertId()).isEqualTo("brain");
             assertThat(created.targetExpertId()).isEqualTo("qa");
         } finally {

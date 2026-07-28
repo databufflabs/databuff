@@ -10,7 +10,8 @@
 环境变量门控：
   - chat：已启用 LLM provider（TEST_SKIP_AI_CHAT=1 跳过）
   - formats：DEEPSEEK_API_KEY / MINIMAX_API_KEY（TEST_SKIP_AI_PROVIDER_FORMATS=1 跳过）
-  - memory / brain：DEEPSEEK_API_KEY（TEST_SKIP_AI_MEMORY / TEST_SKIP_AI_BRAIN_ASYNC 跳过）
+  - memory / brain：由 AI_TEST_PROVIDER 对应 Key 门控（默认 DEEPSEEK_API_KEY；
+    AI_TEST_PROVIDER=minimax 时用 MINIMAX_API_KEY）
 """
 
 from __future__ import annotations
@@ -41,8 +42,10 @@ from ai_provider_formats import (  # noqa: E402
 )
 from ai_session_memory import (  # noqa: E402
     ENV_API_KEY,
+    MODEL,
+    PROVIDER,
     deepseek_api_key,
-    ensure_deepseek_provider,
+    ensure_test_llm_provider,
     run_ai_session_memory_cases,
     MemoryCaseResult,
 )
@@ -84,12 +87,20 @@ def _run_chat(base: str, token: str, timeout: float, chat_rounds: int, chat_poll
     if not is_llm_ready(base, token, timeout):
         print("  skip: no enabled LLM provider with API key configured", flush=True)
         return SuiteOutcome("chat", 0, 0, True, "llm not ready")
-    print(f"  running {chat_rounds} rounds x {len(AI_CHAT_QUESTIONS)} questions (parallel) ...", flush=True)
+    chat_workers = max(1, int(os.environ.get("TEST_AI_CHAT_MAX_WORKERS", "2")))
+    print(
+        f"  running {chat_rounds} rounds x {len(AI_CHAT_QUESTIONS)} questions "
+        f"(max_workers={chat_workers}, provider={PROVIDER}/{MODEL}) ...",
+        flush=True,
+    )
     results: list[AiChatCaseResult] = run_ai_chat_tool_loop(
         base,
         token,
         rounds=chat_rounds,
         poll_timeout_sec=chat_poll_timeout,
+        model_provider_code=PROVIDER,
+        model_name=MODEL,
+        max_workers=chat_workers,
     )
     failed = 0
     for item in results:
@@ -118,7 +129,7 @@ def _run_formats(
     )
     print(
         f"  running {len(formats)} format(s) x {format_rounds} rounds x "
-        f"{len(FORMAT_QUESTIONS)} questions: {labels}",
+        f"{len(FORMAT_QUESTIONS)} questions (max_workers=1): {labels}",
         flush=True,
     )
     format_results = run_ai_provider_format_cases(
@@ -143,7 +154,7 @@ def _run_memory(base: str, token: str, memory_poll_timeout: float) -> SuiteOutco
     if not deepseek_api_key():
         print(f"  skip: set {ENV_API_KEY} to enable", flush=True)
         return SuiteOutcome("memory", 0, 0, True, f"{ENV_API_KEY} unset")
-    print(f"  running cases ({ENV_API_KEY} set) ...", flush=True)
+    print(f"  running cases (provider={PROVIDER}/{MODEL}, {ENV_API_KEY} set) ...", flush=True)
     memory_results: list[MemoryCaseResult] = run_ai_session_memory_cases(
         base,
         token,
@@ -165,7 +176,12 @@ def _run_brain(base: str, token: str, brain_async_poll_timeout: float) -> SuiteO
     if not deepseek_api_key():
         print(f"  skip: set {ENV_API_KEY} to enable", flush=True)
         return SuiteOutcome("brain", 0, 0, True, f"{ENV_API_KEY} unset")
-    print(f"  running cases in parallel ({ENV_API_KEY} set) ...", flush=True)
+    brain_workers = max(1, int(os.environ.get("TEST_AI_BRAIN_MAX_WORKERS", "3")))
+    print(
+        f"  running cases (max_workers={brain_workers}, provider={PROVIDER}/{MODEL}, "
+        f"{ENV_API_KEY} set) ...",
+        flush=True,
+    )
     brain_results: list[BrainAsyncCaseResult] = run_ai_brain_async_routing_cases(
         base,
         token,
@@ -201,11 +217,16 @@ def main() -> int:
     memory_poll_timeout = float(os.environ.get("TEST_AI_MEMORY_POLL_TIMEOUT", "240"))
     brain_async_poll_timeout = float(os.environ.get("TEST_AI_BRAIN_ASYNC_POLL_TIMEOUT", "900"))
 
-    print(f"[ai-tests] login {base} suite={args.suite} parallel=True ...", flush=True)
+    print(
+        f"[ai-tests] login {base} suite={args.suite} parallel=True "
+        f"provider={PROVIDER}/{MODEL} key_env={ENV_API_KEY} ...",
+        flush=True,
+    )
     token = login(base, username, password, timeout)
 
-    if deepseek_api_key():
-        ensure_deepseek_provider(base, token, deepseek_api_key())
+    api_key = deepseek_api_key()
+    if api_key:
+        ensure_test_llm_provider(base, token, api_key)
 
     runners = {
         "chat": lambda: _run_chat(base, token, timeout, chat_rounds, chat_poll_timeout),

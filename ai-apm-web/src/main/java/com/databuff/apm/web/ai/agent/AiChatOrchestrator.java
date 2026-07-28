@@ -210,11 +210,12 @@ public class AiChatOrchestrator implements BrainRoundContinuer {
     /**
      * Per-session serial brain consumption of expert completion events.
      * <p>
-     * Protocol: dispatch → pending+1; each response → pending-1 then feed this session's brain agent.
-     * Same session must not cancel peer continuations; different sessions stay concurrent via
+     * Protocol: dispatch → pending+1; each response → pending-1 then feed this session's brain agent
+     * with the expert deliverable (content only). Same session must not cancel peer continuations;
+     * different sessions stay concurrent via
      * {@link com.databuff.apm.web.ai.platform.task.BrainContinuationService} per-session drains.
-     * When pending reaches 0, the prompt includes an all-async-complete signal so brain can emit
-     * final TEXT.
+     * While pending &gt; 0, brain TEXT is demoted to REASONING; round-final TEXT is allowed only after
+     * pending reaches 0 (runtime-owned, not announced in the model prompt).
      */
     @Override
     public void continueBrainRound(ExpertTaskCompletionEvent event) {

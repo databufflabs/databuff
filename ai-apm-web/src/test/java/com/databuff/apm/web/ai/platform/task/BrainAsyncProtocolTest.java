@@ -91,11 +91,9 @@ class BrainAsyncProtocolTest {
                 brainPrompts.add(message);
             }
             brainStreamCalls.incrementAndGet();
-            if (message.contains("pending=0") || message.contains("均已结束")) {
+            if (message.contains("数字专家")
+                    && (message.contains("已完成") || message.contains("失败"))) {
                 return Flux.just(ExpertRuntimeEvent.text("终稿：汇总完成"));
-            }
-            if (message.contains("pending>0") || message.contains("仍有未完成")) {
-                return Flux.just(ExpertRuntimeEvent.text("中间：等待其余专家"));
             }
             return Flux.empty();
         });
@@ -222,9 +220,16 @@ class BrainAsyncProtocolTest {
                 });
 
         synchronized (brainPrompts) {
-            assertThat(brainPrompts.stream().anyMatch(p -> p.contains("pending>0") || p.contains("仍有未完成")))
+            assertThat(brainPrompts).isNotEmpty();
+            assertThat(brainPrompts.stream().anyMatch(p -> p.contains("数字专家") && p.contains("已完成")))
                     .isTrue();
-            assertThat(brainPrompts.stream().anyMatch(p -> p.contains("pending=0") || p.contains("均已结束")))
+            assertThat(brainPrompts.stream().anyMatch(p -> p.contains("数字专家") && p.contains("失败")))
+                    .isTrue();
+            assertThat(brainPrompts.stream().anyMatch(p -> p.contains("本轮用户原请求")))
+                    .isTrue();
+            assertThat(brainPrompts.stream().noneMatch(p -> p.contains("pending=") || p.contains("[系统]")))
+                    .isTrue();
+            assertThat(brainPrompts.stream().noneMatch(p -> p.contains("[Context:")))
                     .isTrue();
         }
     }
@@ -250,12 +255,12 @@ class BrainAsyncProtocolTest {
         assertThat(awaitRoundFinal(sessionId)).isTrue();
 
         List<AiSessionStore.ChatMessage> messages = sessionStore.messages(sessionId);
-        boolean hasIntermediateReasoning = messages.stream()
+        boolean hasDemotedWhilePending = messages.stream()
                 .anyMatch(message -> "brain".equals(message.expertId())
                         && "REASONING".equals(message.messageType())
                         && message.content() != null
-                        && message.content().contains("中间"));
-        assertThat(hasIntermediateReasoning).isTrue();
+                        && message.content().contains("终稿"));
+        assertThat(hasDemotedWhilePending).isTrue();
 
         long roundFinalCount = messages.stream()
                 .filter(message -> "brain".equals(message.expertId())

@@ -8,13 +8,16 @@
 #   brain     大脑异步路由
 #
 # 需要环境变量：
-#   DEEPSEEK_API_KEY=sk-...   OpenAI Completions；未设置则跳过 memory/brain 与 OpenAI formats
-#   MINIMAX_API_KEY=...       Anthropic Messages；未设置则跳过 Anthropic formats
+#   DEEPSEEK_API_KEY=sk-...   OpenAI Completions；默认 provider 门控 memory/brain
+#   MINIMAX_API_KEY=...       Anthropic Messages；AI_TEST_PROVIDER=minimax 时门控 memory/brain
+#   AI_TEST_PROVIDER=deepseek|minimax   chat/memory/brain 实际调用的模型（默认 deepseek）
+#   AI_TEST_MODEL=...                   可选覆盖模型名
 #
 # Usage:
 #   export DEEPSEEK_API_KEY=sk-...
 #   export MINIMAX_API_KEY=...
-#   ./ai-tests.sh                          # 默认：四套件分进程并行
+#   ./ai-tests.sh                          # 默认：四套件分进程并行（DeepSeek）
+#   AI_TEST_PROVIDER=minimax ./ai-tests.sh # chat/memory/brain 走 MiniMax
 #   ./ai-tests.sh --suite memory           # 只跑会话记忆
 #   ./ai-tests.sh --suite brain
 #   AI_TESTS_PARALLEL=0 ./ai-tests.sh      # 调试：单进程串行（发布门禁禁止）
@@ -27,6 +30,7 @@ set -euo pipefail
 TEST_DIR="$(cd "$(dirname "$0")" && pwd)"
 export TEST_BASE_URL="${TEST_BASE_URL:-http://127.0.0.1:${WEB_HTTP_PORT:-27403}}"
 export AI_TESTS_PARALLEL="${AI_TESTS_PARALLEL:-1}"
+export AI_TEST_PROVIDER="${AI_TEST_PROVIDER:-deepseek}"
 
 SUITE="all"
 SERIAL=0
@@ -51,7 +55,7 @@ PARALLEL_PROC=1
 if [[ "${SERIAL}" == "1" || "${AI_TESTS_PARALLEL}" == "0" ]]; then
   PARALLEL_PROC=0
 fi
-echo "[ai-tests] base=${TEST_BASE_URL} suite=${SUITE} parallel_process=${PARALLEL_PROC}"
+echo "[ai-tests] base=${TEST_BASE_URL} suite=${SUITE} parallel_process=${PARALLEL_PROC} provider=${AI_TEST_PROVIDER}"
 
 # Single suite → one process
 if [[ "${SUITE}" != "all" ]]; then

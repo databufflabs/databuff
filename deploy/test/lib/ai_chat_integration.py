@@ -153,13 +153,16 @@ def run_ai_chat_tool_loop(
     model_name: str | None = None,
     questions: list[tuple[str, str]] | None = None,
     name_prefix: str = "",
+    max_workers: int = 2,
 ) -> list[AiChatCaseResult]:
     """Run data-expert chat cases; each question is its own session.
 
-    Within a round, questions always run in parallel (independent sessions).
+    Within a round, questions run with bounded parallelism (default ``max_workers=2``).
+    ``max_workers <= 1`` forces serial execution.
     """
     question_list = questions if questions is not None else AI_CHAT_QUESTIONS
     results: list[AiChatCaseResult] = []
+    workers = max(1, int(max_workers))
 
     def _one(round_no: int, tool_hint: str, question: str) -> AiChatCaseResult:
         started = time.time()
@@ -191,12 +194,12 @@ def run_ai_chat_tool_loop(
             return AiChatCaseResult(tool_hint, name, "", False, elapsed_ms, str(error))
 
     for round_no in range(1, rounds + 1):
-        if len(question_list) <= 1:
+        if workers == 1 or len(question_list) <= 1:
             for tool_hint, question in question_list:
                 results.append(_one(round_no, tool_hint, question))
             continue
         round_results: list[AiChatCaseResult | None] = [None] * len(question_list)
-        with ThreadPoolExecutor(max_workers=len(question_list)) as pool:
+        with ThreadPoolExecutor(max_workers=min(workers, len(question_list))) as pool:
             futs = {
                 pool.submit(_one, round_no, tool_hint, question): idx
                 for idx, (tool_hint, question) in enumerate(question_list)
