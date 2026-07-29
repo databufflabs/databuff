@@ -2,7 +2,13 @@
   <div class="alarm-cont">
     <div class="alarm-wrapper flex-v">
 
-      <h3 class="m-0 font-14 fw-normal flex-none">{{ $t('modules.views.appMonitor.resourceDetail.s_627f9108') }}</h3>
+      <h3 class="m-0 font-14 fw-normal flex-none">
+        {{ $t('modules.views.appMonitor.resourceDetail.s_627f9108') }}
+        <span v-if='selectedBucketLabel' class="bucket-tip ml-8 cp" @click='resetBucketHandle'>
+          {{ selectedBucketLabel }}
+          <i class="el-icon-circle-close ml-2"></i>
+        </span>
+      </h3>
       <div class="chart-wrapper mt-10 mb-10 flex-none">
         <basic-chart
           :showEmpty="!chartGroup.trend.loading && !chartGroup.trend.source.length"
@@ -13,8 +19,9 @@
           :minInterval="1"
           :min="0"
           :yAxisSplitNum="3"
-          :interval="timeParams.interval"
-          :source='chartGroup.trend.source'></basic-chart>
+          :interval="trendTimeParams.interval"
+          :source='chartGroup.trend.source'
+          :clickEvent='onChartClick'></basic-chart>
       </div>
 
       <div class="list-wrapper flex-1">
@@ -54,6 +61,9 @@ export default class TabLog extends Vue {
   @Watch('current', { immediate: true })
   private onCurrentChange (val: any, oldVal: any) {
     if (val && val?.serviceId !== oldVal?.serviceId && val?.resource !== oldVal?.resource && this.isMounted) {
+      // 切换接口时清空之前选中的时间桶，表格回到全局时间范围
+      this.timeParams = { ...this.trendTimeParams };
+      this.selectedBucketLabel = '';
       this.fetchAllData();
     }
   }
@@ -67,6 +77,15 @@ export default class TabLog extends Vue {
     toTime: '',
     interval: 60,
   }
+
+  // 柱状图始终用全局时间范围渲染，便于点击其它柱子；表格时间范围可被点击柱子收窄
+  private trendTimeParams = {
+    fromTime: '',
+    toTime: '',
+    interval: 60,
+  }
+
+  private selectedBucketLabel = ''
 
   private chartGroup: any = {
     trend: {
@@ -96,11 +115,10 @@ export default class TabLog extends Vue {
     { field: 'error', prop: 'error', label: i18n.t('modules.views.alarmCenter.eventDetail.s_3fea7ca7') as string, labelKey: 'modules.views.aiPlatform.experts.s_3fea7ca7', sortable: true, type: 'healthStatus', warningText: i18n.t('modules.views.alarmCenter.eventDetail.s_1efeae37') as string, warningTextKey: 'modules.utils.filters.s_1efeae37', minWidth: 120, defaultShow: true },
     { field: 'service', prop: 'service', label: i18n.t('modules.views.alarmCenter.alarm.s_47d68cd0') as string, labelKey: 'modules.views.alarmCenter.alarm.s_47d68cd0', type: 'service', minWidth: 120, defaultShow: false },
     { field: 'serviceInstance', prop: 'serviceInstance', label: i18n.t('modules.views.alarmCenter.alarm.s_71673bab') as string, labelKey: 'modules.utils.filters.s_71673bab', minWidth: 120, defaultShow: false },
-    { field: 'clientService', prop: 'clientService', label: i18n.t('modules.views.alarmCenter.eventDetail.s_e739425d') as string, labelKey: 'modules.views.alarmCenter.eventDetail.s_e739425d', minWidth: 120, defaultShow: true },
-    { field: 'clientServiceInstance', prop: 'clientServiceInstance', label: i18n.t('modules.views.alarmCenter.eventDetail.s_6fcfca3f') as string, labelKey: 'modules.views.alarmCenter.eventDetail.s_6fcfca3f', minWidth: 120, defaultShow: false },
+    { field: 'srcService', prop: 'srcService', label: i18n.t('modules.views.alarmCenter.eventDetail.s_e739425d') as string, labelKey: 'modules.views.alarmCenter.eventDetail.s_e739425d', minWidth: 120, defaultShow: true },
+    { field: 'srcServiceInstance', prop: 'srcServiceInstance', label: i18n.t('modules.views.alarmCenter.eventDetail.s_6fcfca3f') as string, labelKey: 'modules.views.alarmCenter.eventDetail.s_6fcfca3f', minWidth: 120, defaultShow: false },
     // HTTP请求 service.http
     { field: 'meta.http.status_code', prop: 'meta.http.status_code', label: i18n.t('modules.views.alarmCenter.eventDetail.s_771d897d') as string, labelKey: 'modules.views.alarmCenter.eventDetail.s_771d897d', sortable: true, minWidth: 120, defaultShow: true, filterType: ['service.http'] },
-    { field: 'meta.http.method', prop: 'meta.http.method', label: i18n.t('modules.views.alarmCenter.eventDetail.s_ea340b9d') as string, labelKey: 'modules.views.alarmCenter.eventDetail.s_ea340b9d', sortable: true, minWidth: 120, defaultShow: true, filterType: ['service.http'] },
     { field: 'meta.http.url', prop: 'meta.http.url', label: 'Url', sortable: true, minWidth: 120, defaultShow: true, filterType: ['service.http'] },
     // RPC请求 service.rpc
     { field: 'type', prop: 'type', label: i18n.t('modules.views.alarmCenter.eventDetail.s_226b0912') as string, labelKey: 'modules.views.aiPlatform.experts.s_226b0912', sortable: true, minWidth: 120, defaultShow: true, filterType: ['service.rpc'] },
@@ -139,7 +157,9 @@ export default class TabLog extends Vue {
 
   private resetTimeParams () {
     const { fromTime, toTime, interval } = this.getGlobalTimeV2()
+    this.trendTimeParams = { fromTime, toTime, interval };
     this.timeParams = { fromTime, toTime, interval };
+    this.selectedBucketLabel = '';
   }
 
   public refresh () {
@@ -155,7 +175,7 @@ export default class TabLog extends Vue {
   private async fetchTrendSource () {
     const serviceId = this.current?.serviceId || decodeURIComponent(String(this.$route.query.sid));
     const _params: any = {
-      ...this.timeParams,
+      ...this.trendTimeParams,
       isIn: 1,
       serviceId,
       componentType: this.componentType,
@@ -217,6 +237,35 @@ export default class TabLog extends Vue {
     }
   }
 
+  // 点击柱状图某个时间桶，表格收窄到该桶时间段
+  private onChartClick (params: any) {
+    if (!params || !params.name) {
+      return;
+    }
+    const bucketLabel = String(params.name); // YYYY-MM-DD HH:mm
+    const interval = this.trendTimeParams.interval || 60;
+    const fromMs = +new Date(bucketLabel);
+    if (!Number.isFinite(fromMs)) {
+      return;
+    }
+    const toMs = fromMs + interval * 1000;
+    const globalToMs = +new Date(this.trendTimeParams.toTime);
+    const fromTime = dayjs(fromMs).format('YYYY-MM-DD HH:mm:ss');
+    const toTime = Number.isFinite(globalToMs) && toMs > globalToMs
+      ? this.trendTimeParams.toTime
+      : dayjs(toMs).format('YYYY-MM-DD HH:mm:ss');
+    this.timeParams = { ...this.timeParams, fromTime, toTime };
+    this.selectedBucketLabel = `${bucketLabel}:00 ~ ${toTime}`;
+    this.$refs.listTable && this.$refs.listTable.refresh();
+  }
+
+  // 重置表格时间范围回全局
+  private resetBucketHandle () {
+    this.timeParams = { ...this.trendTimeParams };
+    this.selectedBucketLabel = '';
+    this.$refs.listTable && this.$refs.listTable.refresh();
+  }
+
   private onFetchEnd () {
     this.$emit('on-loaded')
   }
@@ -265,5 +314,15 @@ export default class TabLog extends Vue {
 .list-wrapper {
   flex: 1 1 auto;
   min-height: 286px;
+}
+.bucket-tip {
+  display: inline-block;
+  font-size: 12px;
+  font-weight: normal;
+  color: var(--color-primary, #2962FF);
+  background: var(--color-primary-light-9, #E8F0FF);
+  border-radius: 10px;
+  padding: 2px 10px;
+  line-height: 18px;
 }
 </style>

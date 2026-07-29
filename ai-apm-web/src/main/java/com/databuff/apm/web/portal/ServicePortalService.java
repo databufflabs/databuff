@@ -1723,9 +1723,23 @@ public class ServicePortalService {
         return series;
     }
 
+    /** Component tables queried for the duration breakdown (table -> display label). */
+    private static final List<Map.Entry<String, String>> BREAKDOWN_COMPONENT_TABLES = List.of(
+            Map.entry(DorisTableNames.METRIC_SERVICE_DB, "DB"),
+            Map.entry(DorisTableNames.METRIC_SERVICE_REDIS, "Redis"),
+            Map.entry(DorisTableNames.METRIC_SERVICE_MQ, "MQ"),
+            Map.entry(DorisTableNames.METRIC_SERVICE_RPC, "RPC"),
+            Map.entry(DorisTableNames.METRIC_SERVICE_HTTP, "HTTP"),
+            Map.entry(DorisTableNames.METRIC_SERVICE_REMOTE, "远程调用"),
+            Map.entry(DorisTableNames.METRIC_SERVICE_CONFIG, "配置"));
+
+    private static final String BREAKDOWN_SELF_LABEL = "接口自身耗时";
+
     public List<Map<String, Object>> resourceStats(Map<String, Object> body) {
         String componentType = stringValue(body.get("componentType"), "service.http");
-        if (!"service.http".equals(componentType)) {
+        if (!"service.http".equals(componentType)
+                && !"service.rpc".equals(componentType)
+                && !"service.mq".equals(componentType)) {
             return List.of();
         }
         long now = System.currentTimeMillis();
@@ -1735,29 +1749,121 @@ public class ServicePortalService {
         String serviceId = resolveServiceId(body);
         String serviceInstance = stringValue(body.get("serviceInstance"), null);
         String url = decodeUrl(body);
+        String resource = decodeResource(body);
+        // rootResource on downstream component tables is the entry interface resource
+        // (the url for service.http, the resource otherwise); fall back to resource
+        // when callers only supply resource for an http interface.
+        String rootResource = "service.http".equals(componentType)
+                ? (url != null && !url.isBlank() ? url : resource)
+                : resource;
 
-        if (serviceId == null) {
+        if (serviceId == null || rootResource == null || rootResource.isBlank()) {
             return List.of();
         }
 
-        List<ServiceTrendBucketPoint> buckets;
+        // 1. Interface's own total sumDuration / cnt per bucket (isIn = 1).
+        Map<Long, long[]> interfaceTotals = new LinkedHashMap<>();
+        List<? extends ServiceTrendBucketPoint> interfaceBuckets = loadInterfaceTotals(
+                componentType, from, to, interval, serviceId, serviceInstance, url, resource);
+        if (interfaceBuckets.isEmpty()) {
+            return List.of();
+        }
+        for (ServiceTrendBucketPoint bucket : interfaceBuckets) {
+            long[] acc = interfaceTotals.computeIfAbsent(bucket.bucketEpochSec(), k -> new long[]{0L, 0L});
+            acc[0] += (long) bucket.sumDurationNs();
+            acc[1] += bucket.requestCount();
+        }
+
+        // 2. For each downstream component table, query buckets grouped by service,
+        //    subtract each component's sumDuration from the interface remainder.
+        Map<Long, long[]> remainder = new LinkedHashMap<>();
+        interfaceTotals.forEach((bucket, acc) -> remainder.put(bucket, new long[]{acc[0], acc[1]}));
+
+        List<Map<String, Object>> series = new ArrayList<>();
+        for (Map.Entry<String, String> entry : BREAKDOWN_COMPONENT_TABLES) {
+            String table = entry.getKey();
+            String label = entry.getValue();
+            List<ServiceTrendBucketPoint> componentBuckets;
+            try {
+                String sql = MetricQueryBuilder.componentBreakdownBucketsSql(
+                        metricDatabase, table, from, to, interval,
+                        serviceId, serviceInstance, rootResource);
+                componentBuckets = readRepository.queryServiceTrendBuckets(sql);
+            } catch (Exception e) {
+                componentBuckets = List.of();
+            }
+            if (componentBuckets.isEmpty()) {
+                continue;
+            }
+            // group by downstream service name
+            Map<String, Map<Long, long[]>> byService = new LinkedHashMap<>();
+            for (ServiceTrendBucketPoint bucket : componentBuckets) {
+                String svc = bucket.service() == null || bucket.service().isBlank() ? label : bucket.service();
+                byService.computeIfAbsent(svc, k -> new LinkedHashMap<>())
+                        .computeIfAbsent(bucket.bucketEpochSec(), k -> new long[]{0L, 0L});
+                long[] acc = byService.get(svc).get(bucket.bucketEpochSec());
+                acc[0] += (long) bucket.sumDurationNs();
+                acc[1] += bucket.requestCount();
+            }
+            for (Map.Entry<String, Map<Long, long[]>> svcEntry : byService.entrySet()) {
+                String seriesName = label + " " + svcEntry.getKey();
+                Map<Long, long[]> svcBuckets = svcEntry.getValue();
+                // subtract from remainder
+                svcBuckets.forEach((bucket, acc) -> {
+                    long[] rem = remainder.get(bucket);
+                    if (rem != null) {
+                        rem[0] -= acc[0];
+                    }
+                });
+                series.add(buildBreakdownSeries(seriesName, svcBuckets, from, to, interval));
+            }
+        }
+
+        // 3. Self duration = (interface sumDuration - sum(component sumDuration)) / interface cnt.
+        Map<Long, long[]> selfBuckets = new LinkedHashMap<>();
+        interfaceTotals.forEach((bucket, acc) -> {
+            long[] rem = remainder.getOrDefault(bucket, new long[]{0L, 0L});
+            long cnt = acc[1];
+            selfBuckets.put(bucket, new long[]{Math.max(0L, rem[0]), cnt});
+        });
+        series.add(buildBreakdownSeries(BREAKDOWN_SELF_LABEL, selfBuckets, from, to, interval));
+        return series;
+    }
+
+    private List<? extends ServiceTrendBucketPoint> loadInterfaceTotals(
+            String componentType, long from, long to, int interval,
+            String serviceId, String serviceInstance, String url, String resource) {
+        Set<String> serviceKeys = metricServiceIdKeys(serviceId);
         try {
-            Set<String> serviceKeys = metricServiceIdKeys(serviceId);
-            String sql = MetricQueryBuilder.httpTrendBucketsSql(
-                    metricDatabase, from, to, interval, serviceKeys, serviceInstance, url,
-                    null, null, Set.of(), true);
-            buckets = readRepository.queryServiceTrendBuckets(sql);
+            if ("service.http".equals(componentType)) {
+                String sql = MetricQueryBuilder.httpTrendBucketsSql(
+                        metricDatabase, from, to, interval, serviceKeys, serviceInstance, url,
+                        1, null, Set.of(), true);
+                return readRepository.queryServiceTrendBuckets(sql);
+            }
+            String table = resolveComponentTable(componentType);
+            String sql = MetricQueryBuilder.componentResourceTrendBucketsSql(
+                    metricDatabase, table, from, to, interval,
+                    serviceId, serviceInstance, url, resource, 1, null);
+            List<ComponentTrendBucketPoint> buckets = readRepository.queryComponentTrendBuckets(sql);
+            return buckets.stream()
+                    .map(b -> new ServiceTrendBucketPoint(
+                            b.bucketEpochSec(), b.service(), b.requestCount(), b.errorCount(), b.sumDurationNs()))
+                    .toList();
         } catch (Exception e) {
             return List.of();
         }
+    }
 
-        List<MetricSeriesPoint> points = buckets.stream()
-                .map(bucket -> new MetricSeriesPoint(
-                        bucket.bucketEpochSec(),
-                        bucket.requestCount() > 0 ? bucket.sumDurationNs() / bucket.requestCount() : 0))
-                .toList();
-        Map<String, String> tags = Map.of("service", serviceId);
-        return List.of(PortalMetricSeriesBuilder.series(tags, points, "avgLatency", from, to, interval));
+    private Map<String, Object> buildBreakdownSeries(
+            String name, Map<Long, long[]> buckets, long from, long to, int interval) {
+        List<MetricSeriesPoint> points = new ArrayList<>();
+        buckets.forEach((bucket, acc) -> {
+            double avgLatency = acc[1] > 0 ? (double) acc[0] / acc[1] : 0.0;
+            points.add(new MetricSeriesPoint(bucket, avgLatency));
+        });
+        Map<String, String> tags = Map.of("service", name);
+        return PortalMetricSeriesBuilder.series(tags, points, "avgLatency", from, to, interval);
     }
 
     public Map<String, Object> list(Map<String, Object> body) {

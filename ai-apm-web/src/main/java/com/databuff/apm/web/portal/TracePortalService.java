@@ -1322,6 +1322,9 @@ public class TracePortalService {
         row.put("service_type", portalDisplay.serviceType());
         row.put("type", portalDisplay.typeIcon());
         row.put("hostName", !hostName.isBlank() ? hostName : instance);
+        row.put("srcService", nullToEmpty(span.srcService()));
+        row.put("srcServiceId", nullToEmpty(span.srcServiceId()));
+        row.put("srcServiceInstance", nullToEmpty(span.srcServiceInstance()));
         String parentId = span.parentId();
         row.put("parent_id", parentId == null || parentId.isBlank() ? "0" : parentId);
         if (span.isParent() != null) {

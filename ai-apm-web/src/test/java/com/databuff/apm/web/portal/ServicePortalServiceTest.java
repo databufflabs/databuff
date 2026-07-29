@@ -1449,8 +1449,16 @@ class ServicePortalServiceTest {
   @Test
   void buildsResourceStatsSeries() throws Exception {
     ApmReadRepository reader = mock(ApmReadRepository.class);
-    when(reader.queryServiceTrendBuckets(anyString())).thenReturn(List.of(
-            new ServiceTrendBucketPoint(1_780_545_360L, "demo-order", 10, 0, 5_000_000)));
+    // Interface total query (http inbound trend) returns one bucket; the
+    // downstream component breakdown queries (filtered by srcServiceId +
+    // rootResource + isOut) return nothing, so only the self series remains.
+    when(reader.queryServiceTrendBuckets(anyString())).thenAnswer(invocation -> {
+      String sql = invocation.getArgument(0);
+      if (sql.contains("srcServiceId") && sql.contains("rootResource")) {
+        return List.of();
+      }
+      return List.of(new ServiceTrendBucketPoint(1_780_545_360L, "demo-order", 10, 0, 5_000_000));
+    });
 
     ServicePortalService service = TestStorageSupport.servicePortalService(reader);
     List<Map<String, Object>> series = service.resourceStats(Map.of(
@@ -1464,11 +1472,58 @@ class ServicePortalServiceTest {
     assertThat(series).hasSize(1);
     @SuppressWarnings("unchecked")
     Map<String, String> tags = (Map<String, String>) series.get(0).get("tags");
-    assertThat(tags.get("service")).isEqualTo("demo-order");
+    assertThat(tags.get("service")).isEqualTo("接口自身耗时");
     @SuppressWarnings("unchecked")
     List<List<Number>> values = (List<List<Number>>) series.get(0).get("values");
     assertThat(values).hasSizeGreaterThan(1);
-    assertThat(values).anyMatch(row -> row.get(1) == null);
+    // self avgLatency = interface sumDuration / cnt = 5_000_000 / 10 = 500_000
+    assertThat(values).anyMatch(row -> row.get(1) != null && ((Number) row.get(1)).doubleValue() == 500_000.0);
+  }
+
+  @Test
+  void buildsResourceStatsBreakdownAcrossComponents() throws Exception {
+    ApmReadRepository reader = mock(ApmReadRepository.class);
+    when(reader.queryServiceTrendBuckets(anyString())).thenAnswer(invocation -> {
+      String sql = invocation.getArgument(0);
+      // Interface inbound total: 10 calls, 5_000_000 ns total.
+      if (!sql.contains("srcServiceId") && !sql.contains("rootResource")) {
+        return List.of(new ServiceTrendBucketPoint(1_780_545_360L, "demo-order", 10, 0, 5_000_000));
+      }
+      // DB breakdown: 8 calls, 3_000_000 ns total under mysql-svc.
+      if (sql.contains("metric_service_db")) {
+        return List.of(new ServiceTrendBucketPoint(1_780_545_360L, "mysql-svc", 8, 0, 3_000_000));
+      }
+      // Redis breakdown: 4 calls, 1_000_000 ns total under redis-svc.
+      if (sql.contains("metric_service_redis")) {
+        return List.of(new ServiceTrendBucketPoint(1_780_545_360L, "redis-svc", 4, 0, 1_000_000));
+      }
+      return List.of();
+    });
+
+    ServicePortalService service = TestStorageSupport.servicePortalService(reader);
+    List<Map<String, Object>> series = service.resourceStats(Map.of(
+            "componentType", "service.http",
+            "serviceId", "demo-order",
+            "resource", "/orders",
+            "fromTime", "2026-06-04 11:00:00",
+            "toTime", "2026-06-04 12:00:00",
+            "interval", 60));
+
+    // DB series, Redis series, and the self series.
+    assertThat(series).hasSize(3);
+    @SuppressWarnings("unchecked")
+    Map<String, String> dbTags = (Map<String, String>) series.get(0).get("tags");
+    assertThat(dbTags.get("service")).isEqualTo("DB mysql-svc");
+    @SuppressWarnings("unchecked")
+    Map<String, String> redisTags = (Map<String, String>) series.get(1).get("tags");
+    assertThat(redisTags.get("service")).isEqualTo("Redis redis-svc");
+    @SuppressWarnings("unchecked")
+    Map<String, String> selfTags = (Map<String, String>) series.get(2).get("tags");
+    assertThat(selfTags.get("service")).isEqualTo("接口自身耗时");
+    // self = (5_000_000 - 3_000_000 - 1_000_000) / 10 = 100_000
+    @SuppressWarnings("unchecked")
+    List<List<Number>> selfValues = (List<List<Number>>) series.get(2).get("values");
+    assertThat(selfValues).anyMatch(row -> row.get(1) != null && ((Number) row.get(1)).doubleValue() == 100_000.0);
   }
 
   @Test

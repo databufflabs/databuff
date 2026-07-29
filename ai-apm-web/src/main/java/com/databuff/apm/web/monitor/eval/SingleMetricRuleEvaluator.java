@@ -115,19 +115,31 @@ public class SingleMetricRuleEvaluator {
     private List<RuleEvaluationResult> evaluateCatalogMutationAll(EventRule rule, long lookbackMillis) {
         long to = PortalTimeParser.portalEndNow();
         long currentFrom = to - lookbackMillis;
+        Map<String, Object> query = EventRulePayloadParser.parseQuery(rule.queryJson());
+        Map<String, Object> primary = EventRulePayloadParser.primaryQueryItem(query);
+        long comparePeriodMillis = EventRulePayloadParser.extractComparePeriodMillis(primary, lookbackMillis);
+        String fluctuate = EventRulePayloadParser.extractFluctuate(primary);
+        boolean yoy = EventRulePayloadParser.isYoyFluctuate(fluctuate);
+        long previousTo = to - comparePeriodMillis;
+        long previousFrom = previousTo - lookbackMillis;
         List<GroupMetricValue> currentGroups = ruleMetricEvaluationService.evaluateRuleGroups(rule, currentFrom, to);
         List<GroupMetricValue> previousGroups = ruleMetricEvaluationService.evaluateRuleGroups(
-                rule, to - lookbackMillis * 2, currentFrom);
+                rule, previousFrom, previousTo);
         Map<String, GroupMetricValue> previousByGroup = previousGroups.stream()
                 .collect(Collectors.toMap(GroupMetricValue::groupKey, Function.identity(), (left, right) -> left));
         List<RuleEvaluationResult> results = new ArrayList<>();
         for (GroupMetricValue current : currentGroups) {
             GroupMetricValue previous = previousByGroup.get(current.groupKey());
             double previousValue = previous == null ? 0 : previous.value();
-            double delta = Math.abs(current.value() - previousValue);
-            if (ThresholdAlarmCheck.breached(delta, rule.threshold(), rule.comparator())) {
+            double change = computeMutationChange(fluctuate, current.value(), previousValue);
+            if (Double.isNaN(change) || Double.isInfinite(change)) {
+                continue;
+            }
+            if (ThresholdAlarmCheck.breached(change, rule.threshold(), rule.comparator())) {
+                double displayDelta = yoy ? change * 100 : change;
+                double displayThreshold = yoy ? rule.threshold() * 100 : rule.threshold();
                 String message = messageFormatter.mutationMessage(
-                        rule, delta, rule.threshold(), current.groupKey(), current.service());
+                        rule, displayDelta, displayThreshold, current.groupKey(), current.service());
                 results.add(new RuleEvaluationResult(
                         true,
                         "critical",
@@ -138,5 +150,25 @@ public class SingleMetricRuleEvaluator {
             }
         }
         return results;
+    }
+
+    /**
+     * Signed change used by mutation (同环比) detection. A positive result means the metric
+     * moved in the configured direction ({@code valUp/yoyUp} = increase, {@code valDown/yoyDown}
+     * = decrease); a negative result means it moved the other way and will not breach a
+     * non-negative threshold. yoy modes return a ratio (fraction) matching the front-end
+     * {@code _scale=0.01} threshold convention; val modes return the absolute difference in
+     * the metric's native display unit. Returns {@code NaN} when the yoy ratio is undefined
+     * (previous == 0) so the caller can skip the group instead of misfiring.
+     */
+    static double computeMutationChange(String fluctuate, double current, double previous) {
+        if (EventRulePayloadParser.isYoyFluctuate(fluctuate)) {
+            if (previous == 0) {
+                return Double.NaN;
+            }
+            double ratio = (current - previous) / previous;
+            return EventRule.FLUCTUATE_YOY_DOWN.equals(fluctuate) ? -ratio : ratio;
+        }
+        return EventRule.FLUCTUATE_VAL_DOWN.equals(fluctuate) ? previous - current : current - previous;
     }
 }

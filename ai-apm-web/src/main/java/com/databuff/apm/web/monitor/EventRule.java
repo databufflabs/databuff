@@ -22,6 +22,11 @@ public record EventRule(
     public static final String METRIC_REQUEST_COUNT = "request_count";
     public static final String COMPARATOR_GT = "gt";
 
+    public static final String FLUCTUATE_VAL_UP = "valUp";
+    public static final String FLUCTUATE_VAL_DOWN = "valDown";
+    public static final String FLUCTUATE_YOY_UP = "yoyUp";
+    public static final String FLUCTUATE_YOY_DOWN = "yoyDown";
+
     public EventRule withEnabled(boolean newEnabled) {
         return new EventRule(
                 id, ruleName, classify, detectionWay, service, metric,

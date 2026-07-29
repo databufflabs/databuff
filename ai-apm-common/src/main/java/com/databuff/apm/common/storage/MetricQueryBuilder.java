@@ -239,7 +239,10 @@ public final class MetricQueryBuilder {
                        COALESCE(`hostName`, '') AS hostName,
                        `meta.http.status_code` AS meta_http_status_code,
                        `meta.error.type` AS meta_error_type,
-                       COALESCE(`meta.http.url`, '') AS meta_http_url
+                       COALESCE(`meta.http.url`, '') AS meta_http_url,
+                       COALESCE(`srcService`, '') AS srcService,
+                       COALESCE(`srcServiceId`, '') AS srcServiceId,
+                       COALESCE(`srcServiceInstance`, '') AS srcServiceInstance
                 FROM %s.`trace_dc_span`
                 WHERE %s
                 %s
@@ -332,7 +335,10 @@ public final class MetricQueryBuilder {
                        COALESCE(`hostName`, '') AS hostName,
                        `meta.http.status_code` AS meta_http_status_code,
                        `meta.error.type` AS meta_error_type,
-                       COALESCE(`meta.http.url`, '') AS meta_http_url
+                       COALESCE(`meta.http.url`, '') AS meta_http_url,
+                       COALESCE(`srcService`, '') AS srcService,
+                       COALESCE(`srcServiceId`, '') AS srcServiceId,
+                       COALESCE(`srcServiceInstance`, '') AS srcServiceInstance
                 FROM %s.`trace_dc_span`
                 WHERE %s
                 %s
@@ -1015,6 +1021,53 @@ public final class MetricQueryBuilder {
                 table,
                 metricTsWhere(fromMillis, toMillis),
                 filters);
+    }
+
+    /**
+     * Downstream component call buckets attributed to a root interface.
+     * Filters by {@code srcServiceId} + {@code rootResource} + {@code isOut = 1},
+     * grouped by time bucket and downstream {@code service}. Used by portal
+     * {@code /service/resource_stats} duration breakdown: each component table
+     * contributes one series per downstream service, and the residual
+     * (interface sumDuration - sum of component sumDuration) becomes the
+     * "接口自身耗时" series.
+     */
+    public static String componentBreakdownBucketsSql(
+            String database,
+            String table,
+            long fromMillis,
+            long toMillis,
+            int intervalSec,
+            String srcServiceId,
+            String serviceInstance,
+            String rootResource) {
+        int bucketSec = Math.max(60, intervalSec);
+        StringBuilder filters = new StringBuilder();
+        if (srcServiceId != null && !srcServiceId.isBlank()) {
+            filters.append(" AND `srcServiceId` = '").append(escapeLiteral(srcServiceId.trim())).append("' ");
+        }
+        filters.append(buildServiceInstanceFilter(serviceInstance));
+        if (rootResource != null && !rootResource.isBlank()) {
+            filters.append(" AND `rootResource` = '").append(escapeLiteral(rootResource.trim())).append("' ");
+        }
+        filters.append(" AND `isOut` = '1' ");
+        return """
+                SELECT %s AS bucket_epoch_sec,
+                       `service`,
+                       SUM(`cnt`) AS request_cnt,
+                       SUM(`error`) AS error_cnt,
+                       SUM(`sumDuration`) AS sum_duration_ns
+                FROM %s.`%s`
+                WHERE %s
+                %s
+                GROUP BY bucket_epoch_sec, `service`
+                ORDER BY bucket_epoch_sec ASC, `service` ASC
+                """.formatted(
+                metricBucketEpochSecSelect(bucketSec),
+                database,
+                table,
+                metricTsWhere(fromMillis, toMillis),
+                filters.toString());
     }
 
     /** {@code service.trace} error trend buckets: only rows with {@code errorType = 'error'}. */

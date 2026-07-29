@@ -72,7 +72,10 @@ public class ApmReadRepository implements AutoCloseable {
                         rs.getString("meta_error_type"),
                         rs.getString("parent_id"),
                         readNullableInt(rs, "is_parent"),
-                        nullToEmpty(rs.getString("meta_http_url"))));
+                        nullToEmpty(rs.getString("meta_http_url")),
+                        nullToEmpty(rs.getString("srcService")),
+                        nullToEmpty(rs.getString("srcServiceId")),
+                        nullToEmpty(rs.getString("srcServiceInstance"))));
             }
         }
         return spans;

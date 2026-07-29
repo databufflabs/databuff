@@ -272,7 +272,7 @@ class MetricQueryBuilderTest {
                 null,
                 null);
         assertThat(sql).contains("`serviceId` = 'c72cc83a8831e407'");
-        assertThat(sql).doesNotContain("srcServiceId");
+        assertThat(sql).doesNotContain("`srcServiceId` =");
     }
 
     @Test

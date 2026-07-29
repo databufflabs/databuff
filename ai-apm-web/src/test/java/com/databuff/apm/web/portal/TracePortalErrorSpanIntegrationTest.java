@@ -98,7 +98,7 @@ class TracePortalErrorSpanIntegrationTest {
         when(readRepository.querySpanSummaries(anyString())).thenAnswer(invocation -> {
             String sql = invocation.getArgument(0);
             assertThat(sql).contains("`serviceId` = '" + MYSQL_DEMO_APM_ID + "'");
-            assertThat(sql).doesNotContain("srcServiceId");
+            assertThat(sql).doesNotContain("`srcServiceId` =");
             return List.of(virtualMysqlErrorSpan());
         });
         when(readRepository.queryCallSpanCount(anyString())).thenReturn(1L);

@@ -25,7 +25,10 @@ public final class ApmQueryModels {
             String metaErrorType,
             String parentId,
             Integer isParent,
-            String metaHttpUrl) {
+            String metaHttpUrl,
+            String srcService,
+            String srcServiceId,
+            String srcServiceInstance) {
 
         public SpanSummary(
                 String traceId,
@@ -57,6 +60,9 @@ public final class ApmQueryModels {
                     metaErrorType,
                     null,
                     null,
+                    null,
+                    null,
+                    null,
                     null);
         }
 
@@ -75,7 +81,8 @@ public final class ApmQueryModels {
                 Integer metaHttpStatusCode,
                 String metaErrorType,
                 String parentId,
-                Integer isParent) {
+                Integer isParent,
+                String metaHttpUrl) {
             this(
                     traceId,
                     spanId,
@@ -92,6 +99,9 @@ public final class ApmQueryModels {
                     metaErrorType,
                     parentId,
                     isParent,
+                    metaHttpUrl,
+                    null,
+                    null,
                     null);
         }
     }

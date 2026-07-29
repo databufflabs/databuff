@@ -169,15 +169,6 @@
             <span v-else>{{ current.service || '-' }}</span>
           </div>
 
-          <div class="attribute-item">
-            <label class="attribute-item-label">
-              <i></i>
-              <span>{{ $t('modules.views.appMonitor.cache.s_73a1c3b8') }}</span>
-            </label>
-            <span v-for="bsLine,index in getBsLine" :key='index'
-              :class='["mr-6", bsLine.id ? "" : ""]'>{{ bsLine.nameKey ? $t(bsLine.nameKey) : bsLine.name }}</span>
-          </div>
-
         </div>
       </div>
     </div>
@@ -209,8 +200,6 @@ const ChartTitleFilter = (key: string) => {
       return i18n.t('modules.views.appMonitor.resourceDetail.s_44e03b37') as string;
     case 'duration':
       return i18n.t('modules.views.appMonitor.resourceDetail.s_b9bee898') as string;
-    case 'cpuTime':
-      return i18n.t('modules.views.appMonitor.resourceDetail.s_99258739') as string;
     case 'avgReadRows':
       return i18n.t('modules.views.appMonitor.resourceDetail.s_5734b2db') as string;
     case 'avgUpdateRows':
@@ -278,14 +267,6 @@ export default class TabBaseinfo extends Vue {
     },
   }
   private chartGroup2: any = {
-    cpuTime: {
-      loading: true,
-      source: [],
-      tsSource: [],
-      unit: 'ns',
-      colors: ['#2962FF', '#00AFF4'],
-      componentTypes: ['service.http'],
-    },
     avgMqBodyLengths: {
       loading: true,
       source: [],
@@ -353,12 +334,6 @@ export default class TabBaseinfo extends Vue {
       return { url: this.resource }
     }
     return { resource: this.resource }
-  }
-
-  get getBsLine () {
-    const bsLineList = Array.isArray(this.current?.businessLineInfo) ? this.current.businessLineInfo : []
-    const noEmptyList = bsLineList.filter((t: any) => t && t.name); // 过滤掉未分配业务线
-    return noEmptyList.length > 0 ? noEmptyList : [{ name: i18n.t('modules.views.appMonitor.resourceDetail.s_b4540f30') as string, nameKey: 'modules.views.appMonitor.resourceDetail.s_b4540f30', id: null }]
   }
 
   get inOutParamsByType () {

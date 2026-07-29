@@ -337,6 +337,38 @@ public final class EventRulePayloadParser {
         return Math.max(1, periodSec / 60);
     }
 
+    /**
+     * Comparison window length (millis) for mutation (同环比) rules. The front-end stores
+     * {@code comparePeriod} in seconds; when absent it falls back to the rule's own
+     * {@code lookbackMillis} so the previous window immediately precedes the current one
+     * (legacy behavior).
+     */
+    public static long extractComparePeriodMillis(Map<String, Object> queryItem, long lookbackMillis) {
+        long comparePeriodSec = longValue(queryItem.get("comparePeriod"), -1);
+        if (comparePeriodSec <= 0) {
+            return lookbackMillis;
+        }
+        return comparePeriodSec * 1000L;
+    }
+
+    /**
+     * Mutation direction mode configured by the front-end: {@code valUp/valDown} compare
+     * absolute change, {@code yoyUp/yoyDown} compare ratio (同比). Defaults to
+     * {@code valUp} for older payloads.
+     */
+    public static String extractFluctuate(Map<String, Object> queryItem) {
+        String fluctuate = stringValue(queryItem.get("fluctuate"), EventRule.FLUCTUATE_VAL_UP);
+        return switch (fluctuate) {
+            case EventRule.FLUCTUATE_VAL_UP, EventRule.FLUCTUATE_VAL_DOWN,
+                    EventRule.FLUCTUATE_YOY_UP, EventRule.FLUCTUATE_YOY_DOWN -> fluctuate;
+            default -> EventRule.FLUCTUATE_VAL_UP;
+        };
+    }
+
+    public static boolean isYoyFluctuate(String fluctuate) {
+        return EventRule.FLUCTUATE_YOY_UP.equals(fluctuate) || EventRule.FLUCTUATE_YOY_DOWN.equals(fluctuate);
+    }
+
     private static String stringValue(Object primary, String fallback) {
         String value = primary == null ? null : String.valueOf(primary).trim();
         if (value != null && !value.isEmpty()) {
