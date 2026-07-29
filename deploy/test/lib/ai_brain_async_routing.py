@@ -912,7 +912,7 @@ def run_ai_brain_async_routing_cases(
     }
     results: list[BrainAsyncCaseResult | None] = [None] * len(case_fns)
     # Cap concurrent brain cases to ease LLM rate limits (was unbounded = len(case_fns)).
-    brain_workers = max(1, int(os.environ.get("TEST_AI_BRAIN_MAX_WORKERS", "3")))
+    brain_workers = max(1, int(os.environ.get("TEST_AI_BRAIN_MAX_WORKERS", "5")))
     with ThreadPoolExecutor(max_workers=min(brain_workers, len(case_fns))) as pool:
         futs = {pool.submit(fn, base, token, **kwargs): idx for idx, fn in enumerate(case_fns)}
         for fut in as_completed(futs):

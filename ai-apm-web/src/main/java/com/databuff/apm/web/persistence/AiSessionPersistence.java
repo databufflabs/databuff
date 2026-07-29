@@ -102,9 +102,9 @@ public class AiSessionPersistence {
         }
         try {
             ApmConfigRepository repository = new ApmConfigRepository(readRepository, configDatabase);
-            return repository.countAiSessions() + memoryOnlySessions().size();
+            return repository.countAiSessions();
         } catch (Exception e) {
-            log.debug("Failed to count AI sessions from store: {}", e.getMessage());
+            failClosedOnSessionStatsError("countSessions", e);
             return sessionStore.listSessions().size();
         }
     }
@@ -116,27 +116,12 @@ public class AiSessionPersistence {
             return paginateMemorySessions(safeOffset, safeLimit);
         }
         try {
-            List<AiSessionStore.SessionSummary> memoryOnly = memoryOnlySessions();
-            int memoryCount = memoryOnly.size();
-            if (safeOffset == 0) {
-                int dbLimit = Math.max(0, safeLimit - memoryCount);
-                List<AiSessionStore.SessionSummary> page = new ArrayList<>(memoryOnly.subList(
-                        0, Math.min(memoryCount, safeLimit)));
-                if (dbLimit > 0) {
-                    ApmConfigRepository repository = new ApmConfigRepository(readRepository, configDatabase);
-                    for (ApmConfigRepository.AiSessionSummaryRow row : repository.loadRecentAiSessions(dbLimit, 0)) {
-                        page.add(toSummary(row));
-                    }
-                }
-                return page;
-            }
-            int dbOffset = Math.max(0, safeOffset - memoryCount);
             ApmConfigRepository repository = new ApmConfigRepository(readRepository, configDatabase);
-            return repository.loadRecentAiSessions(safeLimit, dbOffset).stream()
+            return repository.loadRecentAiSessions(safeLimit, safeOffset).stream()
                     .map(this::toSummary)
                     .toList();
         } catch (Exception e) {
-            log.debug("Failed to list AI sessions from store: {}", e.getMessage());
+            failClosedOnSessionStatsError("listSessions", e);
             return paginateMemorySessions(safeOffset, safeLimit);
         }
     }
@@ -256,10 +241,13 @@ public class AiSessionPersistence {
         return false;
     }
 
-    private List<AiSessionStore.SessionSummary> memoryOnlySessions() {
-        return sessionStore.listSessions().stream()
-                .filter(summary -> !persistedSessionIds.contains(summary.sessionId()))
-                .toList();
+    private void failClosedOnSessionStatsError(String operation, Exception error) {
+        String detail = error == null || error.getMessage() == null || error.getMessage().isBlank()
+                ? operation
+                : operation + ": " + error.getMessage();
+        log.warn("AI session {} failed; falling back to memory and enabling JDBC fast-fail: {}",
+                operation, error == null ? "" : error.getMessage());
+        dorisAvailability.markUnavailable("ai session stats " + detail);
     }
 
     private List<AiSessionStore.SessionSummary> paginateMemorySessions(int offset, int limit) {

@@ -154,8 +154,10 @@ public class AgentScopeExpertRuntime implements ExpertRuntime {
 
     private RuntimeContext buildRuntimeContext(ExpertChatInput input) {
         RuntimeContext.Builder builder = RuntimeContext.builder();
-        // AgentScope memory key: logical chat session. Do not use task-scoped ids here —
-        // same (session, expert) must share memory across serial dispatches and direct chat.
+        // RuntimeContext.sessionId stays the logical chat session (workspace / tools).
+        // Cross-expert isolation for brain dispatches is applied in ExpertIsolatedAgentStateStore.
+        // Do not use task-scoped ids here — serial dispatches to the same expert still share
+        // the expert-scoped slot; direct non-brain chats share the bare session slot.
         String memorySessionId = resolveMemorySessionId(input);
         if (memorySessionId != null && !memorySessionId.isBlank()) {
             builder.sessionId(memorySessionId);
@@ -220,7 +222,8 @@ public class AgentScopeExpertRuntime implements ExpertRuntime {
     }
 
     /**
-     * Logical chat session id used for AgentScope {@code stateStore} / workspace paths.
+     * Logical chat session id for RuntimeContext / workspace paths.
+     * Conditional expert memory isolation is handled by {@link ExpertIsolatedAgentStateStore}.
      */
     static String resolveMemorySessionId(ExpertChatInput input) {
         if (input == null) {

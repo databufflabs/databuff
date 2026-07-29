@@ -93,6 +93,33 @@ public final class ExpertChatScopeRegistry {
         return find(parent).filter(state -> !isTaskScopedSessionId(state.sessionId()));
     }
 
+    /**
+     * True when a dispatched subtask for {@code expertId} is active under the logical session.
+     * Used to isolate AgentScope memory across experts during brain (or other) dispatches,
+     * without relying on ThreadLocal (store access may hop reactor threads).
+     */
+    public static boolean hasActiveTaskForExpert(String sessionId, String expertId) {
+        String parent = parentSessionId(sessionId);
+        if (parent == null || expertId == null || expertId.isBlank()) {
+            return false;
+        }
+        String prefix = parent + TASK_SESSION_SUFFIX;
+        String wantExpert = expertId.trim();
+        for (var entry : ACTIVE.entrySet()) {
+            if (!entry.getKey().startsWith(prefix)) {
+                continue;
+            }
+            ExpertChatContext.State state = entry.getValue();
+            if (state != null
+                    && wantExpert.equals(state.expertId())
+                    && state.taskId() != null
+                    && !state.taskId().isBlank()) {
+                return true;
+            }
+        }
+        return false;
+    }
+
     public static boolean validSessionId(String sessionId) {
         return sessionId != null
                 && !sessionId.isBlank()

@@ -176,7 +176,7 @@ def _run_brain(base: str, token: str, brain_async_poll_timeout: float) -> SuiteO
     if not deepseek_api_key():
         print(f"  skip: set {ENV_API_KEY} to enable", flush=True)
         return SuiteOutcome("brain", 0, 0, True, f"{ENV_API_KEY} unset")
-    brain_workers = max(1, int(os.environ.get("TEST_AI_BRAIN_MAX_WORKERS", "3")))
+    brain_workers = max(1, int(os.environ.get("TEST_AI_BRAIN_MAX_WORKERS", "5")))
     print(
         f"  running cases (max_workers={brain_workers}, provider={PROVIDER}/{MODEL}, "
         f"{ENV_API_KEY} set) ...",

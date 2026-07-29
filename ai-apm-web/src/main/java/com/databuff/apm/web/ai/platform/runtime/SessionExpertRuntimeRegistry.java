@@ -22,8 +22,10 @@ import java.util.concurrent.ConcurrentMap;
  * Keeps one AgentScope runtime per {@code (chatSessionId, expertId)} so multi-turn chat and
  * serial async dispatches to the same expert reuse memory via {@code stateStore}.
  * <p>
- * ChatScope / TaskContext stay on {@code sessionId#task:{taskId}} keys; AgentScope memory uses the
- * logical chat session id on the per-expert agent instance.
+ * ChatScope / TaskContext stay on {@code sessionId#task:{taskId}} keys. AgentScope memory is
+ * conditionally isolated by {@link ExpertIsolatedAgentStateStore}: brain / dispatched subtasks
+ * use {@code sessionId#expert:{expertId}}; direct non-brain chats share the logical session
+ * slot so switching experts keeps memory. RuntimeContext chat session id stays logical.
  */
 @Service
 @Lazy

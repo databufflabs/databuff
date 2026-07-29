@@ -62,6 +62,27 @@ class ExpertChatScopeRegistryTest {
     }
 
     @Test
+    void hasActiveTaskForExpertMatchesTaskScopedRegistration() {
+        String sessionId = "s-active-task";
+        ExpertChatScopeRegistry.register(new ExpertChatContext.State(
+                sessionId, "admin", "brain", null, false, null));
+        assertThat(ExpertChatScopeRegistry.hasActiveTaskForExpert(sessionId, "data")).isFalse();
+
+        ExpertChatScopeRegistry.register(new ExpertChatContext.State(
+                ExpertChatScopeRegistry.taskScopedSessionId(sessionId, "task-9"),
+                "admin",
+                "data",
+                null,
+                true,
+                null,
+                "task-9"));
+        assertThat(ExpertChatScopeRegistry.hasActiveTaskForExpert(sessionId, "data")).isTrue();
+        assertThat(ExpertChatScopeRegistry.hasActiveTaskForExpert(sessionId, "inspection")).isFalse();
+        assertThat(ExpertChatScopeRegistry.hasActiveTaskForExpert(
+                ExpertChatScopeRegistry.taskScopedSessionId(sessionId, "task-9"), "data")).isTrue();
+    }
+
+    @Test
     void parallelTaskScopesDoNotShareStackKeys() {
         String sessionId = "s-parallel";
         ExpertTaskContext.clearForTests();

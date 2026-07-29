@@ -19,6 +19,7 @@ import static org.mockito.ArgumentMatchers.anyString;
 import static org.mockito.ArgumentMatchers.contains;
 import static org.mockito.Mockito.doThrow;
 import static org.mockito.Mockito.mock;
+import static org.mockito.Mockito.reset;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
@@ -167,6 +168,48 @@ class AiSessionPersistenceTest {
 
         assertThat(persistence.listSessions(0, 20)).singleElement()
                 .satisfies(summary -> assertThat(summary.title()).isEqualTo("查询最近 1 小时错误率"));
+    }
+
+    @Test
+    void failsClosedToMemoryWhenSessionStatsStoreErrors() throws Exception {
+        ApmReadRepository reader = mock(ApmReadRepository.class);
+        Connection connection = mock(Connection.class);
+        Statement statement = mock(Statement.class);
+        ResultSet schemaRs = mock(ResultSet.class);
+        ResultSet emptySessionsRs = mock(ResultSet.class);
+        when(reader.connection()).thenReturn(connection);
+        when(connection.createStatement()).thenReturn(statement);
+        when(statement.executeQuery(anyString())).thenAnswer(invocation -> {
+            String sql = invocation.getArgument(0, String.class);
+            if (sql.startsWith("SELECT 1 FROM")) {
+                return schemaRs;
+            }
+            if (sql.contains("COUNT(*)") || sql.contains("ORDER BY grouped.updated_at")) {
+                throw new SQLException("doris hung");
+            }
+            return emptySessionsRs;
+        });
+        when(schemaRs.next()).thenReturn(true);
+        when(emptySessionsRs.next()).thenReturn(false);
+
+        DorisAvailability availability = new DorisAvailability();
+        availability.markAvailable();
+        AiSessionStore store = new AiSessionStore();
+        store.ensureSession("mem-1", "brain", null, null, "admin");
+        AiSessionPersistence persistence = new AiSessionPersistence(
+                reader, availability, store, new AiMessagePersistenceQueue(reader, TestStorageSupport.storage()), TestStorageSupport.storage());
+        persistence.reloadFromStore();
+        assertThat(persistence.persistenceEnabled()).isTrue();
+
+        assertThat(persistence.listSessions(0, 20)).singleElement()
+                .extracting(AiSessionStore.SessionSummary::sessionId)
+                .isEqualTo("mem-1");
+        assertThat(availability.isUnavailable()).isTrue();
+
+        reset(reader);
+        assertThat(persistence.countSessions()).isEqualTo(1);
+        assertThat(persistence.listSessions(0, 20)).hasSize(1);
+        verify(reader, org.mockito.Mockito.never()).connection();
     }
 
     @Test

@@ -49,6 +49,11 @@ public class AgentScopeRuntimeAdapter {
     private final BrainRoutingCatalog brainRoutingCatalog;
     private final InMemoryAgentStateStore sharedAgentStateStore = new InMemoryAgentStateStore();
 
+    /** Package-visible for memory-isolation integration tests. */
+    InMemoryAgentStateStore sharedAgentStateStore() {
+        return sharedAgentStateStore;
+    }
+
     public AgentScopeRuntimeAdapter(
             AgentRuntimeConfig agentRuntimeConfig,
             ExpertManagementService expertManagementService,
@@ -179,7 +184,9 @@ public class AgentScopeRuntimeAdapter {
             // Abort/timeout mid-tool leaves ToolUse without ToolResult in stateStore memory.
             // Without recovery, the next call (incl. orchestrator stream→chat fallback) fails with
             // "Pending tool calls exist without results".
-            builder.stateStore(sharedAgentStateStore)
+            // Store isolates brain / dispatched subtasks by expert; direct non-brain chats share.
+            // RuntimeContext.sessionId stays the logical chat id so workspace / tools are unchanged.
+            builder.stateStore(new ExpertIsolatedAgentStateStore(sharedAgentStateStore, expert.expertId()))
                     .defaultSessionId(chatSessionId.trim())
                     .enablePendingToolRecovery(true);
         }
