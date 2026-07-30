@@ -6,7 +6,7 @@
 
 # Product Overview
 
-> Release notes live under sidebar **Release Notes** (e.g. [v0.1.5](/en/releases/0.1.5)).
+> Release notes live under sidebar **Release Notes** (e.g. [v0.1.6](/en/releases/0.1.6)).
 
 ## In One Sentence
 

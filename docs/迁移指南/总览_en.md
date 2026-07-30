@@ -6,7 +6,7 @@ This guide covers migrating from existing APM/observability systems to DataBuff.
 
 | Source System | Migration Doc | Status |
 |---------------|---------------|--------|
-| SkyWalking | [From SkyWalking to DataBuff](./from-skywalking-to-databuff.md) | ✅ Published (retarget Agent backend) |
+| SkyWalking | [From SkyWalking to DataBuff](./from-skywalking-to-databuff.md) | ✅ Published (Option A direct cutover / Option B proxy dual-write) |
 | Jaeger | [From Jaeger to DataBuff](./from-jaeger-to-databuff.md) | ✅ Published (retarget OTLP endpoint) |
 | Pinpoint | [From Pinpoint to DataBuff](./from-pinpoint-to-databuff.md) | ✅ Published (swap probe + point to DataBuff) |
 | SigNoz | [From SigNoz to DataBuff](./from-signoz-to-databuff.md) | ✅ Published (retarget OTLP endpoint) |
