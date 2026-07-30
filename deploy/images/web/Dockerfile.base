@@ -1,0 +1,20 @@
+# web 运行时基础镜像：JDK + apt 工具链。由 build-base.sh 构建；Hub 推送见 .env/push-web-base-dockerhub.sh。
+ARG JDK_IMAGE=eclipse-temurin:17-jdk-jammy
+FROM ${JDK_IMAGE}
+WORKDIR /app
+
+RUN printf 'Acquire::Retries "5";\nAcquire::http::Timeout "120";\n' > /etc/apt/apt.conf.d/80-retries \
+    && apt-get update \
+    && DEBIAN_FRONTEND=noninteractive apt-get install -y --no-install-recommends \
+        openssh-client \
+        sshpass \
+        procps \
+        iproute2 \
+        nmap \
+        ripgrep \
+    && rm -rf /var/lib/apt/lists/* \
+    && printf 'Host *\n  GSSAPIAuthentication no\n  PreferredAuthentications publickey,password\n  ConnectTimeout 10\n' \
+        > /etc/ssh/ssh_config.d/99-databuff.conf \
+    && mkdir -p ./data/skills ./data/ai-workspaces
+
+ENV TZ=Asia/Shanghai
