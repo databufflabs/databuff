@@ -1,16 +1,17 @@
 #!/usr/bin/env python3
-"""AI 集成测试 runner — 四套件可分别跑，**始终并行**（禁止串行叠跑）。
+"""AI 集成测试 runner — 核心套件可分别跑，**始终并行**（禁止串行叠跑）。
 
 套件：
-  - chat      工具参数校验
-  - formats   OpenAI / Anthropic 接入格式
-  - memory    会话记忆
-  - brain     大脑异步路由（套件内用例亦并行）
+  - chat       工具参数校验
+  - formats    OpenAI / Anthropic 接入格式
+  - memory     会话记忆
+  - brain      大脑异步路由（套件内用例亦并行）
+  - modelfail  模型失败可见性（单专家/多专家；会临时改专家绑定，suit=all 时在核心套件后串行）
 
 环境变量门控：
   - chat：已启用 LLM provider（TEST_SKIP_AI_CHAT=1 跳过）
   - formats：DEEPSEEK_API_KEY / MINIMAX_API_KEY（TEST_SKIP_AI_PROVIDER_FORMATS=1 跳过）
-  - memory / brain：由 AI_TEST_PROVIDER 对应 Key 门控（默认 DEEPSEEK_API_KEY；
+  - memory / brain / modelfail：由 AI_TEST_PROVIDER 对应 Key 门控（默认 DEEPSEEK_API_KEY；
     AI_TEST_PROVIDER=minimax 时用 MINIMAX_API_KEY）
 """
 
@@ -53,9 +54,14 @@ from ai_brain_async_routing import (  # noqa: E402
     run_ai_brain_async_routing_cases,
     BrainAsyncCaseResult,
 )
+from ai_model_failure import (  # noqa: E402
+    run_ai_model_failure_cases,
+    ModelFailureCaseResult,
+)
 from run_tests import login  # noqa: E402
 
-SUITES = ("chat", "formats", "memory", "brain")
+CORE_SUITES = ("chat", "formats", "memory", "brain")
+SUITES = (*CORE_SUITES, "modelfail")
 
 
 @dataclass
@@ -195,6 +201,32 @@ def _run_brain(base: str, token: str, brain_async_poll_timeout: float) -> SuiteO
     return SuiteOutcome("brain", len(brain_results), failed, False)
 
 
+def _run_modelfail(base: str, token: str, poll_timeout: float) -> SuiteOutcome:
+    if os.environ.get("TEST_SKIP_AI_MODEL_FAILURE", "0") == "1":
+        print("[ai-tests:modelfail] skip (TEST_SKIP_AI_MODEL_FAILURE=1)", flush=True)
+        return SuiteOutcome("modelfail", 0, 0, True, "TEST_SKIP_AI_MODEL_FAILURE=1")
+    _print_section("AI 模型失败可见性（单专家 / 多专家，终态必须含 error）")
+    if not deepseek_api_key():
+        print(f"  skip: set {ENV_API_KEY} to enable", flush=True)
+        return SuiteOutcome("modelfail", 0, 0, True, f"{ENV_API_KEY} unset")
+    print(
+        f"  running cases (provider={PROVIDER}/{MODEL}, {ENV_API_KEY} set, "
+        f"strict error-in-final) ...",
+        flush=True,
+    )
+    results: list[ModelFailureCaseResult] = run_ai_model_failure_cases(
+        base,
+        token,
+        poll_timeout_sec=poll_timeout,
+    )
+    failed = 0
+    for item in results:
+        _print_result_row(item.name, item.ok, item.elapsed_ms, item.session_id, item.detail)
+        if not item.ok:
+            failed += 1
+    return SuiteOutcome("modelfail", len(results), failed, False)
+
+
 def main() -> int:
     parser = argparse.ArgumentParser(description="AI integration tests (parallel suites)")
     parser.add_argument(
@@ -216,6 +248,7 @@ def main() -> int:
     format_poll_timeout = float(os.environ.get("TEST_AI_PROVIDER_FORMAT_POLL_TIMEOUT", "180"))
     memory_poll_timeout = float(os.environ.get("TEST_AI_MEMORY_POLL_TIMEOUT", "240"))
     brain_async_poll_timeout = float(os.environ.get("TEST_AI_BRAIN_ASYNC_POLL_TIMEOUT", "900"))
+    modelfail_poll_timeout = float(os.environ.get("TEST_AI_MODEL_FAILURE_POLL_TIMEOUT", "300"))
 
     print(
         f"[ai-tests] login {base} suite={args.suite} parallel=True "
@@ -233,18 +266,28 @@ def main() -> int:
         "formats": lambda: _run_formats(base, token, format_rounds, format_poll_timeout),
         "memory": lambda: _run_memory(base, token, memory_poll_timeout),
         "brain": lambda: _run_brain(base, token, brain_async_poll_timeout),
+        "modelfail": lambda: _run_modelfail(base, token, modelfail_poll_timeout),
     }
 
     selected = list(SUITES) if args.suite == "all" else [args.suite]
     outcomes: list[SuiteOutcome] = []
 
     if args.suite == "all" and len(selected) > 1:
-        print("[ai-tests] launching suites in parallel (ThreadPool) ...", flush=True)
-        with ThreadPoolExecutor(max_workers=len(selected)) as pool:
-            futs = {pool.submit(runners[name]): name for name in selected}
-            for fut in as_completed(futs):
-                outcomes.append(fut.result())
-        outcomes.sort(key=lambda o: selected.index(o.suite))
+        parallel = [name for name in selected if name in CORE_SUITES]
+        serial_after = [name for name in selected if name not in CORE_SUITES]
+        if parallel:
+            print(
+                f"[ai-tests] launching core suites in parallel: {', '.join(parallel)}",
+                flush=True,
+            )
+            with ThreadPoolExecutor(max_workers=len(parallel)) as pool:
+                futs = {pool.submit(runners[name]): name for name in parallel}
+                for fut in as_completed(futs):
+                    outcomes.append(fut.result())
+            outcomes.sort(key=lambda o: parallel.index(o.suite))
+        for name in serial_after:
+            print(f"[ai-tests] running suite={name} after core suites (serial) ...", flush=True)
+            outcomes.append(runners[name]())
     else:
         for name in selected:
             outcomes.append(runners[name]())

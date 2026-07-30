@@ -92,6 +92,9 @@ public class AgentScopeExpertRuntime implements ExpertRuntime {
         RuntimeContext runtimeContext = buildRuntimeContext(input);
         Msg userMessage = AgentScopeToolConfirmSupport.attachAutoConfirmIfNeeded(agent, buildUserMessage(input));
         AgentScopeSessionHook.TraceRecorder recorder = sessionHook.newTraceRecorder(context);
+        // Propagate model/tool failures to callers. Do not onErrorResume into a soft "error"
+        // event — that makes poll/SSE paths treat the round as successful and finalize
+        // intermediate reasoning as the user-visible answer (no failure hint).
         return Flux.defer(() -> {
             ExpertChatScopeRegistry.register(context);
             Flux<AgentEvent> agentEvents = agent.streamEvents(userMessage, runtimeContext);
@@ -103,8 +106,7 @@ public class AgentScopeExpertRuntime implements ExpertRuntime {
                         recorder.finish();
                         ExpertChatScopeRegistry.unregister(context.sessionId());
                     });
-        }).onErrorResume(error -> Flux.just(ExpertRuntimeEvent.error(
-                error.getMessage() == null ? "AgentScope stream failed" : error.getMessage())));
+        });
     }
 
     @Override

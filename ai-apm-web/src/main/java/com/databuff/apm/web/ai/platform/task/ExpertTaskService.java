@@ -396,6 +396,12 @@ public class ExpertTaskService {
             return;
         }
         String type = event.type();
+        if ("error".equals(type)) {
+            String message = event.content() == null || event.content().isBlank()
+                    ? "expert stream failed"
+                    : event.content().trim();
+            throw new IllegalStateException(message);
+        }
         if ("text".equals(type) && event.content() != null) {
             content.append(event.content());
             return;

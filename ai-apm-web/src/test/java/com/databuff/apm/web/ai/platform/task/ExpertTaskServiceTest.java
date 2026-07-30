@@ -90,6 +90,64 @@ class ExpertTaskServiceTest {
     }
 
     @Test
+    void softErrorEventAfterPartialTextPersistsFailureNotPartialSuccess() throws Exception {
+        TestAiSupport.AiFixture aiFixture = TestAiSupport.aiFixture();
+        aiFixture.agentRuntimeConfig().setCustomSkillsDir(tempDir.toString());
+        aiFixture.agentRuntimeConfig().setWorkspaceDir(tempDir.resolve("workspaces-err").toString());
+        aiFixture.store().updateProvider("openai", new UpdateLlmProviderRequest(
+                null, "sk-test", null, true));
+        TestAiSupport.PlatformRuntimeFixture fixture =
+                aiFixture.buildPlatformRuntime(Mockito.mock(ApmToolkit.class));
+
+        ExpertRuntimeRegistry runtimeRegistry = mock(ExpertRuntimeRegistry.class);
+        SessionExpertRuntimeRegistry sessionRuntimeRegistry = mock(SessionExpertRuntimeRegistry.class);
+        ExpertRuntime runtime = mock(ExpertRuntime.class);
+        when(runtime.stream(any(ExpertChatInput.class))).thenReturn(Flux.just(
+                ExpertRuntimeEvent.text("连接成功，继续排查"),
+                ExpertRuntimeEvent.error("OpenAI API request failed with status 503")));
+        when(runtimeRegistry.getOrCreate("ops")).thenReturn(runtime);
+        when(sessionRuntimeRegistry.getOrCreate(any(String.class), any())).thenReturn(runtime);
+
+        AiSessionStore localStore = new AiSessionStore();
+        ExpertTaskPendingRegistry localPending = new ExpertTaskPendingRegistry();
+        ExpertTaskService localService = new ExpertTaskService(
+                fixture.expertManagementService(),
+                providerOf(runtimeRegistry),
+                providerOf(sessionRuntimeRegistry),
+                null,
+                localStore,
+                localPending,
+                new ExpertTaskTextGuard(),
+                new BrainContinuationService(emptyContinuerProvider(), localPending),
+                fixture.sessionWorkspaceService(),
+                new TaskGeneratedFileRegistry());
+        try {
+            String sessionId = localStore.ensureSession(null, "brain", "rk", "web-1", "admin");
+            localStore.appendUserMessage(sessionId, "排查", "brain", "admin", Map.of());
+            ExpertTask task = localService.submit(new ExpertTaskRequest(
+                    sessionId,
+                    "brain",
+                    "ops",
+                    "排查机器",
+                    null,
+                    Map.of(ExpertMessageConstants.META_ROUND_INDEX, 1, "userName", "admin")));
+            ExpertTask finished = localService.waitFor(task.taskId(), Duration.ofSeconds(5));
+            assertThat(finished.status()).isEqualTo(ExpertTaskStatus.FAILED);
+            assertThat(finished.error()).contains("503");
+            assertThat(localStore.messages(sessionId))
+                    .anyMatch(message -> "ERROR".equals(message.messageType())
+                            && "ops".equals(message.expertId())
+                            && message.content() != null
+                            && message.content().contains("503"))
+                    .noneMatch(message -> "ops".equals(message.expertId())
+                            && Boolean.TRUE.equals(message.metadata()
+                                    .get(ExpertMessageConstants.META_IS_EXPERT_DELIVERABLE)));
+        } finally {
+            localService.shutdownForTests();
+        }
+    }
+
+    @Test
     void awaitingBrainTaskCompletionNotificationsUntilBrainNotified() {
         String sessionId = sessionStore.ensureSession(null, "brain", "rk", "web-1", "admin");
         ExpertTask task = new ExpertTask(

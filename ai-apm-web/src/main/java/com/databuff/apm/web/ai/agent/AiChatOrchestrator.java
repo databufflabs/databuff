@@ -468,6 +468,12 @@ public class AiChatOrchestrator implements BrainRoundContinuer {
                 Flux<ExpertRuntimeEvent> events = runtime.stream(input);
                 events.doOnNext(event -> {
                         String type = event.type();
+                        if ("error".equals(type)) {
+                            String message = event.content() == null || event.content().isBlank()
+                                    ? "AgentScope stream failed"
+                                    : event.content().trim();
+                            throw new IllegalStateException(message);
+                        }
                         if ("tool_call".equals(type) || "tool_result".equals(type)) {
                             toolActivitySeen[0] = true;
                             textBeforeFirstTool.setLength(0);
@@ -534,7 +540,12 @@ public class AiChatOrchestrator implements BrainRoundContinuer {
             if (isChatCancellation(e) || sessionStore.isAbortRequested(sessionId)) {
                 return "";
             }
-            return runtimeFailureReply(expertId, chatContext.message(), e.getMessage());
+            // Brain keeps legacy tool/LLM fallback. Other experts rethrow so executeAssistantReply
+            // can persist FAILED + isRoundFinal=true user-visible error (do not change isRoundFinal).
+            if ("brain".equals(expertId)) {
+                return runtimeFailureReply(expertId, chatContext.message(), e.getMessage());
+            }
+            throw e;
         }
     }
 
@@ -606,6 +617,12 @@ public class AiChatOrchestrator implements BrainRoundContinuer {
                 ExpertRuntime runtime = expertRuntime(sessionId, expert, transientRuntime);
                 Flux<ExpertRuntimeEvent> events = runtime.stream(input);
                 events.doOnNext(event -> {
+                            if ("error".equals(event.type())) {
+                                String message = event.content() == null || event.content().isBlank()
+                                        ? "AgentScope stream failed"
+                                        : event.content().trim();
+                                throw new IllegalStateException(message);
+                            }
                             if ("text".equals(event.type()) && event.content() != null) {
                                 if (content.isEmpty()) {
                                     sessionStore.endReasoningSegment(sessionId, expertId);
@@ -625,6 +642,17 @@ public class AiChatOrchestrator implements BrainRoundContinuer {
                                 runtime.close();
                             }
                             if (!isChatCancellation(error) && !sessionStore.isAbortRequested(sessionId)) {
+                                Map<String, Object> failedMetadata = Map.of(
+                                        ExpertMessageConstants.META_IS_ROUND_FINAL, true);
+                                sessionStore.appendOrUpdateAssistantText(
+                                        sessionId,
+                                        assistantMessageId,
+                                        expertId,
+                                        "对话失败：" + (error.getMessage() == null ? "unknown" : error.getMessage()),
+                                        AiMessageStatus.FAILED,
+                                        failedMetadata);
+                                sessionStore.completeRound(sessionId, expertId);
+                                releaseSessionRuntimeAfterRound(sessionId, expertId);
                                 sendStreamError(emitter, error);
                                 if (!shouldKeepSessionRunning(sessionId)) {
                                     sessionStore.setRunning(sessionId, false);
