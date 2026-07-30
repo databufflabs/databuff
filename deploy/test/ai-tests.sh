@@ -29,6 +29,9 @@
 #   ./ai-tests.sh --suite brain
 #   ./ai-tests.sh --suite modelfail        # 只跑模型失败可见性
 #   AI_TESTS_PARALLEL=0 ./ai-tests.sh      # 调试：单进程串行（发布门禁禁止）
+#   AI_TESTS_SUITE_CONCURRENCY=1           # 核心套件同时跑几个进程（默认 1，降速限）
+#   TEST_AI_CHAT_MAX_WORKERS=1             # chat 题内并发（默认 1）
+#   TEST_AI_BRAIN_MAX_WORKERS=1            # brain 用例内并发（默认 1）
 #   TEST_SKIP_AI_CHAT=1 ./ai-tests.sh
 #   TEST_SKIP_AI_PROVIDER_FORMATS=1 ./ai-tests.sh
 #   TEST_SKIP_AI_MEMORY=1 ./ai-tests.sh
@@ -56,6 +59,11 @@ if [[ -n "${TEST_BASE_URL:-}" ]]; then
 fi
 export TEST_BASE_URL="${LOCAL_BASE_URL}"
 export AI_TESTS_PARALLEL="${AI_TESTS_PARALLEL:-1}"
+# 核心套件进程并发上限（默认 1，避免 MiniMax/DeepSeek 429）
+export AI_TESTS_SUITE_CONCURRENCY="${AI_TESTS_SUITE_CONCURRENCY:-1}"
+# 套件内 LLM 并发默认压低
+export TEST_AI_CHAT_MAX_WORKERS="${TEST_AI_CHAT_MAX_WORKERS:-1}"
+export TEST_AI_BRAIN_MAX_WORKERS="${TEST_AI_BRAIN_MAX_WORKERS:-1}"
 export AI_TEST_PROVIDER="${AI_TEST_PROVIDER:-deepseek}"
 case "${AI_TEST_PROVIDER}" in
   deepseek|minimax) ;;
@@ -98,7 +106,12 @@ PARALLEL_PROC=1
 if [[ "${SERIAL}" == "1" || "${AI_TESTS_PARALLEL}" == "0" ]]; then
   PARALLEL_PROC=0
 fi
-echo "[ai-tests] base=${TEST_BASE_URL} suite=${SUITE} parallel_process=${PARALLEL_PROC} provider=${AI_TEST_PROVIDER}"
+SUITE_CONCURRENCY="${AI_TESTS_SUITE_CONCURRENCY:-1}"
+if ! [[ "${SUITE_CONCURRENCY}" =~ ^[1-9][0-9]*$ ]]; then
+  echo "[ai-tests] AI_TESTS_SUITE_CONCURRENCY must be positive int, got ${SUITE_CONCURRENCY}" >&2
+  exit 2
+fi
+echo "[ai-tests] base=${TEST_BASE_URL} suite=${SUITE} parallel_process=${PARALLEL_PROC} suite_concurrency=${SUITE_CONCURRENCY} chat_workers=${TEST_AI_CHAT_MAX_WORKERS} brain_workers=${TEST_AI_BRAIN_MAX_WORKERS} provider=${AI_TEST_PROVIDER}"
 
 # Single suite → one process
 if [[ "${SUITE}" != "all" ]]; then
@@ -111,11 +124,26 @@ if [[ "${PARALLEL_PROC}" == "0" ]]; then
   exec python3 "${TEST_DIR}/lib/run_ai_tests.py" --suite all
 fi
 
-# Default: core suites in separate processes, then modelfail serially
+# Default: core suites in separate processes (bounded concurrency), then modelfail serially
 LOG_DIR="${TMPDIR:-/tmp}/ai-tests-$$"
 mkdir -p "${LOG_DIR}"
 
-for s in chat formats memory brain; do
+CORE_SUITES=(chat formats memory brain)
+active_pids=()
+for s in "${CORE_SUITES[@]}"; do
+  # bash 3.2（macOS）无 wait -n；轮询已结束进程再开新套件
+  while (( ${#active_pids[@]} >= SUITE_CONCURRENCY )); do
+    still=()
+    for pid in "${active_pids[@]}"; do
+      if kill -0 "${pid}" 2>/dev/null; then
+        still+=("${pid}")
+      fi
+    done
+    active_pids=("${still[@]+"${still[@]}"}")
+    if (( ${#active_pids[@]} >= SUITE_CONCURRENCY )); then
+      sleep 1
+    fi
+  done
   (
     set +e
     python3 "${TEST_DIR}/lib/run_ai_tests.py" --suite "${s}" \
@@ -123,13 +151,14 @@ for s in chat formats memory brain; do
     echo $? >"${LOG_DIR}/${s}.exit"
   ) &
   echo $! >"${LOG_DIR}/${s}.pid"
+  active_pids+=("$(cat "${LOG_DIR}/${s}.pid")")
   echo "[ai-tests] started suite=${s} pid=$(cat "${LOG_DIR}/${s}.pid") log=${LOG_DIR}/${s}.log"
 done
 
 fail=0
-for s in chat formats memory brain; do
+for s in "${CORE_SUITES[@]}"; do
   pid="$(cat "${LOG_DIR}/${s}.pid")"
-  wait "${pid}" || true
+  wait "${pid}" 2>/dev/null || true
   ec="$(cat "${LOG_DIR}/${s}.exit" 2>/dev/null || echo 1)"
   echo "---------- suite=${s} exit=${ec} ----------"
   cat "${LOG_DIR}/${s}.log" || true

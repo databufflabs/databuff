@@ -131,10 +131,10 @@ compose_up() {
 # Doris FE/BE only: block until healthchecks pass. App services (ingest/web) are
 # started with compose_up and readiness is handled by wait_for_apm_services_ready
 # in start.sh — compose --wait would abort too early when Java is still warming up.
-# Default 180s so a stuck "Waiting" (never healthy/unhealthy) fails into Web 排障
+# Default 300s so a stuck "Waiting" (never healthy/unhealthy) fails into Web 排障
 # instead of hanging forever. Override: COMPOSE_WAIT_TIMEOUT=<seconds>.
 compose_up_wait() {
-  local wait_timeout="${COMPOSE_WAIT_TIMEOUT:-180}"
+  local wait_timeout="${COMPOSE_WAIT_TIMEOUT:-300}"
   if compose_supports_wait; then
     echo "[compose] waiting for healthy (timeout=${wait_timeout}s): $*" >&2
     if compose_supports_wait_timeout; then

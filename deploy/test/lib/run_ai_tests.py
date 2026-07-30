@@ -94,7 +94,7 @@ def _run_chat(base: str, token: str, timeout: float, chat_rounds: int, chat_poll
     if not is_llm_ready(base, token, timeout):
         print("  skip: no enabled LLM provider with API key configured", flush=True)
         return SuiteOutcome("chat", 0, 0, True, "llm not ready")
-    chat_workers = max(1, int(os.environ.get("TEST_AI_CHAT_MAX_WORKERS", "2")))
+    chat_workers = max(1, int(os.environ.get("TEST_AI_CHAT_MAX_WORKERS", "1")))
     print(
         f"  running {chat_rounds} rounds x {len(AI_CHAT_QUESTIONS)} questions "
         f"(max_workers={chat_workers}, provider={PROVIDER}/{MODEL}) ...",
@@ -183,7 +183,7 @@ def _run_brain(base: str, token: str, brain_async_poll_timeout: float) -> SuiteO
     if not deepseek_api_key():
         print(f"  skip: set {ENV_API_KEY} to enable", flush=True)
         return SuiteOutcome("brain", 0, 0, True, f"{ENV_API_KEY} unset")
-    brain_workers = max(1, int(os.environ.get("TEST_AI_BRAIN_MAX_WORKERS", "5")))
+    brain_workers = max(1, int(os.environ.get("TEST_AI_BRAIN_MAX_WORKERS", "1")))
     print(
         f"  running cases (max_workers={brain_workers}, provider={PROVIDER}/{MODEL}, "
         f"{ENV_API_KEY} set) ...",
@@ -288,11 +288,14 @@ def main() -> int:
         parallel = [name for name in selected if name in CORE_SUITES]
         serial_after = [name for name in selected if name not in CORE_SUITES]
         if parallel:
+            suite_workers = max(1, int(os.environ.get("AI_TESTS_SUITE_CONCURRENCY", "1")))
+            suite_workers = min(suite_workers, len(parallel))
             print(
-                f"[ai-tests] launching core suites in parallel: {', '.join(parallel)}",
+                f"[ai-tests] launching core suites (concurrency={suite_workers}): "
+                f"{', '.join(parallel)}",
                 flush=True,
             )
-            with ThreadPoolExecutor(max_workers=len(parallel)) as pool:
+            with ThreadPoolExecutor(max_workers=suite_workers) as pool:
                 futs = {pool.submit(runners[name]): name for name in parallel}
                 for fut in as_completed(futs):
                     outcomes.append(fut.result())

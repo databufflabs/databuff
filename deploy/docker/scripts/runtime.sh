@@ -157,7 +157,7 @@ wait_for_container_ready() {
       return 0
     fi
     if [ "$elapsed" -ge "$next_log" ]; then
-      echo "[start] waiting for ${label} [${name}: ${status}] (${elapsed}s/${timeout}s) ..."
+      echo "[start] waiting for ${label} [${status}] (${elapsed}s/${timeout}s) ..."
       next_log=$((elapsed + 30))
     fi
     sleep "$interval"

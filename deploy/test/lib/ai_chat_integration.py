@@ -153,11 +153,11 @@ def run_ai_chat_tool_loop(
     model_name: str | None = None,
     questions: list[tuple[str, str]] | None = None,
     name_prefix: str = "",
-    max_workers: int = 2,
+    max_workers: int = 1,
 ) -> list[AiChatCaseResult]:
     """Run data-expert chat cases; each question is its own session.
 
-    Within a round, questions run with bounded parallelism (default ``max_workers=2``).
+    Within a round, questions run with bounded parallelism (default ``max_workers=1``).
     ``max_workers <= 1`` forces serial execution.
     """
     question_list = questions if questions is not None else AI_CHAT_QUESTIONS

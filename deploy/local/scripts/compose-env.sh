@@ -78,9 +78,9 @@ compose_up() {
   compose_cmd up -d "$@"
 }
 
-# Default 180s; stuck Doris "Waiting" must fail into Web 排障. Override: COMPOSE_WAIT_TIMEOUT.
+# Default 300s; stuck Doris "Waiting" must fail into Web 排障. Override: COMPOSE_WAIT_TIMEOUT.
 compose_up_wait() {
-  local wait_timeout="${COMPOSE_WAIT_TIMEOUT:-180}"
+  local wait_timeout="${COMPOSE_WAIT_TIMEOUT:-300}"
   if compose_supports_wait; then
     echo "[compose] waiting for healthy (timeout=${wait_timeout}s): $*" >&2
     if compose_supports_wait_timeout; then
