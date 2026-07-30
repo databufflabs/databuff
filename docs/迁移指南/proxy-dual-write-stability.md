@@ -59,4 +59,5 @@
 
 - [从 SkyWalking 迁移到 DataBuff](./from-skywalking-to-databuff.md)（方案 B）
 - [databuff-proxy 仓库与 README](https://github.com/databufflabs/databuff-proxy)
+- [博客 · 双写稳定性验证](/blog/zh/databuff-proxy-dual-write-stability/)
 - [完整 Markdown 报告（仓库内）](https://github.com/databufflabs/databuff-proxy/blob/main/docs/reports/proxy-fanout-verify-20260730-091800.md)

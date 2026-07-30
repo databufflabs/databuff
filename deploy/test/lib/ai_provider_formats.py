@@ -6,6 +6,7 @@
 环境变量门控（未设置则尝试使用实例上已启用的同名 provider）：
   - ``DEEPSEEK_API_KEY`` → OpenAI Completions（deepseek / openai-completions）
   - ``MINIMAX_API_KEY``  → Anthropic Messages（minimax / anthropic-messages）
+  - ``AI_TEST_PROVIDER=deepseek|minimax`` → 只跑对应格式（与 memory/brain 一致）
 
 跳过整组：``TEST_SKIP_AI_PROVIDER_FORMATS=1``
 """
@@ -96,13 +97,22 @@ def _provider_ready_on_server(
     return False
 
 
+def _selected_provider_filter() -> str | None:
+    """``AI_TEST_PROVIDER`` 有值时只保留对应格式；未设置则跑全部可用格式。"""
+    code = os.environ.get("AI_TEST_PROVIDER", "").strip().lower()
+    return code or None
+
+
 def available_provider_formats(
     base: str | None = None,
     token: str | None = None,
     *,
     timeout: float = 30.0,
 ) -> list[ProviderFormatProfile]:
-    """Env key 优先；否则回退到实例上已启用且 apiType 匹配的 provider。"""
+    """Env key 优先；否则回退到实例上已启用且 apiType 匹配的 provider。
+
+    若设置了 ``AI_TEST_PROVIDER``，只返回该 provider 对应格式。
+    """
     server_providers: list[dict[str, Any]] | None = None
     if base and token:
         try:
@@ -110,8 +120,11 @@ def available_provider_formats(
         except Exception:
             server_providers = []
 
+    selected = _selected_provider_filter()
     ready: list[ProviderFormatProfile] = []
     for profile in PROVIDER_FORMATS:
+        if selected and profile.provider_code != selected:
+            continue
         if provider_api_key(profile.env_key):
             ready.append(profile)
             continue

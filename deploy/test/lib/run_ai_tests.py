@@ -9,10 +9,11 @@
   - modelfail  模型失败可见性（单专家/多专家；会临时改专家绑定，suit=all 时在核心套件后串行）
 
 环境变量门控：
+  - AI_TEST_PROVIDER=deepseek|minimax：选择本轮模型（chat/formats/memory/brain/modelfail）
   - chat：已启用 LLM provider（TEST_SKIP_AI_CHAT=1 跳过）
-  - formats：DEEPSEEK_API_KEY / MINIMAX_API_KEY（TEST_SKIP_AI_PROVIDER_FORMATS=1 跳过）
-  - memory / brain / modelfail：由 AI_TEST_PROVIDER 对应 Key 门控（默认 DEEPSEEK_API_KEY；
-    AI_TEST_PROVIDER=minimax 时用 MINIMAX_API_KEY）
+  - formats：按 AI_TEST_PROVIDER 只跑对应格式；Key 为 DEEPSEEK_API_KEY / MINIMAX_API_KEY
+    （TEST_SKIP_AI_PROVIDER_FORMATS=1 跳过）
+  - memory / brain / modelfail：由 AI_TEST_PROVIDER 对应 Key 门控
 """
 
 from __future__ import annotations
@@ -238,6 +239,17 @@ def main() -> int:
     args = parser.parse_args()
 
     base = os.environ.get("TEST_BASE_URL", "http://127.0.0.1:27403").rstrip("/")
+    # AI 集成测试仅允许本地 deploy/local，禁止 113/110 等外部机
+    from urllib.parse import urlparse
+
+    _host = (urlparse(base).hostname or "").lower()
+    if _host not in {"127.0.0.1", "localhost", "::1"}:
+        print(
+            f"[ai-tests] refusing non-local base={base}; "
+            "only deploy/local (127.0.0.1) is allowed",
+            flush=True,
+        )
+        return 2
     username = os.environ.get("TEST_USERNAME", "admin")
     password = os.environ.get("TEST_PASSWORD", "Databuff@123")
     timeout = float(os.environ.get("TEST_TIMEOUT", "60"))

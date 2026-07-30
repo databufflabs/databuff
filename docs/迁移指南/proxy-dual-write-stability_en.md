@@ -59,4 +59,5 @@ Ingest: DataBuff ~**11.3k span/s** · SkyWalking ~**5805 segment/s**
 
 - [From SkyWalking to DataBuff](./from-skywalking-to-databuff_en.md) (Option B)
 - [databuff-proxy repository](https://github.com/databufflabs/databuff-proxy)
+- [Blog · Dual-Write Stability](/blog/en/databuff-proxy-dual-write-stability/)
 - [Full Markdown report in repo](https://github.com/databufflabs/databuff-proxy/blob/main/docs/reports/proxy-fanout-verify-20260730-091800.md)

@@ -1,6 +1,11 @@
 #!/usr/bin/env bash
 # AI 集成测试入口 — 核心套件「分别并行」（禁止默认串行叠跑）。
 #
+# 目标环境：仅本地 deploy/local（127.0.0.1:${WEB_HTTP_PORT:-27403}）。
+# 禁止指向 113/110 等外部机；未启动时请先：
+#   cd deploy/local && ./install.sh          # 干净重装
+#   # 或：SKIP_BUILD=1 ./start.sh            # 已有 jar 时快速拉起
+#
 # 套件：
 #   chat       工具参数校验
 #   formats    OpenAI / Anthropic 接入格式
@@ -8,17 +13,18 @@
 #   brain      大脑异步路由
 #   modelfail  模型失败可见性（单专家/多专家；终态必须含 error；all 时在核心套件后串行）
 #
-# 需要环境变量：
-#   DEEPSEEK_API_KEY=sk-...   OpenAI Completions；默认 provider 门控 memory/brain/modelfail
-#   MINIMAX_API_KEY=...       Anthropic Messages；AI_TEST_PROVIDER=minimax 时门控
-#   AI_TEST_PROVIDER=deepseek|minimax   chat/memory/brain/modelfail 实际调用的模型（默认 deepseek）
-#   AI_TEST_MODEL=...                   可选覆盖模型名
+# 需要环境变量（可写在 ~/.zshrc）：
+#   DEEPSEEK_API_KEY=sk-...   OpenAI Completions
+#   MINIMAX_API_KEY=...       Anthropic Messages
+#   AI_TEST_PROVIDER=deepseek|minimax
+#       选择本轮实际调用的模型（chat/formats/memory/brain/modelfail 均按此切换；默认 deepseek）
+#   AI_TEST_MODEL=...         可选覆盖模型名
 #
 # Usage:
-#   export DEEPSEEK_API_KEY=sk-...
-#   export MINIMAX_API_KEY=...
-#   ./ai-tests.sh                          # 默认：核心套件分进程并行，再串行 modelfail
-#   AI_TEST_PROVIDER=minimax ./ai-tests.sh # 走 MiniMax
+#   # ~/.zshrc 已 export AI_TEST_PROVIDER / 对应 *_API_KEY 后直接：
+#   ./ai-tests.sh                          # 核心套件分进程并行，再串行 modelfail
+#   AI_TEST_PROVIDER=minimax ./ai-tests.sh # 临时覆盖走 MiniMax
+#   AI_TEST_PROVIDER=deepseek ./ai-tests.sh
 #   ./ai-tests.sh --suite memory           # 只跑会话记忆
 #   ./ai-tests.sh --suite brain
 #   ./ai-tests.sh --suite modelfail        # 只跑模型失败可见性
@@ -31,9 +37,43 @@
 set -euo pipefail
 
 TEST_DIR="$(cd "$(dirname "$0")" && pwd)"
-export TEST_BASE_URL="${TEST_BASE_URL:-http://127.0.0.1:${WEB_HTTP_PORT:-27403}}"
+REPO_ROOT="$(cd "${TEST_DIR}/../.." && pwd)"
+LOCAL_WEB_PORT="${WEB_HTTP_PORT:-27403}"
+LOCAL_BASE_URL="http://127.0.0.1:${LOCAL_WEB_PORT}"
+
+# 强制本地：忽略指向外部机的 TEST_BASE_URL
+if [[ -n "${TEST_BASE_URL:-}" ]]; then
+  case "${TEST_BASE_URL}" in
+    http://127.0.0.1:*|http://localhost:*|http://[::1]:*)
+      ;;
+    *)
+      echo "[ai-tests] refusing non-local TEST_BASE_URL=${TEST_BASE_URL}" >&2
+      echo "[ai-tests] AI tests only target deploy/local (${LOCAL_BASE_URL})" >&2
+      echo "[ai-tests] start local: cd ${REPO_ROOT}/deploy/local && ./install.sh" >&2
+      exit 2
+      ;;
+  esac
+fi
+export TEST_BASE_URL="${LOCAL_BASE_URL}"
 export AI_TESTS_PARALLEL="${AI_TESTS_PARALLEL:-1}"
 export AI_TEST_PROVIDER="${AI_TEST_PROVIDER:-deepseek}"
+case "${AI_TEST_PROVIDER}" in
+  deepseek|minimax) ;;
+  *)
+    echo "[ai-tests] unsupported AI_TEST_PROVIDER=${AI_TEST_PROVIDER}; expected deepseek|minimax" >&2
+    exit 2
+    ;;
+esac
+
+# 本地未就绪则直接失败并提示 install/start（任意 HTTP 响应码均算可达）
+_http_code="$(curl -s -o /dev/null -w '%{http_code}' --connect-timeout 2 --max-time 5 "${TEST_BASE_URL}/" || true)"
+if [[ "${_http_code}" == "000" || -z "${_http_code}" ]]; then
+  echo "[ai-tests] local databuff not reachable at ${TEST_BASE_URL}" >&2
+  echo "[ai-tests] start it first:" >&2
+  echo "  cd ${REPO_ROOT}/deploy/local && ./install.sh" >&2
+  echo "  # or: SKIP_BUILD=1 ./start.sh" >&2
+  exit 2
+fi
 
 SUITE="all"
 SERIAL=0
