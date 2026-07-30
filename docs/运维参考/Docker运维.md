@@ -57,10 +57,12 @@ docker compose restart ai-apm-ingest
 | Ingest | `http://127.0.0.1:4318/health` |
 | Web | `http://127.0.0.1:27403/health` |
 
-安装完成或 `start.sh` 结束后，终端会输出 Web 地址与默认账号：
+安装完成或 `start.sh` 结束后，终端会输出 Web 地址与当前生效的登录账号（未改密时为默认值）：
 
-- 用户名：`admin`
-- 密码：`Databuff@123`
+- 用户名：`admin`（可通过 `APM_SECURITY_SEED_USERNAME` 覆盖）
+- 密码：`Databuff@123`（可通过 `APM_SECURITY_SEED_PASSWORD` 覆盖）
+
+修改登录账号或 Ingest 任务参数见 [参数配置](参数配置.md)。脚本会读取运行中 Web 容器的环境变量并打印实际账号，不会在改密后仍显示默认密码。
 
 ## 查看日志
 

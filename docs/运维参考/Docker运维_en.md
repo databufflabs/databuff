@@ -57,10 +57,12 @@ docker compose restart ai-apm-ingest
 | Ingest | `http://127.0.0.1:4318/health` |
 | Web | `http://127.0.0.1:27403/health` |
 
-After install or `start.sh`, the terminal prints the Web URL and default login:
+After install or `start.sh`, the terminal prints the Web URL and the **effective** login (defaults if unchanged):
 
-- Username: `admin`
-- Password: `Databuff@123`
+- Username: `admin` (override with `APM_SECURITY_SEED_USERNAME`)
+- Password: `Databuff@123` (override with `APM_SECURITY_SEED_PASSWORD`)
+
+To change credentials or Ingest task settings, see [Parameter Configuration](参数配置_en.md). Summaries read the running Web container env, so a changed password is not still printed as the default.
 
 ## Logs
 

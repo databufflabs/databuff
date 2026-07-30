@@ -1,8 +1,13 @@
 package com.databuff.apm.web.ai.agent;
 
+import com.databuff.apm.web.ai.AiConfigController;
+import com.databuff.apm.web.ai.LlmApiTypes;
+import com.databuff.apm.web.ai.LlmChatModelFactory;
 import com.databuff.apm.web.ai.OpenAiCompatibleChatClient;
 import com.databuff.apm.web.ai.TestAiSupport;
 import com.databuff.apm.web.ai.TestBeanSupport;
+import com.databuff.apm.web.ai.TestLlmProviderRequest;
+import com.databuff.apm.web.ai.TestLlmProviderResult;
 import com.databuff.apm.web.ai.UpdateLlmProviderRequest;
 import com.databuff.apm.web.ai.platform.BuiltInExpertCatalog;
 import com.databuff.apm.web.ai.platform.expert.AiExpertDefinition;
@@ -15,13 +20,18 @@ import com.databuff.apm.web.ai.platform.task.ExpertTaskContext;
 import com.databuff.apm.web.ai.tool.ApmToolkit;
 import jakarta.servlet.http.HttpServletRequest;
 import com.databuff.apm.web.support.WebTestClusterSupport;
+import io.agentscope.extensions.model.anthropic.AnthropicChatModel;
+import io.agentscope.extensions.model.openai.OpenAIChatModel;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.io.TempDir;
 
+import java.net.InetSocketAddress;
+import java.nio.charset.StandardCharsets;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.util.List;
 import java.util.Map;
+import java.util.concurrent.atomic.AtomicReference;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.mockito.ArgumentMatchers.anyLong;
@@ -32,6 +42,14 @@ import static org.mockito.Mockito.when;
  * Design Phase 6 integration checks mapped to requirement acceptance criteria.
  */
 class AiAcceptanceIntegrationTest {
+
+    private static final byte[] OPENAI_CHAT_OK = """
+            {"id":"t","object":"chat.completion","choices":[{"index":0,"message":{"role":"assistant","content":"pong"},"finish_reason":"stop"}]}
+            """.getBytes(StandardCharsets.UTF_8);
+
+    private static final byte[] ANTHROPIC_MESSAGE_OK = """
+            {"id":"t","type":"message","role":"assistant","content":[{"type":"text","text":"pong"}],"model":"MiniMax-M3","stop_reason":"end_turn","usage":{"input_tokens":1,"output_tokens":1}}
+            """.getBytes(StandardCharsets.UTF_8);
 
     @TempDir
     Path tempDir;
@@ -173,6 +191,154 @@ class AiAcceptanceIntegrationTest {
                             .containsExactlyInAnyOrder("data", "inspection");
                 });
         assertThat(fixture.expertTaskService().listBySession(sessionId)).hasSize(2);
+    }
+
+    @Test
+    void llmConnectivityViaAgentScopeSucceedsForVersionedOpenAiBaseUrl() throws Exception {
+        AtomicReference<String> hitPath = new AtomicReference<>();
+        com.sun.net.httpserver.HttpServer server = com.sun.net.httpserver.HttpServer.create(new InetSocketAddress(0), 0);
+        server.createContext("/", exchange -> {
+            hitPath.set(exchange.getRequestURI().getPath());
+            if ("/api/paas/v4/chat/completions".equals(hitPath.get())) {
+                exchange.getResponseHeaders().add("Content-Type", "application/json");
+                exchange.sendResponseHeaders(200, OPENAI_CHAT_OK.length);
+                exchange.getResponseBody().write(OPENAI_CHAT_OK);
+            } else {
+                exchange.sendResponseHeaders(404, -1);
+            }
+            exchange.close();
+        });
+        server.start();
+        try {
+            int port = server.getAddress().getPort();
+            AiConfigController controller = new AiConfigController(TestAiSupport.configService());
+            TestLlmProviderResult result = controller.testProvider(new TestLlmProviderRequest(
+                    "http://127.0.0.1:" + port + "/api/paas/v4",
+                    "sk-test",
+                    LlmApiTypes.OPENAI_COMPLETIONS,
+                    "GLM-5",
+                    "zhipu"));
+            assertThat(result.ok()).as(result.message()).isTrue();
+            assertThat(hitPath.get()).isEqualTo("/api/paas/v4/chat/completions");
+            assertThat(LlmChatModelFactory.build(
+                    new OpenAiCompatibleChatClient.ResolvedLlmProvider(
+                            "zhipu",
+                            "http://127.0.0.1:" + port + "/api/paas/v4",
+                            "GLM-5",
+                            "sk-test",
+                            LlmApiTypes.OPENAI_COMPLETIONS),
+                    "GLM-5",
+                    false)).isInstanceOf(OpenAIChatModel.class);
+        } finally {
+            server.stop(0);
+        }
+    }
+
+    @Test
+    void llmConnectivityFailsWhenChatCompletionsPathUsedAsBaseUrl() throws Exception {
+        AtomicReference<String> hitPath = new AtomicReference<>();
+        com.sun.net.httpserver.HttpServer server = com.sun.net.httpserver.HttpServer.create(new InetSocketAddress(0), 0);
+        server.createContext("/", exchange -> {
+            hitPath.set(exchange.getRequestURI().getPath());
+            if ("/api/paas/v4/chat/completions".equals(hitPath.get())) {
+                exchange.getResponseHeaders().add("Content-Type", "application/json");
+                exchange.sendResponseHeaders(200, OPENAI_CHAT_OK.length);
+                exchange.getResponseBody().write(OPENAI_CHAT_OK);
+            } else {
+                exchange.sendResponseHeaders(404, -1);
+            }
+            exchange.close();
+        });
+        server.start();
+        try {
+            int port = server.getAddress().getPort();
+            AiConfigController controller = new AiConfigController(TestAiSupport.configService());
+            // Same mistake as pasting Zhipu's full endpoint into Base URL — connectivity must fail like Q&A.
+            TestLlmProviderResult result = controller.testProvider(new TestLlmProviderRequest(
+                    "http://127.0.0.1:" + port + "/api/paas/v4/chat/completions",
+                    "sk-test",
+                    LlmApiTypes.OPENAI_COMPLETIONS,
+                    "GLM-5",
+                    "zhipu"));
+            assertThat(result.ok()).isFalse();
+            assertThat(hitPath.get()).isEqualTo("/api/paas/v4/chat/completions/v1/chat/completions");
+            assertThat(LlmChatModelFactory.buildOpenAiChatCompletionsUrl(
+                    "http://127.0.0.1:" + port + "/api/paas/v4/chat/completions"))
+                    .endsWith("/api/paas/v4/chat/completions/v1/chat/completions");
+        } finally {
+            server.stop(0);
+        }
+    }
+
+    @Test
+    void llmConnectivityViaAgentScopeSucceedsForAnthropicBaseUrl() throws Exception {
+        AtomicReference<String> hitPath = new AtomicReference<>();
+        com.sun.net.httpserver.HttpServer server = com.sun.net.httpserver.HttpServer.create(new InetSocketAddress(0), 0);
+        server.createContext("/", exchange -> {
+            hitPath.set(exchange.getRequestURI().getPath());
+            if ("/anthropic/v1/messages".equals(hitPath.get())) {
+                exchange.getResponseHeaders().add("Content-Type", "application/json");
+                exchange.sendResponseHeaders(200, ANTHROPIC_MESSAGE_OK.length);
+                exchange.getResponseBody().write(ANTHROPIC_MESSAGE_OK);
+            } else {
+                exchange.sendResponseHeaders(404, -1);
+            }
+            exchange.close();
+        });
+        server.start();
+        try {
+            int port = server.getAddress().getPort();
+            AiConfigController controller = new AiConfigController(TestAiSupport.configService());
+            TestLlmProviderResult result = controller.testProvider(new TestLlmProviderRequest(
+                    "http://127.0.0.1:" + port + "/anthropic",
+                    "sk-test",
+                    LlmApiTypes.ANTHROPIC_MESSAGES,
+                    "MiniMax-M3",
+                    "minimax"));
+            assertThat(result.ok()).as(result.message()).isTrue();
+            assertThat(hitPath.get()).isEqualTo("/anthropic/v1/messages");
+            assertThat(LlmChatModelFactory.build(
+                    new OpenAiCompatibleChatClient.ResolvedLlmProvider(
+                            "minimax",
+                            "http://127.0.0.1:" + port + "/anthropic",
+                            "MiniMax-M3",
+                            "sk-test",
+                            LlmApiTypes.ANTHROPIC_MESSAGES),
+                    "MiniMax-M3",
+                    false)).isInstanceOf(AnthropicChatModel.class);
+        } finally {
+            server.stop(0);
+        }
+    }
+
+    @Test
+    void llmConnectivityAndExpertModelShareAgentScopeFactory() throws Exception {
+        com.sun.net.httpserver.HttpServer server = com.sun.net.httpserver.HttpServer.create(new InetSocketAddress(0), 0);
+        server.createContext("/v1/chat/completions", exchange -> {
+            exchange.getResponseHeaders().add("Content-Type", "application/json");
+            exchange.sendResponseHeaders(200, OPENAI_CHAT_OK.length);
+            exchange.getResponseBody().write(OPENAI_CHAT_OK);
+            exchange.close();
+        });
+        server.start();
+        try {
+            int port = server.getAddress().getPort();
+            String baseUrl = "http://127.0.0.1:" + port + "/v1";
+            var provider = new OpenAiCompatibleChatClient.ResolvedLlmProvider(
+                    "openai", baseUrl, "gpt-test", "sk-test", LlmApiTypes.OPENAI_COMPLETIONS);
+
+            // Connectivity probe and expert Q&A model construction share LlmChatModelFactory.build.
+            LlmChatModelFactory.probe(provider, "gpt-test");
+            assertThat(LlmChatModelFactory.build(provider, "gpt-test", false))
+                    .isInstanceOf(OpenAIChatModel.class);
+
+            AiConfigController controller = new AiConfigController(TestAiSupport.configService());
+            assertThat(controller.testProvider(new TestLlmProviderRequest(
+                    baseUrl, "sk-test", LlmApiTypes.OPENAI_COMPLETIONS, "gpt-test", "openai")).ok())
+                    .isTrue();
+        } finally {
+            server.stop(0);
+        }
     }
 
     private TestAiSupport.PlatformRuntimeFixture platformFixture() {

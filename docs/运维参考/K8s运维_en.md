@@ -45,10 +45,12 @@ cd databuff-ai-apm-k8s-<version>
 
 Example: Web UI at `http://<node-ip>:32703`; external OTLP HTTP at `http://<node-ip>:30418` (gRPC at `30417`). In-cluster Service `ai-apm-ingest`: `http://ai-apm-ingest:4318`.
 
-Default login (same as Docker install):
+Default login (same as Docker; when unchanged):
 
 - Username: `admin`
 - Password: `Databuff@123`
+
+`start.sh` / `install.sh` print the **effective** credentials from the Web Pod env. To change credentials or Ingest task settings, see [Parameter Configuration](参数配置_en.md).
 
 ## Offline Images
 

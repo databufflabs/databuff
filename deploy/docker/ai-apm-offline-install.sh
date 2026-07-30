@@ -69,6 +69,16 @@ show_summary() {
   INSTALL_SUMMARY_PRINTED=1
 
   host_ip="$(detect_host_ip)"
+  login_user=""
+  login_pass=""
+  if command -v docker >/dev/null 2>&1; then
+    login_user="$(docker exec ai-apm-web printenv APM_SECURITY_SEED_USERNAME 2>/dev/null || true)"
+    login_pass="$(docker exec ai-apm-web printenv APM_SECURITY_SEED_PASSWORD 2>/dev/null || true)"
+  fi
+  [ -z "$login_user" ] && login_user="${APM_SECURITY_SEED_USERNAME:-}"
+  [ -z "$login_pass" ] && login_pass="${APM_SECURITY_SEED_PASSWORD:-}"
+  login_user="${login_user:-admin}"
+  login_pass="${login_pass:-Databuff@123}"
 
   echo ""
   echo -e "${CYN}========================================================${RST}"
@@ -86,7 +96,7 @@ show_summary() {
   echo -e "  ${CYN}Web UI${RST}"
   echo "    http://${host_ip}:${web_port}"
   echo -e "  ${CYN}账号${RST}"
-  echo -e "    admin / ${YLW}Databuff@123${RST}"
+  printf "    %s / ${YLW}%s${RST}\n" "$login_user" "$login_pass"
   echo -e "  ${CYN}Ingest${RST}"
   echo "    http://${host_ip}:${ingest_port}/v1/traces"
   echo ""

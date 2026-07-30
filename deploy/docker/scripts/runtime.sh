@@ -64,6 +64,29 @@ apm_ingest_host_port() {
   published_host_port "${INGEST_SERVICE:-ai-apm-ingest}" "$INGEST_CONTAINER_HTTP_PORT" "${INGEST_HTTP_PORT:-$INGEST_CONTAINER_HTTP_PORT}"
 }
 
+# Prefer running web container env (override.yml), then shell/.env, then defaults.
+apm_seed_username() {
+  local val=""
+  if command -v docker >/dev/null 2>&1; then
+    val="$(docker exec "${WEB_SERVICE:-ai-apm-web}" printenv APM_SECURITY_SEED_USERNAME 2>/dev/null || true)"
+  fi
+  if [ -z "$val" ]; then
+    val="${APM_SECURITY_SEED_USERNAME:-}"
+  fi
+  printf '%s\n' "${val:-admin}"
+}
+
+apm_seed_password() {
+  local val=""
+  if command -v docker >/dev/null 2>&1; then
+    val="$(docker exec "${WEB_SERVICE:-ai-apm-web}" printenv APM_SECURITY_SEED_PASSWORD 2>/dev/null || true)"
+  fi
+  if [ -z "$val" ]; then
+    val="${APM_SECURITY_SEED_PASSWORD:-}"
+  fi
+  printf '%s\n' "${val:-Databuff@123}"
+}
+
 check_http_ready() {
   url="$1"
   if command -v curl >/dev/null 2>&1; then
@@ -170,6 +193,8 @@ print_apm_ready_summary() {
   host_ip="$(detect_local_ip)"
   web_port="$(apm_web_host_port)"
   ingest_port="$(apm_ingest_host_port)"
+  login_user="$(apm_seed_username)"
+  login_pass="$(apm_seed_password)"
   CYN='\033[36m'
   GRN='\033[32m'
   YLW='\033[33m'
@@ -184,8 +209,8 @@ print_apm_ready_summary() {
   echo -e "  ${CYN}Web UI${RST}"
   echo "    http://${host_ip}:${web_port}"
   echo -e "  ${CYN}登录账号${RST}"
-  echo -e "    用户名: ${BLD}admin${RST}"
-  echo -e "    密码:   ${YLW}Databuff@123${RST}"
+  printf "    用户名: ${BLD}%s${RST}\n" "$login_user"
+  printf "    密码:   ${YLW}%s${RST}\n" "$login_pass"
   echo -e "  ${CYN}Ingest${RST}"
   echo "    http://${host_ip}:${ingest_port}/v1/traces"
   echo ""
@@ -214,6 +239,8 @@ print_web_bootstrap_summary() {
   local reason="${1:-Doris 未就绪}"
   host_ip="$(detect_local_ip)"
   web_port="$(apm_web_host_port)"
+  login_user="$(apm_seed_username)"
+  login_pass="$(apm_seed_password)"
   CYN='\033[36m'
   YLW='\033[33m'
   BLD='\033[1m'
@@ -227,8 +254,8 @@ print_web_bootstrap_summary() {
   echo -e "  ${CYN}Web UI${RST}"
   echo "    http://${host_ip}:${web_port}"
   echo -e "  ${CYN}登录账号${RST}"
-  echo -e "    用户名: ${BLD}admin${RST}"
-  echo -e "    密码:   ${YLW}Databuff@123${RST}"
+  printf "    用户名: ${BLD}%s${RST}\n" "$login_user"
+  printf "    密码:   ${YLW}%s${RST}\n" "$login_pass"
   echo ""
   echo -e "  ${CYN}下一步${RST}"
   echo "    1. 打开「配置 → 大模型」，填写 API Key 并保存"

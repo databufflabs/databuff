@@ -48,6 +48,7 @@ Online docs: [databuff.ai/docs](https://databuff.ai/docs/en/)
 
 - [Docker Operations](运维参考/Docker运维_en.md)
 - [Kubernetes Operations](运维参考/K8s运维_en.md)
+- [Parameter Configuration](运维参考/参数配置_en.md)
 - [Performance Tuning and Capacity](运维参考/性能优化_en.md)
 - [Upgrade and Uninstall](运维参考/升级与卸载_en.md)
 - [Offline Installation](运维参考/离线安装_en.md)

@@ -238,12 +238,36 @@ detect_local_ip() {
   [[ -n "$ip" ]] && echo "$ip" || echo "127.0.0.1"
 }
 
+apm_seed_username() {
+  local val=""
+  if command -v kubectl >/dev/null 2>&1; then
+    val="$(kubectl -n "${APM_NAMESPACE}" exec deploy/ai-apm-web -- printenv APM_SECURITY_SEED_USERNAME 2>/dev/null || true)"
+  fi
+  if [[ -z "$val" ]]; then
+    val="${APM_SECURITY_SEED_USERNAME:-}"
+  fi
+  printf '%s\n' "${val:-admin}"
+}
+
+apm_seed_password() {
+  local val=""
+  if command -v kubectl >/dev/null 2>&1; then
+    val="$(kubectl -n "${APM_NAMESPACE}" exec deploy/ai-apm-web -- printenv APM_SECURITY_SEED_PASSWORD 2>/dev/null || true)"
+  fi
+  if [[ -z "$val" ]]; then
+    val="${APM_SECURITY_SEED_PASSWORD:-}"
+  fi
+  printf '%s\n' "${val:-Databuff@123}"
+}
+
 print_apm_summary() {
   local title="$1"
   local show_demo="${2:-0}"
-  local host_ip demo_pkg_base
+  local host_ip demo_pkg_base login_user login_pass
   host_ip="$(detect_local_ip)"
   demo_pkg_base="${APM_PUBLIC_PKG_BASE:-https://databuff.ai/databuff}"
+  login_user="$(apm_seed_username)"
+  login_pass="$(apm_seed_password)"
   echo ""
   echo -e "${CYN}========================================================${RST}"
   echo -e "${GRN}${BLD} ${title}${RST}"
@@ -252,7 +276,7 @@ print_apm_summary() {
   echo -e "  ${CYN}Web UI${RST}"
   echo "    http://${host_ip}:${WEB_NODE_PORT}"
   echo -e "  ${CYN}账号${RST}"
-  echo -e "    admin / ${YLW}Databuff@123${RST}"
+  printf "    %s / ${YLW}%s${RST}\n" "$login_user" "$login_pass"
   echo -e "  ${CYN}Ingest${RST}"
   echo "    http://${host_ip}:${INGEST_HTTP_NODE_PORT}/v1/traces"
   echo ""

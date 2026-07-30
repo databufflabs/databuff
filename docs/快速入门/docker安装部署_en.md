@@ -12,6 +12,7 @@ Get DataBuff running in 5 minutes — platform, storage, and ingest in one comma
 
 - Docker
 - Docker Compose
+- **Recommended**: 8C16G (8 CPU cores / 16 GB RAM)
 
 ## 2. Install the Platform
 

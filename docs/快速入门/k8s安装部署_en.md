@@ -12,6 +12,7 @@ Run DataBuff on a Kubernetes cluster — Doris, Ingest, and Web are deployed aut
 
 - A Kubernetes cluster
 - kubectl with cluster access
+- **Recommended**: 8C16G (8 CPU cores / 16 GB RAM)
 
 ## 2. Install the Platform
 

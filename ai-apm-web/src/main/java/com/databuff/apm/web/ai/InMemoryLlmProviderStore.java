@@ -10,11 +10,6 @@ import org.springframework.beans.factory.ObjectProvider;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Component;
 
-import java.net.URI;
-import java.net.http.HttpClient;
-import java.net.http.HttpRequest;
-import java.net.http.HttpResponse;
-import java.time.Duration;
 import java.util.ArrayList;
 import java.util.LinkedHashMap;
 import java.util.List;
@@ -216,16 +211,21 @@ public class InMemoryLlmProviderStore {
             return new TestLlmProviderResult(false, "baseUrl is required");
         }
         TestLlmProviderRequest resolved = withResolvedApiKey(request);
-        String apiType = LlmApiTypes.normalize(resolved.apiType());
         String modelId = resolveTestModelId(resolved);
         if (modelId == null) {
             return new TestLlmProviderResult(false, "请先配置模型 ID");
         }
         try {
-            if (LlmApiTypes.isAnthropic(apiType)) {
-                return testAnthropicMessage(resolved, modelId);
-            }
-            return testOpenAiChat(resolved, modelId);
+            // Same AgentScope Model path as expert Q&A (LlmChatModelFactory.build → OpenAI/AnthropicChatModel).
+            LlmChatModelFactory.probe(
+                    new OpenAiCompatibleChatClient.ResolvedLlmProvider(
+                            resolved.providerCode(),
+                            resolved.baseUrl().trim(),
+                            modelId,
+                            resolved.apiKey(),
+                            LlmApiTypes.normalize(resolved.apiType())),
+                    modelId);
+            return new TestLlmProviderResult(true, "连接成功");
         } catch (Exception e) {
             return new TestLlmProviderResult(false, e.getMessage() == null ? "connection failed" : e.getMessage());
         }
@@ -580,45 +580,6 @@ public class InMemoryLlmProviderStore {
                 state.enabled,
                 apiKeys.containsKey(state.code),
                 state.code.equals(defaultProviderCode));
-    }
-
-    private TestLlmProviderResult testOpenAiChat(TestLlmProviderRequest request, String modelId) throws Exception {
-        String body = objectMapper.writeValueAsString(Map.of(
-                "model", modelId,
-                "messages", List.of(Map.of("role", "user", "content", "ping")),
-                "max_tokens", 8));
-        URI uri = URI.create(LlmChatModelFactory.buildOpenAiChatCompletionsUrl(request.baseUrl()));
-        HttpRequest.Builder builder = HttpRequest.newBuilder(uri)
-                .timeout(Duration.ofSeconds(30))
-                .header("Content-Type", "application/json")
-                .POST(HttpRequest.BodyPublishers.ofString(body));
-        if (request.apiKey() != null && !request.apiKey().isBlank()) {
-            builder.header("Authorization", "Bearer " + request.apiKey().trim());
-        }
-        HttpResponse<String> response = HttpClient.newHttpClient().send(builder.build(), HttpResponse.BodyHandlers.ofString());
-        if (response.statusCode() >= 200 && response.statusCode() < 300) {
-            return new TestLlmProviderResult(true, "连接成功");
-        }
-        return new TestLlmProviderResult(false, "HTTP " + response.statusCode());
-    }
-
-    private TestLlmProviderResult testAnthropicMessage(TestLlmProviderRequest request, String modelId) throws Exception {
-        String body = objectMapper.writeValueAsString(Map.of(
-                "model", modelId,
-                "max_tokens", 8,
-                "messages", List.of(Map.of("role", "user", "content", "ping"))));
-        URI uri = URI.create(LlmChatModelFactory.buildAnthropicMessagesUrl(request.baseUrl()));
-        HttpRequest.Builder builder = HttpRequest.newBuilder(uri)
-                .timeout(Duration.ofSeconds(30))
-                .header("Content-Type", "application/json")
-                .header("anthropic-version", "2023-06-01")
-                .POST(HttpRequest.BodyPublishers.ofString(body));
-        OpenAiCompatibleChatClient.applyAnthropicAuth(builder, request.apiKey());
-        HttpResponse<String> response = HttpClient.newHttpClient().send(builder.build(), HttpResponse.BodyHandlers.ofString());
-        if (response.statusCode() >= 200 && response.statusCode() < 300) {
-            return new TestLlmProviderResult(true, "连接成功");
-        }
-        return new TestLlmProviderResult(false, "HTTP " + response.statusCode());
     }
 
     private String encodeEnvVars(List<EnvVarState> envVars) {

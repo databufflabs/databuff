@@ -17,6 +17,34 @@ class LlmChatModelFactoryTest {
     }
 
     @Test
+    void probeUsesSameAgentScopeModelStackAsBuild() throws Exception {
+        com.sun.net.httpserver.HttpServer server =
+                com.sun.net.httpserver.HttpServer.create(new java.net.InetSocketAddress(0), 0);
+        byte[] body = """
+                {"id":"t","object":"chat.completion","choices":[{"index":0,"message":{"role":"assistant","content":"pong"},"finish_reason":"stop"}]}
+                """.getBytes(java.nio.charset.StandardCharsets.UTF_8);
+        server.createContext("/v1/chat/completions", exchange -> {
+            exchange.getResponseHeaders().add("Content-Type", "application/json");
+            exchange.sendResponseHeaders(200, body.length);
+            exchange.getResponseBody().write(body);
+            exchange.close();
+        });
+        server.start();
+        try {
+            int port = server.getAddress().getPort();
+            var provider = new OpenAiCompatibleChatClient.ResolvedLlmProvider(
+                    "openai",
+                    "http://127.0.0.1:" + port + "/v1",
+                    "gpt-test",
+                    "sk-test",
+                    LlmApiTypes.OPENAI_COMPLETIONS);
+            LlmChatModelFactory.probe(provider, "gpt-test");
+        } finally {
+            server.stop(0);
+        }
+    }
+
+    @Test
     void buildsAnthropicModelForAnthropicApiType() {
         var provider = new OpenAiCompatibleChatClient.ResolvedLlmProvider(
                 "minimax",
@@ -76,6 +104,28 @@ class LlmChatModelFactoryTest {
                 .isEqualTo("https://open.bigmodel.cn/api/paas/v4/chat/completions");
         assertThat(LlmChatModelFactory.buildOpenAiChatCompletionsUrl("https://api.deepseek.com"))
                 .isEqualTo("https://api.deepseek.com/v1/chat/completions");
+    }
+
+    @Test
+    void openAiFullEndpointAsBaseUrlDoublesPathLikeSdk() {
+        // Connectivity must not special-case a pasted /chat/completions Base URL;
+        // otherwise it passes while AgentScope still appends /v1/chat/completions.
+        assertThat(LlmChatModelFactory.buildOpenAiChatCompletionsUrl(
+                "https://open.bigmodel.cn/api/paas/v4/chat/completions"))
+                .isEqualTo("https://open.bigmodel.cn/api/paas/v4/chat/completions/v1/chat/completions");
+        assertThat(LlmChatModelFactory.buildOpenAiChatCompletionsUrl(
+                "https://api.openai.com/v1/chat/completions"))
+                .isEqualTo("https://api.openai.com/v1/chat/completions/v1/chat/completions");
+    }
+
+    @Test
+    void anthropicFullEndpointAsBaseUrlDoublesPathLikeSdk() {
+        assertThat(LlmChatModelFactory.buildAnthropicMessagesUrl(
+                "https://api.minimaxi.com/anthropic/v1/messages"))
+                .isEqualTo("https://api.minimaxi.com/anthropic/v1/messages/v1/messages");
+        assertThat(LlmChatModelFactory.normalizeAnthropicSdkBaseUrl(
+                "https://api.minimaxi.com/anthropic/v1/messages"))
+                .isEqualTo("https://api.minimaxi.com/anthropic/v1/messages");
     }
 
     @Test

@@ -12,6 +12,7 @@
 
 - Docker
 - Docker Compose
+- **推荐配置**：8C16G（8 核 CPU / 16GB 内存）
 
 ## 2. 安装平台
 

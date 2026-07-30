@@ -48,6 +48,7 @@ curl -fsSL https://databuff.ai/databuff/ai-apm-install.sh | bash
 
 - [Docker 运维](运维参考/Docker运维.md)
 - [Kubernetes 运维](运维参考/K8s运维.md)
+- [参数配置](运维参考/参数配置.md)
 - [性能优化与容量规划](运维参考/性能优化.md)
 - [升级与卸载](运维参考/升级与卸载.md)
 - [离线安装](运维参考/离线安装.md)

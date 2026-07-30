@@ -45,10 +45,12 @@ cd databuff-ai-apm-k8s-<version>
 
 示例：`http://<node-ip>:32703` 打开 Web UI；集群外 OTLP 上报 `http://<node-ip>:30418`（gRPC 用 `30417`）。集群内 Service `ai-apm-ingest`：`http://ai-apm-ingest:4318`。
 
-默认登录账号（与 Docker 安装一致）：
+默认登录账号（与 Docker 安装一致；未改密时）：
 
 - 用户名：`admin`
 - 密码：`Databuff@123`
+
+`start.sh` / `install.sh` 结束时会从 Web Pod 环境变量读取并打印**当前生效**账号。修改登录账号或 Ingest 任务参数见 [参数配置](参数配置.md)。
 
 ## 离线镜像
 
