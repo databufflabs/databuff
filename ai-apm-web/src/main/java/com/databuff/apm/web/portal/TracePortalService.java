@@ -148,27 +148,15 @@ public class TracePortalService {
                     sortOrder,
                     resource,
                     exception);
-            String countSql = MetricQueryBuilder.errorSpanListCountSql(
-                    traceDatabase,
-                    serviceKeys,
-                    virtualServiceFilter,
-                    from,
-                    to,
-                    PortalTimeParser.rangeFromText(body),
-                    PortalTimeParser.rangeToText(body),
-                    resource,
-                    exception);
             List<Map<String, Object>> spans = readRepository.querySpanSummaries(listSql).stream()
                     .map(this::toPortalSpan)
                     .toList();
             Map<String, Object> filterBody = new LinkedHashMap<>(body);
             filterBody.put("error", 1);
             List<Map<String, Object>> filtered = filterPortalSpans(spans, filterBody, true);
-            long total = readRepository.queryCallSpanCount(countSql);
 
             Map<String, Object> data = new LinkedHashMap<>();
             data.put("list", filtered);
-            data.put("total", total);
 
             Map<String, Object> response = new LinkedHashMap<>();
             response.put("status", 200);
@@ -270,15 +258,11 @@ public class TracePortalService {
                 extraFilter.accept(query);
             }
 
-            int offset = ServicePortalService.intValue(query.get("offset"), 0);
-            int size = ServicePortalService.intValue(query.get("size"), 50);
             List<Map<String, Object>> spans = loadResourcePortalSpans(query);
             List<Map<String, Object>> filtered = filterPortalSpans(spans, query);
 
-            long total = traceQueryService.spanListCount(buildResourceSpanListRequest(query, offset, size));
             Map<String, Object> data = new LinkedHashMap<>();
             data.put("list", filtered);
-            data.put("total", total);
 
             Map<String, Object> response = new LinkedHashMap<>();
             response.put("status", 200);
@@ -1262,9 +1246,10 @@ public class TracePortalService {
             return Set.of();
         }
         try {
-            long lookback = MetricQueryBuilder.SPAN_PARTITION_LOOKBACK_MS;
-            long logFrom = fromMillis > 0L ? Math.max(0L, fromMillis - lookback) : 0L;
-            long logTo = toMillis > fromMillis ? toMillis + lookback : 0L;
+            long logFrom = fromMillis > 0L
+                    ? Math.max(0L, fromMillis - MetricQueryBuilder.SPAN_PARTITION_LOOKBACK_MS)
+                    : 0L;
+            long logTo = toMillis > fromMillis ? toMillis : 0L;
             String sql = LogQueryBuilder.spanIdsWithLogsSql(traceDatabase, traceId, logFrom, logTo);
             List<Map<String, Object>> rows = readRepository.queryRows(sql, 10_000);
             Set<String> spanIds = new HashSet<>();

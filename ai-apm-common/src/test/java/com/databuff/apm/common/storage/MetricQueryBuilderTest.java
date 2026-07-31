@@ -137,7 +137,7 @@ class MetricQueryBuilderTest {
         // Long-lived streaming RPC (e.g. flagd EventStream) starts outside the clicked
         // metric bucket but ends inside it; metric_service_rpc.ts is the span end-minute
         // bucket, so the drill-down must filter by end minute (not replace with startTime).
-        // A loose startTime lookback is AND-ed only for Doris partition pruning.
+        // startTime prune is [from - 30m, to) for Doris DAY partition pruning.
         long from = ApmTimeZones.wallClockToEpochMilli("2026-07-17 21:12:00");
         long to = ApmTimeZones.wallClockToEpochMilli("2026-07-17 21:13:00");
         String sql = MetricQueryBuilder.callSpanListSql(
@@ -199,7 +199,7 @@ class MetricQueryBuilderTest {
                 1_000_000_000L,
                 1);
         assertThat(sql).contains("COALESCE(`meta.http.url`, '') = '/demo/checkout'");
-        assertThat(sql).contains("COALESCE(`meta.http.url`, '') LIKE '%/demo/checkout'");
+        assertThat(sql).doesNotContain("LIKE '%/demo/checkout'");
         assertThat(sql).contains("`duration` >= 1000000000");
         assertThat(sql).contains("`error` = 1");
 
@@ -216,7 +216,7 @@ class MetricQueryBuilderTest {
                 1_000_000_000L,
                 1);
         assertThat(countSql).contains("COALESCE(`meta.http.url`, '') = '/demo/checkout'");
-        assertThat(countSql).contains("COALESCE(`meta.http.url`, '') LIKE '%/demo/checkout'");
+        assertThat(countSql).doesNotContain("LIKE '%/demo/checkout'");
         assertThat(countSql).contains("`duration` >= 1000000000");
         assertThat(countSql).contains("`error` = 1");
     }
@@ -343,9 +343,8 @@ class MetricQueryBuilderTest {
                 "databuff", "abc123", from, to, "2026-06-05 22:10:00", "2026-06-05 22:20:00");
         assertThat(sql).contains("trace_id` = 'abc123'");
         long pruneFrom = from - MetricQueryBuilder.SPAN_PARTITION_LOOKBACK_MS;
-        long pruneTo = to + MetricQueryBuilder.SPAN_PARTITION_LOOKBACK_MS;
         assertThat(sql).contains("`startTime` >= '" + ApmTimeZones.formatWallClock(pruneFrom) + "'");
-        assertThat(sql).contains("`startTime` < '" + ApmTimeZones.formatWallClock(pruneTo) + "'");
+        assertThat(sql).contains("`startTime` < '" + ApmTimeZones.formatWallClock(to) + "'");
     }
 
     @Test
@@ -1232,7 +1231,8 @@ class MetricQueryBuilderTest {
         assertThat(sql).contains("trace_dc_span");
         assertThat(sql).contains("`dstServiceId` = '" + dstServiceId + "'");
         assertThat(sql).doesNotContain(" OR `dstService` = ");
-        assertThat(sql).contains("LIKE '%/orders%'");
+        assertThat(sql).contains("COALESCE(`meta.http.url`, '') = '/orders'");
+        assertThat(sql).doesNotContain("LIKE '%/orders%'");
         assertThat(sql).contains("`meta.http.method`");
         assertThat(sql).contains("isOut` = 1");
         assertThat(sql).contains("LIMIT 20");
@@ -1246,7 +1246,8 @@ class MetricQueryBuilderTest {
                 "5457a0119281bb98", null,
                 "/api/orders/10001", "GET", null, false, "service.http",
                 "start", "desc", 50, 0);
-        assertThat(sql).contains("LIKE '%/api/orders/10001%'");
+        assertThat(sql).contains("COALESCE(`meta.http.url`, '') = '/api/orders/10001'");
+        assertThat(sql).doesNotContain("LIKE '%/api/orders/10001%'");
         assertThat(sql).contains("`meta.http.url`");
         assertThat(sql).contains("= 'GET'");
         assertThat(sql).contains("`meta.http.method`");
@@ -1266,6 +1267,8 @@ class MetricQueryBuilderTest {
         assertThat(sql).contains("`srcServiceId` = '9bf61532d56eb7b5'");
         assertThat(sql).doesNotContain("`serviceId` = 'dad537de7e10e098'");
         assertThat(sql).contains("db.statement");
+        assertThat(sql).contains("INSERT INTO demo_order_audit(order_id, channel) VALUES (?, ?)");
+        assertThat(sql).doesNotContain("LIKE '%INSERT INTO demo_order_audit");
         assertThat(sql).contains("isOut` = 1");
     }
 
@@ -1290,7 +1293,8 @@ class MetricQueryBuilderTest {
                 "start", "desc", 50, 0);
         assertThat(sql).contains("get_json_string(`meta`, '$.\"root.resource\"')");
         assertThat(sql).contains("LIKE '%/methodA4%'");
-        assertThat(sql).contains("LIKE '%/methodB7%'");
+        assertThat(sql).contains("COALESCE(`meta.http.url`, '') = '/methodB7'");
+        assertThat(sql).doesNotContain("LIKE '%/methodB7%'");
     }
 
     @Test

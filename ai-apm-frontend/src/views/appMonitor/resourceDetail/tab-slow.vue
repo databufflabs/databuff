@@ -22,6 +22,7 @@
           :queryApi='queryApi'
           :queryParams='tableQueryParams'
           :offsetMode='true'
+          :showTotal='false'
           :showSetting='true'
           :columnConfig='getColumns'
           @on-table-inited='tableInitedHandle'

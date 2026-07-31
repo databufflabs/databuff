@@ -13,11 +13,15 @@ public final class MetricQueryBuilder {
             "SUM(`sumDuration`) / NULLIF(SUM(`cnt`), 0) / 1000000";
 
     /**
-     * Loose lower bound for {@code startTime} partition pruning on span queries that filter by end
-     * minute (or trace-id with a portal window). Keeps long-lived spans (e.g. streaming RPC) while
-     * still dropping most DAY partitions outside the lookback.
+     * How far before the end-minute window {@code startTime} may still fall for short-lived spans
+     * that end inside the window. Used only for {@code PARTITION BY RANGE(startTime)} pruning —
+     * keeps DAY prune tight while covering typical request durations.
      */
-    public static final long SPAN_PARTITION_LOOKBACK_MS = 7L * 24 * 60 * 60 * 1000;
+    public static final long SPAN_PARTITION_LOOKBACK_MS = 30L * 60 * 1000;
+
+    /** Aligns with {@link com.databuff.apm.common.metric.TraceMetricMinuteBucket} / {@code metric_service_trace}. */
+    private static final String SPAN_END_MINUTE_BUCKET_MS_EXPR =
+            "(FLOOR(`end` / 1000000 / 60000) * 60000)";
 
     private MetricQueryBuilder() {
     }
@@ -37,10 +41,6 @@ public final class MetricQueryBuilder {
         }
         return toMillis;
     }
-
-    /** Aligns with {@link com.databuff.apm.common.metric.TraceMetricMinuteBucket} / {@code metric_service_trace}. */
-    private static final String SPAN_END_MINUTE_BUCKET_MS_EXPR =
-            "(FLOOR(`end` / 1000000 / 60000) * 60000)";
 
     /**
      * Exclusive upper wall-clock millis so second-truncated DATETIME predicates never drop rows that
@@ -78,7 +78,8 @@ public final class MetricQueryBuilder {
      * Bucketing by {@code startTime} drifts off the metric chart for long-lived spans
      * (e.g. streaming RPC {@code EventStream}).
      *
-     * <p>Also adds a loose {@code startTime} range so Doris can prune {@code PARTITION BY RANGE(startTime)}.
+     * <p>Also adds a {@code startTime} range of {@code [from - 30m, to)} so Doris can prune
+     * {@code PARTITION BY RANGE(startTime)} without scanning many DAY partitions.
      */
     private static String spanEndBucketTimeWhere(
             long fromMillis,
@@ -406,19 +407,14 @@ public final class MetricQueryBuilder {
 
     /**
      * HTTP interface span list filter on path-only {@code url} (no host).
-     * Matches normalized {@code meta.http.url}; suffix match covers legacy absolute URLs.
+     * Exact match on normalized {@code meta.http.url} only (ingest stores path-only URLs).
      */
     static String appendSpanListResourceFilter(String urlPath) {
         if (urlPath == null || urlPath.isBlank()) {
             return "";
         }
-        String trimmed = urlPath.trim();
-        String escaped = escapeLiteral(trimmed);
-        if (trimmed.contains("://")) {
-            return " AND COALESCE(`meta.http.url`, '') = '" + escaped + "' ";
-        }
-        return " AND (COALESCE(`meta.http.url`, '') = '" + escaped + "'"
-                + " OR COALESCE(`meta.http.url`, '') LIKE '%" + escaped + "') ";
+        String escaped = escapeLiteral(urlPath.trim());
+        return " AND COALESCE(`meta.http.url`, '') = '" + escaped + "' ";
     }
 
     private static String appendTraceSpanListScopeFilters(Integer isParent, String parentId) {
@@ -648,8 +644,8 @@ public final class MetricQueryBuilder {
     }
 
     /**
-     * Trace detail by id. When a portal time window is present, adds a loose {@code startTime}
-     * predicate for DAY partition pruning (lookback {@link #SPAN_PARTITION_LOOKBACK_MS}).
+     * Trace detail by id. When a portal time window is present, adds a {@code startTime}
+     * predicate of {@code [from - 30m, to)} for DAY partition pruning.
      */
     public static String traceDetailSql(
             String database,
@@ -664,8 +660,7 @@ public final class MetricQueryBuilder {
         long to = resolveSpanTimeToMillis(toMillis, toTimeText);
         if (from > 0L && to > from) {
             long pruneFrom = Math.max(0L, from - SPAN_PARTITION_LOOKBACK_MS);
-            long pruneTo = to + SPAN_PARTITION_LOOKBACK_MS;
-            timePrune = " AND " + partitionWallClockRange("startTime", pruneFrom, pruneTo);
+            timePrune = " AND " + partitionWallClockRange("startTime", pruneFrom, to);
         }
         return """
                 SELECT `trace_id`, `span_id`, `parent_id`, `service`,
@@ -2602,13 +2597,10 @@ public final class MetricQueryBuilder {
         }
         if (DorisTableNames.METRIC_SERVICE_DB.equals(tableName)) {
             filters.append(" AND (`sqlContent` = '").append(escaped).append("'")
-                    .append(" OR `sqlContent` LIKE '%").append(escaped).append("%'")
-                    .append(" OR `resource` = '").append(escaped).append("'")
-                    .append(" OR `resource` LIKE '%").append(escaped).append("%') ");
+                    .append(" OR `resource` = '").append(escaped).append("') ");
             return;
         }
-        filters.append(" AND (`resource` = '").append(escaped).append("'")
-                .append(" OR `resource` LIKE '%").append(escaped).append("%') ");
+        filters.append(" AND `resource` = '").append(escaped).append("' ");
     }
 
     private static void appendRootResourceFilter(
@@ -4280,9 +4272,7 @@ public final class MetricQueryBuilder {
             String escaped = escapeLiteral(resourceMatch);
             String dbStatement = metaJsonString("db.statement");
             filters.append(" AND (COALESCE(NULLIF(`resource`, ''), `name`) = '").append(escaped).append("'")
-                    .append(" OR ").append(dbStatement).append(" = '").append(escaped).append("'")
-                    .append(" OR ").append(dbStatement).append(" LIKE '%").append(escaped).append("%'")
-                    .append(" OR COALESCE(NULLIF(`resource`, ''), `name`) LIKE '%").append(escaped).append("%') ");
+                    .append(" OR ").append(dbStatement).append(" = '").append(escaped).append("') ");
             return;
         }
         if (componentType == null || componentType.isBlank() || "service.http".equals(componentType)) {
@@ -4291,17 +4281,8 @@ public final class MetricQueryBuilder {
                 return;
             }
             String escapedPath = escapeLiteral(path);
-            String urlFull = metaJsonString("url.full");
-            String httpUrl = metaJsonString("http.url");
             String httpMethodMeta = metaJsonString("http.method");
-            filters.append(" AND (COALESCE(NULLIF(`resource`, ''), `name`) LIKE '%")
-                    .append(escapedPath).append("%'")
-                    .append(" OR COALESCE(NULLIF(`meta.http.url`, ''), '') LIKE '%")
-                    .append(escapedPath).append("%'")
-                    .append(" OR ").append(urlFull).append(" LIKE '%")
-                    .append(escapedPath).append("%'")
-                    .append(" OR ").append(httpUrl).append(" LIKE '%")
-                    .append(escapedPath).append("%') ");
+            filters.append(" AND COALESCE(`meta.http.url`, '') = '").append(escapedPath).append("' ");
             if (httpMethod != null && !httpMethod.isBlank()) {
                 String escapedMethod = escapeLiteral(httpMethod.trim());
                 filters.append(" AND COALESCE(NULLIF(`meta.http.method`, ''), ")

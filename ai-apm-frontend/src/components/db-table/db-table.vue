@@ -1,9 +1,10 @@
 <template>
   <div class="scroll-el-table">
-    <div v-if='showTotal' class="scroll-el-table-header flex-h-jc">
-      <slot name="total" v-bind="{ total: tableTotal }">
+    <div v-if='showTotal || showSetting' class="scroll-el-table-header flex-h-jc">
+      <slot v-if="showTotal" name="total" v-bind="{ total: tableTotal }">
         <div class="describe">{{ $t('modules.components.db-table.s_fc4d75f6') }} {{ new Intl.NumberFormat().format(tableTotal) }} {{ $t('modules.components.db-table.s_f932eff5') }}</div>
       </slot>
+      <div v-else class="flex-1"></div>
       <!-- 设置表头展示列 -->
       <el-popover
         v-if="showSetting"
@@ -502,6 +503,8 @@ export default {
       tableColumns: [],
       tableSource: [],
       tableTotal: 0,
+      hasExactTotal: false,
+      lastFetchCount: 0,
       queryInited: false,
       queryLoading: false,
       tableSortableKey: 0,
@@ -514,6 +517,10 @@ export default {
       return this.scrollMode ? this.calcScrollHeight : this.height
     },
     noMore () {
+      if (!this.hasExactTotal) {
+        const pageSize = this.offsetMode ? this.offsetBaseQuery.size : this.baseQuery.pageSize
+        return this.lastFetchCount < pageSize
+      }
       return this.tableSource && this.tableTotal && this.tableSource.length >= this.tableTotal
     },
     tableLocalKey () {
@@ -715,6 +722,8 @@ export default {
       this.queryLoading = false
       this.tableSource = []
       this.tableTotal = 0
+      this.hasExactTotal = false
+      this.lastFetchCount = 0
       this.offsetBaseQuery.offset = 0
       this.offsetBaseQuery.size = 50
       this.baseQuery.pageNum = 1
@@ -829,13 +838,23 @@ export default {
         if (!error) {
           const { data, total } = result || {}
           let resultData = data || [];
-          let resultTotal = total || 0;
+          let resultTotal = 0;
+          let hasExactTotal = false;
           if (!Array.isArray(data) && Object.prototype.hasOwnProperty.call(data || {}, 'list')) {
             resultData = data.list || [];
-            resultTotal = data.total || 0;
+            if (Object.prototype.hasOwnProperty.call(data, 'total')) {
+              resultTotal = data.total || 0;
+              hasExactTotal = true;
+            }
           } else if (!Array.isArray(data) && Object.prototype.hasOwnProperty.call(data || {}, 'data')) {
             resultData = data.data || [];
-            resultTotal = data.total || 0;
+            if (Object.prototype.hasOwnProperty.call(data, 'total')) {
+              resultTotal = data.total || 0;
+              hasExactTotal = true;
+            }
+          } else if (typeof total === 'number') {
+            resultTotal = total;
+            hasExactTotal = true;
           }
           if (this.formatFunc && typeof this.formatFunc === 'function') {
             resultData = await this.formatFunc(resultData) || resultData
@@ -843,7 +862,11 @@ export default {
           const tableSource = reset ? resultData : this.tableSource.concat(resultData)
           this.formatThisData(tableSource)
           this.tableSource = tableSource
-          this.tableTotal = resultTotal || this.tableSource.length || 0
+          this.lastFetchCount = Array.isArray(resultData) ? resultData.length : 0
+          this.hasExactTotal = hasExactTotal
+          this.tableTotal = hasExactTotal
+            ? (resultTotal || this.tableSource.length || 0)
+            : (this.tableSource.length || 0)
           if (this.offsetMode) {
             this.offsetBaseQuery.offset = this.offsetBaseQuery.size + this.offsetBaseQuery.offset
           } else {
@@ -897,7 +920,7 @@ export default {
         // 默认展示 defaultShow 设置
         c.defaultShow = !!c.disabled || (typeof c.defaultShow === 'boolean' ? c.defaultShow : true)
       });
-      if (this.showTotal && this.showSetting) {
+      if (this.showSetting) {
         // 至少有一列禁止操作，防止列表全部隐藏
         if (!this.columnConfig.find(c => c.disabled)) {
           const column = this.columnConfig.find(c => c.defaultShow)

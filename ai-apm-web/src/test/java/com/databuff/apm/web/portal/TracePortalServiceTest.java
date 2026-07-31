@@ -168,7 +168,6 @@ class TracePortalServiceTest {
     @Test
     void resourceSpanListUsesAllSpansScopeAndResourceFilter() {
         TraceQueryService traceQuery = mock(TraceQueryService.class);
-        when(traceQuery.spanListCount(any())).thenReturn(1L);
         when(traceQuery.spanList(any())).thenReturn(List.of(
                 new SpanSummary(
                         "t1", "s1", "demo-order", null, "GET /demo/checkout",
@@ -194,11 +193,13 @@ class TracePortalServiceTest {
         org.mockito.ArgumentCaptor<TraceQueryService.SpanListRequest> captor =
                 org.mockito.ArgumentCaptor.forClass(TraceQueryService.SpanListRequest.class);
         org.mockito.Mockito.verify(traceQuery).spanList(captor.capture());
+        org.mockito.Mockito.verify(traceQuery, never()).spanListCount(any());
         assertThat(captor.getValue().isParent()).isNull();
         assertThat(captor.getValue().resource()).isEqualTo("/demo/checkout");
 
         @SuppressWarnings("unchecked")
         Map<String, Object> data = (Map<String, Object>) resp.get("data");
+        assertThat(data).doesNotContainKey("total");
         @SuppressWarnings("unchecked")
         List<Map<String, Object>> list = (List<Map<String, Object>>) data.get("list");
         assertThat(list).hasSize(1);
@@ -211,7 +212,6 @@ class TracePortalServiceTest {
     @Test
     void resourceSpanListMatchesAbsoluteHttpUrlAgainstPortalUrl() {
         TraceQueryService traceQuery = mock(TraceQueryService.class);
-        when(traceQuery.spanListCount(any())).thenReturn(1L);
         when(traceQuery.spanList(any())).thenReturn(List.of(
                 new SpanSummary(
                         "t1", "s1", "frontend", "046b2a50b8c3c54c",
@@ -240,8 +240,10 @@ class TracePortalServiceTest {
                 "offset", 0,
                 "size", 20));
 
+        org.mockito.Mockito.verify(traceQuery, never()).spanListCount(any());
         @SuppressWarnings("unchecked")
         Map<String, Object> data = (Map<String, Object>) resp.get("data");
+        assertThat(data).doesNotContainKey("total");
         @SuppressWarnings("unchecked")
         List<Map<String, Object>> list = (List<Map<String, Object>>) data.get("list");
         assertThat(list).hasSize(1);
@@ -254,7 +256,6 @@ class TracePortalServiceTest {
     @Test
     void errorResourceSpanListFiltersErrors() throws Exception {
         ApmReadRepository reader = mock(ApmReadRepository.class);
-        when(reader.queryCallSpanCount(anyString())).thenReturn(1L);
         when(reader.querySpanSummaries(anyString())).thenReturn(List.of(
                 new SpanSummary(
                         "t1", "s1", "demo-order", null, "/demo/checkout",
@@ -274,8 +275,10 @@ class TracePortalServiceTest {
                 "offset", 0,
                 "size", 20));
 
+        verify(reader, never()).queryCallSpanCount(anyString());
         @SuppressWarnings("unchecked")
         Map<String, Object> data = (Map<String, Object>) resp.get("data");
+        assertThat(data).doesNotContainKey("total");
         @SuppressWarnings("unchecked")
         List<Map<String, Object>> list = (List<Map<String, Object>>) data.get("list");
         assertThat(list).hasSize(1);
@@ -761,7 +764,8 @@ class TracePortalServiceTest {
         });
         when(reader.queryCallSpanCount(anyString())).thenAnswer(invocation -> {
             String sql = invocation.getArgument(0);
-            assertThat(sql).contains("LIKE '%/api/orders/10001%'");
+            assertThat(sql).contains("COALESCE(`meta.http.url`, '') = '/api/orders/10001'");
+            assertThat(sql).doesNotContain("LIKE '%/api/orders/10001%'");
             assertThat(sql).contains("= 'GET'");
             assertThat(sql).contains("`meta.http.method`");
             assertThat(sql).containsAnyOf("9bf61532d56eb7b5", "service-a");
