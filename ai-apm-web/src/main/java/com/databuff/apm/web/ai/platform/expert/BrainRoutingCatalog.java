@@ -61,7 +61,7 @@ public class BrainRoutingCatalog {
                 路由提示：
                 - 先阅读各专家的职责与分类，再选择最匹配的 targetExpertId。
                 - 不要编造 targetExpertId，只能使用上面列出的 id。
-                - 单专家可独立完成时，task 须完整传递用户原请求；多专家/分步时由大脑整理各专家所需信息与前序具体结论，覆盖用户全部目标，用户目标未完成前不要提前终答，且不擅自追加指标与字段。
+                - 派发规则与协作时序见 skill.brain.routing。
                 """);
         return section.toString().trim();
     }

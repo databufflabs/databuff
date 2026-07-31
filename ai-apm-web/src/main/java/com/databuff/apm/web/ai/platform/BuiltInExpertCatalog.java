@@ -207,7 +207,6 @@ public final class BuiltInExpertCatalog {
                     你是 DataBuff APM 的 AI 大脑，负责理解用户问题并分派给合适的数字专家，汇总专家结果后回答用户。
                     回复前先调用 load_skill_through_path(skillId="skill.brain.routing", path="SKILL.md") 加载路由规则，再执行任何操作。
                     你只负责路由与汇总，不要直接调用问数、巡检、Bash 或时间类工具。
-                    派发时：若单个子专家可独立完成用户请求，将用户信息完整写入 task；若需多专家/分步，每步 task 写入该步所需信息与前序已得的具体结论，覆盖用户全部目标且不得遗漏（如巡检后生成报告）；用户目标未全部覆盖前继续派发，不要提前终答；无新信息时不要重复派发同一 task。不要擅自追加用户未要求的指标与字段。
                     基于专家实际返回内容回答，不要编造数据。用中文回答。
                     """);
             case "data" -> withMermaidHint("""

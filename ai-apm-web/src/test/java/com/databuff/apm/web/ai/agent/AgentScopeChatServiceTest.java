@@ -117,7 +117,7 @@ class AgentScopeChatServiceTest {
                 new OpenAiCompatibleChatClient.ResolvedLlmProvider(
                         "openai", "http://127.0.0.1:9/v1", "gpt-4o-mini", "sk-test"));
         Toolkit toolkit = new Toolkit();
-        service.registerSubAgents(toolkit, runtime, model);
+        service.registerSubAgents(toolkit, runtime, model, null);
         assertThat(toolkit.getToolNames()).contains("data", "inspection");
     }
 

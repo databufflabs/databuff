@@ -15,10 +15,30 @@ import java.util.regex.Pattern;
 
 public final class LlmChatModelFactory {
 
+    /**
+     * Default max output tokens when model config leaves {@code maxOutputTokens} empty.
+     * Overrides AgentScope AnthropicChatModel's built-in 4096 default.
+     */
+    public static final int DEFAULT_MAX_OUTPUT_TOKENS = 200_000;
+
     private static final Pattern VERSION_IN_PATH = Pattern.compile(".*/v\\d+$");
     private static final Duration PROBE_TIMEOUT = Duration.ofSeconds(30);
 
     private LlmChatModelFactory() {
+    }
+
+    /** Prefer configured value when positive; otherwise {@link #DEFAULT_MAX_OUTPUT_TOKENS}. */
+    public static int resolveMaxOutputTokens(Integer configured) {
+        if (configured != null && configured > 0) {
+            return configured;
+        }
+        return DEFAULT_MAX_OUTPUT_TOKENS;
+    }
+
+    public static GenerateOptions generateOptions(Integer configuredMaxOutputTokens) {
+        return GenerateOptions.builder()
+                .maxTokens(resolveMaxOutputTokens(configuredMaxOutputTokens))
+                .build();
     }
 
     public static Model build(

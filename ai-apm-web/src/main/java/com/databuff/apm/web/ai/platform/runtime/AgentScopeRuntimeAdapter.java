@@ -169,10 +169,16 @@ public class AgentScopeRuntimeAdapter {
         toolkit.registerTool(sessionWorkspaceTools);
 
         EmbedSkillsResult embeddedSkills = embedExpertSkills(resolveSystemPrompt(expert), skillIds);
+        int maxOutputTokens = llmProviderStore.resolveMaxOutputTokens(
+                provider.providerCode(),
+                expert.modelName() != null && !expert.modelName().isBlank()
+                        ? expert.modelName()
+                        : provider.defaultModel());
         ReActAgent.Builder builder = ReActAgent.builder()
                 .name(expert.expertId())
                 .sysPrompt(embeddedSkills.prompt())
                 .model(model)
+                .generateOptions(LlmChatModelFactory.generateOptions(maxOutputTokens))
                 .toolkit(toolkit)
                 .maxIters(agentRuntimeConfig.resolvedMaxIters())
                 .modelExecutionConfig(agentRuntimeConfig.llmModelExecutionConfig())

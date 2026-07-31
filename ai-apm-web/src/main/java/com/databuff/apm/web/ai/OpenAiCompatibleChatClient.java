@@ -39,6 +39,7 @@ public class OpenAiCompatibleChatClient {
         try {
             String body = objectMapper.writeValueAsString(Map.of(
                     "model", provider.defaultModel(),
+                    "max_tokens", LlmChatModelFactory.resolveMaxOutputTokens(provider.maxOutputTokens()),
                     "messages", new Object[] {
                             Map.of("role", "user", "content", userMessage)
                     }));
@@ -69,7 +70,7 @@ public class OpenAiCompatibleChatClient {
         try {
             String body = objectMapper.writeValueAsString(Map.of(
                     "model", provider.defaultModel(),
-                    "max_tokens", 4096,
+                    "max_tokens", LlmChatModelFactory.resolveMaxOutputTokens(provider.maxOutputTokens()),
                     "messages", new Object[] {
                             Map.of("role", "user", "content", userMessage)
                     }));
@@ -109,10 +110,16 @@ public class OpenAiCompatibleChatClient {
             String baseUrl,
             String defaultModel,
             String apiKey,
-            String apiType) {
+            String apiType,
+            Integer maxOutputTokens) {
 
         public ResolvedLlmProvider(String providerCode, String baseUrl, String defaultModel, String apiKey) {
-            this(providerCode, baseUrl, defaultModel, apiKey, "openai-completions");
+            this(providerCode, baseUrl, defaultModel, apiKey, "openai-completions", null);
+        }
+
+        public ResolvedLlmProvider(
+                String providerCode, String baseUrl, String defaultModel, String apiKey, String apiType) {
+            this(providerCode, baseUrl, defaultModel, apiKey, apiType, null);
         }
     }
 

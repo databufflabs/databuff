@@ -126,7 +126,13 @@ public class InMemoryLlmProviderStore {
                 DEFAULT_API_TYPE,
                 enabled);
         providers.put(code, state);
-        modelsByProvider.put(code, List.of(new ModelState(defaultModel, defaultModel, null, null, List.of(), true)));
+        modelsByProvider.put(code, List.of(new ModelState(
+                defaultModel,
+                defaultModel,
+                null,
+                LlmChatModelFactory.DEFAULT_MAX_OUTPUT_TOKENS,
+                List.of(),
+                true)));
         if (request.apiKey() != null && !request.apiKey().isBlank()) {
             apiKeys.put(code, request.apiKey().trim());
         }
@@ -151,7 +157,13 @@ public class InMemoryLlmProviderStore {
             state.defaultModel = request.defaultModel().trim();
             List<ModelState> models = modelsByProvider.computeIfAbsent(providerCode, key -> new ArrayList<>());
             if (models.isEmpty()) {
-                models.add(new ModelState(state.defaultModel, state.defaultModel, null, null, List.of(), true));
+                models.add(new ModelState(
+                        state.defaultModel,
+                        state.defaultModel,
+                        null,
+                        LlmChatModelFactory.DEFAULT_MAX_OUTPUT_TOKENS,
+                        List.of(),
+                        true));
             } else {
                 for (ModelState model : models) {
                     model.isDefault = state.defaultModel.equals(model.modelId);
@@ -186,7 +198,38 @@ public class InMemoryLlmProviderStore {
                 state.baseUrl,
                 resolveDefaultModelId(providerCode, state),
                 apiKeys.get(state.code),
-                state.apiType));
+                state.apiType,
+                configuredMaxOutputTokens(providerCode, null)));
+    }
+
+    /**
+     * Max output tokens for a provider model. Empty/blank config falls back to
+     * {@link LlmChatModelFactory#DEFAULT_MAX_OUTPUT_TOKENS} (200K).
+     * DataBuff does not clamp to vendor limits — oversized values may fail at the LLM API.
+     */
+    public int resolveMaxOutputTokens(String providerCode, String modelId) {
+        return LlmChatModelFactory.resolveMaxOutputTokens(configuredMaxOutputTokens(providerCode, modelId));
+    }
+
+    private Integer configuredMaxOutputTokens(String providerCode, String modelId) {
+        if (providerCode == null || providerCode.isBlank()) {
+            return null;
+        }
+        List<ModelState> models = modelsByProvider.getOrDefault(providerCode, List.of());
+        String resolvedId = modelId;
+        if (resolvedId == null || resolvedId.isBlank()) {
+            ProviderState state = providers.get(providerCode);
+            resolvedId = state == null ? null : resolveDefaultModelId(providerCode, state);
+        }
+        if (resolvedId == null || resolvedId.isBlank()) {
+            return null;
+        }
+        for (ModelState model : models) {
+            if (resolvedId.equals(model.modelId)) {
+                return model.maxOutputTokens;
+            }
+        }
+        return null;
     }
 
     public long providerVersion(String providerCode) {
@@ -223,7 +266,8 @@ public class InMemoryLlmProviderStore {
                             resolved.baseUrl().trim(),
                             modelId,
                             resolved.apiKey(),
-                            LlmApiTypes.normalize(resolved.apiType())),
+                            LlmApiTypes.normalize(resolved.apiType()),
+                            configuredMaxOutputTokens(resolved.providerCode(), modelId)),
                     modelId);
             return new TestLlmProviderResult(true, "连接成功");
         } catch (Exception e) {
@@ -296,7 +340,8 @@ public class InMemoryLlmProviderStore {
                         state.baseUrl,
                         resolveDefaultModelId(state.code, state),
                         apiKeys.get(state.code),
-                        state.apiType));
+                        state.apiType,
+                        configuredMaxOutputTokens(state.code, null)));
     }
 
     public void applyPersistedRows(
@@ -442,7 +487,7 @@ public class InMemoryLlmProviderStore {
                 state.defaultModel,
                 state.defaultModel,
                 null,
-                null,
+                LlmChatModelFactory.DEFAULT_MAX_OUTPUT_TOKENS,
                 List.of(),
                 true)));
     }

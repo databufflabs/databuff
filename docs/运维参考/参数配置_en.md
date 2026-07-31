@@ -6,7 +6,7 @@
 
 # Parameter Configuration
 
-How to change the login account after install, and how to tune Ingest pipeline task settings. For directories and lifecycle, see [Docker Operations](Docker运维_en.md) and [Kubernetes Operations](K8s运维_en.md). For capacity planning and additional knobs, see [Performance Tuning](性能优化_en.md).
+How to change the login account after install, tune Ingest pipeline task settings, and adjust telemetry retention. For directories and lifecycle, see [Docker Operations](Docker运维_en.md) and [Kubernetes Operations](K8s运维_en.md). For capacity planning and additional knobs, see [Performance Tuning](性能优化_en.md).
 
 ## 1. Change login username and password
 
@@ -136,6 +136,18 @@ kubectl -n databuff exec deploy/ai-apm-ingest -- printenv | grep '^INGEST_'
 - Change one or two knobs at a time so you can roll back easily.
 - Fix drops first (larger buffers / tasks), then tune against CPU and Doris Stream Load pressure.
 - Higher `*_TASKS` uses more CPU and memory—see the baselines in [Performance Tuning](性能优化_en.md).
+
+## 3. Adjust storage retention
+
+To keep data for 14 days, connect to Doris and run the following SQL (no FE / BE restart required):
+
+```sql
+USE databuff;
+ALTER TABLE trace_dc_span SET ("dynamic_partition.start" = "-14");
+ALTER TABLE log_dc_record SET ("dynamic_partition.start" = "-14");
+ALTER TABLE metric_service SET ("dynamic_partition.start" = "-14");
+-- Repeat for other metric_* tables as needed
+```
 
 ## Related docs
 

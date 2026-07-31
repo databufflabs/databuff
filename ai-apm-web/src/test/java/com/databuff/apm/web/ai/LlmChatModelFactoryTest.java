@@ -9,6 +9,16 @@ import static org.assertj.core.api.Assertions.assertThat;
 class LlmChatModelFactoryTest {
 
     @Test
+    void resolveMaxOutputTokensDefaultsTo200k() {
+        assertThat(LlmChatModelFactory.DEFAULT_MAX_OUTPUT_TOKENS).isEqualTo(200_000);
+        assertThat(LlmChatModelFactory.resolveMaxOutputTokens(null)).isEqualTo(200_000);
+        assertThat(LlmChatModelFactory.resolveMaxOutputTokens(0)).isEqualTo(200_000);
+        assertThat(LlmChatModelFactory.resolveMaxOutputTokens(-1)).isEqualTo(200_000);
+        assertThat(LlmChatModelFactory.resolveMaxOutputTokens(65536)).isEqualTo(65536);
+        assertThat(LlmChatModelFactory.generateOptions(null).getMaxTokens()).isEqualTo(200_000);
+    }
+
+    @Test
     void buildsOpenAiModelByDefault() {
         var provider = new OpenAiCompatibleChatClient.ResolvedLlmProvider(
                 "openai", "https://api.openai.com/v1", "gpt-4o-mini", "sk-test", LlmApiTypes.OPENAI_COMPLETIONS);

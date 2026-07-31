@@ -322,7 +322,9 @@ class BrainExpertInteractionContractIntegrationTest {
         String prompt = BuiltInExpertCatalog.brainPromptBase();
         assertThat(prompt)
                 .contains("路由与汇总")
-                .contains("不要擅自追加")
+                .contains("skill.brain.routing")
+                .contains("不要编造数据")
+                .doesNotContain("派发时：")
                 .doesNotContain("串行派发")
                 .doesNotContain("pending");
         assertNoBanned(prompt, PROTOCOL_COACHING_BANNED);
@@ -337,7 +339,8 @@ class BrainExpertInteractionContractIntegrationTest {
                 .contains("`inspection`")
                 .contains("`ops`")
                 .contains("`qa`")
-                .contains("完整传递用户原请求")
+                .contains("skill.brain.routing")
+                .doesNotContain("完整传递用户原请求")
                 .doesNotContain("串行")
                 .doesNotContain("pending");
         assertNoBanned(section, PROTOCOL_COACHING_BANNED);
@@ -350,6 +353,7 @@ class BrainExpertInteractionContractIntegrationTest {
         assertThat(body)
                 .contains("派发任务（task）写法")
                 .contains("汇总与回答")
+                .contains("协作时序")
                 .contains("不要编造数据")
                 .doesNotContain("派发后行为")
                 .doesNotContain("串行派发")

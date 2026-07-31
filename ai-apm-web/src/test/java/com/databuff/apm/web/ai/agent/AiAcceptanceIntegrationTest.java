@@ -132,9 +132,9 @@ class AiAcceptanceIntegrationTest {
             ExpertMessageContractTest.assertNoBanned(text, ExpertMessageContractTest.PROTOCOL_COACHING_BANNED);
             assertThat(text).doesNotContain("pending=0").doesNotContain("系统注入");
         }
-        assertThat(brainPrompt).contains("路由与汇总").contains("不要编造数据");
-        assertThat(routingSection).contains("`data`").contains("完整传递用户原请求");
-        assertThat(skillBody).contains("汇总与回答").doesNotContain("派发后行为");
+        assertThat(brainPrompt).contains("路由与汇总").contains("不要编造数据").contains("skill.brain.routing");
+        assertThat(routingSection).contains("`data`").contains("skill.brain.routing");
+        assertThat(skillBody).contains("汇总与回答").contains("协作时序").doesNotContain("派发后行为");
     }
 
     @Test

@@ -69,12 +69,13 @@ public class AgentScopeChatService {
         Toolkit toolkit = new Toolkit();
         toolkit.registerTool(dataTools);
         toolkit.registerTool(timeTool);
-        registerSubAgents(toolkit, runtime, model);
+        registerSubAgents(toolkit, runtime, model, provider.maxOutputTokens());
 
         ReActAgent.Builder builder = ReActAgent.builder()
                 .name(runtime.getBrainAgentName())
                 .sysPrompt(buildSysPrompt(runtime))
                 .model(model)
+                .generateOptions(LlmChatModelFactory.generateOptions(provider.maxOutputTokens()))
                 .toolkit(toolkit)
                 .maxIters(runtime.resolvedMaxIters())
                 .modelExecutionConfig(runtime.llmModelExecutionConfig())
@@ -91,14 +92,16 @@ public class AgentScopeChatService {
     void registerSubAgents(
             Toolkit toolkit,
             AgentRuntimeConfig runtime,
-            Model model) {
+            Model model,
+            Integer maxOutputTokens) {
         toolkit.registerAgentTool(new SubAgentTool(
                 () -> buildSubAgent(
                         runtime.getDataAgentName(),
                         model,
                         buildDataPrompt(),
                         runtime,
-                        "skill.data.metrics"),
+                        "skill.data.metrics",
+                        maxOutputTokens),
                 SubAgentConfig.builder()
                         .toolName(runtime.getDataAgentName())
                         .description("APM 问数：metrics / trace / error rate queries")
@@ -109,7 +112,8 @@ public class AgentScopeChatService {
                         model,
                         buildInspectionPrompt(),
                         runtime,
-                        "skill.inspection.health"),
+                        "skill.inspection.health",
+                        maxOutputTokens),
                 SubAgentConfig.builder()
                         .toolName(runtime.getInspectionAgentName())
                         .description("APM 巡检：health inspection and anomaly triage")
@@ -121,7 +125,8 @@ public class AgentScopeChatService {
             Model model,
             String sysPrompt,
             AgentRuntimeConfig runtime,
-            String skillId) {
+            String skillId,
+            Integer maxOutputTokens) {
         Toolkit subToolkit = new Toolkit();
         subToolkit.registerTool(dataTools);
         subToolkit.registerTool(timeTool);
@@ -130,6 +135,7 @@ public class AgentScopeChatService {
                 .name(name)
                 .sysPrompt(sysPrompt)
                 .model(model)
+                .generateOptions(LlmChatModelFactory.generateOptions(maxOutputTokens))
                 .toolkit(subToolkit)
                 .maxIters(runtime.resolvedMaxIters())
                 .modelExecutionConfig(runtime.llmModelExecutionConfig())

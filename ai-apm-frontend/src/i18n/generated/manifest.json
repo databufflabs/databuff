@@ -942,7 +942,7 @@
   "失败请求量": "views.appMonitor.service.s_ea1f0429",
   "失败调用数": "views.appMonitor.serviceFlow.s_696acc9b",
   "如 262144": "views.configManage.llm.s_15c7b6f7",
-  "如 65536": "views.configManage.llm.s_b45f1a9f",
+  "如 200000": "views.configManage.llm.s_b45f1a9f",
   "如 Kimi、DeepSeek": "views.configManage.llm.s_790d7e1c",
   "如 kimi-k2.6": "views.configManage.llm.s_6c720cb4",
   "如您已获取新的授权，请登录Admin用户更新授权": "views.authorization.s_f716f713",
