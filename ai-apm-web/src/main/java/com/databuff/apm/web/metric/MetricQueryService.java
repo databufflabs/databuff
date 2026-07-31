@@ -8,6 +8,7 @@ import com.databuff.apm.common.query.TimeSeriesFillUtil;
 import com.databuff.apm.web.config.ApmStorageProperties;
 import com.databuff.apm.web.portal.PortalTimeParser;
 
+import com.databuff.apm.common.metric.MetricSchemaRegistry;
 import com.databuff.apm.common.storage.ApmReadRepository;
 import com.databuff.apm.common.storage.MetricIdentifierParser;
 import com.databuff.apm.common.storage.MetricQueryBuilder;
@@ -17,8 +18,11 @@ import org.springframework.stereotype.Service;
 import java.util.ArrayList;
 import java.util.Collections;
 import java.util.HashMap;
+import java.util.HashSet;
+import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
+import java.util.Set;
 
 @Service
 public class MetricQueryService {
@@ -83,11 +87,25 @@ public class MetricQueryService {
             MetricIdentifierParser.ParsedMetric parsed = MetricIdentifierParser.parse(request.metrics().get(0));
             String table = MetricIdentifierParser.dorisTableName(parsed.measurement());
             String filters = buildFilterClause(request.filters());
-            Map<String, List<String>> result = new HashMap<>();
+            Set<String> knownTags = MetricSchemaRegistry.schema(parsed.measurement())
+                    .map(schema -> new HashSet<>(schema.tagColumns()))
+                    .orElse(null);
+            Map<String, List<String>> result = new LinkedHashMap<>();
             for (String tag : request.by()) {
-                String sql = MetricQueryBuilder.metricTagDistinctSql(
-                        metricDatabase, table, tag, request.fromMillis(), request.toMillis(), filters);
-                result.put(tag, readRepository.queryDistinctTags(sql));
+                // Schema stores Doris column names (service_id); portal requests use camelCase
+                // (serviceId). Skip tags that exist in neither form — e.g. stale serviceType on
+                // metric_service — so one bad column cannot wipe all filter keys.
+                String column = MetricIdentifierParser.toColumnName(tag);
+                if (knownTags != null && !knownTags.contains(tag) && !knownTags.contains(column)) {
+                    continue;
+                }
+                try {
+                    String sql = MetricQueryBuilder.metricTagDistinctSql(
+                            metricDatabase, table, tag, request.fromMillis(), request.toMillis(), filters);
+                    result.put(tag, readRepository.queryDistinctTags(sql));
+                } catch (Exception e) {
+                    result.put(tag, List.of());
+                }
             }
             return result;
         } catch (Exception e) {

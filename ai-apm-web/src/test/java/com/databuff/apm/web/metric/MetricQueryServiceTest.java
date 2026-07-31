@@ -74,6 +74,39 @@ class MetricQueryServiceTest {
     }
 
     @Test
+    void lastTagsSkipsUnknownColumnsAndKeepsValidKeys() throws Exception {
+        ApmReadRepository reader = mock(ApmReadRepository.class);
+        when(reader.queryDistinctTags(anyString())).thenReturn(List.of("demo-order"));
+        MetricQueryService service = new MetricQueryService(reader, TestStorageSupport.storage());
+
+        // serviceType is in stale portal metadata but not a metric_service Doris column.
+        assertThat(service.lastTags(new MetricQueryService.LastTagsRequest(
+                0, 1000,
+                List.of("service.avgDuration"),
+                List.of("serviceType", "service", "serviceId"),
+                List.of())))
+                .containsOnlyKeys("service", "serviceId")
+                .containsEntry("service", List.of("demo-order"));
+    }
+
+    @Test
+    void lastTagsIsolatesPerTagQueryFailures() throws Exception {
+        ApmReadRepository reader = mock(ApmReadRepository.class);
+        when(reader.queryDistinctTags(anyString()))
+                .thenThrow(new RuntimeException("column boom"))
+                .thenReturn(List.of("inst-1"));
+        MetricQueryService service = new MetricQueryService(reader, TestStorageSupport.storage());
+
+        assertThat(service.lastTags(new MetricQueryService.LastTagsRequest(
+                0, 1000,
+                List.of("service.avgDuration"),
+                List.of("service", "serviceInstance"),
+                List.of())))
+                .containsEntry("service", List.of())
+                .containsEntry("serviceInstance", List.of("inst-1"));
+    }
+
+    @Test
     void returnsMetricChartSeries() throws Exception {
         ApmReadRepository reader = mock(ApmReadRepository.class);
         when(reader.queryMetricSeries(anyString())).thenReturn(List.of(
