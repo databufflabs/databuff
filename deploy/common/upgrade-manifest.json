@@ -1,6 +1,6 @@
 {
-  "schema_version": 5,
+  "schema_version": 6,
   "upgrade_type": "A",
   "min_upgrade_from": "0.1.0",
-  "notes": "V005 reduces dynamic-partition telemetry table buckets from 16 to 3 for newly created partitions (existing partitions unchanged until retention)."
+  "notes": "V006 sets compaction_policy=time_series on trace/log/metric dynamic-partition tables (append-only telemetry)."
 }
