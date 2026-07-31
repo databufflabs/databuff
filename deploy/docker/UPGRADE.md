@@ -89,7 +89,7 @@ Set `SKIP_VERIFY=1` on `update.sh` if you will verify only after the manual star
 
 ## Schema migration failure
 
-Step 6 order: start Doris → `migrate-schema` → start ingest/web. On migration/start failure, `update.sh` restores the pre-upgrade `data/` backup and retries (default 3 attempts). Intermediate failures only log a short message and retry — they do **not** start Web troubleshooting mode. Only after all attempts fail does **Web troubleshooting mode** start (`ai-apm-web` only; ingest stays down to avoid writing into a broken schema). Web probes Doris at startup and about every minute afterward; when unreachable, Doris-backed APIs fail fast so the AI chat page loads quickly for ops expert troubleshooting. After Doris is fixed, the next successful probe clears troubleshooting mode and re-hydrates persistence (web restart is optional). Check `GET /health` for `"doris":"UNAVAILABLE"`. `start.sh` has no retry loop: Doris failure there enters troubleshooting mode immediately (single attempt).
+Step 6 order: start Doris → `migrate-schema` → start ingest/web. By default `update.sh` does **not** copy `data/` to `backups/` (pass `--backup` or `SKIP_BACKUP=0` to enable). With a pre-upgrade backup, on migration/start failure it restores that backup and retries (default 3 attempts). Without a backup, it fails after a single attempt. Intermediate failures only log a short message and retry — they do **not** start Web troubleshooting mode. Only after all attempts fail does **Web troubleshooting mode** start (`ai-apm-web` only; ingest stays down to avoid writing into a broken schema). Web probes Doris at startup and about every minute afterward; when unreachable, Doris-backed APIs fail fast so the AI chat page loads quickly for ops expert troubleshooting. After Doris is fixed, the next successful probe clears troubleshooting mode and re-hydrates persistence (web restart is optional). Check `GET /health` for `"doris":"UNAVAILABLE"`. `start.sh` has no retry loop: Doris failure there enters troubleshooting mode immediately (single attempt).
 
 ### One-command recovery (recommended)
 
@@ -116,11 +116,11 @@ cd /opt/databuff-ai-apm
 
 What it does: stop services → restore trusted backup → sync deploy files/images → migrate + start (with auto-retry). It does **not** run `install.sh`.
 
-Requires a pre-upgrade backup under `backups/`. Do not set `SKIP_BACKUP=1` on the original upgrade if you may need this path.
+Requires a pre-upgrade backup under `backups/` (create one with `--backup` / `SKIP_BACKUP=0` on a prior upgrade, or copy `data/` manually).
 
 ### Manual recovery
 
-If all automatic attempts fail, `data/` is restored to the backup used for recovery and the script exits with an error. You can retry `--restore-backup` again or restore manually:
+If all automatic attempts fail, `data/` is restored to the backup used for recovery (when one exists) and the script exits with an error. You can retry `--restore-backup` again or restore manually:
 
 ```bash
 cd /opt/databuff-ai-apm
@@ -135,7 +135,7 @@ Do not hand-edit `schema_version` or drop Doris tables unless you know the exact
 
 ## Rollback
 
-Each upgrade creates `backups/data-backup-<timestamp>/` (a directory copy of `data/`) under the install directory (unless `SKIP_BACKUP=1`). Legacy `.tar.gz` backups are still accepted for restore.
+By default upgrades skip copying `data/`. With `--backup` (or `SKIP_BACKUP=0`), each upgrade creates `backups/data-backup-<timestamp>/` (a directory copy of `data/`) under the install directory. Legacy `.tar.gz` backups are still accepted for restore.
 
 **Data rollback (restore pre-upgrade `data/`):**
 

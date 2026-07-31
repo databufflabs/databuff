@@ -5,6 +5,7 @@
 #   cd /opt/databuff-ai-apm && ./update.sh
 #   ./update.sh --version 0.1.6
 #   ./update.sh --pull-images
+#   ./update.sh --backup
 #   ./update.sh --restore-backup
 #   ./update.sh --restore-backup=data-backup-20260713-110220
 #
@@ -14,10 +15,10 @@
 #   UPDATE_BUNDLE_ROOT        离线包解压目录（内网升级时设置，无需 curl）
 #   FORCE_PULL_IMAGES         1=强制重新下载镜像
 #   FORCE_LOAD_IMAGES         1=离线包强制 docker load
-#   SKIP_BACKUP               1=跳过 data/ 备份（禁用失败自动恢复）
+#   SKIP_BACKUP               1=跳过 data/ 备份（默认 1；设 0 或 --backup 启用备份与失败自动恢复）
 #   SKIP_START                1=仅更新文件与镜像，不启动
 #   SKIP_VERIFY               1=跳过升级后校验 (verify-upgrade.sh)
-#   UPDATE_MAX_ATTEMPTS       启动/迁移失败时自动恢复备份并重试的次数 (默认 3)
+#   UPDATE_MAX_ATTEMPTS       启动/迁移失败时自动恢复备份并重试的次数 (默认 3；无备份时仅尝试 1 次)
 #   RESTORE_BACKUP         1=当前 data/ 不可信，先从 backups/ 恢复后再继续
 #   BACKUP_FILE            指定备份目录名（默认取 backups/ 下最新 data-backup-*；亦兼容旧版 *.tar.gz）
 
@@ -53,7 +54,7 @@ fi
 
 FORCE_PULL_IMAGES="${FORCE_PULL_IMAGES:-0}"
 FORCE_LOAD_IMAGES="${FORCE_LOAD_IMAGES:-0}"
-SKIP_BACKUP="${SKIP_BACKUP:-0}"
+SKIP_BACKUP="${SKIP_BACKUP:-1}"
 SKIP_START="${SKIP_START:-0}"
 SKIP_VERIFY="${SKIP_VERIFY:-0}"
 UPDATE_MAX_ATTEMPTS="${UPDATE_MAX_ATTEMPTS:-3}"
@@ -80,6 +81,10 @@ while [[ $# -gt 0 ]]; do
     --pull-images | -f)
       FORCE_PULL_IMAGES=1
       FORCE_LOAD_IMAGES=1
+      shift
+      ;;
+    --backup)
+      SKIP_BACKUP=0
       shift
       ;;
     --skip-backup)
@@ -265,7 +270,7 @@ log "${BLD}(3/6)${RST} 备份 data/"
 if [[ "$RESTORE_BACKUP" == "1" ]]; then
   log_skip "${BLD}(3/6)${RST} 备份 data/（已从可信备份恢复，跳过）"
 elif [[ "$SKIP_BACKUP" == "1" ]]; then
-  log_skip "${BLD}(3/6)${RST} 备份 data/ (SKIP_BACKUP=1)"
+  log_skip "${BLD}(3/6)${RST} 备份 data/（默认跳过；需要时加 --backup）"
 else
   backup_archive="$(apm_backup_data_dir "$INSTALL_DIR")" \
     || fail "备份 data/ 失败（请确认 ${INSTALL_DIR}/data 存在）"
@@ -336,7 +341,7 @@ else
     if [[ "$attempt" -gt 1 ]]; then
       log "${YLW}第 ${attempt}/${UPDATE_MAX_ATTEMPTS} 次尝试：恢复升级前 data/ 备份后重试${RST}"
       if [[ -z "$backup_archive" || ! -e "$backup_archive" ]]; then
-        fail "无法自动重试：缺少 data/ 备份（请勿设置 SKIP_BACKUP=1）"
+        fail "无法自动重试：缺少 data/ 备份（升级前请加 --backup 或 SKIP_BACKUP=0）"
       fi
       source_compose_env
       (cd "$INSTALL_DIR" && compose_down) >/dev/null 2>&1 || true
@@ -350,13 +355,18 @@ else
       break
     fi
 
-    if [[ "$attempt" -ge "$UPDATE_MAX_ATTEMPTS" ]]; then
+    can_retry=0
+    if [[ "$attempt" -lt "$UPDATE_MAX_ATTEMPTS" && -n "$backup_archive" && -e "$backup_archive" ]]; then
+      can_retry=1
+    fi
+
+    if [[ "$can_retry" != "1" ]]; then
       if [[ -n "$backup_archive" && -e "$backup_archive" ]]; then
         source_compose_env
         (cd "$INSTALL_DIR" && compose_down) >/dev/null 2>&1 || true
         apm_restore_data_dir "$INSTALL_DIR" "$backup_archive" || true
       fi
-      log "${YLW}升级失败（已尝试 ${UPDATE_MAX_ATTEMPTS} 次），启动 Web 排障模式${RST}"
+      log "${YLW}升级失败（已尝试 ${attempt} 次），启动 Web 排障模式${RST}"
       cd "$INSTALL_DIR"
       source_compose_env
       # shellcheck disable=SC1091
@@ -364,9 +374,9 @@ else
       compose_up_wait ai-apm-doris-fe ai-apm-doris-be || true
       bootstrap_web_for_troubleshooting "升级失败"
       if [[ -n "$backup_archive" && -e "$backup_archive" ]]; then
-        fail "升级失败（已尝试 ${UPDATE_MAX_ATTEMPTS} 次）。data/ 已恢复为升级前备份: ${backup_archive}"
+        fail "升级失败（已尝试 ${attempt} 次）。data/ 已恢复为升级前备份: ${backup_archive}"
       fi
-      fail "升级失败（已尝试 ${UPDATE_MAX_ATTEMPTS} 次）"
+      fail "升级失败（已尝试 ${attempt} 次）"
     fi
 
     log "${YLW}(6/6) 启动或迁移失败，将恢复备份并重试${RST}"

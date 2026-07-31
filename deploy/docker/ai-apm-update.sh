@@ -4,6 +4,7 @@
 #   curl -fsSL https://databuff.ai/databuff/ai-apm-update.sh | bash
 #   curl -fsSL https://databuff.ai/databuff/ai-apm-update.sh | bash -s -- --version 0.1.6
 #   curl -fsSL .../ai-apm-update.sh | bash -s -- --pull-images
+#   curl -fsSL .../ai-apm-update.sh | bash -s -- --backup
 #
 # 与 ai-apm-install.sh 区别:
 #   install = 全新安装，会删除安装目录（含 data/）
@@ -14,7 +15,7 @@
 #   APM_INSTALL_DIR    安装目录 (默认 /opt/databuff-ai-apm)
 #   APM_VERSION        目标版本 (默认从 VERSION 读取最新)
 #   FORCE_PULL_IMAGES  1=强制重新下载镜像
-#   SKIP_BACKUP        1=跳过 data/ 备份
+#   SKIP_BACKUP        1=跳过 data/ 备份（默认 1；设 0 或 --backup 启用）
 #   SKIP_START         1=仅更新文件与镜像，不启动
 #   SKIP_PULL_IMAGES   1=不下载镜像（使用本地已 load 的镜像）
 #   SKIP_VERIFY        1=跳过升级后校验
@@ -31,7 +32,7 @@ BUILTIN_APM_VERSION="__APM_VERSION__"
 INSTALL_DIR="${APM_INSTALL_DIR:-/opt/databuff-ai-apm}"
 
 FORCE_PULL_IMAGES="${FORCE_PULL_IMAGES:-0}"
-SKIP_BACKUP="${SKIP_BACKUP:-0}"
+SKIP_BACKUP="${SKIP_BACKUP:-1}"
 SKIP_START="${SKIP_START:-0}"
 SKIP_PULL_IMAGES="${SKIP_PULL_IMAGES:-0}"
 SKIP_VERIFY="${SKIP_VERIFY:-0}"
@@ -54,6 +55,10 @@ while [[ $# -gt 0 ]]; do
       ;;
     --pull-images | -f)
       FORCE_PULL_IMAGES=1
+      shift
+      ;;
+    --backup)
+      SKIP_BACKUP=0
       shift
       ;;
     --skip-backup)
@@ -153,6 +158,7 @@ exec env \
   BACKUP_FILE="$BACKUP_FILE" \
   "$UPDATE_SCRIPT" --version "$APM_VERSION" \
   $([[ "$FORCE_PULL_IMAGES" == "1" ]] && echo --pull-images) \
+  $([[ "$SKIP_BACKUP" == "0" ]] && echo --backup) \
   $([[ "$SKIP_BACKUP" == "1" ]] && echo --skip-backup) \
   $([[ "$SKIP_START" == "1" ]] && echo --skip-start) \
   $([[ "$RESTORE_BACKUP" == "1" && -z "$BACKUP_FILE" ]] && echo --restore-backup) \

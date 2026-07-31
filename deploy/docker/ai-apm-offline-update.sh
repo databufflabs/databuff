@@ -16,7 +16,7 @@
 # 环境变量:
 #   APM_INSTALL_DIR    安装目录 (默认 /opt/databuff-ai-apm)
 #   FORCE_LOAD_IMAGES  1=强制重新 docker load
-#   SKIP_BACKUP        1=跳过 data/ 备份
+#   SKIP_BACKUP        1=跳过 data/ 备份（默认 1；设 0 或 --backup 启用）
 #   SKIP_START         1=仅更新不启动
 
 set -e
@@ -24,13 +24,17 @@ set -e
 BUNDLE_ROOT="$(cd "$(dirname "$0")" && pwd)"
 INSTALL_DIR="${APM_INSTALL_DIR:-/opt/databuff-ai-apm}"
 FORCE_LOAD_IMAGES="${FORCE_LOAD_IMAGES:-0}"
-SKIP_BACKUP="${SKIP_BACKUP:-0}"
+SKIP_BACKUP="${SKIP_BACKUP:-1}"
 SKIP_START="${SKIP_START:-0}"
 
 while [[ $# -gt 0 ]]; do
   case "$1" in
     --pull-images | -f)
       FORCE_LOAD_IMAGES=1
+      shift
+      ;;
+    --backup)
+      SKIP_BACKUP=0
       shift
       ;;
     --skip-backup)
@@ -106,5 +110,6 @@ export SKIP_BACKUP SKIP_START
 
 exec "$UPDATE_SCRIPT" --version "$APM_VERSION" \
   $([[ "$FORCE_LOAD_IMAGES" == "1" ]] && echo --pull-images) \
+  $([[ "$SKIP_BACKUP" == "0" ]] && echo --backup) \
   $([[ "$SKIP_BACKUP" == "1" ]] && echo --skip-backup) \
   $([[ "$SKIP_START" == "1" ]] && echo --skip-start)
