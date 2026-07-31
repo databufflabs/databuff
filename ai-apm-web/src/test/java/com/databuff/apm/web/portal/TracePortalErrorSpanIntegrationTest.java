@@ -21,7 +21,9 @@ import java.util.Map;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.mockito.ArgumentMatchers.anyString;
 import static org.mockito.Mockito.mock;
+import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.reset;
+import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
 /**
@@ -59,12 +61,6 @@ class TracePortalErrorSpanIntegrationTest {
             assertThat(sql).contains("`error` = 1");
             return List.of(virtualMysqlErrorSpan());
         });
-        when(readRepository.queryCallSpanCount(anyString())).thenAnswer(invocation -> {
-            String sql = invocation.getArgument(0);
-            assertThat(sql).contains("`srcServiceId` = '" + SERVICE_B_ID + "'");
-            assertThat(sql).contains("InsufficientStockException");
-            return 35L;
-        });
 
         Map<String, Object> response = tracePortalService.errorSpanList(Map.of(
                 "serviceId", SERVICE_B_ID,
@@ -77,9 +73,10 @@ class TracePortalErrorSpanIntegrationTest {
                 "sortOrder", "desc"));
 
         assertThat(response.get("status")).isEqualTo(200);
+        verify(readRepository, never()).queryCallSpanCount(anyString());
         @SuppressWarnings("unchecked")
         Map<String, Object> data = (Map<String, Object>) response.get("data");
-        assertThat(data.get("total")).isEqualTo(35L);
+        assertThat(data).doesNotContainKey("total");
         @SuppressWarnings("unchecked")
         List<Map<String, Object>> list = (List<Map<String, Object>>) data.get("list");
         assertThat(list).hasSize(1);
@@ -101,7 +98,6 @@ class TracePortalErrorSpanIntegrationTest {
             assertThat(sql).doesNotContain("`srcServiceId` =");
             return List.of(virtualMysqlErrorSpan());
         });
-        when(readRepository.queryCallSpanCount(anyString())).thenReturn(1L);
 
         Map<String, Object> response = tracePortalService.errorSpanList(Map.of(
                 "serviceId", MYSQL_DEMO_APM_ID,
@@ -111,9 +107,13 @@ class TracePortalErrorSpanIntegrationTest {
                 "offset", 0,
                 "size", 50));
 
+        verify(readRepository, never()).queryCallSpanCount(anyString());
         @SuppressWarnings("unchecked")
         Map<String, Object> data = (Map<String, Object>) response.get("data");
-        assertThat(data.get("total")).isEqualTo(1L);
+        assertThat(data).doesNotContainKey("total");
+        @SuppressWarnings("unchecked")
+        List<Map<String, Object>> list = (List<Map<String, Object>>) data.get("list");
+        assertThat(list).hasSize(1);
     }
 
     private static SpanSummary virtualMysqlErrorSpan() {
