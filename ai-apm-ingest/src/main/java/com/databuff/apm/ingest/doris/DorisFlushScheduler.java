@@ -6,7 +6,6 @@ import com.databuff.apm.common.storage.DorisStreamLoadSink;
 import com.databuff.apm.common.storage.DorisTableNames;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
-import com.databuff.apm.ingest.cluster.ClusterPipelineLog;
 import com.databuff.apm.ingest.support.LogRateLimiter;
 import org.springframework.beans.factory.DisposableBean;
 import org.springframework.beans.factory.annotation.Autowired;
@@ -156,17 +155,11 @@ public class DorisFlushScheduler implements DisposableBean {
                 }
             }, flushExecutor).get(flushTimeoutMs, TimeUnit.MILLISECONDS);
             if (rows > 0) {
-                ClusterPipelineLog.dorisFlushOkSample(log, sink.table(), sink.database(), rows);
                 if (metaServiceCollector != null && DorisTableNames.META_SERVICE.equals(sink.table())) {
                     metaServiceCollector.onFlushComplete();
                 }
             }
         } catch (TimeoutException e) {
-            ClusterPipelineLog.dorisFlushFailed(
-                    log,
-                    sink.table(),
-                    sink.database(),
-                    "timeout>" + flushTimeoutMs + "ms — check DORIS_BE_HTTP_HOST / BE port");
             warnFlushFailure(
                     "Doris flush timed out for {}.{} (>{}ms) — check DORIS_BE_HTTP_HOST / BE port",
                     sink.database(),
@@ -175,7 +168,6 @@ public class DorisFlushScheduler implements DisposableBean {
         } catch (ExecutionException e) {
             Throwable cause = e.getCause();
             String message = cause != null ? cause.getMessage() : e.getMessage();
-            ClusterPipelineLog.dorisFlushFailed(log, sink.table(), sink.database(), message);
             warnFlushFailure("Doris flush failed for {}.{}: {}", sink.database(), sink.table(), message);
         } catch (InterruptedException e) {
             Thread.currentThread().interrupt();
@@ -188,9 +180,7 @@ public class DorisFlushScheduler implements DisposableBean {
         }
         long count = FLUSH_FAILURE_LIMITER.record();
         if (count > 0) {
-            log.warn("{} failure-tally={} in last 10s (see preceding FAILED lines)",
-                    ClusterPipelineLog.DORIS_FLUSH,
-                    count);
+            log.warn("Doris flush failures: {} in last 10s", count);
         }
     }
 

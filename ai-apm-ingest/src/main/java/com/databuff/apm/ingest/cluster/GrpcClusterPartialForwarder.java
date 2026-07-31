@@ -1,9 +1,9 @@
 package com.databuff.apm.ingest.cluster;
 
-import com.databuff.apm.common.cluster.aggregate.ClusterPartialForwarder;
-import com.databuff.apm.common.cluster.coordination.ClusterInstanceCoordinator;
 import com.databuff.apm.cluster.v1.AggregationPartialRequest;
 import com.databuff.apm.cluster.v1.ClusterCoordinationServiceGrpc;
+import com.databuff.apm.common.cluster.aggregate.ClusterPartialForwarder;
+import com.databuff.apm.common.cluster.coordination.ClusterInstanceCoordinator;
 import com.databuff.apm.ingest.support.LogRateLimiter;
 import io.grpc.ManagedChannel;
 import io.grpc.ManagedChannelBuilder;
@@ -17,7 +17,7 @@ import java.util.concurrent.TimeUnit;
 public final class GrpcClusterPartialForwarder implements ClusterPartialForwarder, AutoCloseable {
 
     private static final Logger log = LoggerFactory.getLogger(GrpcClusterPartialForwarder.class);
-    private static final LogRateLimiter FORWARD_TALLY = new LogRateLimiter(10_000L);
+    private static final LogRateLimiter FORWARD_LIMITER = new LogRateLimiter(10_000L);
 
     private final ClusterInstanceCoordinator coordinator;
     private final String originNodeId;
@@ -26,13 +26,6 @@ public final class GrpcClusterPartialForwarder implements ClusterPartialForwarde
     public GrpcClusterPartialForwarder(ClusterInstanceCoordinator coordinator) {
         this.coordinator = coordinator;
         this.originNodeId = coordinator.localNodeId();
-        log.info(
-                "{} boot originNodeId={} clusterEnabled={} members={} endpoints={} (pipeline diag logging active)",
-                ClusterPipelineLog.FORWARD_OUT,
-                originNodeId,
-                coordinator.effectiveClusterEnabled(),
-                coordinator.sortedMembers().size(),
-                coordinator.endpointsByNodeId());
     }
 
     @Override
@@ -43,22 +36,16 @@ public final class GrpcClusterPartialForwarder implements ClusterPartialForwarde
             long windowStart,
             long windowEnd,
             byte[] partial) {
-        int bytes = partial == null ? 0 : partial.length;
         String endpoint = coordinator.endpointFor(targetNodeId).orElse(null);
         if (endpoint == null) {
-            ClusterPipelineLog.forwardOutFailed(
-                    log,
-                    "no-endpoint",
+            warnThrottled(
+                    "Cluster forward out failed stream={} target={} reason=no-endpoint partition={} windowMs={} bytes={} {}",
                     stream,
-                    originNodeId,
                     targetNodeId,
-                    null,
-                    partitionKey,
+                    ClusterAggregationLog.partitionKeyBrief(partitionKey),
                     windowStart,
-                    bytes,
-                    coordinator,
-                    "endpointFor(target) empty — peer missing from ZK membership or not registered");
-            tallyFailures();
+                    partial == null ? 0 : partial.length,
+                    ClusterAggregationLog.membershipBrief(coordinator));
             return;
         }
         try {
@@ -74,54 +61,37 @@ public final class GrpcClusterPartialForwarder implements ClusterPartialForwarde
                     .setOriginNodeId(originNodeId)
                     .build());
             if (!response.getAccepted()) {
-                ClusterPipelineLog.forwardOutFailed(
-                        log,
-                        "rejected",
+                warnThrottled(
+                        "Cluster forward out rejected stream={} origin={} target={} endpoint={} partition={} windowMs={} bytes={}",
                         stream,
                         originNodeId,
                         targetNodeId,
                         endpoint,
-                        partitionKey,
+                        ClusterAggregationLog.partitionKeyBrief(partitionKey),
                         windowStart,
-                        bytes,
-                        coordinator,
-                        "peer returned accepted=false (decode/owner/accept path failed on target)");
-                tallyFailures();
-                return;
+                        partial.length);
             }
-            ClusterPipelineLog.forwardOutOk(
-                    log,
-                    stream,
-                    originNodeId,
-                    targetNodeId,
-                    endpoint,
-                    partitionKey,
-                    windowStart,
-                    bytes,
-                    coordinator);
         } catch (Exception e) {
-            ClusterPipelineLog.forwardOutFailed(
-                    log,
-                    "exception",
+            warnThrottled(
+                    "Cluster forward out failed stream={} origin={} target={} endpoint={} partition={} windowMs={} bytes={}: {}",
                     stream,
                     originNodeId,
                     targetNodeId,
                     endpoint,
-                    partitionKey,
+                    ClusterAggregationLog.partitionKeyBrief(partitionKey),
                     windowStart,
-                    bytes,
-                    coordinator,
+                    partial == null ? 0 : partial.length,
                     e.toString());
-            tallyFailures();
         }
     }
 
-    private static void tallyFailures() {
-        long count = FORWARD_TALLY.record();
+    private static void warnThrottled(String template, Object... args) {
+        if (log.isDebugEnabled()) {
+            log.debug(template, args);
+        }
+        long count = FORWARD_LIMITER.record();
         if (count > 0) {
-            log.warn("{} failure-tally={} in last 10s (see preceding FAILED lines for raw cause)",
-                    ClusterPipelineLog.FORWARD_OUT,
-                    count);
+            log.warn("Cluster partial forward failures: {} in last 10s", count);
         }
     }
 

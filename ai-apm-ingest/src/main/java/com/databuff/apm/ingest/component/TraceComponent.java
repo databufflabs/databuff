@@ -19,7 +19,6 @@ import com.databuff.apm.ingest.trace.SpanResourceIgnoreFilter;
 import com.databuff.apm.ingest.trace.TraceAssemblyBuffer;
 import com.databuff.apm.ingest.trace.TraceEnrichProcessor;
 import com.databuff.apm.ingest.trace.TraceFillProcessor;
-import com.databuff.apm.ingest.cluster.ClusterPipelineLog;
 import com.databuff.apm.ingest.support.LogRateLimiter;
 import com.databuff.apm.ingest.trace.VirtualServiceExtractor;
 import com.databuff.apm.ingest.trace.remote.RemoteCallProcessor;
@@ -188,32 +187,9 @@ public final class TraceComponent extends AbstractComponent<TraceComponent.Trace
         try {
             // Full Jackson decode: fast-path (ignoreMap=true) omits fields and breaks fill/metrics.
             DcSpan span = DCSpanJsonDecoder.decode(spanBytes, false);
-            boolean ok = emit(traceId, TraceEvent.forwarded(span));
-            if (ok) {
-                ClusterPipelineLog.assembleSample(
-                        log, TRACE_STREAM, traceId, "forwarded-in", partitionMembership);
-            } else {
-                ClusterPipelineLog.forwardInFailed(
-                        log,
-                        "emit-false",
-                        TRACE_STREAM,
-                        partitionMembership.localNodeId(),
-                        traceId,
-                        1,
-                        partitionMembership,
-                        "emit(traceId, forwarded) returned false (buffer overflow or shutdown?)");
-            }
-            return ok;
+            return emit(traceId, TraceEvent.forwarded(span));
         } catch (Exception e) {
-            ClusterPipelineLog.forwardInFailed(
-                    log,
-                    "decode",
-                    TRACE_STREAM,
-                    partitionMembership.localNodeId(),
-                    traceId,
-                    1,
-                    partitionMembership,
-                    e.toString());
+            log.warn("Failed to decode forwarded trace span traceId={}: {}", shortTraceId(traceId), e.getMessage());
             return false;
         }
     }
@@ -304,8 +280,6 @@ public final class TraceComponent extends AbstractComponent<TraceComponent.Trace
             // Step 3 · 集群：非 traceId owner 时，此处为 trace 链路唯一序列化点
             Optional<String> forwardTarget = partitionMembership.forwardPartialTarget(span.trace_id);
             if (forwardTarget.isPresent()) {
-                ClusterPipelineLog.routeForward(
-                        log, TRACE_STREAM, span.trace_id, forwardTarget.get(), partitionMembership);
                 TraceComponent.this.partialForwarder.forward(
                         forwardTarget.get(),
                         TRACE_STREAM,
@@ -316,8 +290,6 @@ public final class TraceComponent extends AbstractComponent<TraceComponent.Trace
                 return;
             }
             // Step 3 · 单机 / 集群 owner：内存按 traceId 聚合，定时检测后 flush
-            ClusterPipelineLog.routeLocal(log, TRACE_STREAM, span.trace_id, partitionMembership);
-            ClusterPipelineLog.assembleSample(log, TRACE_STREAM, span.trace_id, "local-owner", partitionMembership);
             assembleSpans(serviceKey, List.of(span));
         }
 
@@ -343,8 +315,6 @@ public final class TraceComponent extends AbstractComponent<TraceComponent.Trace
             }
             Optional<String> forwardTarget = partitionMembership.forwardPartialTarget(traceKey);
             if (forwardTarget.isPresent()) {
-                ClusterPipelineLog.routeForward(
-                        log, TRACE_STREAM, traceKey, forwardTarget.get(), partitionMembership);
                 for (DcSpan span : kept) {
                     TraceComponent.this.partialForwarder.forward(
                             forwardTarget.get(),
@@ -356,8 +326,6 @@ public final class TraceComponent extends AbstractComponent<TraceComponent.Trace
                 }
                 return;
             }
-            ClusterPipelineLog.routeLocal(log, TRACE_STREAM, traceKey, partitionMembership);
-            ClusterPipelineLog.assembleSample(log, TRACE_STREAM, traceKey, "local-owner-batch", partitionMembership);
             assembleSpans(traceKey, kept);
         }
 
