@@ -84,6 +84,9 @@ export default class WorkspaceFilePreview extends Vue {
     return this.expanded ? '82%' : '64%'
   }
 
+  /** Known binary / non-text suffixes; everything else previews as plain text. */
+  private static readonly BINARY_EXT_RE = /\.(png|jpe?g|gif|webp|ico|bmp|tiff?|pdf|zip|tar|t?gz|bz2|xz|7z|rar|jar|war|ear|class|exe|dll|so|dylib|bin|wasm|mp[34]|m4a|wav|flac|avi|mov|mkv|webm|woff2?|ttf|otf|eot|parquet|avro|orc|pickle|pyc|pyo|o|a|obj|dmg|iso|apk|ipa)$/
+
   private get previewKind (): 'html' | 'svg' | 'markdown' | 'text' | 'other' {
     const name = (this.fileName || this.filePath || '').toLowerCase()
     if (/\.(html?|htm)$/.test(name)) {
@@ -95,7 +98,8 @@ export default class WorkspaceFilePreview extends Vue {
     if (/\.(md|markdown)$/.test(name)) {
       return 'markdown'
     }
-    if (/\.(txt|log|csv|json)$/.test(name)) {
+    // Text/code files (.py, .sh, .yml, .json, .txt, Dockerfile, …) all preview online.
+    if (!WorkspaceFilePreview.BINARY_EXT_RE.test(name)) {
       return 'text'
     }
     return 'other'
