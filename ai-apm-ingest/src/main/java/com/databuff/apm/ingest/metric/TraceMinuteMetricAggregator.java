@@ -7,6 +7,7 @@ import com.databuff.apm.common.metric.TraceMetricMinuteBucket;
 import com.databuff.apm.common.model.OptimizedMetric;
 import com.databuff.apm.common.serde.OptimizedMetricUtil;
 import com.databuff.apm.ingest.cluster.ClusterAggregationLog;
+import com.databuff.apm.ingest.cluster.ClusterPipelineLog;
 import com.databuff.apm.ingest.support.LogRateLimiter;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -96,6 +97,8 @@ public final class TraceMinuteMetricAggregator implements AutoCloseable {
 
         Optional<String> forwardTarget = partitionMembership.forwardPartialTarget(partitionKey);
         if (forwardTarget.isPresent()) {
+            ClusterPipelineLog.routeForward(
+                    log, STREAM, partitionKey, forwardTarget.get(), partitionMembership);
             byte[] serialized = OptimizedMetricUtil.serialize(bucketed);
             partialForwarder.forward(
                     forwardTarget.get(), STREAM, partitionKey, windowStartMs, windowEndMs, serialized);
@@ -110,8 +113,21 @@ public final class TraceMinuteMetricAggregator implements AutoCloseable {
                     ClusterAggregationLog.ownerBrief(partitionMembership, partitionKey),
                     ClusterAggregationLog.metricBrief(metric),
                     ClusterAggregationLog.membershipBrief(partitionMembership));
+            ClusterPipelineLog.forwardOutFailed(
+                    log,
+                    "not-owner-no-forward",
+                    STREAM,
+                    partitionMembership.localNodeId(),
+                    ClusterAggregationLog.ownerBrief(partitionMembership, partitionKey),
+                    null,
+                    partitionKey,
+                    windowStartMs,
+                    0,
+                    partitionMembership,
+                    "owns=false and forwardPartialTarget empty (owner has no endpoint yet?)");
             return;
         }
+        ClusterPipelineLog.routeLocal(log, STREAM, partitionKey, partitionMembership);
         mergeLocal(windowStartMs, partitionKey, bucketed);
     }
 
@@ -123,6 +139,15 @@ public final class TraceMinuteMetricAggregator implements AutoCloseable {
                     windowStartMs,
                     ClusterAggregationLog.partitionKeyBrief(partitionKey),
                     ClusterAggregationLog.membershipBrief(partitionMembership));
+            ClusterPipelineLog.forwardInFailed(
+                    log,
+                    "empty-partial",
+                    STREAM,
+                    partitionMembership.localNodeId(),
+                    partitionKey,
+                    0,
+                    partitionMembership,
+                    "partial bytes empty");
             return;
         }
         if (!partitionMembership.owns(partitionKey)) {
@@ -135,6 +160,15 @@ public final class TraceMinuteMetricAggregator implements AutoCloseable {
                     ClusterAggregationLog.ownerBrief(partitionMembership, partitionKey),
                     ClusterAggregationLog.metricBrief(preview),
                     ClusterAggregationLog.membershipBrief(partitionMembership));
+            ClusterPipelineLog.forwardInFailed(
+                    log,
+                    "not-owner",
+                    STREAM,
+                    partitionMembership.localNodeId(),
+                    partitionKey,
+                    1,
+                    partitionMembership,
+                    "forward-in arrived but local node is not partition owner (membership race?)");
             return;
         }
         OptimizedMetric incoming = OptimizedMetricUtil.deserialize(partial);

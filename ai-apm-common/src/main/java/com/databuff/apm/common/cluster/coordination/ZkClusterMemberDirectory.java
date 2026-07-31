@@ -101,10 +101,11 @@ public final class ZkClusterMemberDirectory implements ClusterMemberDirectory, A
             Map<String, String> previous = endpointsByNodeId;
             endpointsByNodeId = latest;
             if (!latest.equals(previous)) {
-                log.info(
-                        "ZK cluster membership changed localNodeId={} {}",
+                log.warn(
+                        "[cluster.membership] CHANGED localNodeId={} {} fullEndpoints={}",
                         localNodeId,
-                        membershipDelta(previous, latest));
+                        membershipDelta(previous, latest),
+                        latest);
             }
         }
     }

@@ -48,16 +48,27 @@ public final class ClusterCoordinationGrpcService
     @Override
     public void forwardPartial(
             AggregationPartialRequest request, StreamObserver<AggregationPartialResponse> responseObserver) {
+        String stream = request.getStream();
+        String origin = request.getOriginNodeId();
+        String partitionKey = request.getPartitionKey();
+        int partialCount = request.getPartialsCount();
+        int bytes = 0;
+        for (com.google.protobuf.ByteString partial : request.getPartialsList()) {
+            bytes += partial.size();
+        }
         try {
-            if (TraceComponent.TRACE_STREAM.equals(request.getStream())) {
+            if (TraceComponent.TRACE_STREAM.equals(stream)) {
                 for (com.google.protobuf.ByteString partial : request.getPartialsList()) {
-                    traceComponent.acceptForwardedSpan(
-                            request.getPartitionKey(), partial.toByteArray());
+                    boolean ok = traceComponent.acceptForwardedSpan(
+                            partitionKey, partial.toByteArray());
+                    if (!ok) {
+                        throw new IllegalStateException("acceptForwardedSpan returned false");
+                    }
                 }
-            } else if (TraceMinuteMetricAggregator.STREAM.equals(request.getStream())) {
+            } else if (TraceMinuteMetricAggregator.STREAM.equals(stream)) {
                 for (com.google.protobuf.ByteString partial : request.getPartialsList()) {
                     aggregateComponent.acceptForwardedTraceMinutePartial(
-                            request.getPartitionKey(),
+                            partitionKey,
                             request.getWindowStart(),
                             request.getWindowEnd(),
                             partial.toByteArray());
@@ -65,14 +76,23 @@ public final class ClusterCoordinationGrpcService
             } else {
                 for (com.google.protobuf.ByteString partial : request.getPartialsList()) {
                     aggregateComponent.acceptForwardedPartial(
-                            request.getPartitionKey(),
+                            partitionKey,
                             AggregateEvent.fromBytes(partial.toByteArray()));
                 }
             }
             responseObserver.onNext(AggregationPartialResponse.newBuilder().setAccepted(true).build());
             responseObserver.onCompleted();
+            ClusterPipelineLog.forwardInOk(log, stream, origin, partitionKey, partialCount, bytes, coordinator);
         } catch (Exception e) {
-            log.warn("ForwardPartial ingest failed from {}: {}", request.getOriginNodeId(), e.toString());
+            ClusterPipelineLog.forwardInFailed(
+                    log,
+                    "ingest-accept",
+                    stream,
+                    origin,
+                    partitionKey,
+                    partialCount,
+                    coordinator,
+                    e.toString());
             responseObserver.onNext(AggregationPartialResponse.newBuilder().setAccepted(false).build());
             responseObserver.onCompleted();
         }

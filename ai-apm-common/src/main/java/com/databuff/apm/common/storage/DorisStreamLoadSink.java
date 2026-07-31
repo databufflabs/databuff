@@ -224,10 +224,10 @@ public final class DorisStreamLoadSink {
             }
             String sample = sampleRow(batch);
             log.error(
-                    "Doris stream load dropped after {} consecutive failures {}.{} rows={} sample={} cause={}",
-                    failures,
+                    "[doris.flush] DROPPED database={} table={} consecutiveFailures={} rows={} sample={} cause={}",
                     database,
                     table,
+                    failures,
                     batch.size(),
                     sample,
                     e.toString());
