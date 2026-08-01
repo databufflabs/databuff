@@ -4,7 +4,7 @@
   "data": [
     {
       "tags": {
-        "service": "service-a"
+        "service": "接口自身耗时"
       },
       "columns": [
         "time",

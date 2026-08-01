@@ -1,6 +1,6 @@
 {
-  "schema_version": 6,
+  "schema_version": 5,
   "upgrade_type": "A",
   "min_upgrade_from": "0.1.0",
-  "notes": "V006 sets compaction_policy=time_series on trace/log/metric dynamic-partition tables (append-only telemetry)."
+  "notes": "V005 reduces dynamic partition buckets. time_series compaction (former V006) removed \u2014 regresses Trace list query latency."
 }

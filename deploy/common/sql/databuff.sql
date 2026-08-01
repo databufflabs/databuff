@@ -76,8 +76,7 @@ PROPERTIES (
   "dynamic_partition.time_unit" = "DAY",
   "dynamic_partition.start" = "-30",
   "dynamic_partition.end" = "3",
-  "dynamic_partition.prefix" = "p",
-  "compaction_policy" = "time_series"
+  "dynamic_partition.prefix" = "p"
 );
 
 -- OTLP logs (v0.2.0+)
@@ -106,8 +105,7 @@ PROPERTIES (
   "dynamic_partition.time_unit" = "DAY",
   "dynamic_partition.start" = "-30",
   "dynamic_partition.end" = "3",
-  "dynamic_partition.prefix" = "p",
-  "compaction_policy" = "time_series"
+  "dynamic_partition.prefix" = "p"
 );
 
 -- metric (daily dynamic partition on metric_time; ts = epoch millis; default 30-day retention)
@@ -162,8 +160,7 @@ PROPERTIES (
   "dynamic_partition.time_unit" = "DAY",
   "dynamic_partition.start" = "-30",
   "dynamic_partition.end" = "3",
-  "dynamic_partition.prefix" = "p",
-  "compaction_policy" = "time_series"
+  "dynamic_partition.prefix" = "p"
 );
 
 CREATE TABLE metric_service (
@@ -201,8 +198,7 @@ PROPERTIES (
   "dynamic_partition.time_unit" = "DAY",
   "dynamic_partition.start" = "-30",
   "dynamic_partition.end" = "3",
-  "dynamic_partition.prefix" = "p",
-  "compaction_policy" = "time_series"
+  "dynamic_partition.prefix" = "p"
 );
 
 CREATE TABLE metric_service_config (
@@ -254,8 +250,7 @@ PROPERTIES (
   "dynamic_partition.time_unit" = "DAY",
   "dynamic_partition.start" = "-30",
   "dynamic_partition.end" = "3",
-  "dynamic_partition.prefix" = "p",
-  "compaction_policy" = "time_series"
+  "dynamic_partition.prefix" = "p"
 );
 
 CREATE TABLE metric_service_cpu (
@@ -280,8 +275,7 @@ PROPERTIES (
   "dynamic_partition.time_unit" = "DAY",
   "dynamic_partition.start" = "-30",
   "dynamic_partition.end" = "3",
-  "dynamic_partition.prefix" = "p",
-  "compaction_policy" = "time_series"
+  "dynamic_partition.prefix" = "p"
 );
 
 CREATE TABLE metric_service_db (
@@ -344,8 +338,7 @@ PROPERTIES (
   "dynamic_partition.time_unit" = "DAY",
   "dynamic_partition.start" = "-30",
   "dynamic_partition.end" = "3",
-  "dynamic_partition.prefix" = "p",
-  "compaction_policy" = "time_series"
+  "dynamic_partition.prefix" = "p"
 );
 
 CREATE TABLE metric_service_db_connection_pool (
@@ -383,8 +376,7 @@ PROPERTIES (
   "dynamic_partition.time_unit" = "DAY",
   "dynamic_partition.start" = "-30",
   "dynamic_partition.end" = "3",
-  "dynamic_partition.prefix" = "p",
-  "compaction_policy" = "time_series"
+  "dynamic_partition.prefix" = "p"
 );
 
 CREATE TABLE metric_service_db_connection_pool_get (
@@ -410,8 +402,7 @@ PROPERTIES (
   "dynamic_partition.time_unit" = "DAY",
   "dynamic_partition.start" = "-30",
   "dynamic_partition.end" = "3",
-  "dynamic_partition.prefix" = "p",
-  "compaction_policy" = "time_series"
+  "dynamic_partition.prefix" = "p"
 );
 
 CREATE TABLE metric_service_exception (
@@ -455,8 +446,7 @@ PROPERTIES (
   "dynamic_partition.time_unit" = "DAY",
   "dynamic_partition.start" = "-30",
   "dynamic_partition.end" = "3",
-  "dynamic_partition.prefix" = "p",
-  "compaction_policy" = "time_series"
+  "dynamic_partition.prefix" = "p"
 );
 
 CREATE TABLE metric_service_flow (
@@ -503,8 +493,7 @@ PROPERTIES (
   "dynamic_partition.time_unit" = "DAY",
   "dynamic_partition.start" = "-30",
   "dynamic_partition.end" = "3",
-  "dynamic_partition.prefix" = "p",
-  "compaction_policy" = "time_series"
+  "dynamic_partition.prefix" = "p"
 );
 
 CREATE TABLE metric_service_health_status (
@@ -541,8 +530,7 @@ PROPERTIES (
   "dynamic_partition.time_unit" = "DAY",
   "dynamic_partition.start" = "-30",
   "dynamic_partition.end" = "3",
-  "dynamic_partition.prefix" = "p",
-  "compaction_policy" = "time_series"
+  "dynamic_partition.prefix" = "p"
 );
 
 CREATE TABLE metric_service_http (
@@ -601,8 +589,7 @@ PROPERTIES (
   "dynamic_partition.time_unit" = "DAY",
   "dynamic_partition.start" = "-30",
   "dynamic_partition.end" = "3",
-  "dynamic_partition.prefix" = "p",
-  "compaction_policy" = "time_series"
+  "dynamic_partition.prefix" = "p"
 );
 
 CREATE TABLE metric_service_http_connection_pool (
@@ -630,8 +617,7 @@ PROPERTIES (
   "dynamic_partition.time_unit" = "DAY",
   "dynamic_partition.start" = "-30",
   "dynamic_partition.end" = "3",
-  "dynamic_partition.prefix" = "p",
-  "compaction_policy" = "time_series"
+  "dynamic_partition.prefix" = "p"
 );
 
 CREATE TABLE metric_service_http_connection_pool_get (
@@ -657,8 +643,7 @@ PROPERTIES (
   "dynamic_partition.time_unit" = "DAY",
   "dynamic_partition.start" = "-30",
   "dynamic_partition.end" = "3",
-  "dynamic_partition.prefix" = "p",
-  "compaction_policy" = "time_series"
+  "dynamic_partition.prefix" = "p"
 );
 
 CREATE TABLE metric_service_instance (
@@ -713,8 +698,7 @@ PROPERTIES (
   "dynamic_partition.time_unit" = "DAY",
   "dynamic_partition.start" = "-30",
   "dynamic_partition.end" = "3",
-  "dynamic_partition.prefix" = "p",
-  "compaction_policy" = "time_series"
+  "dynamic_partition.prefix" = "p"
 );
 
 CREATE TABLE metric_service_io (
@@ -740,8 +724,7 @@ PROPERTIES (
   "dynamic_partition.time_unit" = "DAY",
   "dynamic_partition.start" = "-30",
   "dynamic_partition.end" = "3",
-  "dynamic_partition.prefix" = "p",
-  "compaction_policy" = "time_series"
+  "dynamic_partition.prefix" = "p"
 );
 
 CREATE TABLE metric_service_mem (
@@ -768,8 +751,7 @@ PROPERTIES (
   "dynamic_partition.time_unit" = "DAY",
   "dynamic_partition.start" = "-30",
   "dynamic_partition.end" = "3",
-  "dynamic_partition.prefix" = "p",
-  "compaction_policy" = "time_series"
+  "dynamic_partition.prefix" = "p"
 );
 
 CREATE TABLE metric_service_mq (
@@ -832,8 +814,7 @@ PROPERTIES (
   "dynamic_partition.time_unit" = "DAY",
   "dynamic_partition.start" = "-30",
   "dynamic_partition.end" = "3",
-  "dynamic_partition.prefix" = "p",
-  "compaction_policy" = "time_series"
+  "dynamic_partition.prefix" = "p"
 );
 
 CREATE TABLE metric_service_net (
@@ -859,8 +840,7 @@ PROPERTIES (
   "dynamic_partition.time_unit" = "DAY",
   "dynamic_partition.start" = "-30",
   "dynamic_partition.end" = "3",
-  "dynamic_partition.prefix" = "p",
-  "compaction_policy" = "time_series"
+  "dynamic_partition.prefix" = "p"
 );
 
 CREATE TABLE metric_service_object_pool (
@@ -891,8 +871,7 @@ PROPERTIES (
   "dynamic_partition.time_unit" = "DAY",
   "dynamic_partition.start" = "-30",
   "dynamic_partition.end" = "3",
-  "dynamic_partition.prefix" = "p",
-  "compaction_policy" = "time_series"
+  "dynamic_partition.prefix" = "p"
 );
 
 CREATE TABLE metric_service_object_pool_get (
@@ -918,8 +897,7 @@ PROPERTIES (
   "dynamic_partition.time_unit" = "DAY",
   "dynamic_partition.start" = "-30",
   "dynamic_partition.end" = "3",
-  "dynamic_partition.prefix" = "p",
-  "compaction_policy" = "time_series"
+  "dynamic_partition.prefix" = "p"
 );
 
 CREATE TABLE metric_service_redis (
@@ -971,8 +949,7 @@ PROPERTIES (
   "dynamic_partition.time_unit" = "DAY",
   "dynamic_partition.start" = "-30",
   "dynamic_partition.end" = "3",
-  "dynamic_partition.prefix" = "p",
-  "compaction_policy" = "time_series"
+  "dynamic_partition.prefix" = "p"
 );
 
 CREATE TABLE metric_service_rpc (
@@ -1029,8 +1006,7 @@ PROPERTIES (
   "dynamic_partition.time_unit" = "DAY",
   "dynamic_partition.start" = "-30",
   "dynamic_partition.end" = "3",
-  "dynamic_partition.prefix" = "p",
-  "compaction_policy" = "time_series"
+  "dynamic_partition.prefix" = "p"
 );
 
 CREATE TABLE metric_service_remote (
@@ -1085,8 +1061,7 @@ PROPERTIES (
   "dynamic_partition.time_unit" = "DAY",
   "dynamic_partition.start" = "-30",
   "dynamic_partition.end" = "3",
-  "dynamic_partition.prefix" = "p",
-  "compaction_policy" = "time_series"
+  "dynamic_partition.prefix" = "p"
 );
 
 CREATE TABLE metric_service_tcp (
@@ -1112,8 +1087,7 @@ PROPERTIES (
   "dynamic_partition.time_unit" = "DAY",
   "dynamic_partition.start" = "-30",
   "dynamic_partition.end" = "3",
-  "dynamic_partition.prefix" = "p",
-  "compaction_policy" = "time_series"
+  "dynamic_partition.prefix" = "p"
 );
 
 CREATE TABLE metric_service_thread_pool (
@@ -1146,8 +1120,7 @@ PROPERTIES (
   "dynamic_partition.time_unit" = "DAY",
   "dynamic_partition.start" = "-30",
   "dynamic_partition.end" = "3",
-  "dynamic_partition.prefix" = "p",
-  "compaction_policy" = "time_series"
+  "dynamic_partition.prefix" = "p"
 );
 
 CREATE TABLE metric_service_thread_pool_cost (
@@ -1179,8 +1152,7 @@ PROPERTIES (
   "dynamic_partition.time_unit" = "DAY",
   "dynamic_partition.start" = "-30",
   "dynamic_partition.end" = "3",
-  "dynamic_partition.prefix" = "p",
-  "compaction_policy" = "time_series"
+  "dynamic_partition.prefix" = "p"
 );
 
 CREATE TABLE metric_service_trace (
@@ -1219,8 +1191,7 @@ PROPERTIES (
   "dynamic_partition.time_unit" = "DAY",
   "dynamic_partition.start" = "-30",
   "dynamic_partition.end" = "3",
-  "dynamic_partition.prefix" = "p",
-  "compaction_policy" = "time_series"
+  "dynamic_partition.prefix" = "p"
 );
 
 -- config
@@ -1625,4 +1596,4 @@ DISTRIBUTED BY HASH(`id`) BUCKETS 1
 PROPERTIES ("replication_num" = "1");
 
 INSERT INTO schema_version (id, version, applied_at)
-VALUES (1, 6, NOW());
+VALUES (1, 5, NOW());

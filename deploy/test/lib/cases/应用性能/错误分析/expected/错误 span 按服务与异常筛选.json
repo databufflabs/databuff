@@ -2,7 +2,8 @@
   "status": 200,
   "message": "success",
   "data": {
-    "total": {"$range": [1, 30]},
-    "list": {"$minLength": 1}
+    "list": {
+      "$minLength": 1
+    }
   }
 }
