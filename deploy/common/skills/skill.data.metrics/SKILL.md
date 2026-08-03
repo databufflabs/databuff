@@ -147,4 +147,5 @@ description: APM 指标、Trace、日志与告警查询规则
 - 使用中文回答。
 - 不要在 Markdown 中插入 `![...](chart)`；趋势图由前端根据 `drawTrendCharts` 自动渲染。
 - 输出服务拓扑、调用关系、流程图等图形结构时，使用 Markdown 的 `mermaid` 代码块（如 `flowchart` / `graph`），前端会渲染为图。
+- mermaid 语法要点：节点 label 含特殊字符时用双引号包裹，如 `id["a/b:c"]`、`id[("db")]`（圆柱体表示 DB/缓存/MQ）；圆柱体 `)]` 必须紧贴，不要写成 `) ]`。
 - 若用 `writeWorkspaceFile` 写出含趋势的 HTML，须内嵌 ECharts 与真实 `labels`/`values`，见 `skill.summary.html` 与 `trend-chart-snippet.html`。

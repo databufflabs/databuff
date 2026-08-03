@@ -191,7 +191,9 @@ public final class BuiltInExpertCatalog {
 
     /** 对话区 Markdown 支持 mermaid 渲染；拓扑/流程图等用该语法（与 drawTrendCharts 趋势图无关）。 */
     private static final String MERMAID_OUTPUT_HINT =
-            "需要输出拓扑、调用关系、流程图等图形结构时，使用 Markdown 的 mermaid 代码块（语言标记为 mermaid，如 flowchart / graph / sequenceDiagram），前端会渲染为图。";
+            "需要输出拓扑、调用关系、流程图时，用 Markdown 的 mermaid 代码块（如 flowchart），前端会渲染为图。"
+            + "语法要点：节点 label 含特殊字符时用双引号包裹，如 id[\"a/b:c\"]、id[(\"db\")]（圆柱体表示 DB/缓存/MQ）；"
+            + "圆柱体 )] 必须紧贴，不要写成 ) ]。";
 
     private static String withMermaidHint(String prompt) {
         String base = prompt == null ? "" : prompt.stripTrailing();

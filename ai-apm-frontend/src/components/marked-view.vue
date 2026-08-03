@@ -40,6 +40,23 @@ type MermaidApi = {
 /** 模块级缓存：同源 mermaid 文本复用 SVG，跨组件实例也避免重复布局闪烁 */
 const mermaidSvgCache = new Map<string, string>()
 
+/** 解析失败时给 diagram 容器加的标记 class，用于展示「图表解析失败」提示 */
+const MERMAID_FAIL_CLASS = 'mermaid-render-failed'
+
+/**
+ * 对 LLM 常见的 mermaid 语法错误做最小修复。仅在 mermaid.run 抛错后兜底重试时调用，
+ * 不影响首次正常渲染。当前覆盖：
+ * - 圆柱体 / 引号矩形闭合 `)` 或 `"` 与 `]` 之间多了空格：`id[("label") ]` → `id[("label")]`
+ */
+function repairMermaidSource (source: string): string {
+  if (!source) {
+    return source
+  }
+  return source
+    .replace(/\)\s+\]/g, ')]')
+    .replace(/"\s+\]/g, '"]')
+}
+
 function escapeHtml (text: string): string {
   return text
     .replace(/&/g, '&amp;')
@@ -341,6 +358,8 @@ export default class MarkedView extends Vue {
       if (!source.trim()) {
         return
       }
+      // 渲染成功，清除之前的失败标记
+      diagram.classList.remove(MERMAID_FAIL_CLASS)
       // 缓存整段 diagram 内容（含 svg），回填时保持结构
       mermaidSvgCache.set(source, diagram.innerHTML)
     })
@@ -382,11 +401,6 @@ export default class MarkedView extends Vue {
       if (!isElementVisible(wrap)) {
         return
       }
-      // 加载脚本期间 DOM 可能被打字机重绘，重新采集待渲染节点
-      const freshNodes = this.collectPendingMermaidNodes(wrap)
-      if (!freshNodes.length) {
-        return
-      }
       if (!mermaidInitialized) {
         const isDark = document.documentElement.getAttribute('data-theme') === 'dark'
         mermaid.initialize({
@@ -398,13 +412,71 @@ export default class MarkedView extends Vue {
         })
         mermaidInitialized = true
       }
-      await mermaid.run({ nodes: freshNodes })
-      // 若仍因布局瞬时不可见而残缺，恢复源码等下次可见重试
+      // 加载脚本期间 DOM 可能被打字机重绘，重新采集待渲染节点
+      const freshNodes = this.collectPendingMermaidNodes(wrap)
+      if (!freshNodes.length) {
+        return
+      }
+      // 逐节点渲染：单块语法错误不会阻断同消息内其它图，失败块再尝试一次最小修复
+      for (const node of freshNodes) {
+        if (token !== this.mermaidRenderToken) {
+          return
+        }
+        await this.renderOneMermaidNode(mermaid, node)
+      }
+      // 折叠态瞬时残缺的 SVG 恢复源码，等下次可见重试
       this.restoreBrokenMermaidDiagrams(wrap)
       this.cacheRenderedDiagrams(wrap)
     } catch (err) {
-      // 语法未闭合或非法时保留源码，不打断其余内容
       console.warn('[marked-view] mermaid render failed', err)
+    }
+  }
+
+  /**
+   * 渲染单个 mermaid 节点。首次失败时套用 repairMermaidSource 做一次最小修复重试；
+   * 仍失败则回退为源码占位并加 mermaid-render-failed 标记，配合 CSS 提示「图表解析失败」。
+   *
+   * 逐节点调用 mermaid.run 而非批量传入：mermaid v11 即便某节点解析失败也会给所有节点
+   * 标上 data-processed 并塞入错误 SVG，且整体 promise reject；逐节点调用可隔离失败，
+   * 保证同消息里其它合法图正常渲染。
+   */
+  private async renderOneMermaidNode (mermaid: MermaidApi, node: HTMLElement): Promise<void> {
+    const diagram = node.closest<HTMLElement>('.mermaid-diagram[data-mermaid-source]')
+    const original = diagram ? decodeMermaidSource(diagram) : (node.textContent || '')
+    if (!original.trim()) {
+      return
+    }
+    const tryRun = async (src: string) => {
+      node.textContent = src
+      // 移除上一次失败留下的 data-processed / 错误 SVG，让 mermaid 重新处理
+      node.removeAttribute('data-processed')
+      await mermaid.run({ nodes: [node] })
+    }
+    // 第一次：原样渲染
+    try {
+      await tryRun(original)
+      return
+    } catch (e1) {
+      console.warn('[marked-view] mermaid node failed, attempting repair', e1)
+    }
+    // 第二次：最小修复后重试
+    const fixed = repairMermaidSource(original)
+    if (fixed.trim() && fixed !== original) {
+      try {
+        await tryRun(fixed)
+        // 修复成功：把修复后的文本作为新的规范源码，后续缓存/回填基于它
+        if (diagram) {
+          diagram.setAttribute('data-mermaid-source', encodeURIComponent(fixed))
+        }
+        return
+      } catch (e2) {
+        console.warn('[marked-view] mermaid repair retry failed', e2)
+      }
+    }
+    // 仍失败：回退为源码占位并打标记（不保留 mermaid 的错误 SVG）
+    if (diagram) {
+      diagram.classList.add(MERMAID_FAIL_CLASS)
+      diagram.innerHTML = `<pre class="mermaid">${escapeHtml(original)}</pre>`
     }
   }
 
@@ -578,6 +650,7 @@ export default class MarkedView extends Vue {
     text-align: center;
     /* 未渲染时给一点最小高度，减少源码↔SVG 切换的布局跳动 */
     min-height: 48px;
+    position: relative;
 
     pre.mermaid {
       margin: 0;
@@ -594,6 +667,22 @@ export default class MarkedView extends Vue {
     svg {
       max-width: 100%;
       height: auto;
+    }
+
+    /* 修复重试仍失败时：展示「图表解析失败」提示，引导用户知道是模型画法错了 */
+    &.mermaid-render-failed {
+      border: 1px dashed var(--color-danger, #ef4444);
+      background-color: rgba(239, 68, 68, 0.04);
+
+      &::before {
+        content: '图表解析失败：模型生成的 mermaid 语法有误，已尝试自动修复未果';
+        display: block;
+        margin-bottom: 8px;
+        padding: 2px 0;
+        color: var(--color-danger, #ef4444);
+        font-size: 12px;
+        text-align: left;
+      }
     }
   }
 
