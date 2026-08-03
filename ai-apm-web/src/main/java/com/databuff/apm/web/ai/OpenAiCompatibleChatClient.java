@@ -37,12 +37,16 @@ public class OpenAiCompatibleChatClient {
 
     private ChatResult chatOpenAi(ResolvedLlmProvider provider, String userMessage) {
         try {
-            String body = objectMapper.writeValueAsString(Map.of(
-                    "model", provider.defaultModel(),
-                    "max_tokens", LlmChatModelFactory.resolveMaxOutputTokens(provider.maxOutputTokens()),
-                    "messages", new Object[] {
-                            Map.of("role", "user", "content", userMessage)
-                    }));
+            Map<String, Object> bodyMap = new java.util.LinkedHashMap<>();
+            bodyMap.put("model", provider.defaultModel());
+            Integer maxTokens = LlmChatModelFactory.resolveMaxOutputTokens(provider.maxOutputTokens());
+            if (maxTokens != null) {
+                bodyMap.put("max_tokens", maxTokens);
+            }
+            bodyMap.put("messages", new Object[] {
+                    Map.of("role", "user", "content", userMessage)
+            });
+            String body = objectMapper.writeValueAsString(bodyMap);
             URI uri = URI.create(LlmChatModelFactory.buildOpenAiChatCompletionsUrl(provider.baseUrl()));
             HttpRequest.Builder builder = HttpRequest.newBuilder(uri)
                     .timeout(agentRuntimeConfig.llmHttpTimeout())
@@ -68,12 +72,16 @@ public class OpenAiCompatibleChatClient {
 
     private ChatResult chatAnthropic(ResolvedLlmProvider provider, String userMessage) {
         try {
-            String body = objectMapper.writeValueAsString(Map.of(
-                    "model", provider.defaultModel(),
-                    "max_tokens", LlmChatModelFactory.resolveMaxOutputTokens(provider.maxOutputTokens()),
-                    "messages", new Object[] {
-                            Map.of("role", "user", "content", userMessage)
-                    }));
+            Map<String, Object> bodyMap = new java.util.LinkedHashMap<>();
+            bodyMap.put("model", provider.defaultModel());
+            // Anthropic Messages API requires max_tokens; fall back to 4096 when unconfigured
+            // (matches AgentScope AnthropicChatModel's built-in default).
+            Integer maxTokens = LlmChatModelFactory.resolveMaxOutputTokens(provider.maxOutputTokens());
+            bodyMap.put("max_tokens", maxTokens != null ? maxTokens : 4096);
+            bodyMap.put("messages", new Object[] {
+                    Map.of("role", "user", "content", userMessage)
+            });
+            String body = objectMapper.writeValueAsString(bodyMap);
             URI uri = URI.create(LlmChatModelFactory.buildAnthropicMessagesUrl(provider.baseUrl()));
             HttpRequest.Builder builder = HttpRequest.newBuilder(uri)
                     .timeout(agentRuntimeConfig.llmHttpTimeout())

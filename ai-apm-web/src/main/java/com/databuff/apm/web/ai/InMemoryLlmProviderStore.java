@@ -130,7 +130,7 @@ public class InMemoryLlmProviderStore {
                 defaultModel,
                 defaultModel,
                 null,
-                LlmChatModelFactory.DEFAULT_MAX_OUTPUT_TOKENS,
+                null,
                 List.of(),
                 true)));
         if (request.apiKey() != null && !request.apiKey().isBlank()) {
@@ -161,7 +161,7 @@ public class InMemoryLlmProviderStore {
                         state.defaultModel,
                         state.defaultModel,
                         null,
-                        LlmChatModelFactory.DEFAULT_MAX_OUTPUT_TOKENS,
+                        null,
                         List.of(),
                         true));
             } else {
@@ -203,11 +203,11 @@ public class InMemoryLlmProviderStore {
     }
 
     /**
-     * Max output tokens for a provider model. Empty/blank config falls back to
-     * {@link LlmChatModelFactory#DEFAULT_MAX_OUTPUT_TOKENS} (200K).
-     * DataBuff does not clamp to vendor limits — oversized values may fail at the LLM API.
+     * Max output tokens for a provider model, or {@code null} when unconfigured (meaning
+     * "do not send {@code max_tokens}"; the model / SDK applies its own default).
+     * DataBuff does not clamp to vendor limits — oversized configured values may fail at the LLM API.
      */
-    public int resolveMaxOutputTokens(String providerCode, String modelId) {
+    public Integer resolveMaxOutputTokens(String providerCode, String modelId) {
         return LlmChatModelFactory.resolveMaxOutputTokens(configuredMaxOutputTokens(providerCode, modelId));
     }
 
@@ -487,7 +487,7 @@ public class InMemoryLlmProviderStore {
                 state.defaultModel,
                 state.defaultModel,
                 null,
-                LlmChatModelFactory.DEFAULT_MAX_OUTPUT_TOKENS,
+                null,
                 List.of(),
                 true)));
     }

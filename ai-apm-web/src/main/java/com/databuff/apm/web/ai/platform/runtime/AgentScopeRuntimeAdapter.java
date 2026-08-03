@@ -169,7 +169,7 @@ public class AgentScopeRuntimeAdapter {
         toolkit.registerTool(sessionWorkspaceTools);
 
         EmbedSkillsResult embeddedSkills = embedExpertSkills(resolveSystemPrompt(expert), skillIds);
-        int maxOutputTokens = llmProviderStore.resolveMaxOutputTokens(
+        Integer maxOutputTokens = llmProviderStore.resolveMaxOutputTokens(
                 provider.providerCode(),
                 expert.modelName() != null && !expert.modelName().isBlank()
                         ? expert.modelName()

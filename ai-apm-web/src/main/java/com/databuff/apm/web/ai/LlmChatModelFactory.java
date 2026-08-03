@@ -15,30 +15,33 @@ import java.util.regex.Pattern;
 
 public final class LlmChatModelFactory {
 
-    /**
-     * Default max output tokens when model config leaves {@code maxOutputTokens} empty.
-     * Overrides AgentScope AnthropicChatModel's built-in 4096 default.
-     */
-    public static final int DEFAULT_MAX_OUTPUT_TOKENS = 200_000;
-
     private static final Pattern VERSION_IN_PATH = Pattern.compile(".*/v\\d+$");
     private static final Duration PROBE_TIMEOUT = Duration.ofSeconds(30);
 
     private LlmChatModelFactory() {
     }
 
-    /** Prefer configured value when positive; otherwise {@link #DEFAULT_MAX_OUTPUT_TOKENS}. */
-    public static int resolveMaxOutputTokens(Integer configured) {
+    /**
+     * Resolved max output tokens, or {@code null} when not configured. A {@code null} result
+     * means "do not send {@code max_tokens}"; the model / SDK then applies its own default
+     * (e.g. AgentScope AnthropicChatModel's built-in 4096). DataBuff intentionally ships no
+     * cross-model default — a single default cannot fit every vendor's max output limit and
+     * oversized values make the LLM API reject the request (HTTP 400).
+     */
+    public static Integer resolveMaxOutputTokens(Integer configured) {
         if (configured != null && configured > 0) {
             return configured;
         }
-        return DEFAULT_MAX_OUTPUT_TOKENS;
+        return null;
     }
 
     public static GenerateOptions generateOptions(Integer configuredMaxOutputTokens) {
-        return GenerateOptions.builder()
-                .maxTokens(resolveMaxOutputTokens(configuredMaxOutputTokens))
-                .build();
+        Integer resolved = resolveMaxOutputTokens(configuredMaxOutputTokens);
+        GenerateOptions.Builder builder = GenerateOptions.builder();
+        if (resolved != null) {
+            builder.maxTokens(resolved);
+        }
+        return builder.build();
     }
 
     public static Model build(
@@ -70,25 +73,30 @@ public final class LlmChatModelFactory {
 
     /**
      * Connectivity probe through the same AgentScope {@link Model} stack used by expert Q&A.
-     * Throws on failure so callers can surface the SDK/HTTP error message.
+     * Uses the same resolved {@code max_tokens} as real chat (configured value, or none when
+     * unconfigured) so the probe reflects actual request parameters — a model that rejects the
+     * configured max_tokens fails here too, rather than passing connectivity but failing every
+     * real turn. Throws on failure so callers can surface the SDK/HTTP error message.
      */
     public static void probe(OpenAiCompatibleChatClient.ResolvedLlmProvider provider, String modelName) {
         if (provider == null) {
             throw new IllegalArgumentException("provider is required");
         }
         Model model = build(provider, modelName, false);
-        GenerateOptions options = GenerateOptions.builder()
-                .maxTokens(8)
+        Integer resolvedMaxTokens = resolveMaxOutputTokens(provider.maxOutputTokens());
+        GenerateOptions.Builder optionsBuilder = GenerateOptions.builder()
                 .executionConfig(ExecutionConfig.builder()
                         .timeout(PROBE_TIMEOUT)
                         .maxAttempts(1)
-                        .build())
-                .build();
+                        .build());
+        if (resolvedMaxTokens != null) {
+            optionsBuilder.maxTokens(resolvedMaxTokens);
+        }
         Msg ping = Msg.builder()
                 .role(MsgRole.USER)
                 .textContent("ping")
                 .build();
-        model.stream(List.of(ping), List.of(), options).blockLast(PROBE_TIMEOUT.plusSeconds(5));
+        model.stream(List.of(ping), List.of(), optionsBuilder.build()).blockLast(PROBE_TIMEOUT.plusSeconds(5));
     }
 
     public static String normalizeBaseUrl(String baseUrl) {
