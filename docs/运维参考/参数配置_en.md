@@ -6,7 +6,7 @@
 
 # Parameter Configuration
 
-How to change the login account after install, tune Ingest pipeline task settings, and adjust telemetry retention. For directories and lifecycle, see [Docker Operations](Docker运维_en.md) and [Kubernetes Operations](K8s运维_en.md). For capacity planning and additional knobs, see [Performance Tuning](性能优化_en.md).
+How to change the login account after install, tune Ingest pipeline task settings, configure Trace resource ignore filtering, and adjust telemetry retention. For directories and lifecycle, see [Docker Operations](Docker运维_en.md) and [Kubernetes Operations](K8s运维_en.md). For capacity planning and additional knobs, see [Performance Tuning](性能优化_en.md).
 
 ## 1. Change login username and password
 
@@ -137,7 +137,75 @@ kubectl -n databuff exec deploy/ai-apm-ingest -- printenv | grep '^INGEST_'
 - Fix drops first (larger buffers / tasks), then tune against CPU and Doris Stream Load pressure.
 - Higher `*_TASKS` uses more CPU and memory—see the baselines in [Performance Tuning](性能优化_en.md).
 
-## 3. Adjust storage retention
+## 3. Trace resource ignore filtering
+
+Drop matching spans (skip enrich / assemble / write and metrics) to filter noise such as health checks, Prometheus scrapes, and `SELECT 1`. Matching uses the span `resource` and, for HTTP, `metaHttpUrl` (either hit drops the span). Exact rules use full-string equality; regex uses Java `Matcher#matches()` (full-string match).
+
+| YAML key | Environment variable | Default | Meaning |
+|----------|----------------------|---------|---------|
+| `ingest.trace.ignore-resources` | `INGEST_TRACE_IGNORE_RESOURCES` | empty | Exact-match list; comma-separated in env |
+| `ingest.trace.ignore-resource-regex` | `INGEST_TRACE_IGNORE_RESOURCE_REGEX` | empty | Full-string regex list; comma-separated in env |
+
+### Option 1: Edit `application.yml`
+
+For local development or when you mount / bake config into the image. Edit ingest `application.yml`:
+
+```yaml
+ingest:
+  trace:
+    ignore-resources:
+      - PING
+      - /actuator/prometheus
+    ignore-resource-regex:
+      - ^/actuator(/.*)?$
+      - ^SELECT 1$
+```
+
+### Option 2: Docker Compose environment variables
+
+Preferred for one-line installs — use `docker-compose.override.yml` (survives upgrades):
+
+```bash
+cd /opt/databuff-ai-apm   # or: echo $APM_INSTALL_DIR
+
+cat > docker-compose.override.yml <<'EOF'
+services:
+  ai-apm-ingest:
+    environment:
+      INGEST_TRACE_IGNORE_RESOURCES: "PING,/actuator/prometheus"
+      INGEST_TRACE_IGNORE_RESOURCE_REGEX: "^/actuator(/.*)?$,^SELECT 1$"
+EOF
+
+docker compose up -d ai-apm-ingest
+```
+
+If the same override already sets other ingest knobs, append under `environment` instead of replacing the whole file. If a regex or path contains commas, prefer Option 1 (YAML lists) to avoid delimiter ambiguity.
+
+### Kubernetes
+
+```bash
+kubectl -n databuff edit configmap ai-apm-config
+```
+
+Under `data:`:
+
+```yaml
+  INGEST_TRACE_IGNORE_RESOURCES: "PING,/actuator/prometheus"
+  INGEST_TRACE_IGNORE_RESOURCE_REGEX: "^/actuator(/.*)?$,^SELECT 1$"
+```
+
+Restart ingest:
+
+```bash
+kubectl -n databuff rollout restart deploy/ai-apm-ingest
+kubectl -n databuff rollout status deploy/ai-apm-ingest
+```
+
+### Verify
+
+After restart, ingest logs should contain `Span resource ignore filter enabled` when rules are loaded.
+
+## 4. Adjust storage retention
 
 To keep data for 14 days, connect to Doris and run the following SQL (no FE / BE restart required):
 

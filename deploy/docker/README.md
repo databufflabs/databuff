@@ -40,7 +40,7 @@ cd /opt/databuff-ai-apm && ./update.sh
 
 ## 离线安装（一体化大包）
 
-无法访问镜像仓库时，按架构从 `${APM_PKG_BASE}/<version>/offline/` 下载离线包（对外地址示例：`https://openocta.com/pkg/databuff/0.1.2/offline/`），解压后执行 `install.sh`，**全程无需联网**：
+无法访问镜像仓库时，按架构从 `${APM_PKG_BASE}/<version>/offline/` 下载离线包（对外地址示例：`https://datalens.databuff.com:5001/databuff/0.1.2/offline/`），解压后执行 `install.sh`，**全程无需联网**：
 
 ```bash
 tar -zxvf databuff-ai-apm-offline-0.1.2-amd64.tar.gz

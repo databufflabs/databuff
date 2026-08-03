@@ -199,7 +199,7 @@ curl -fsSL https://databuff.ai/databuff/ai-apm-demo-install.sh | bash
 
 When the registry is unreachable, download the bundle for your architecture and install on the target machine. Pick a version on the [install page](https://databuff.ai/#install) under **Docker → Offline Install**, or use:
 
-`https://openocta.com/pkg/databuff/<version>/offline/databuff-ai-apm-offline-<version>-<arch>.tar.gz`
+`https://datalens.databuff.com:5001/databuff/<version>/offline/databuff-ai-apm-offline-<version>-<arch>.tar.gz`
 
 ```bash
 tar -zxvf databuff-ai-apm-offline-<version>-<arch>.tar.gz

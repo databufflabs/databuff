@@ -160,7 +160,7 @@ format_bytes_human() {
   }'
 }
 
-# 远程 tarball 总大小：只读 ${url}.size 侧车（openocta HEAD/Range 不可用）。
+# 远程 tarball 总大小：只读 ${url}.size 侧车（datalens HEAD/Range 不可用时回退）。
 valid_remote_content_length() {
   local len="$1"
   [[ -n "$len" && "$len" =~ ^[0-9]+$ && "$len" -gt 1048576 ]]

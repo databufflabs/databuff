@@ -193,7 +193,7 @@ curl -fsSL https://databuff.ai/databuff/ai-apm-demo-install.sh | bash
 
 无法访问镜像仓库时，按架构下载离线包后在目标机器安装。版本与下载链接见 [官网安装页](https://databuff.ai/#install) **Docker → 离线安装**，或：
 
-`https://openocta.com/pkg/databuff/<version>/offline/databuff-ai-apm-offline-<version>-<arch>.tar.gz`
+`https://datalens.databuff.com:5001/databuff/<version>/offline/databuff-ai-apm-offline-<version>-<arch>.tar.gz`
 
 ```bash
 tar -zxvf databuff-ai-apm-offline-<version>-<arch>.tar.gz

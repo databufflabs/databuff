@@ -27,21 +27,21 @@ Download the all-in-one offline bundle matching your CPU architecture.
 
 Download URLs (replace `<version>` with the release, e.g. `0.1.2`):
 
-- amd64: `https://openocta.com/pkg/databuff/<version>/offline/databuff-ai-apm-offline-<version>-amd64.tar.gz`
-- arm64: `https://openocta.com/pkg/databuff/<version>/offline/databuff-ai-apm-offline-<version>-arm64.tar.gz`
+- amd64: `https://datalens.databuff.com:5001/databuff/<version>/offline/databuff-ai-apm-offline-<version>-amd64.tar.gz`
+- arm64: `https://datalens.databuff.com:5001/databuff/<version>/offline/databuff-ai-apm-offline-<version>-arm64.tar.gz`
 
 Example CLI download (amd64 / `0.1.2`):
 
 ```bash
-curl -fLO https://openocta.com/pkg/databuff/0.1.2/offline/databuff-ai-apm-offline-0.1.2-amd64.tar.gz
+curl -fLO https://datalens.databuff.com:5001/databuff/0.1.2/offline/databuff-ai-apm-offline-0.1.2-amd64.tar.gz
 ```
 
-To resolve the latest release automatically, `https://openocta.com/pkg/databuff/VERSION` returns plain text (e.g. `0.1.2`) — **not** the bundle. Query the version first, then download:
+To resolve the latest release automatically, `https://datalens.databuff.com:5001/databuff/VERSION` returns plain text (e.g. `0.1.2`) — **not** the bundle. Query the version first, then download:
 
 ```bash
-VERSION=$(curl -fsSL https://openocta.com/pkg/databuff/VERSION)
+VERSION=$(curl -fsSL https://datalens.databuff.com:5001/databuff/VERSION)
 ARCH=amd64   # or arm64
-curl -fLO "https://openocta.com/pkg/databuff/${VERSION}/offline/databuff-ai-apm-offline-${VERSION}-${ARCH}.tar.gz"
+curl -fLO "https://datalens.databuff.com:5001/databuff/${VERSION}/offline/databuff-ai-apm-offline-${VERSION}-${ARCH}.tar.gz"
 ```
 
 Each bundle includes deployment scripts, `ai-apm-stack` app images, and `doris-stack` infra images.
