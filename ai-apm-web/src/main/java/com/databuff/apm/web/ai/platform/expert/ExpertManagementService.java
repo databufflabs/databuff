@@ -179,7 +179,11 @@ public class ExpertManagementService {
             case "inspection" -> missingMermaidHint
                     && systemPrompt.startsWith("你是 DataBuff APM 智能巡检专家，负责对服务健康状态做初步异常检测");
             case "ops" -> missingMermaidHint && systemPrompt.startsWith("你是 DataBuff APM 运维专家");
-            case "qa" -> missingMermaidHint && systemPrompt.startsWith("你是 DataBuff 产品答疑专家");
+            case "qa" -> systemPrompt.contains("若问题本质是线上数据或环境故障，明确说明应转给对应专家")
+                    || systemPrompt.contains("不要硬查源码凑答案")
+                    || systemPrompt.contains("不负责查 APM 指标/Trace/告警")
+                    || systemPrompt.contains("**不**查 APM 指标")
+                    || (missingMermaidHint && systemPrompt.startsWith("你是 DataBuff 产品答疑专家"));
             default -> false;
         };
     }

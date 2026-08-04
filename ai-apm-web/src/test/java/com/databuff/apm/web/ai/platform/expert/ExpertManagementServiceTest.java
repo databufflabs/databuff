@@ -39,7 +39,7 @@ class ExpertManagementServiceTest {
         assertThat(service.find("ops").orElseThrow().toolIds())
                 .contains("Bash", "BashOutput", "KillShell", "inspect.inspectService");
         assertThat(service.find("qa").orElseThrow().toolIds())
-                .containsExactly("Bash", "BashOutput", "KillShell");
+                .containsExactly("Bash", "BashOutput", "KillShell", "platform.queryDoris");
         assertThat(service.find("qa").orElseThrow().skillIds())
                 .contains("skill.qa.product");
         assertThat(service.delete("brain")).isFalse();
@@ -132,6 +132,40 @@ class ExpertManagementServiceTest {
         assertThat(service.find("data").orElseThrow().systemPrompt())
                 .contains("智能问数")
                 .contains("skill.data.metrics");
+    }
+
+    @Test
+    void persistedLegacyQaPromptUpgradesToDorisQueryGuidance() {
+        ExpertManagementService service = service();
+        AiExpertDefinition qa = service.find("qa").orElseThrow();
+        String legacyPrompt = """
+                你是 DataBuff 产品答疑专家。用户问产品怎么用时，你通过 Bash 检索源码与文档后回答。
+                需要输出拓扑、调用关系、流程图时，用 Markdown 的 mermaid 代码块。
+                工作范围：若问题本质是线上数据或环境故障，明确说明应转给对应专家，不要硬查源码凑答案。
+                """;
+        service.applyPersistedRows(List.of(new AiExpertDefinition(
+                qa.expertId(),
+                qa.name(),
+                qa.category(),
+                qa.description(),
+                qa.type(),
+                qa.modelProviderCode(),
+                qa.modelName(),
+                legacyPrompt,
+                List.of("Bash", "BashOutput", "KillShell"),
+                qa.skillIds(),
+                qa.options(),
+                qa.enabled(),
+                true,
+                qa.version(),
+                qa.createdAt(),
+                qa.updatedAt())));
+
+        AiExpertDefinition upgraded = service.find("qa").orElseThrow();
+        assertThat(upgraded.systemPrompt())
+                .contains("queryDoris")
+                .doesNotContain("不要硬查源码凑答案");
+        assertThat(upgraded.toolIds()).contains("platform.queryDoris");
     }
 
     @Test

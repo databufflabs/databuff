@@ -35,6 +35,7 @@ import com.databuff.apm.web.tools.local.CommonTools;
 import com.databuff.apm.web.tools.local.DataTools;
 import com.databuff.apm.web.tools.local.InspectTools;
 import com.databuff.apm.web.tools.local.LogTools;
+import com.databuff.apm.web.tools.local.PlatformTools;
 import com.databuff.apm.web.tools.local.TimeTool;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import org.springframework.beans.factory.ObjectProvider;
@@ -255,6 +256,7 @@ public final class TestBeanSupport {
                 inspectTools(mock(ServicePortalService.class), objectMapper),
                 mock(LogTools.class),
                 timeTool,
+                mock(PlatformTools.class),
                 objectMapper);
     }
 

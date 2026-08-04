@@ -9,6 +9,7 @@ import com.databuff.apm.web.tools.local.CommonTools;
 import com.databuff.apm.web.tools.local.DataTools;
 import com.databuff.apm.web.tools.local.InspectTools;
 import com.databuff.apm.web.tools.local.LogTools;
+import com.databuff.apm.web.tools.local.PlatformTools;
 import com.databuff.apm.web.tools.local.TimeTool;
 import io.agentscope.core.tool.Toolkit;
 import io.agentscope.core.tool.mcp.McpClientWrapper;
@@ -41,6 +42,8 @@ public class AgentScopeToolFactory {
     private ExpertDispatchTool expertDispatchTool;
     @Autowired
     private BashTools bashTools;
+    @Autowired
+    private PlatformTools platformTools;
     @Autowired
     private RemoteMcpToolRegistrar remoteMcpToolRegistrar;
 
@@ -96,6 +99,8 @@ public class AgentScopeToolFactory {
             toolkit.registerTool(expertDispatchTool);
         } else if ("bashTools".equals(beanName) && bashTools != null) {
             toolkit.registerTool(bashTools);
+        } else if ("platformTools".equals(beanName) && platformTools != null) {
+            toolkit.registerTool(platformTools);
         } else {
             log.warn("Tool {} implementation {} has no registered local bean", tool.toolId(), implementation);
         }

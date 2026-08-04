@@ -224,6 +224,8 @@ export default {
   disableTool: (toolId: string) => http.post(`/api/v1/ai/tools/${encodeURIComponent(toolId)}/disable`),
   testTool: (toolId: string, service?: string) =>
     http.post(`/api/v1/ai/tools/${encodeURIComponent(toolId)}/test`, service ? { service } : {}),
+  queryDoris: (data: { sql: string; maxRows?: number }) =>
+    http.post('/api/v1/ai/doris/query', data),
 
   listSkills: () => http.get('/api/v1/ai/skills').then(unwrapList<AiSkillDefinition>),
   getSkill: (skillId: string) => http.get(`/api/v1/ai/skills/${encodeURIComponent(skillId)}`),

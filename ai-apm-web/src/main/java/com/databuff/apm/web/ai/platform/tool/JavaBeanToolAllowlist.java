@@ -25,6 +25,7 @@ public final class JavaBeanToolAllowlist {
             "bashTools.bash",
             "bashTools.bashOutput",
             "bashTools.killShell",
+            "platformTools.queryDoris",
             "expertDispatchTool.dispatchExpertTask");
 
     private JavaBeanToolAllowlist() {

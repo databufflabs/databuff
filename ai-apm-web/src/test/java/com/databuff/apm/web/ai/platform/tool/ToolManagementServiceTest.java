@@ -37,7 +37,8 @@ class ToolManagementServiceTest {
                         "inspect.inspectService",
                         "Bash",
                         "BashOutput",
-                        "KillShell");
+                        "KillShell",
+                        "platform.queryDoris");
         assertThat(service.delete("data.queryServicesAll")).isFalse();
     }
 

@@ -6,6 +6,7 @@ import com.databuff.apm.web.tools.local.DataTools;
 import com.databuff.apm.web.tools.local.InspectTools;
 import com.databuff.apm.web.tools.local.LogTools;
 import com.databuff.apm.web.tools.local.MetricQueryRequest;
+import com.databuff.apm.web.tools.local.PlatformTools;
 import com.databuff.apm.web.tools.local.TimeTool;
 import com.databuff.apm.web.tools.local.TrendChartSpec;
 import com.fasterxml.jackson.core.JsonProcessingException;
@@ -23,6 +24,7 @@ public class JavaBeanToolExecutor {
     private final InspectTools inspectTools;
     private final LogTools logTools;
     private final TimeTool timeTool;
+    private final PlatformTools platformTools;
     private final ObjectMapper objectMapper;
 
     public JavaBeanToolExecutor(
@@ -31,12 +33,14 @@ public class JavaBeanToolExecutor {
             InspectTools inspectTools,
             LogTools logTools,
             TimeTool timeTool,
+            PlatformTools platformTools,
             ObjectMapper objectMapper) {
         this.commonTools = commonTools;
         this.dataTools = dataTools;
         this.inspectTools = inspectTools;
         this.logTools = logTools;
         this.timeTool = timeTool;
+        this.platformTools = platformTools;
         this.objectMapper = objectMapper;
     }
 
@@ -117,6 +121,7 @@ public class JavaBeanToolExecutor {
                     safeRequest.size());
             case "inspectTools.inspectService" -> inspectTools.inspectService(
                     firstNonBlank(safeRequest.serviceName(), safeRequest.service()));
+            case "platformTools.queryDoris" -> platformTools.queryDoris(safeRequest.sql(), safeRequest.maxRows());
             default -> throw AiPlatformApiException.badRequest("unsupported implementation: " + implementation);
         };
     }
@@ -176,14 +181,17 @@ public class JavaBeanToolExecutor {
             Integer offset,
             Integer status,
             Integer rangeMinutes,
-            List<TrendChartSpec> charts) {
+            List<TrendChartSpec> charts,
+            String sql,
+            Integer maxRows) {
 
         public static TestToolRequest empty() {
             return new TestToolRequest(
                     null, null, null, null, null, null, null, null, null, null,
                     null, null, null, null, null, null, null, null,
                     null, null, null, null,
-                    null, null, null, null, null, null, null, null, null, null, null);
+                    null, null, null, null, null, null, null, null, null, null, null,
+                    null, null);
         }
     }
 }
