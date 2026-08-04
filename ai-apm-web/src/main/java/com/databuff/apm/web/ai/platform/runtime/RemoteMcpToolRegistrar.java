@@ -41,16 +41,10 @@ public class RemoteMcpToolRegistrar {
             McpClientBuilder builder = McpClientBuilder.create(tool.toolId())
                     .timeout(CONNECT_TIMEOUT)
                     .initializationTimeout(INIT_TIMEOUT);
-            if (!config.headers().isEmpty()) {
-                builder.headers(config.headers());
-            }
-            switch (config.transport()) {
-                case "SSE" -> builder.sseTransport(config.endpoint());
-                case "STREAMABLE_HTTP" -> builder.streamableHttpTransport(config.endpoint());
-                default -> {
-                    log.warn("Unsupported MCP transport {} for tool {}", config.transport(), tool.toolId());
-                    return null;
-                }
+            // AgentScope applies headers onto the transport config; transport must be set first
+            // or headers() is a silent no-op.
+            if (!applyTransportAndHeaders(builder, config)) {
+                return null;
             }
             McpClientWrapper client = builder.buildSync();
             toolkit.registerMcpClient(client).block(CONNECT_TIMEOUT);
@@ -69,6 +63,28 @@ public class RemoteMcpToolRegistrar {
                     ex);
             return null;
         }
+    }
+
+    /**
+     * Bind transport then headers. Order matters for AgentScope {@link McpClientBuilder}:
+     * {@code headers()} is ignored until an HTTP transport exists.
+     */
+    boolean applyTransportAndHeaders(McpClientBuilder builder, McpConnectionConfig config) {
+        if (builder == null || config == null) {
+            return false;
+        }
+        switch (config.transport()) {
+            case "SSE" -> builder.sseTransport(config.endpoint());
+            case "STREAMABLE_HTTP" -> builder.streamableHttpTransport(config.endpoint());
+            default -> {
+                log.warn("Unsupported MCP transport {} for tool endpoint {}", config.transport(), config.endpoint());
+                return false;
+            }
+        }
+        if (!config.headers().isEmpty()) {
+            builder.headers(config.headers());
+        }
+        return true;
     }
 
     McpConnectionConfig parseConfig(AiToolDefinition tool) {
