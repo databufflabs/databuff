@@ -274,4 +274,148 @@ class SingleMetricRuleEvaluatorTest {
         assertThat(EventRulePayloadParser.extractFluctuate(primary))
                 .isEqualTo(EventRule.FLUCTUATE_VAL_UP);
     }
+
+    @Test
+    void lessThanRequestCountTriggersWhenNoDataReturnsZero() {
+        RuleMetricEvaluationService metricService = mock(RuleMetricEvaluationService.class);
+        when(metricService.evaluateRuleGroups(any(), anyLong()))
+                .thenReturn(List.of(new GroupMetricValue("order-service", "order-service", 0.0)));
+
+        String queryJson = "{\"1\":{\"way\":\"threshold\",\"period\":300,\"comparison\":\"<\","
+                + "\"thresholds\":{\"critical\":1},"
+                + "\"A\":{\"metric\":\"service.cnt\",\"aggs\":\"sum\",\"by\":[],"
+                + "\"from\":[{\"left\":\"service\",\"operator\":\"=\",\"right\":\"order-service\"}]}}}";
+        // Denormalized column still says gt (legacy save); queryJson.comparison must win.
+        EventRule rule = new EventRule(
+                2L,
+                "order-service no data",
+                EventRule.CLASSIFY_SINGLE,
+                EventRule.WAY_THRESHOLD,
+                "order-service",
+                EventRule.METRIC_REQUEST_COUNT,
+                1.0,
+                EventRule.COMPARATOR_GT,
+                true,
+                queryJson,
+                java.time.Instant.now());
+
+        List<RuleEvaluationResult> results = evaluator(metricService).evaluateAll(rule, 300_000L);
+
+        assertThat(results).hasSize(1);
+        assertThat(results.get(0).triggered()).isTrue();
+        assertThat(results.get(0).message()).contains("低于阈值");
+    }
+
+    @Test
+    void lessThanRequestCountDoesNotTriggerWhenAboveThreshold() {
+        RuleMetricEvaluationService metricService = mock(RuleMetricEvaluationService.class);
+        when(metricService.evaluateRuleGroups(any(), anyLong()))
+                .thenReturn(List.of(new GroupMetricValue("order-service", "order-service", 42.0)));
+
+        String queryJson = "{\"1\":{\"way\":\"threshold\",\"period\":300,\"comparison\":\"<\","
+                + "\"thresholds\":{\"critical\":1},"
+                + "\"A\":{\"metric\":\"service.cnt\",\"from\":[]}}}";
+        EventRule rule = new EventRule(
+                3L,
+                "order-service no data",
+                EventRule.CLASSIFY_SINGLE,
+                EventRule.WAY_THRESHOLD,
+                "order-service",
+                EventRule.METRIC_REQUEST_COUNT,
+                1.0,
+                EventRule.COMPARATOR_LT,
+                true,
+                queryJson,
+                java.time.Instant.now());
+
+        assertThat(evaluator(metricService).evaluateAll(rule, 300_000L)).isEmpty();
+    }
+
+    @Test
+    void warningThresholdFiresWarningLevelWhenCriticalNotBreached() {
+        RuleMetricEvaluationService metricService = mock(RuleMetricEvaluationService.class);
+        when(metricService.evaluateRuleGroups(any(), anyLong()))
+                .thenReturn(List.of(new GroupMetricValue("checkout", "checkout", 7.0)));
+
+        String queryJson = "{\"1\":{\"way\":\"threshold\",\"period\":300,\"comparison\":\">\","
+                + "\"thresholds\":{\"critical\":10,\"warning\":5},"
+                + "\"A\":{\"metric\":\"service.error.pct\",\"from\":[]}}}";
+        EventRule rule = new EventRule(
+                4L,
+                "error rate dual band",
+                EventRule.CLASSIFY_SINGLE,
+                EventRule.WAY_THRESHOLD,
+                "checkout",
+                EventRule.METRIC_ERROR_RATE,
+                10.0,
+                EventRule.COMPARATOR_GT,
+                true,
+                queryJson,
+                java.time.Instant.now());
+
+        List<RuleEvaluationResult> results = evaluator(metricService).evaluateAll(rule, 300_000L);
+
+        assertThat(results).hasSize(1);
+        assertThat(results.get(0).level()).isEqualTo(EventRule.LEVEL_WARNING);
+        assertThat(results.get(0).message()).contains("超过阈值5%");
+    }
+
+    @Test
+    void criticalThresholdWinsWhenBothBandsBreached() {
+        RuleMetricEvaluationService metricService = mock(RuleMetricEvaluationService.class);
+        when(metricService.evaluateRuleGroups(any(), anyLong()))
+                .thenReturn(List.of(new GroupMetricValue("checkout", "checkout", 15.0)));
+
+        String queryJson = "{\"1\":{\"way\":\"threshold\",\"period\":300,\"comparison\":\">\","
+                + "\"thresholds\":{\"critical\":10,\"warning\":5},"
+                + "\"A\":{\"metric\":\"service.error.pct\",\"from\":[]}}}";
+        EventRule rule = new EventRule(
+                5L,
+                "error rate dual band",
+                EventRule.CLASSIFY_SINGLE,
+                EventRule.WAY_THRESHOLD,
+                "checkout",
+                EventRule.METRIC_ERROR_RATE,
+                10.0,
+                EventRule.COMPARATOR_GT,
+                true,
+                queryJson,
+                java.time.Instant.now());
+
+        List<RuleEvaluationResult> results = evaluator(metricService).evaluateAll(rule, 300_000L);
+
+        assertThat(results).hasSize(1);
+        assertThat(results.get(0).level()).isEqualTo(EventRule.LEVEL_CRITICAL);
+        assertThat(results.get(0).message()).contains("超过阈值10%");
+    }
+
+    @Test
+    void warningOnlyRuleCanTrigger() {
+        RuleMetricEvaluationService metricService = mock(RuleMetricEvaluationService.class);
+        when(metricService.evaluateRuleGroups(any(), anyLong()))
+                .thenReturn(List.of(new GroupMetricValue("checkout", "checkout", 8.0)));
+
+        // No critical in query; denormalized rule.threshold (100) is the critical fallback and
+        // won't breach, so only the warning band (5) fires.
+        String queryJson = "{\"1\":{\"way\":\"threshold\",\"period\":300,\"comparison\":\">\","
+                + "\"thresholds\":{\"warning\":5},"
+                + "\"A\":{\"metric\":\"service.error.pct\",\"from\":[]}}}";
+        EventRule rule = new EventRule(
+                6L,
+                "warning only",
+                EventRule.CLASSIFY_SINGLE,
+                EventRule.WAY_THRESHOLD,
+                "checkout",
+                EventRule.METRIC_ERROR_RATE,
+                100.0,
+                EventRule.COMPARATOR_GT,
+                true,
+                queryJson,
+                java.time.Instant.now());
+
+        List<RuleEvaluationResult> results = evaluator(metricService).evaluateAll(rule, 300_000L);
+
+        assertThat(results).hasSize(1);
+        assertThat(results.get(0).level()).isEqualTo(EventRule.LEVEL_WARNING);
+    }
 }

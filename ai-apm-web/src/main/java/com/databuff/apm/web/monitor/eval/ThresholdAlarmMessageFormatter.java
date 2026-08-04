@@ -26,7 +26,8 @@ public class ThresholdAlarmMessageFormatter {
         MetricContext context = resolveContext(rule);
         String valueText = formatNumber(value, context);
         String thresholdText = formatNumber(threshold, context);
-        return formatMessage(context.metricLabel(), valueText, thresholdText, groupKey, service);
+        String verb = EventRule.isLowerBoundComparator(rule.comparator()) ? "低于" : "超过";
+        return formatMessage(context.metricLabel(), valueText, thresholdText, groupKey, service, verb);
     }
 
     public String mutationMessage(
@@ -47,7 +48,7 @@ public class ThresholdAlarmMessageFormatter {
     }
 
     public String legacyErrorRateThresholdMessage(String service, double rate, double threshold) {
-        return formatMessage("错误率", formatPercent(rate * 100), formatPercent(threshold * 100), service, service);
+        return formatMessage("错误率", formatPercent(rate * 100), formatPercent(threshold * 100), service, service, "超过");
     }
 
     public String legacyErrorRateMutationMessage(String service, double delta, double threshold) {
@@ -60,12 +61,13 @@ public class ThresholdAlarmMessageFormatter {
             String valueText,
             String thresholdText,
             String groupKey,
-            String service) {
+            String service,
+            String verb) {
         if (hasDistinctGroup(groupKey, service)) {
-            return "%s（%s）的%s值超过阈值%s"
-                    .formatted(metricLabel, groupKey, valueText, thresholdText);
+            return "%s（%s）的%s值%s阈值%s"
+                    .formatted(metricLabel, groupKey, valueText, verb, thresholdText);
         }
-        return "%s的%s值超过阈值%s".formatted(metricLabel, valueText, thresholdText);
+        return "%s的%s值%s阈值%s".formatted(metricLabel, valueText, verb, thresholdText);
     }
 
     private static boolean hasDistinctGroup(String groupKey, String service) {

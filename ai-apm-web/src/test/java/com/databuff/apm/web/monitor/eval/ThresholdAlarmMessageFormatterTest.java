@@ -44,6 +44,16 @@ class ThresholdAlarmMessageFormatterTest {
     }
 
     @Test
+    void formatsLessThanThresholdMessage() {
+        EventRule rule = catalogRule(
+                "service.cnt", 1.0, null, EventRule.COMPARATOR_LT);
+
+        String message = formatter.thresholdMessage(rule, 0.0, 1.0, "order-service", "order-service");
+
+        assertThat(message).isEqualTo("请求次数的0个值低于阈值1个");
+    }
+
+    @Test
     void formatsMutationMessage() {
         EventRule rule = catalogRule("service.error.pct", 3.0);
 
@@ -61,10 +71,15 @@ class ThresholdAlarmMessageFormatterTest {
     }
 
     private static EventRule catalogRule(String metricId, double threshold) {
-        return catalogRule(metricId, threshold, "%");
+        return catalogRule(metricId, threshold, "%", EventRule.COMPARATOR_GT);
     }
 
     private static EventRule catalogRule(String metricId, double threshold, String viewUnit) {
+        return catalogRule(metricId, threshold, viewUnit, EventRule.COMPARATOR_GT);
+    }
+
+    private static EventRule catalogRule(
+            String metricId, double threshold, String viewUnit, String comparator) {
         String viewUnitJson = viewUnit == null ? "" : ",\"view_unit\":\"" + viewUnit + "\"";
         String queryJson = "{\"1\":{\"way\":\"threshold\",\"period\":300" + viewUnitJson
                 + ",\"thresholds\":{\"critical\":" + threshold + "},"
@@ -77,7 +92,7 @@ class ThresholdAlarmMessageFormatterTest {
                 "checkout",
                 EventRule.METRIC_ERROR_RATE,
                 threshold,
-                EventRule.COMPARATOR_GT,
+                comparator,
                 true,
                 queryJson,
                 Instant.now());

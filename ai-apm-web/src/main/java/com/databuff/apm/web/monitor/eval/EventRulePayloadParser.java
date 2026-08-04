@@ -228,32 +228,78 @@ public final class EventRulePayloadParser {
         return stringValue(queryItem.get("view_unit"), null);
     }
 
+    /**
+     * Critical + optional warning thresholds from a query item. Missing / blank / null values are
+     * absent ({@link Double#isNaN()}). Front-end stores plain numbers under
+     * {@code thresholds.critical}/{@code thresholds.warning}; nested API may use
+     * {@code {value, comparator}}.
+     */
+    public record ThresholdLevels(double critical, double warning) {
+        public boolean hasCritical() {
+            return !Double.isNaN(critical);
+        }
+
+        public boolean hasWarning() {
+            return !Double.isNaN(warning);
+        }
+    }
+
     static double extractThreshold(Map<String, Object> queryItem, Map<String, Object> body) {
-        Object thresholdsObj = queryItem.get("thresholds");
-        if (thresholdsObj instanceof Map<?, ?> thresholds) {
-            Object critical = thresholds.get("critical");
-            if (critical instanceof Number number) {
-                return number.doubleValue();
-            }
-            if (critical instanceof Map<?, ?> criticalMap) {
-                Object value = criticalMap.get("value");
-                if (value instanceof Number number) {
-                    return number.doubleValue();
-                }
-            }
-            if (critical != null) {
-                try {
-                    return Double.parseDouble(String.valueOf(critical));
-                } catch (NumberFormatException ignored) {
-                    // fall through
-                }
-            }
+        ThresholdLevels levels = extractThresholdLevels(queryItem);
+        if (levels.hasCritical()) {
+            return levels.critical();
         }
         return doubleValue(body.get("threshold"), 0.05);
     }
 
+    public static ThresholdLevels extractThresholdLevels(Map<String, Object> queryItem) {
+        if (queryItem == null || queryItem.isEmpty()) {
+            return new ThresholdLevels(Double.NaN, Double.NaN);
+        }
+        Object thresholdsObj = queryItem.get("thresholds");
+        if (!(thresholdsObj instanceof Map<?, ?> thresholds)) {
+            return new ThresholdLevels(Double.NaN, Double.NaN);
+        }
+        return new ThresholdLevels(
+                parseThresholdValue(thresholds.get("critical")),
+                parseThresholdValue(thresholds.get("warning")));
+    }
+
+    private static double parseThresholdValue(Object raw) {
+        if (raw == null) {
+            return Double.NaN;
+        }
+        if (raw instanceof Number number) {
+            return number.doubleValue();
+        }
+        if (raw instanceof Map<?, ?> map) {
+            Object value = map.get("value");
+            if (value instanceof Number number) {
+                return number.doubleValue();
+            }
+            if (value != null) {
+                return parseThresholdValue(value);
+            }
+            return Double.NaN;
+        }
+        String text = String.valueOf(raw).trim();
+        if (text.isEmpty() || "null".equalsIgnoreCase(text)) {
+            return Double.NaN;
+        }
+        try {
+            return Double.parseDouble(text);
+        } catch (NumberFormatException ignored) {
+            return Double.NaN;
+        }
+    }
+
     @SuppressWarnings("unchecked")
     static String extractComparator(Map<String, Object> queryItem) {
+        // Front-end ruleSetting stores comparison at the query-item root (e.g. "comparison": "<").
+        String fromComparison = stringValue(queryItem.get("comparison"), null);
+        if (fromComparison != null) {
+            return normalizeComparator(fromComparison);
+        }
         Object thresholdsObj = queryItem.get("thresholds");
         if (thresholdsObj instanceof Map<?, ?> thresholds) {
             Object critical = thresholds.get("critical");
@@ -325,11 +371,7 @@ public final class EventRulePayloadParser {
     }
 
     static String normalizeComparator(String comparator) {
-        return switch (comparator) {
-            case ">", ">=" -> EventRule.COMPARATOR_GT;
-            case "<", "<=" -> "lt";
-            default -> comparator == null || comparator.isBlank() ? EventRule.COMPARATOR_GT : comparator;
-        };
+        return EventRule.normalizeComparator(comparator);
     }
 
     public static long lookbackMinutes(Map<String, Object> queryItem) {

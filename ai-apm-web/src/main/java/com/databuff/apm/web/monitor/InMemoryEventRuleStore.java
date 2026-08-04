@@ -101,9 +101,6 @@ public class InMemoryEventRuleStore implements EventRuleStore {
     }
 
     private static String normalizeComparator(String comparator) {
-        if (comparator == null || comparator.isBlank()) {
-            return EventRule.COMPARATOR_GT;
-        }
-        return comparator;
+        return EventRule.normalizeComparator(comparator);
     }
 }

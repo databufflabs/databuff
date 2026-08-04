@@ -16,6 +16,22 @@ class EventRuleTest {
         assertThat(EventRule.METRIC_ERROR_RATE).isEqualTo("error_rate");
         assertThat(EventRule.METRIC_REQUEST_COUNT).isEqualTo("request_count");
         assertThat(EventRule.COMPARATOR_GT).isEqualTo("gt");
+        assertThat(EventRule.COMPARATOR_GTE).isEqualTo("gte");
+        assertThat(EventRule.COMPARATOR_LT).isEqualTo("lt");
+        assertThat(EventRule.COMPARATOR_LTE).isEqualTo("lte");
+        assertThat(EventRule.LEVEL_CRITICAL).isEqualTo("critical");
+        assertThat(EventRule.LEVEL_WARNING).isEqualTo("warning");
+    }
+
+    @Test
+    void normalizeComparatorMapsUiSymbols() {
+        assertThat(EventRule.normalizeComparator(">")).isEqualTo(EventRule.COMPARATOR_GT);
+        assertThat(EventRule.normalizeComparator(">=")).isEqualTo(EventRule.COMPARATOR_GTE);
+        assertThat(EventRule.normalizeComparator("<")).isEqualTo(EventRule.COMPARATOR_LT);
+        assertThat(EventRule.normalizeComparator("<=")).isEqualTo(EventRule.COMPARATOR_LTE);
+        assertThat(EventRule.normalizeComparator(null)).isEqualTo(EventRule.COMPARATOR_GT);
+        assertThat(EventRule.isLowerBoundComparator("<")).isTrue();
+        assertThat(EventRule.isLowerBoundComparator(">")).isFalse();
     }
 
     @Test

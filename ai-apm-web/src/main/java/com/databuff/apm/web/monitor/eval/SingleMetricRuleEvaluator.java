@@ -72,7 +72,12 @@ public class SingleMetricRuleEvaluator {
             String message = messageFormatter.legacyErrorRateThresholdMessage(
                     rule.service(), rate, rule.threshold());
             return new RuleEvaluationResult(
-                    true, "critical", message, EventRule.WAY_THRESHOLD, rule.service(), rule.service());
+                    true,
+                    EventRule.LEVEL_CRITICAL,
+                    message,
+                    EventRule.WAY_THRESHOLD,
+                    rule.service(),
+                    rule.service());
         }
         return RuleEvaluationResult.normal();
     }
@@ -88,26 +93,42 @@ public class SingleMetricRuleEvaluator {
             String message = messageFormatter.legacyErrorRateMutationMessage(
                     rule.service(), delta, rule.threshold());
             return new RuleEvaluationResult(
-                    true, "critical", message, EventRule.WAY_MUTATION, rule.service(), rule.service());
+                    true,
+                    EventRule.LEVEL_CRITICAL,
+                    message,
+                    EventRule.WAY_MUTATION,
+                    rule.service(),
+                    rule.service());
         }
         return RuleEvaluationResult.normal();
     }
 
     private List<RuleEvaluationResult> evaluateCatalogThresholdAll(EventRule rule, long lookbackMillis) {
         List<GroupMetricValue> groups = ruleMetricEvaluationService.evaluateRuleGroups(rule, lookbackMillis);
+        String comparator = resolveComparator(rule);
+        EventRulePayloadParser.ThresholdLevels levels = resolveThresholdLevels(rule);
         List<RuleEvaluationResult> results = new ArrayList<>();
         for (GroupMetricValue group : groups) {
-            if (ThresholdAlarmCheck.breached(group.value(), rule.threshold(), rule.comparator())) {
-                String message = messageFormatter.thresholdMessage(
-                        rule, group.value(), rule.threshold(), group.groupKey(), group.service());
-                results.add(new RuleEvaluationResult(
-                        true,
-                        "critical",
-                        message,
-                        EventRule.WAY_THRESHOLD,
-                        group.service(),
-                        group.groupKey()));
+            String level = ThresholdAlarmCheck.resolveLevel(
+                    group.value(), comparator, levels.critical(), levels.warning());
+            if (level == null) {
+                continue;
             }
+            double breachedThreshold = ThresholdAlarmCheck.resolveBreachedThreshold(
+                    level, levels.critical(), levels.warning());
+            String message = messageFormatter.thresholdMessage(
+                    rule.withComparator(comparator),
+                    group.value(),
+                    breachedThreshold,
+                    group.groupKey(),
+                    group.service());
+            results.add(new RuleEvaluationResult(
+                    true,
+                    level,
+                    message,
+                    EventRule.WAY_THRESHOLD,
+                    group.service(),
+                    group.groupKey()));
         }
         return results;
     }
@@ -127,6 +148,8 @@ public class SingleMetricRuleEvaluator {
                 rule, previousFrom, previousTo);
         Map<String, GroupMetricValue> previousByGroup = previousGroups.stream()
                 .collect(Collectors.toMap(GroupMetricValue::groupKey, Function.identity(), (left, right) -> left));
+        String comparator = resolveComparator(rule);
+        EventRulePayloadParser.ThresholdLevels levels = resolveThresholdLevels(rule);
         List<RuleEvaluationResult> results = new ArrayList<>();
         for (GroupMetricValue current : currentGroups) {
             GroupMetricValue previous = previousByGroup.get(current.groupKey());
@@ -135,21 +158,73 @@ public class SingleMetricRuleEvaluator {
             if (Double.isNaN(change) || Double.isInfinite(change)) {
                 continue;
             }
-            if (ThresholdAlarmCheck.breached(change, rule.threshold(), rule.comparator())) {
-                double displayDelta = yoy ? change * 100 : change;
-                double displayThreshold = yoy ? rule.threshold() * 100 : rule.threshold();
-                String message = messageFormatter.mutationMessage(
-                        rule, displayDelta, displayThreshold, current.groupKey(), current.service());
-                results.add(new RuleEvaluationResult(
-                        true,
-                        "critical",
-                        message,
-                        EventRule.WAY_MUTATION,
-                        current.service(),
-                        current.groupKey()));
+            String level = ThresholdAlarmCheck.resolveLevel(
+                    change, comparator, levels.critical(), levels.warning());
+            if (level == null) {
+                continue;
             }
+            double breachedThreshold = ThresholdAlarmCheck.resolveBreachedThreshold(
+                    level, levels.critical(), levels.warning());
+            double displayDelta = yoy ? change * 100 : change;
+            double displayThreshold = yoy ? breachedThreshold * 100 : breachedThreshold;
+            String message = messageFormatter.mutationMessage(
+                    rule, displayDelta, displayThreshold, current.groupKey(), current.service());
+            results.add(new RuleEvaluationResult(
+                    true,
+                    level,
+                    message,
+                    EventRule.WAY_MUTATION,
+                    current.service(),
+                    current.groupKey()));
         }
         return results;
+    }
+
+    /**
+     * Prefer the front-end {@code comparison} (or nested critical comparator) from query JSON so
+     * already-persisted rules keep working after comparator support is fixed, even when the
+     * denormalized {@code EventRule.comparator} column still says {@code gt}.
+     * <p>
+     * When query JSON has no comparison hint, {@link EventRulePayloadParser#extractComparator}
+     * returns {@code gt}; that is only used when the rule also has no denormalized comparator.
+     */
+    static String resolveComparator(EventRule rule) {
+        Map<String, Object> query = EventRulePayloadParser.parseQuery(rule.queryJson());
+        Map<String, Object> primary = EventRulePayloadParser.primaryQueryItem(query);
+        if (!primary.isEmpty()) {
+            // Front-end stores "comparison"; nested API stores thresholds.critical.comparator.
+            if (primary.containsKey("comparison")
+                    || hasNestedCriticalComparator(primary)) {
+                return EventRulePayloadParser.extractComparator(primary);
+            }
+        }
+        return EventRule.normalizeComparator(rule.comparator());
+    }
+
+    /**
+     * Reads critical/warning from query JSON; falls back to denormalized {@link EventRule#threshold()}
+     * for critical when the query band is absent (legacy rules).
+     */
+    static EventRulePayloadParser.ThresholdLevels resolveThresholdLevels(EventRule rule) {
+        Map<String, Object> query = EventRulePayloadParser.parseQuery(rule.queryJson());
+        Map<String, Object> primary = EventRulePayloadParser.primaryQueryItem(query);
+        EventRulePayloadParser.ThresholdLevels fromQuery =
+                EventRulePayloadParser.extractThresholdLevels(primary);
+        double critical = fromQuery.hasCritical() ? fromQuery.critical() : rule.threshold();
+        return new EventRulePayloadParser.ThresholdLevels(critical, fromQuery.warning());
+    }
+
+    private static boolean hasNestedCriticalComparator(Map<String, Object> primary) {
+        Object thresholdsObj = primary.get("thresholds");
+        if (!(thresholdsObj instanceof Map<?, ?> thresholds)) {
+            return false;
+        }
+        Object critical = thresholds.get("critical");
+        if (!(critical instanceof Map<?, ?> criticalMap)) {
+            return false;
+        }
+        Object comparator = criticalMap.get("comparator");
+        return comparator != null && !String.valueOf(comparator).isBlank();
     }
 
     /**
