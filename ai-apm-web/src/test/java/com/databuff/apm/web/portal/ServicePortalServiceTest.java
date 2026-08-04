@@ -1271,6 +1271,145 @@ class ServicePortalServiceTest {
 
     assertThat(info.get("resource")).isEqualTo("/orders");
     assertThat(info.get("callCnt")).isEqualTo(30L);
+    assertThat(info.get("service_type")).isEqualTo("web");
+  }
+
+  @Test
+  void buildsDbResourceInfoFromSqlResource() throws Exception {
+    ApmReadRepository reader = mock(ApmReadRepository.class);
+    when(reader.queryDbEndpoints(anyString())).thenAnswer(invocation -> {
+      String sql = invocation.getArgument(0);
+      assertThat(sql).contains("metric_service_db");
+      assertThat(sql).contains("c72cc83a8831e407");
+      return List.of(new ApmQueryModels.DbEndpointPoint(
+              "c72cc83a8831e407", "[mysql]demo_apm",
+              "SELECT sku, available FROM demo_inventory WHERE sku = ?",
+              "SELECT", "mysql", "demo_apm",
+              42, 1, 12.0, 24_000_000.0, 10, 0));
+    });
+
+    ServicePortalService service = TestStorageSupport.servicePortalService(reader);
+    Map<String, Object> info = service.resourceInfo(Map.of(
+            "componentType", "service.db",
+            "serviceId", "c72cc83a8831e407",
+            "resource", "SELECT sku, available FROM demo_inventory WHERE sku = ?",
+            "fromTime", "2026-08-04 16:40:00",
+            "toTime", "2026-08-04 17:40:00"));
+
+    assertThat(info.get("resource")).isEqualTo("SELECT sku, available FROM demo_inventory WHERE sku = ?");
+    assertThat(info.get("serviceId")).isEqualTo("c72cc83a8831e407");
+    assertThat(info.get("service")).isEqualTo("[mysql]demo_apm");
+    assertThat(info.get("service_type")).isEqualTo("db");
+    assertThat(info.get("sqlOperation")).isEqualTo("SELECT");
+    assertThat(info.get("dbType")).isEqualTo("mysql");
+    assertThat(info.get("callCnt")).isEqualTo(42L);
+    assertThat(info.get("errCnt")).isEqualTo(1L);
+    assertThat(info.get("avgLatency")).isEqualTo(12_000_000L);
+  }
+
+  @Test
+  void buildsRpcResourceInfo() throws Exception {
+    ApmReadRepository reader = mock(ApmReadRepository.class);
+    when(reader.queryComponentEndpoints(anyString())).thenAnswer(invocation -> {
+      String sql = invocation.getArgument(0);
+      assertThat(sql).contains("metric_service_rpc");
+      return List.of(new ApmQueryModels.ComponentEndpointPoint(
+              "fedcba0987654321", "service-b", "com.demo.OrderService/getOrder",
+              java.util.Map.of("type", "dubbo"),
+              29, 0, 45.0, 90_000_000.0, 0, 0, 0, 0, 0, 0));
+    });
+
+    ServicePortalService service = TestStorageSupport.servicePortalService(reader);
+    Map<String, Object> info = service.resourceInfo(Map.of(
+            "componentType", "service.rpc",
+            "serviceId", "fedcba0987654321",
+            "resource", "com.demo.OrderService/getOrder",
+            "fromTime", "2026-06-06 00:19:00",
+            "toTime", "2026-06-06 00:34:00"));
+
+    assertThat(info.get("resource")).isEqualTo("com.demo.OrderService/getOrder");
+    assertThat(info.get("service")).isEqualTo("service-b");
+    assertThat(info.get("service_type")).isEqualTo("web");
+    assertThat(info.get("type")).isEqualTo("dubbo");
+    assertThat(info.get("callCnt")).isEqualTo(29L);
+  }
+
+  @Test
+  void buildsRedisResourceInfo() throws Exception {
+    ApmReadRepository reader = mock(ApmReadRepository.class);
+    when(reader.queryComponentEndpoints(anyString())).thenAnswer(invocation -> {
+      String sql = invocation.getArgument(0);
+      assertThat(sql).contains("metric_service_redis");
+      assertThat(sql).contains("`isOut` = '1'");
+      return List.of(new ApmQueryModels.ComponentEndpointPoint(
+              "redis-id", "[redis]redis:6379", "GET key",
+              java.util.Map.of("type", "GET", "command", "GET"),
+              15, 0, 1.5, 3_000_000.0, 0, 0, 0, 0, 0, 0));
+    });
+
+    ServicePortalService service = TestStorageSupport.servicePortalService(reader);
+    Map<String, Object> info = service.resourceInfo(Map.of(
+            "componentType", "service.redis",
+            "serviceId", "redis-id",
+            "resource", "GET key",
+            "fromTime", "2026-06-06 00:19:00",
+            "toTime", "2026-06-06 00:34:00"));
+
+    assertThat(info.get("resource")).isEqualTo("GET key");
+    assertThat(info.get("service")).isEqualTo("[redis]redis:6379");
+    assertThat(info.get("service_type")).isEqualTo("cache");
+    assertThat(info.get("callCnt")).isEqualTo(15L);
+  }
+
+  @Test
+  void buildsMqResourceInfo() throws Exception {
+    ApmReadRepository reader = mock(ApmReadRepository.class);
+    when(reader.queryComponentEndpoints(anyString())).thenAnswer(invocation -> {
+      String sql = invocation.getArgument(0);
+      assertThat(sql).contains("metric_service_mq");
+      return List.of(new ApmQueryModels.ComponentEndpointPoint(
+              "mq-id", "[kafka]orders", "orders",
+              java.util.Map.of("type", "kafka", "topic", "orders"),
+              8, 1, 20.0, 40_000_000.0, 0, 0, 0, 0, 0, 0));
+    });
+
+    ServicePortalService service = TestStorageSupport.servicePortalService(reader);
+    Map<String, Object> info = service.resourceInfo(Map.of(
+            "componentType", "service.mq",
+            "serviceId", "mq-id",
+            "resource", "orders",
+            "fromTime", "2026-06-06 00:19:00",
+            "toTime", "2026-06-06 00:34:00"));
+
+    assertThat(info.get("resource")).isEqualTo("orders");
+    assertThat(info.get("service_type")).isEqualTo("mq");
+    assertThat(info.get("callCnt")).isEqualTo(8L);
+  }
+
+  @Test
+  void resourceRelationUsesResourceFieldForDb() throws Exception {
+    ApmReadRepository reader = mock(ApmReadRepository.class);
+    when(reader.queryDbEndpoints(anyString())).thenReturn(List.of(
+            new ApmQueryModels.DbEndpointPoint(
+                    "c72cc83a8831e407", "[mysql]demo_apm",
+                    "SELECT 1", "SELECT", "mysql", "demo_apm",
+                    10, 0, 5.0, 10_000_000.0, 1, 0)));
+    when(reader.queryComponentResourceRelations(anyString(), any())).thenReturn(List.of());
+
+    ServicePortalService service = TestStorageSupport.servicePortalService(reader);
+    Map<String, Object> data = service.resourceRelation(Map.of(
+            "componentType", "service.db",
+            "serviceId", "c72cc83a8831e407",
+            "resource", "SELECT 1",
+            "start", 1_780_545_360_000L,
+            "end", 1_780_548_960_000L));
+
+    assertThat(data.get("reqCnt")).isEqualTo(10L);
+    @SuppressWarnings("unchecked")
+    Map<String, List<Map<String, Object>>> current =
+            (Map<String, List<Map<String, Object>>>) data.get("currentResources");
+    assertThat(current.get("service.db")).hasSize(1);
+    assertThat(current.get("service.db").get(0).get("resource")).isEqualTo("SELECT 1");
   }
 
   @Test

@@ -1431,17 +1431,17 @@ public class ServicePortalService {
         long from = PortalTimeParser.rangeFrom(body, now - 3_600_000L);
         long to = PortalTimeParser.rangeTo(body, now);
         String serviceId = resolveServiceId(body);
-        String url = decodeUrl(body);
+        String resource = resolveResourcePath(body);
         String componentType = stringValue(body.get("componentType"), "service.http");
         double durationSec = Math.max(1.0, (to - from) / 1000.0);
 
-        Map<String, Object> detail = resourceInfo(withUrl(body, url));
+        Map<String, Object> detail = resourceInfo(body);
         Map<String, List<Map<String, Object>>> currentResources = loadCurrentResourceRelations(
-                serviceId, url, componentType, from, to, durationSec, detail);
+                serviceId, resource, componentType, from, to, durationSec, detail);
         Map<String, List<Map<String, Object>>> upFlowResources = loadUpstreamResourceRelations(
-                serviceId, url, componentType, from, to, durationSec);
+                serviceId, resource, componentType, from, to, durationSec);
         Map<String, List<Map<String, Object>>> downFlowResources = loadDownstreamResourceRelations(
-                serviceId, url, from, to, durationSec);
+                serviceId, resource, from, to, durationSec);
 
         Map<String, Object> data = new LinkedHashMap<>();
         data.put("reqCnt", toLong(detail.get("callCnt")));
@@ -1452,11 +1452,26 @@ public class ServicePortalService {
     }
 
     public Map<String, Object> resourceInfo(Map<String, Object> body) {
+        String componentType = stringValue(body.get("componentType"), "service.http");
+        if ("service.http".equals(componentType)) {
+            return httpResourceInfo(body);
+        }
+        if ("service.db".equals(componentType)) {
+            return dbResourceInfo(body);
+        }
+        ComponentPeerSpec spec = findComponentSpec(componentType);
+        if (spec == null) {
+            return Map.of();
+        }
+        return componentResourceInfo(body, spec);
+    }
+
+    private Map<String, Object> httpResourceInfo(Map<String, Object> body) {
         long now = System.currentTimeMillis();
         long from = PortalTimeParser.rangeFrom(body, now - 3_600_000L);
         long to = PortalTimeParser.rangeTo(body, now);
         String serviceId = resolveServiceId(body);
-        String url = decodeUrl(body);
+        String url = resolveResourcePath(body);
 
         List<HttpEndpointPoint> points = loadHttpEndpoints(serviceId, from, to, url, 500, null, null, null, true);
         HttpEndpointPoint match = points.stream()
@@ -1480,6 +1495,109 @@ public class ServicePortalService {
         data.put("avgLatency", avgDurationMsToNs(match.avgDuration()));
         data.put("errRate", callCnt > 0 ? (double) errCnt / callCnt : 0);
         return data;
+    }
+
+    private Map<String, Object> dbResourceInfo(Map<String, Object> body) {
+        long now = System.currentTimeMillis();
+        Map<String, Object> params = normalizeDbGraphStatsBody(body);
+        long from = PortalTimeParser.rangeFrom(params, now - 3_600_000L);
+        long to = PortalTimeParser.rangeTo(params, now);
+        String serviceId = resolveServiceId(params);
+        String resource = resolveResourcePath(params);
+        Integer isIn = parseOptionalFlag(params.get("isIn"));
+        Integer isOut = parseOptionalFlag(params.get("isOut"));
+        String srcServiceId = stringValue(params.get("srcServiceId"), null);
+
+        List<DbEndpointPoint> points = loadDbEndpoints(
+                serviceId, from, to, resource, null, null, 500, isIn, isOut, srcServiceId);
+        DbEndpointPoint match = points.stream()
+                .filter(point -> resource == null || resource.equals(point.resource()))
+                .findFirst()
+                .orElse(points.isEmpty() ? null : points.get(0));
+        if (match == null) {
+            return Map.of();
+        }
+
+        long callCnt = match.requestCount();
+        long errCnt = match.errorCount();
+        Map<String, Object> data = new LinkedHashMap<>();
+        data.put("resource", resource != null ? resource : match.resource());
+        data.put("serviceId", PortalServiceIdResolver.resolve(match.serviceId(), match.service(), serviceId));
+        data.put("service", match.service());
+        data.put("service_type", "db");
+        data.put("sqlOperation", match.sqlOperation());
+        data.put("dbType", match.dbType());
+        data.put("sqlDatabase", match.sqlDatabase());
+        data.put("callCnt", callCnt);
+        data.put("errCnt", errCnt);
+        data.put("avgLatency", avgDurationMsToNs(match.avgDuration()));
+        data.put("errRate", callCnt > 0 ? (double) errCnt / callCnt : 0);
+        return data;
+    }
+
+    private Map<String, Object> componentResourceInfo(Map<String, Object> body, ComponentPeerSpec spec) {
+        long now = System.currentTimeMillis();
+        Map<String, Object> params = spec.webPeer() ? body : normalizeOutboundGraphStatsBody(body);
+        long from = PortalTimeParser.rangeFrom(params, now - 3_600_000L);
+        long to = PortalTimeParser.rangeTo(params, now);
+        String serviceId = resolveServiceId(params);
+        String resource = resolveResourcePath(params);
+        String srcServiceId = stringValue(params.get("srcServiceId"), null);
+        Integer isIn = parseOptionalFlag(params.get("isIn"));
+        Integer isOut = parseOptionalFlag(params.get("isOut"));
+        if (!spec.webPeer() && isOut == null && isIn == null) {
+            isOut = spec.outboundIsOut();
+            isIn = spec.outboundIsIn();
+        }
+
+        List<ComponentEndpointPoint> points = loadComponentEndpoints(
+                spec.tableName(), serviceId, from, to, resource, 500, isIn, isOut, srcServiceId);
+        ComponentEndpointPoint match = points.stream()
+                .filter(point -> resource == null || resource.equals(point.resource()))
+                .findFirst()
+                .orElse(points.isEmpty() ? null : points.get(0));
+        if (match == null) {
+            return Map.of();
+        }
+
+        long callCnt = match.requestCount();
+        long errCnt = match.errorCount();
+        Map<String, Object> data = new LinkedHashMap<>();
+        data.put("resource", resource != null ? resource : match.resource());
+        data.put("serviceId", PortalServiceIdResolver.resolve(match.serviceId(), match.service(), serviceId));
+        data.put("service", match.service());
+        data.put("service_type", serviceTypeForComponent(spec.componentType()));
+        String type = match.tags() != null ? match.tags().get("type") : null;
+        if (type != null && !type.isBlank()) {
+            data.put("type", type);
+        }
+        data.put("callCnt", callCnt);
+        data.put("errCnt", errCnt);
+        data.put("avgLatency", avgDurationMsToNs(match.avgDuration()));
+        data.put("errRate", callCnt > 0 ? (double) errCnt / callCnt : 0);
+        return data;
+    }
+
+    /** Exact resource path from {@code url} (HTTP) or {@code resource} (other components). */
+    private static String resolveResourcePath(Map<String, Object> body) {
+        String fromUrl = decodeUrl(body);
+        if (fromUrl != null && !fromUrl.isBlank()) {
+            return fromUrl;
+        }
+        return decodeResource(body);
+    }
+
+    private static String serviceTypeForComponent(String componentType) {
+        if (componentType == null) {
+            return "web";
+        }
+        return switch (componentType) {
+            case "service.db" -> "db";
+            case "service.mq" -> "mq";
+            case "service.redis" -> "cache";
+            case "service.remote" -> "custom";
+            default -> "web";
+        };
     }
 
     public Map<String, Object> allCntForSingleResource(Map<String, Object> body) {
