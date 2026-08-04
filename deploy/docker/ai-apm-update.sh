@@ -2,7 +2,7 @@
 # DataBuff AI APM 在线升级（保留 data/，不删除安装目录）
 #
 #   curl -fsSL https://databuff.ai/databuff/ai-apm-update.sh | bash
-#   curl -fsSL https://databuff.ai/databuff/ai-apm-update.sh | bash -s -- --version 0.1.6
+#   curl -fsSL https://databuff.ai/databuff/ai-apm-update.sh | bash -s -- --version 0.1.7
 #   curl -fsSL .../ai-apm-update.sh | bash -s -- --pull-images
 #   curl -fsSL .../ai-apm-update.sh | bash -s -- --backup
 #

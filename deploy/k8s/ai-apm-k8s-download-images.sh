@@ -17,8 +17,8 @@
 #   FORCE_PULL_IMAGES=1  强制重新下载（忽略本地已有镜像）
 #
 # 指定版本:
-#   curl -fsSL .../ai-apm-k8s-download-images.sh | bash -s -- --version 0.1.6
-#   APM_VERSION=0.1.6 curl -fsSL .../ai-apm-k8s-download-images.sh | bash
+#   curl -fsSL .../ai-apm-k8s-download-images.sh | bash -s -- --version 0.1.7
+#   APM_VERSION=0.1.7 curl -fsSL .../ai-apm-k8s-download-images.sh | bash
 
 set -euo pipefail
 

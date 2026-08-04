@@ -25,18 +25,18 @@ Download the all-in-one offline bundle matching your CPU architecture.
 | amd64 | `databuff-ai-apm-offline-<version>-amd64.tar.gz` |
 | arm64 | `databuff-ai-apm-offline-<version>-arm64.tar.gz` |
 
-Download URLs (replace `<version>` with the release, e.g. `0.1.6`):
+Download URLs (replace `<version>` with the release, e.g. `0.1.7`):
 
 - amd64: `https://datalens.databuff.com:5001/databuff/<version>/offline/databuff-ai-apm-offline-<version>-amd64.tar.gz`
 - arm64: `https://datalens.databuff.com:5001/databuff/<version>/offline/databuff-ai-apm-offline-<version>-arm64.tar.gz`
 
-Example CLI download (amd64 / `0.1.6`):
+Example CLI download (amd64 / `0.1.7`):
 
 ```bash
-curl -fLO https://datalens.databuff.com:5001/databuff/0.1.6/offline/databuff-ai-apm-offline-0.1.6-amd64.tar.gz
+curl -fLO https://datalens.databuff.com:5001/databuff/0.1.7/offline/databuff-ai-apm-offline-0.1.7-amd64.tar.gz
 ```
 
-To resolve the latest release automatically, `https://datalens.databuff.com:5001/databuff/VERSION` returns plain text (e.g. `0.1.6`) — **not** the bundle. Query the version first, then download:
+To resolve the latest release automatically, `https://datalens.databuff.com:5001/databuff/VERSION` returns plain text (e.g. `0.1.7`) — **not** the bundle. Query the version first, then download:
 
 ```bash
 VERSION=$(curl -fsSL https://datalens.databuff.com:5001/databuff/VERSION)
@@ -48,11 +48,11 @@ Each bundle includes deployment scripts, `ai-apm-stack` app images, and `doris-s
 
 ## Install
 
-Example for `0.1.6` / `amd64` (download on a connected machine, then copy the bundle to the target):
+Example for `0.1.7` / `amd64` (download on a connected machine, then copy the bundle to the target):
 
 ```bash
-tar -zxvf databuff-ai-apm-offline-0.1.6-amd64.tar.gz
-cd databuff-ai-apm-offline-0.1.6-amd64
+tar -zxvf databuff-ai-apm-offline-0.1.7-amd64.tar.gz
+cd databuff-ai-apm-offline-0.1.7-amd64
 
 # Install platform
 sudo ./install.sh

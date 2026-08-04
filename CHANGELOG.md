@@ -1,5 +1,42 @@
 # Changelog
 
+## [0.1.7] - 2026-08-04
+
+### Features
+
+- **QA Doris read query**: `POST /webapi/api/v1/ai/doris/query` and built-in tool `platform.queryDoris` so the product QA expert can verify platform config and telemetry via the web JDBC pool (read-only, row-capped)
+- **QA skill / management APIs**: product QA skill documents `queryDoris` plus frontend management API login/credential discovery for config diagnosis
+
+### Bug Fixes
+
+- Fix portal `resourceInfo` / `resourceRelation` for non-HTTP `componentTypes`
+- Honor `lt` / `lte` / `gte` comparators and warning thresholds in monitor rule evaluation
+- Apply remote MCP headers after transport; add Streamable HTTP integration coverage
+- Fix AI chat Mermaid rendering (per-node with syntax-repair fallback) and tighten expert Mermaid prompt hints
+- Fix `getCurrentTimeRange` end-time handling; remove unused LLM `max_token` default
+
+### Documentation
+
+- Update download URL and related install docs
+
+### Deploy & Build
+
+- Docker / K8s / offline install scripts versioned to `0.1.7`
+
+### Full changelog
+
+Commits since `0.1.6`:
+
+- `2890b41` Add read-only Doris query API and queryDoris tool so the QA expert can verify platform config and data without ad-hoc DB connections
+- `08fc79e` fix(portal): support non-HTTP componentTypes in resourceInfo and resourceRelation
+- `eeb246e` update docs
+- `8cde082` fix(monitor): honor lt/lte/gte comparators and warning thresholds in rule evaluation
+- `0ff8ae2` fix(mcp): apply remote MCP headers after transport and add Streamable HTTP IT
+- `1d5f0a3` update getCurrentTimeRange for end
+- `853552b` update download url
+- `f67a2b0` fix(ai-chat): render mermaid per-node with syntax-repair fallback and tighten expert mermaid prompt hints
+- `7b347bc` remove llm max_token default value
+
 ## [0.1.6] - 2026-07-30
 
 ## [0.1.5] - 2026-07-27

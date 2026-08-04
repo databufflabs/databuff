@@ -44,9 +44,9 @@ curl -fsSL https://databuff.ai/databuff/ai-apm-k8s-download-images.sh | bash
 指定版本安装：
 
 ```bash
-curl -fsSL https://databuff.ai/databuff/ai-apm-k8s-install.sh | bash -s -- --version 0.1.6
+curl -fsSL https://databuff.ai/databuff/ai-apm-k8s-install.sh | bash -s -- --version 0.1.7
 # 或
-APM_VERSION=0.1.6 curl -fsSL https://databuff.ai/databuff/ai-apm-k8s-install.sh | bash
+APM_VERSION=0.1.7 curl -fsSL https://databuff.ai/databuff/ai-apm-k8s-install.sh | bash
 ```
 
 > **运维详情**：[Kubernetes 运维参考](../运维参考/K8s运维.md) — 启停、NodePort 访问、离线镜像与扩缩容。
