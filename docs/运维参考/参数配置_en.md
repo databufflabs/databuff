@@ -6,7 +6,7 @@
 
 # Parameter Configuration
 
-How to change the login account after install, tune Ingest pipeline task settings, configure Trace resource ignore filtering, and adjust telemetry retention. For directories and lifecycle, see [Docker Operations](Docker运维_en.md) and [Kubernetes Operations](K8s运维_en.md). For capacity planning and additional knobs, see [Performance Tuning](性能优化_en.md).
+How to skip the AVX2 CPU check at install time, and after install how to change the login account, tune Ingest pipeline task settings, configure Trace resource ignore filtering, and adjust telemetry retention. For directories and lifecycle, see [Docker Operations](Docker运维_en.md) and [Kubernetes Operations](K8s运维_en.md). For capacity planning and additional knobs, see [Performance Tuning](性能优化_en.md).
 
 ## 1. Change login username and password
 
@@ -216,6 +216,31 @@ ALTER TABLE log_dc_record SET ("dynamic_partition.start" = "-14");
 ALTER TABLE metric_service SET ("dynamic_partition.start" = "-14");
 -- Repeat for other metric_* tables as needed
 ```
+
+## 5. Skip AVX2 CPU check (install time)
+
+Doris BE on **x86_64 / amd64** requires AVX2. Online/offline installers check the CPU and **exit 1** if the `avx2` flag is missing. For PoC or legacy VMs only, export this env var before install:
+
+| Environment variable | Value | Meaning |
+|----------------------|-------|---------|
+| `DATABUFF_SKIP_AVX2_CHECK` | `1` or `true` | Skip the installer's AVX2 check (warning only, does not abort) |
+
+**Online install:**
+
+```bash
+export DATABUFF_SKIP_AVX2_CHECK=1
+curl -fsSL https://databuff.ai/databuff/ai-apm-install.sh | bash
+```
+
+**Offline install:**
+
+```bash
+export DATABUFF_SKIP_AVX2_CHECK=1
+cd /path/to/databuff-docker-offline-*-amd64
+./install-offline.sh
+```
+
+> This only bypasses the **installer** gate; it does not remove Doris's AVX2 dependency. Prefer AVX2-capable x86_64 or arm64 for production. Full risks and legacy-script workarounds: [Performance Tuning — Bypass AVX2 check](性能优化_en.md#7-bypass-avx2-check-on-x86_64-without-avx2).
 
 ## Related docs
 

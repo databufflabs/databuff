@@ -298,7 +298,7 @@ These cases **skip** the check automatically:
 | **arm64 / aarch64** | Check skipped |
 | **macOS (no `/proc/cpuinfo`)** | Check skipped (Doris in Linux containers still follows host CPU features) |
 
-### Recommended: `DATABUFF_SKIP_AVX2_CHECK` (v0.1.2+ script)
+### Recommended: `DATABUFF_SKIP_AVX2_CHECK` (v0.1.6+ script)
 
 Set before install:
 
