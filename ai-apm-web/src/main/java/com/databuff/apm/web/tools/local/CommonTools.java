@@ -36,7 +36,7 @@ public class CommonTools {
             @ToolParam(name = "rangeMinutes", required = false, description = "Lookback minutes, default 10, minimum 1")
             Integer rangeMinutes) {
         int minutes = rangeMinutes == null || rangeMinutes < 1 ? 10 : rangeMinutes;
-        long endTime = System.currentTimeMillis() / ONE_MINUTE_MS * ONE_MINUTE_MS;
+        long endTime = System.currentTimeMillis() / ONE_MINUTE_MS * ONE_MINUTE_MS - ONE_MINUTE_MS;
         return timeRange(endTime - minutes * ONE_MINUTE_MS, endTime);
     }
 
