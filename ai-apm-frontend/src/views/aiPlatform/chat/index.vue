@@ -565,7 +565,7 @@ import AiPlatformApi, {
   ExpertTask,
 } from '@/api/aiPlatform';
 import { getLlmStatus, listLlmProviders, getLlmProviderDetail } from '@/api/llmConfig';
-import { debounce, toAsyncWait } from '@/utils/common';
+import { toAsyncWait } from '@/utils/common';
 import sendIcon from '@/assets/img/aibot/send.svg';
 import sendActiveIcon from '@/assets/img/aibot/send-active.svg';
 import sendStopIcon from '@/assets/img/aibot/send-stop.svg';
@@ -746,8 +746,10 @@ export default class AiPlatformChat extends Vue {
   private serverRunning = false
   private pollTimer: number | null = null
   private typewriterTimers: Record<string, number> = {}
-  private isUserScrolling = false
-  private lastScrollTop = 0
+  /** 是否贴底跟随最新回复；用户上翻后为 false，回到底部附近再恢复 */
+  private stickToBottom = true
+  private programmaticScroll = false
+  private readonly stickBottomThreshold = 48
   private chatPageEl: HTMLElement | null = null
   private showSessionDrawer = false
   private previewFile: GeneratedFileMeta | null = null
@@ -1685,6 +1687,7 @@ export default class AiPlatformChat extends Vue {
     this.draft = ''
     this.expertId = DEFAULT_EXPERT_ID
     this.clearUploadItems()
+    this.stickToBottom = true
     this.syncSessionIdToRoute(this.activeSessionId)
   }
 
@@ -2263,27 +2266,40 @@ export default class AiPlatformChat extends Vue {
     box.scrollTop += event.deltaY
   }
 
-  private onMessageScroll = debounce(() => {
+  private onMessageScroll = () => {
     const box = this.$refs.messageBox
-    if (!box) {
+    if (!box || this.programmaticScroll) {
       return
     }
-    const { scrollHeight, clientHeight, scrollTop } = box
-    if (scrollTop >= scrollHeight - clientHeight - 8) {
-      this.isUserScrolling = false
-    } else if (scrollTop < this.lastScrollTop) {
-      this.isUserScrolling = true
-    }
-    this.lastScrollTop = scrollTop
-  }, 100)
+    const distanceFromBottom = box.scrollHeight - box.clientHeight - box.scrollTop
+    this.stickToBottom = distanceFromBottom <= this.stickBottomThreshold
+  }
+
+  private withProgrammaticScroll (apply: () => void) {
+    this.programmaticScroll = true
+    apply()
+    requestAnimationFrame(() => {
+      requestAnimationFrame(() => {
+        this.programmaticScroll = false
+      })
+    })
+  }
 
   private scrollToBottom (force = false) {
     this.$nextTick(() => {
       const box = this.$refs.messageBox
-      if (!box || (this.isUserScrolling && !force)) {
+      if (!box) {
         return
       }
-      box.scrollTop = box.scrollHeight
+      if (force) {
+        this.stickToBottom = true
+      }
+      if (!this.stickToBottom) {
+        return
+      }
+      this.withProgrammaticScroll(() => {
+        box.scrollTop = box.scrollHeight
+      })
     })
   }
 
@@ -2294,13 +2310,18 @@ export default class AiPlatformChat extends Vue {
       if (!box || !element) {
         return
       }
+      // 用户已上翻查看历史时，不要因思考过程展开而强行跳转
+      if (!this.stickToBottom) {
+        return
+      }
       const boxRect = box.getBoundingClientRect()
       const elementRect = element.getBoundingClientRect()
       const offsetTop = elementRect.top - boxRect.top + box.scrollTop
       const nextTop = Math.max(0, offsetTop - (box.clientHeight - elementRect.height) / 2)
-      box.scrollTop = nextTop
-      this.isUserScrolling = true
-      this.lastScrollTop = nextTop
+      this.withProgrammaticScroll(() => {
+        box.scrollTop = nextTop
+      })
+      this.stickToBottom = false
     })
   }
 

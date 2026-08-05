@@ -113,7 +113,6 @@ import { Vue, Component, Prop, Watch } from 'vue-property-decorator';
 import Typed from 'typed.js';
 import { v4 as uuidv4 } from 'uuid';
 import MarkedView from '@/components/marked-view.vue';
-import { debounce } from '@/utils/common';
 import { toAsyncWait } from '@/utils/common';
 import AlarmApi from '@/api/alarm';
 
@@ -149,8 +148,9 @@ export default class ChatAI extends Vue {
   private scrollContainer: any = null;
   private scrollHandle: any = null;
 
-  private isUserScrolling = false; // 用户是否主动滚动
-  private lastScrollTop = 0; // 上一次的滚动位置
+  private isUserScrolling = false; // 用户是否主动滚动（离开底部）
+  private programmaticScroll = false;
+  private readonly stickBottomThreshold = 48;
 
   private typed: any = null
 
@@ -178,15 +178,15 @@ export default class ChatAI extends Vue {
         this.scrollContainer = scrollContainer;
       }
       if (this.scrollContainer && !this.scrollHandle) {
-        this.scrollHandle = debounce(() => {
-          const { scrollHeight, clientHeight, scrollTop } = this.scrollContainer
-          if (scrollTop >= scrollHeight - clientHeight) { // 判断用户是否滚动到底部
-            this.isUserScrolling = false; // 重置为自动滚动
-          } else if (scrollTop < this.lastScrollTop) { // 判断用户是否向上滚动
-            this.isUserScrolling = true; // 停止自动滚动
+        this.scrollHandle = () => {
+          if (this.programmaticScroll) {
+            return;
           }
-          this.lastScrollTop = scrollTop;
-        }, 100);
+          const { scrollHeight, clientHeight, scrollTop } = this.scrollContainer;
+          const distanceFromBottom = scrollHeight - clientHeight - scrollTop;
+          // 贴底则继续跟随；离开底部则停止自动滚动，方便上翻查看
+          this.isUserScrolling = distanceFromBottom > this.stickBottomThreshold;
+        };
         this.scrollContainer.addEventListener('scroll', this.scrollHandle);
       }
       if (this.scrollContainer && !this.scrollToBottomTimer) {
@@ -218,7 +218,7 @@ export default class ChatAI extends Vue {
       this.scrollHandle = null
     }
     this.isUserScrolling = false
-    this.lastScrollTop = 0
+    this.programmaticScroll = false
     if (this.typed) {
       this.typed.destroy();
       this.typed = null;
@@ -333,7 +333,7 @@ export default class ChatAI extends Vue {
     }, 5000);
   }
 
-  // 自动滚动
+  // 自动滚动：仅在用户贴底时跟随最新内容
   private loopScrollToBottom () {
     if (this.scrollToBottomTimer) {
       window.clearInterval(this.scrollToBottomTimer);
@@ -341,10 +341,17 @@ export default class ChatAI extends Vue {
     }
     this.scrollToBottomTimer = setInterval(async() => {
       this.$nextTick(() => {
-        if (!this.isUserScrolling) {
-          const { scrollHeight, clientHeight } = this.scrollContainer;
-          this.scrollContainer.scrollTop = scrollHeight - clientHeight;
+        if (!this.scrollContainer || this.isUserScrolling) {
+          return;
         }
+        this.programmaticScroll = true;
+        const { scrollHeight, clientHeight } = this.scrollContainer;
+        this.scrollContainer.scrollTop = scrollHeight - clientHeight;
+        requestAnimationFrame(() => {
+          requestAnimationFrame(() => {
+            this.programmaticScroll = false;
+          });
+        });
       })
     }, 1000);
   }
