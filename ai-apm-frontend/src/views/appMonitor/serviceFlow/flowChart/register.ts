@@ -77,6 +77,7 @@ const multipleFittingString = (str: string, maxWidth: number, fontSize: number, 
 
 export const rectConfig = {
   width: 188,
+  // 单行标题时的收起/展开高度；标题需 2 行时再叠加 TITLE_LINE_EXTRA
   height: 90,
   expandHeight: 138,
   lineWidth: 2,
@@ -85,15 +86,21 @@ export const rectConfig = {
   opacity: 1,
 };
 
+const ROOT_BASE_HEIGHT = 102;
+
 const nodeOrigin = {
   x: -rectConfig.width / 2,
   y: -rectConfig.height / 2,
   padding: 12,
 };
 
+const HEADER_HEIGHT_SINGLE = 32;
+const HEADER_HEIGHT_DOUBLE = 46;
+export const TITLE_LINE_EXTRA = HEADER_HEIGHT_DOUBLE - HEADER_HEIGHT_SINGLE; // 14
+
 const rectHeaderConfig = {
   width: rectConfig.width - 2,
-  height: 32,
+  height: HEADER_HEIGHT_SINGLE,
   stroke: null,
   opacity: 1,
   radius: [rectConfig.radius - 1.2, rectConfig.radius - 1.2, 0, 0]
@@ -103,7 +110,61 @@ const rectHeaderConfig = {
 const rectHeaderTitleConfig = {
   fontSize: 13,
   fontWeight: 400,
+  lineHeight: 16,
+  textBaseline: 'top' as const,
 }
+
+const HEADER_TITLE_MAX_LINE = 2;
+const HEADER_OFFSET_Y = 2;
+// 普通节点 / 根节点标题可用宽度（扣除图标与右侧按钮）
+const TITLE_MAX_WIDTH_NODE = rectHeaderConfig.width - 63;
+const TITLE_MAX_WIDTH_ROOT = rectHeaderConfig.width - 48;
+
+const headerIconCenterY = (cardY: number, headerHeight: number) =>
+  cardY + HEADER_OFFSET_Y + headerHeight / 2;
+
+/** 按服务名实际行数（最多 2 行）计算 header 与卡片附加高度 */
+const resolveHeaderTitle = (name: string, maxWidth: number) => {
+  const fitted = multipleFittingString(
+    name || '-',
+    maxWidth,
+    rectHeaderTitleConfig.fontSize,
+    HEADER_TITLE_MAX_LINE,
+  );
+  const lines = Math.max(fitted.line, 1);
+  const headerHeight = lines > 1 ? HEADER_HEIGHT_DOUBLE : HEADER_HEIGHT_SINGLE;
+  const extra = lines > 1 ? TITLE_LINE_EXTRA : 0;
+  return {
+    text: fitted.text || '-',
+    lines,
+    headerHeight,
+    extra,
+    titleYOffset:
+      HEADER_OFFSET_Y +
+      (headerHeight - lines * rectHeaderTitleConfig.lineHeight) / 2,
+  };
+};
+
+/** 布局用：按节点名是否换行返回卡片高度 */
+export const getFlowNodeCardHeight = (d: any) => {
+  const isRoot = d?.type === FLOW_NODE.rootName;
+  const maxWidth = isRoot ? TITLE_MAX_WIDTH_ROOT : TITLE_MAX_WIDTH_NODE;
+  const lines = resolveHeaderTitle(d?.name, maxWidth).lines;
+  // 布局沿用收起态基准高度（与原先 getHeight 一致），仅对 2 行标题加高
+  return rectConfig.height + (lines > 1 ? TITLE_LINE_EXTRA : 0);
+};
+
+// 单行标题时的 body 内容相对卡片顶部偏移；2 行时 + TITLE_LINE_EXTRA
+const BODY_Y = {
+  contribution: 50,
+  percent: 72,
+  response: 86,
+  request: 110,
+};
+const ROOT_BODY_Y = {
+  response: 50,
+  request: 74,
+};
 // 贡献度进度条
 const percentConfig = {
   height: 4,
@@ -139,7 +200,7 @@ const viewDataShapeNames = [
   FLOW_NODE.viewData.requestTitle,
   FLOW_NODE.viewData.requestValue,
 ]
-const { x, y } = nodeOrigin;
+const { x } = nodeOrigin;
 
 export const registerFlowNodeCard = (g6Cls: G6Type) => {
   g6Cls.registerNode(
@@ -151,6 +212,10 @@ export const registerFlowNodeCard = (g6Cls: G6Type) => {
         const { viewData = {}, serviceInfo = {}, children, childrenInfo } = cfg || {};
         const { contribution = 0, response = 0, reqCnt = 0 } = viewData || {};
         const { serviceType = 'default' } = serviceInfo || {};
+        const headerTitle = resolveHeaderTitle(cfg!.name as string, TITLE_MAX_WIDTH_NODE);
+        cfg.titleLines = headerTitle.lines;
+        const cardHeight = rectConfig.height + headerTitle.extra;
+        const y = -cardHeight / 2;
         // 主体容器
         const mainRect = group!.addShape(
           'rect',
@@ -158,6 +223,7 @@ export const registerFlowNodeCard = (g6Cls: G6Type) => {
             attrs: {
               x, y,
               ...rectConfig,
+              height: cardHeight,
               stroke: colors.border,
               cursor: 'pointer',
               fill: colors.background,
@@ -178,8 +244,9 @@ export const registerFlowNodeCard = (g6Cls: G6Type) => {
           'rect',
           {
             attrs: {
-              x: x + 1, y: rectBBox.minY + 2,
+              x: x + 1, y: rectBBox.minY + HEADER_OFFSET_Y,
               ...rectHeaderConfig,
+              height: headerTitle.headerHeight,
               fill: colors.headerBg,
               cursor: 'pointer',
             },
@@ -192,25 +259,26 @@ export const registerFlowNodeCard = (g6Cls: G6Type) => {
           {
             attrs: {
               x: x + 11,
-              y: y + ((rectHeaderConfig.height + 16) / 2),
+              y: headerIconCenterY(y, headerTitle.headerHeight),
               text: getDbIcon(serviceType || 'default'),
               fontFamily: 'db-icon',
-              ...rectHeaderTitleConfig,
               fontSize: 14,
+              fontWeight: 400,
+              textBaseline: 'middle',
               fill: colors.headerText,
               cursor: 'pointer',
             },
             name: FLOW_NODE.header.titleIcon
           }
         );
-        // header标题文字
+        // header标题文字（能一行则一行，否则最多 2 行）
         const titleText = contentGroup!.addShape(
           'text',
           {
             attrs: {
               x: x + 30,
-              y: y + ((rectHeaderConfig.height + 16) / 2),
-              text: multipleFittingString(cfg!.name as string || '-', rectHeaderConfig.width - 63, rectHeaderTitleConfig.fontSize, 1).text || '-',
+              y: y + headerTitle.titleYOffset,
+              text: headerTitle.text,
               ...rectHeaderTitleConfig,
               fill: colors.headerText,
               cursor: 'pointer',
@@ -224,11 +292,12 @@ export const registerFlowNodeCard = (g6Cls: G6Type) => {
           {
             attrs: {
               x: x + rectConfig.width - 22,
-              y: y + ((rectHeaderConfig.height + 16) / 2),
+              y: headerIconCenterY(y, headerTitle.headerHeight),
               fill: colors.headerArrow,
               text: getDbIcon('down'),
               fontFamily: 'db-icon',
               fontSize: 14,
+              textBaseline: 'middle',
               cursor: 'pointer',
             },
             name: FLOW_NODE.header.toggleIcon
@@ -251,6 +320,7 @@ export const registerFlowNodeCard = (g6Cls: G6Type) => {
         //   }
         // );
 
+        const bodyExtra = headerTitle.extra;
         // 响应贡献度文字
         const conbText = contentGroup!.addShape(
           'text',
@@ -258,7 +328,7 @@ export const registerFlowNodeCard = (g6Cls: G6Type) => {
             attrs: {
               ...viewDataTitle,
               fill: colors.contText,
-              y: y + 50,
+              y: y + BODY_Y.contribution + bodyExtra,
               text: i18n.t('modules.views.appMonitor.serviceFlow.s_b71a5427') as string, textKey: 'modules.views.appMonitor.serviceFlow.s_b71a5427',
               cursor: 'pointer',
             },
@@ -272,7 +342,7 @@ export const registerFlowNodeCard = (g6Cls: G6Type) => {
             attrs: {
               ...viewDataValue,
               fill: colors.contValue,
-              y: y + 50,
+              y: y + BODY_Y.contribution + bodyExtra,
               text: PercentFilter(contribution > 1 ? 1 : contribution, true),
               cursor: 'pointer',
             },
@@ -285,7 +355,7 @@ export const registerFlowNodeCard = (g6Cls: G6Type) => {
           {
             attrs: {
               x: x + 12,
-              y: y + 72,
+              y: y + BODY_Y.percent + bodyExtra,
               ...percentBgConfig,
               fill: colors.percentBg,
               cursor: 'pointer',
@@ -300,7 +370,7 @@ export const registerFlowNodeCard = (g6Cls: G6Type) => {
           {
             attrs: {
               x: x + 12,
-              y: y + 72,
+              y: y + BODY_Y.percent + bodyExtra,
               ...percentConfig,
               fill: colors.percent,
               width: percentBgConfig.width * (contribution > 1 ? 1 : (contribution < 0 ? 0 : contribution)),
@@ -317,7 +387,7 @@ export const registerFlowNodeCard = (g6Cls: G6Type) => {
             attrs: {
               ...viewDataTitle,
               fill: colors.contText,
-              y: y + 86,
+              y: y + BODY_Y.response + bodyExtra,
               text: i18n.t('modules.views.appMonitor.cache.s_96a0c062') as string, textKey: 'modules.views.appMonitor.cache.s_96a0c062',
               cursor: 'pointer',
             },
@@ -331,7 +401,7 @@ export const registerFlowNodeCard = (g6Cls: G6Type) => {
             attrs: {
               ...viewDataValue,
               fill: colors.contValue,
-              y: y + 86,
+              y: y + BODY_Y.response + bodyExtra,
               text: NsFilter(response),
               cursor: 'pointer',
             },
@@ -345,7 +415,7 @@ export const registerFlowNodeCard = (g6Cls: G6Type) => {
             attrs: {
               ...viewDataTitle,
               fill: colors.contText,
-              y: y + 110,
+              y: y + BODY_Y.request + bodyExtra,
               text: i18n.t('modules.views.appMonitor.cache.s_8bc42b53') as string, textKey: 'modules.views.appMonitor.cache.s_8bc42b53',
               cursor: 'pointer',
             },
@@ -359,7 +429,7 @@ export const registerFlowNodeCard = (g6Cls: G6Type) => {
             attrs: {
               ...viewDataValue,
               fill: colors.contValue,
-              y: y + 110,
+              y: y + BODY_Y.request + bodyExtra,
               text: NumberFilter(reqCnt),
               cursor: 'pointer',
             },
@@ -426,12 +496,15 @@ export const registerFlowNodeCard = (g6Cls: G6Type) => {
           const toggleIcon = group.find((i: any) => i.get('name') === FLOW_NODE.header.toggleIcon);
 
           // --- 2. 处理 'nodeActive' 状态 (展开/收起 + 样式) ---
-          const originY = nodeOrigin.y;
-          const originHeight = rectConfig.height; // 默认高度
-          const expandY = -rectConfig.expandHeight / 2;
-          const expandHeight = rectConfig.expandHeight; // 展开时高度
+          const titleExtra = cfg.titleLines != null
+            ? (cfg.titleLines > 1 ? TITLE_LINE_EXTRA : 0)
+            : resolveHeaderTitle(cfg.name, TITLE_MAX_WIDTH_NODE).extra;
+          const originHeight = rectConfig.height + titleExtra;
+          const originY = -originHeight / 2;
+          const expandHeight = rectConfig.expandHeight + titleExtra;
+          const expandY = -expandHeight / 2;
           // 高度差的一半
-          const halfDelta = (rectConfig.expandHeight - rectConfig.height) / 2;
+          const halfDelta = (expandHeight - originHeight) / 2;
 
           if (value) {
             // --- 设为 Active (展开) ---
@@ -506,14 +579,17 @@ export const registerFlowRootNodeCard = (g6Cls: G6Type) => {
         const { viewData = {}, serviceInfo = {}, children, childrenInfo } = cfg || {};
         const { response = 0, reqCnt = 0 } = viewData || {};
         const { serviceType = 'default' } = serviceInfo || {};
-        const _y = -51;
+        const headerTitle = resolveHeaderTitle(cfg!.name as string, TITLE_MAX_WIDTH_ROOT);
+        cfg.titleLines = headerTitle.lines;
+        const rootHeight = ROOT_BASE_HEIGHT + headerTitle.extra;
+        const _y = -rootHeight / 2;
         // 主体容器
         const mainRect = group!.addShape(
           'rect',
           {
             attrs: {
               ...rectConfig,
-              height: 102,
+              height: rootHeight,
               x,
               y: _y,
               stroke: colors.border,
@@ -535,8 +611,9 @@ export const registerFlowRootNodeCard = (g6Cls: G6Type) => {
           'rect',
           {
             attrs: {
-              x: x + 1, y: rectBBox.minY + 2,
+              x: x + 1, y: rectBBox.minY + HEADER_OFFSET_Y,
               ...rectHeaderConfig,
+              height: headerTitle.headerHeight,
               fill: colors.headerBg,
             },
             name: FLOW_NODE.header.box,
@@ -548,24 +625,25 @@ export const registerFlowRootNodeCard = (g6Cls: G6Type) => {
           {
             attrs: {
               x: x + 11,
-              y: _y + ((rectHeaderConfig.height + 16) / 2),
+              y: headerIconCenterY(_y, headerTitle.headerHeight),
               text: getDbIcon(serviceType || 'default'),
               fontFamily: 'db-icon',
-              ...rectHeaderTitleConfig,
               fontSize: 14,
+              fontWeight: 400,
+              textBaseline: 'middle',
               fill: colors.headerText,
             },
             name: FLOW_NODE.header.titleIcon
           }
         );
-        // header标题文字
+        // header标题文字（能一行则一行，否则最多 2 行）
         const titleText = contentGroup!.addShape(
           'text',
           {
             attrs: {
               x: x + 30,
-              y: _y + ((rectHeaderConfig.height + 16) / 2),
-              text: multipleFittingString(cfg!.name as string || '-', rectHeaderConfig.width - 48, rectHeaderTitleConfig.fontSize, 1).text || '-',
+              y: _y + headerTitle.titleYOffset,
+              text: headerTitle.text,
               ...rectHeaderTitleConfig,
               fill: colors.headerText,
             },
@@ -573,6 +651,7 @@ export const registerFlowRootNodeCard = (g6Cls: G6Type) => {
           }
         );
 
+        const bodyExtra = headerTitle.extra;
         // 平均响应时间文字
         const responseText = contentGroup!.addShape(
           'text',
@@ -580,7 +659,7 @@ export const registerFlowRootNodeCard = (g6Cls: G6Type) => {
             attrs: {
               ...viewDataTitle,
               fill: colors.contText,
-              y: _y + 50,
+              y: _y + ROOT_BODY_Y.response + bodyExtra,
               text: i18n.t('modules.views.appMonitor.cache.s_96a0c062') as string, textKey: 'modules.views.appMonitor.cache.s_96a0c062',
             },
             name: FLOW_NODE.viewData.responseTitle
@@ -593,7 +672,7 @@ export const registerFlowRootNodeCard = (g6Cls: G6Type) => {
             attrs: {
               ...viewDataValue,
               fill: colors.contValue,
-              y: _y + 50,
+              y: _y + ROOT_BODY_Y.response + bodyExtra,
               text: NsFilter(response),
             },
             name: FLOW_NODE.viewData.responseValue
@@ -606,7 +685,7 @@ export const registerFlowRootNodeCard = (g6Cls: G6Type) => {
             attrs: {
               ...viewDataTitle,
               fill: colors.contText,
-              y: _y + 74,
+              y: _y + ROOT_BODY_Y.request + bodyExtra,
               text: i18n.t('modules.views.appMonitor.cache.s_8bc42b53') as string, textKey: 'modules.views.appMonitor.cache.s_8bc42b53',
             },
             name: FLOW_NODE.viewData.requestTitle
@@ -619,7 +698,7 @@ export const registerFlowRootNodeCard = (g6Cls: G6Type) => {
             attrs: {
               ...viewDataValue,
               fill: colors.contValue,
-              y: _y + 74,
+              y: _y + ROOT_BODY_Y.request + bodyExtra,
               text: NumberFilter(reqCnt),
             },
             name: FLOW_NODE.viewData.requestValue

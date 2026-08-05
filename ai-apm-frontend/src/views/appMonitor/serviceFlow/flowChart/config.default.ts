@@ -1,5 +1,5 @@
 import G6 from '@antv/g6';
-import { rectConfig, colors } from './register';
+import { rectConfig, colors, getFlowNodeCardHeight } from './register';
 import { FLOW_NODE, FLOW_EDGE } from './index.types'
 
 export default function getDefaultCfg () {
@@ -33,7 +33,7 @@ export default function getDefaultCfg () {
       type: 'compactBox',
       direction: 'LR',
       getWidth: () => rectConfig.width,
-      getHeight: () => rectConfig.height,
+      getHeight: (d: any) => getFlowNodeCardHeight(d),
       getHGap: () => 65,
       getVGap: () => 35,
     },
