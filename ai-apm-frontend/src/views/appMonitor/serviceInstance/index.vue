@@ -344,14 +344,40 @@ export default class ServiceDetail extends Vue {
 
   // 查看详细分析
   private viewAnalysisHandle () {
+    const query: any = {
+      ...this.getRouteTimeOrRange,
+      sn: encodeURIComponent(this.serviceDetail.name || this.serviceDetail.service),
+      sid: encodeURIComponent(this.serviceDetail.serviceId),
+    }
+    const analysisType = this.resolveAnalysisComponentType()
+    if (analysisType) {
+      query.tabType = encodeURIComponent(analysisType)
+      if (analysisType === 'service.db') {
+        query.dbTarget = encodeURIComponent('1')
+      }
+    }
     this.$router.push({
       path: '/appMonitor/serviceAnalysis',
-      query: {
-        ...this.getRouteTimeOrRange,
-        sn: encodeURIComponent(this.serviceDetail.name || this.serviceDetail.service),
-        sid: encodeURIComponent(this.serviceDetail.serviceId),
-      },
+      query,
     })
+  }
+
+  /** Map service instance context to 接口分析 componentType (tabType). */
+  private resolveAnalysisComponentType (): string {
+    const serviceType = String(this.serviceDetail?.service_type || '').toLowerCase()
+    if (serviceType === 'db') {
+      return 'service.db'
+    }
+    if (serviceType === 'mq') {
+      return 'service.mq'
+    }
+    if (serviceType === 'cache') {
+      return 'service.redis'
+    }
+    if (serviceType === 'remote' || serviceType === 'custom') {
+      return 'service.remote'
+    }
+    return ''
   }
 
 }

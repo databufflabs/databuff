@@ -1242,7 +1242,10 @@ public class ServicePortalService {
                 .toList();
         Map<String, Object> data = new LinkedHashMap<>();
         data.put("serviceInstances", rows);
-        data.put("componentTypes", List.of("service.http"));
+        // Must match serviceInfo: hardcoding service.http breaks DB/MQ/cache jumps into 接口分析.
+        data.put("componentTypes", serviceId != null && !serviceId.isBlank()
+                ? loadServiceComponentTypes(serviceId, from, to)
+                : List.of());
         return data;
     }
 

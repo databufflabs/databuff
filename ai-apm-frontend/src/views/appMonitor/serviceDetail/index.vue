@@ -288,14 +288,36 @@ export default class ServiceDetail extends Vue {
       sn: encodeURIComponent(this.serviceDetail.name || this.serviceDetail.service),
       sid: encodeURIComponent(this.serviceDetail.serviceId),
     }
-    if (this.$route.path === '/appMonitor/database/detail') {
-      query.tabType = encodeURIComponent('service.db')
-      query.dbTarget = encodeURIComponent('1')
+    const analysisType = this.resolveAnalysisComponentType()
+    if (analysisType) {
+      query.tabType = encodeURIComponent(analysisType)
+      if (analysisType === 'service.db') {
+        query.dbTarget = encodeURIComponent('1')
+      }
     }
     this.$router.push({
       path: '/appMonitor/serviceAnalysis',
       query,
     })
+  }
+
+  /** Map service detail context to 接口分析 componentType (tabType). */
+  private resolveAnalysisComponentType (): string {
+    const serviceType = String(this.serviceDetail?.service_type || '').toLowerCase()
+    const path = this.$route.path
+    if (serviceType === 'db' || path === '/appMonitor/database/detail') {
+      return 'service.db'
+    }
+    if (serviceType === 'mq' || path === '/appMonitor/msgQueue/detail') {
+      return 'service.mq'
+    }
+    if (serviceType === 'cache' || path === '/appMonitor/cache/detail') {
+      return 'service.redis'
+    }
+    if (serviceType === 'remote' || serviceType === 'custom' || path === '/appMonitor/external/detail') {
+      return 'service.remote'
+    }
+    return ''
   }
 }
 </script>
