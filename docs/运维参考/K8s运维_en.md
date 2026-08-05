@@ -50,7 +50,7 @@ Default login (same as Docker; when unchanged):
 - Username: `admin`
 - Password: `Databuff@123`
 
-`start.sh` / `install.sh` print the **effective** credentials from the Web Pod env. To change credentials or Ingest task settings, see [Parameter Configuration](参数配置_en.md).
+`start.sh` / `install.sh` print the **effective** credentials from the Web Pod env. To change login credentials, Doris connection credentials, or Ingest task settings, see [Parameter Configuration](参数配置_en.md).
 
 ## Offline Images
 

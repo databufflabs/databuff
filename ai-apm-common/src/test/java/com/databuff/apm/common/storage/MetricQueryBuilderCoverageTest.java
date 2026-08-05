@@ -23,9 +23,13 @@ class MetricQueryBuilderCoverageTest {
 
         String withWallClock = MetricQueryBuilder.callSpanCountSql(
                 DB, FROM, TO, "2026-06-01 00:00:00", "2026-06-01 01:00:00",
-                SERVICE_ID, "inst-1", null, null, null, null, "/api", "GET", null, true, "http");
+                SERVICE_ID, "inst-1", null, null, null, null, "/api", "GET", null, true, "service.http");
         assertThat(withWallClock).contains("FLOOR(`end` / 1000000 / 60000)").contains("inst-1");
         assertThat(withWallClock).contains("`startTime` >=");
+        assertThat(withWallClock).contains("`minutes` >=");
+        assertThat(withWallClock).contains("`resource` = 'GET /api'");
+        assertThat(withWallClock).contains("`meta.http.url` = '/api'");
+        assertThat(withWallClock).doesNotContain("get_json_string(`meta`, '$.\"http.method\"')");
     }
 
     @Test

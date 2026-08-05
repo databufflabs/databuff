@@ -62,7 +62,7 @@ After install or `start.sh`, the terminal prints the Web URL and the **effective
 - Username: `admin` (override with `APM_SECURITY_SEED_USERNAME`)
 - Password: `Databuff@123` (override with `APM_SECURITY_SEED_PASSWORD`)
 
-To change credentials or Ingest task settings, see [Parameter Configuration](参数配置_en.md). Summaries read the running Web container env, so a changed password is not still printed as the default.
+To change login credentials, Doris connection credentials, or Ingest task settings, see [Parameter Configuration](参数配置_en.md). Summaries read the running Web container env, so a changed password is not still printed as the default.
 
 ## Logs
 

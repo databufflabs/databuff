@@ -93,7 +93,10 @@ public class TracePortalService {
                 return response;
             }
 
-            long total = traceQueryService.spanListCount(buildSpanListRequest(body, offset, size));
+            boolean includeTotal = !"false".equalsIgnoreCase(String.valueOf(body.getOrDefault("includeTotal", true)));
+            long total = includeTotal
+                    ? traceQueryService.spanListCount(buildSpanListRequest(body, offset, size))
+                    : (long) offset + page.size();
             Map<String, Object> data = new LinkedHashMap<>();
             data.put("list", page);
             data.put("total", total);

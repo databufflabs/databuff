@@ -50,7 +50,7 @@ cd databuff-ai-apm-k8s-<version>
 - 用户名：`admin`
 - 密码：`Databuff@123`
 
-`start.sh` / `install.sh` 结束时会从 Web Pod 环境变量读取并打印**当前生效**账号。修改登录账号或 Ingest 任务参数见 [参数配置](参数配置.md)。
+`start.sh` / `install.sh` 结束时会从 Web Pod 环境变量读取并打印**当前生效**账号。修改登录账号、Doris 连接账号或 Ingest 任务参数见 [参数配置](参数配置.md)。
 
 ## 离线镜像
 

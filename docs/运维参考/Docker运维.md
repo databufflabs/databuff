@@ -62,7 +62,7 @@ docker compose restart ai-apm-ingest
 - 用户名：`admin`（可通过 `APM_SECURITY_SEED_USERNAME` 覆盖）
 - 密码：`Databuff@123`（可通过 `APM_SECURITY_SEED_PASSWORD` 覆盖）
 
-修改登录账号或 Ingest 任务参数见 [参数配置](参数配置.md)。脚本会读取运行中 Web 容器的环境变量并打印实际账号，不会在改密后仍显示默认密码。
+修改登录账号、Doris 连接账号或 Ingest 任务参数见 [参数配置](参数配置.md)。脚本会读取运行中 Web 容器的环境变量并打印实际账号，不会在改密后仍显示默认密码。
 
 ## 查看日志
 

@@ -128,8 +128,20 @@ class MetricQueryBuilderTest {
         assertThat(sql).contains("(FLOOR(`end` / 1000000 / 60000) * 60000) >= ");
         assertThat(sql).contains("(FLOOR(`end` / 1000000 / 60000) * 60000) < ");
         assertThat(sql).contains("`startTime` >=");
+        assertThat(sql).contains("`minutes` >=");
         assertThat(sql).contains("$.\"" + "db.statement" + "\"");
         assertThat(sql).contains("$.\"" + "db.system" + "\"");
+    }
+
+    @Test
+    void spanMinutesKeyRangeUsesYyyyMmDdHhMmBuckets() {
+        long from = ApmTimeZones.wallClockToEpochMilli("2026-08-05 09:54:00");
+        long to = ApmTimeZones.wallClockToEpochMilli("2026-08-05 09:55:00");
+        assertThat(MetricQueryBuilder.spanMinutesKeyRange(from, to))
+                .isEqualTo("`minutes` >= 202608050954 AND `minutes` < 202608050955");
+        long pruneFrom = from - MetricQueryBuilder.SPAN_PARTITION_LOOKBACK_MS;
+        assertThat(MetricQueryBuilder.spanMinutesKeyRange(pruneFrom, to))
+                .isEqualTo("`minutes` >= 202608050924 AND `minutes` < 202608050955");
     }
 
     @Test
@@ -157,6 +169,7 @@ class MetricQueryBuilderTest {
         long pruneFrom = from - MetricQueryBuilder.SPAN_PARTITION_LOOKBACK_MS;
         assertThat(sql).contains("`startTime` >= '" + ApmTimeZones.formatWallClock(pruneFrom) + "'");
         assertThat(sql).contains("`startTime` < '" + ApmTimeZones.formatWallClock(to) + "'");
+        assertThat(sql).contains(MetricQueryBuilder.spanMinutesKeyRange(pruneFrom, to));
     }
 
     @Test
@@ -198,7 +211,8 @@ class MetricQueryBuilderTest {
                 "/demo/checkout",
                 1_000_000_000L,
                 1);
-        assertThat(sql).contains("COALESCE(`meta.http.url`, '') = '/demo/checkout'");
+        assertThat(sql).contains("`meta.http.url` = '/demo/checkout'");
+        assertThat(sql).doesNotContain("COALESCE(`meta.http.url`, '') = ");
         assertThat(sql).doesNotContain("LIKE '%/demo/checkout'");
         assertThat(sql).contains("`duration` >= 1000000000");
         assertThat(sql).contains("`error` = 1");
@@ -215,7 +229,8 @@ class MetricQueryBuilderTest {
                 "/demo/checkout",
                 1_000_000_000L,
                 1);
-        assertThat(countSql).contains("COALESCE(`meta.http.url`, '') = '/demo/checkout'");
+        assertThat(countSql).contains("`meta.http.url` = '/demo/checkout'");
+        assertThat(countSql).doesNotContain("COALESCE(`meta.http.url`, '') = ");
         assertThat(countSql).doesNotContain("LIKE '%/demo/checkout'");
         assertThat(countSql).contains("`duration` >= 1000000000");
         assertThat(countSql).contains("`error` = 1");
@@ -1240,11 +1255,15 @@ class MetricQueryBuilderTest {
         assertThat(sql).contains("trace_dc_span");
         assertThat(sql).contains("`dstServiceId` = '" + dstServiceId + "'");
         assertThat(sql).doesNotContain(" OR `dstService` = ");
-        assertThat(sql).contains("COALESCE(`meta.http.url`, '') = '/orders'");
+        assertThat(sql).contains("`resource` = 'GET /orders'");
+        assertThat(sql).contains("`meta.http.url` = '/orders'");
+        assertThat(sql).contains("`meta.http.method` = 'GET'");
+        assertThat(sql).doesNotContain("COALESCE(`meta.http.url`");
+        assertThat(sql).doesNotContain("get_json_string(`meta`, '$.\"http.method\"')");
         assertThat(sql).doesNotContain("LIKE '%/orders%'");
-        assertThat(sql).contains("`meta.http.method`");
         assertThat(sql).contains("isOut` = 1");
         assertThat(sql).contains("LIMIT 20");
+        assertThat(sql).contains("`minutes` >=");
     }
 
     @Test
@@ -1255,11 +1274,12 @@ class MetricQueryBuilderTest {
                 "5457a0119281bb98", null,
                 "/api/orders/10001", "GET", null, false, "service.http",
                 "start", "desc", 50, 0);
-        assertThat(sql).contains("COALESCE(`meta.http.url`, '') = '/api/orders/10001'");
+        assertThat(sql).contains("`resource` = 'GET /api/orders/10001'");
+        assertThat(sql).contains("`meta.http.url` = '/api/orders/10001'");
+        assertThat(sql).contains("`meta.http.method` = 'GET'");
+        assertThat(sql).doesNotContain("COALESCE(`meta.http.url`");
+        assertThat(sql).doesNotContain("get_json_string(`meta`, '$.\"http.method\"')");
         assertThat(sql).doesNotContain("LIKE '%/api/orders/10001%'");
-        assertThat(sql).contains("`meta.http.url`");
-        assertThat(sql).contains("= 'GET'");
-        assertThat(sql).contains("`meta.http.method`");
         assertThat(sql).contains("`srcServiceId` = '9bf61532d56eb7b5'");
         assertThat(sql).contains("`dstServiceId` = '5457a0119281bb98'");
     }
@@ -1302,8 +1322,10 @@ class MetricQueryBuilderTest {
                 "start", "desc", 50, 0);
         assertThat(sql).contains("get_json_string(`meta`, '$.\"root.resource\"')");
         assertThat(sql).contains("LIKE '%/methodA4%'");
-        assertThat(sql).contains("COALESCE(`meta.http.url`, '') = '/methodB7'");
+        assertThat(sql).contains("`resource` = 'GET /methodB7'");
+        assertThat(sql).contains("`meta.http.url` = '/methodB7'");
         assertThat(sql).doesNotContain("LIKE '%/methodB7%'");
+        assertThat(sql).doesNotContain("COALESCE(`meta.http.url`");
     }
 
     @Test

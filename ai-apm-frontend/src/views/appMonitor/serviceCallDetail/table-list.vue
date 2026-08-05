@@ -126,9 +126,10 @@ export default class TableList extends Vue {
 
   private isLoading = false
   private listTotal = 0
+  private hasMore = true
   private tableList: any[] = []
   get noMore () {
-    return this.tableList.length >= this.listTotal
+    return !this.hasMore
   }
 
   private columnsFullLabels = [
@@ -218,6 +219,8 @@ export default class TableList extends Vue {
       fromTime, toTime,
       offset: (page - 1) * pageSize,
       size: pageSize,
+      // Skip Doris COUNT(*) — same predicates as list and often as expensive as the page query.
+      includeTotal: false,
     }
     Object.entries(params).forEach(([key, value]) => {
       if (value === '') {
@@ -246,8 +249,10 @@ export default class TableList extends Vue {
         })
         return item
       })
-      this.listTotal = result.total || 0
+      this.hasMore = data.length >= pageSize
       this.tableList = page === 1 ? list : Array.from(this.tableList).concat(list);
+      // Exact total skipped (includeTotal:false); show loaded count, +1 while more pages exist.
+      this.listTotal = this.hasMore ? this.tableList.length + 1 : this.tableList.length
       this.$nextTick(() => {
         if (!this.scrollContainer) {
           this.loop();

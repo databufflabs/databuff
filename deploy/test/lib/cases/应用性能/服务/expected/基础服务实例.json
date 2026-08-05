@@ -8,7 +8,11 @@
       }
     ],
     "componentTypes": [
-      "service.http"
+      "service.http",
+      "service.db",
+      "service.rpc",
+      "service.mq",
+      "service.redis"
     ]
   }
 }

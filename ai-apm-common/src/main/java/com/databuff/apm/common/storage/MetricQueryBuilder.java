@@ -79,7 +79,9 @@ public final class MetricQueryBuilder {
      * (e.g. streaming RPC {@code EventStream}).
      *
      * <p>Also adds a {@code startTime} range of {@code [from - 30m, to)} so Doris can prune
-     * {@code PARTITION BY RANGE(startTime)} without scanning many DAY partitions.
+     * {@code PARTITION BY RANGE(startTime)} without scanning many DAY partitions, and a
+     * matching {@code minutes} ({@code yyyyMMddHHmm}, span-start bucket / DUPLICATE KEY prefix)
+     * range so short-key prune can kick in inside a large DAY partition.
      */
     private static String spanEndBucketTimeWhere(
             long fromMillis,
@@ -91,7 +93,28 @@ public final class MetricQueryBuilder {
         long pruneFrom = Math.max(0L, from - SPAN_PARTITION_LOOKBACK_MS);
         return SPAN_END_MINUTE_BUCKET_MS_EXPR + " >= " + from
                 + " AND " + SPAN_END_MINUTE_BUCKET_MS_EXPR + " < " + to
-                + " AND " + partitionWallClockRange("startTime", pruneFrom, to);
+                + " AND " + partitionWallClockRange("startTime", pruneFrom, to)
+                + " AND " + spanMinutesKeyRange(pruneFrom, to);
+    }
+
+    /**
+     * {@code trace_dc_span.minutes} is {@code yyyyMMddHHmm} from span <em>start</em> (ingest).
+     * Range is a superset of the end-minute semantic window using the same lookback as
+     * {@code startTime} partition prune — never tighter than that window.
+     */
+    static String spanMinutesKeyRange(long fromMillisInclusive, long toMillisExclusive) {
+        long fromSec = Math.max(0L, fromMillisInclusive) / 1000L;
+        long toSec = Math.max(fromSec, toMillisExclusive) / 1000L;
+        long fromBucket = ApmTimeZones.wallClockMinuteBucket((fromSec / 60L) * 60L);
+        long toBucketExclusive = ApmTimeZones.wallClockMinuteBucket((toSec / 60L) * 60L);
+        if (toMillisExclusive % 60_000L != 0L) {
+            // Partial end minute: allow starts that fall in floor(to)'s minute.
+            toBucketExclusive = ApmTimeZones.wallClockMinuteBucket((toSec / 60L) * 60L + 60L);
+        }
+        if (toBucketExclusive <= fromBucket) {
+            toBucketExclusive = fromBucket + 1L;
+        }
+        return "`minutes` >= " + fromBucket + " AND `minutes` < " + toBucketExclusive;
     }
 
     private static String spanListTimeWhere(
@@ -407,14 +430,15 @@ public final class MetricQueryBuilder {
 
     /**
      * HTTP interface span list filter on path-only {@code url} (no host).
-     * Exact match on normalized {@code meta.http.url} only (ingest stores path-only URLs).
+     * Exact match on {@code meta.http.url} (ingest stores path-only URLs). Avoid COALESCE so
+     * Doris can prune on the column directly.
      */
     static String appendSpanListResourceFilter(String urlPath) {
         if (urlPath == null || urlPath.isBlank()) {
             return "";
         }
         String escaped = escapeLiteral(urlPath.trim());
-        return " AND COALESCE(`meta.http.url`, '') = '" + escaped + "' ";
+        return " AND `meta.http.url` = '" + escaped + "' ";
     }
 
     private static String appendTraceSpanListScopeFilters(Integer isParent, String parentId) {
@@ -4307,13 +4331,17 @@ public final class MetricQueryBuilder {
                 return;
             }
             String escapedPath = escapeLiteral(path);
-            String httpMethodMeta = metaJsonString("http.method");
-            filters.append(" AND COALESCE(`meta.http.url`, '') = '").append(escapedPath).append("' ");
+            // Prefer DUPLICATE KEY `resource` (= "METHOD path") when method is known; keep
+            // meta.http.url for route-template spans where resource is "/api/{id}" etc.
+            // Avoid COALESCE / get_json_string(meta) so column prune stays cheap.
             if (httpMethod != null && !httpMethod.isBlank()) {
                 String escapedMethod = escapeLiteral(httpMethod.trim());
-                filters.append(" AND COALESCE(NULLIF(`meta.http.method`, ''), ")
-                        .append(httpMethodMeta).append(", '') = '")
-                        .append(escapedMethod).append("' ");
+                String resourceKey = escapeLiteral(httpMethod.trim() + " " + path);
+                filters.append(" AND (`resource` = '").append(resourceKey).append("'")
+                        .append(" OR (`meta.http.url` = '").append(escapedPath).append("'")
+                        .append(" AND `meta.http.method` = '").append(escapedMethod).append("')) ");
+            } else {
+                filters.append(" AND `meta.http.url` = '").append(escapedPath).append("' ");
             }
             return;
         }

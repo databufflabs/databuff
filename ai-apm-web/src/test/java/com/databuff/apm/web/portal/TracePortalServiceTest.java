@@ -87,6 +87,28 @@ class TracePortalServiceTest {
     }
 
     @Test
+    void listSkipsCountWhenIncludeTotalFalse() {
+        TraceQueryService traceQuery = mock(TraceQueryService.class);
+        when(traceQuery.spanList(any())).thenReturn(List.of());
+
+        TracePortalService service = new TracePortalService(
+                traceQuery, mock(ServiceFlowService.class), mock(ApmReadRepository.class), TestStorageSupport.storage());
+        Map<String, Object> resp = service.list(Map.of(
+                "parentId", "0",
+                "fromTime", "2026-06-20 07:02:00",
+                "toTime", "2026-06-20 07:03:00",
+                "includeTotal", false,
+                "offset", 0,
+                "size", 50));
+
+        org.mockito.Mockito.verify(traceQuery).spanList(any());
+        org.mockito.Mockito.verify(traceQuery, never()).spanListCount(any());
+        @SuppressWarnings("unchecked")
+        Map<String, Object> data = (Map<String, Object>) resp.get("data");
+        assertThat(data.get("total")).isEqualTo(0L);
+    }
+
+    @Test
     void buildsPortalSpanListEnvelope() {
         TraceQueryService traceQuery = mock(TraceQueryService.class);
         when(traceQuery.spanListCount(any())).thenReturn(1L);
@@ -764,10 +786,11 @@ class TracePortalServiceTest {
         });
         when(reader.queryCallSpanCount(anyString())).thenAnswer(invocation -> {
             String sql = invocation.getArgument(0);
-            assertThat(sql).contains("COALESCE(`meta.http.url`, '') = '/api/orders/10001'");
+            assertThat(sql).contains("`resource` = 'GET /api/orders/10001'");
+            assertThat(sql).contains("`meta.http.url` = '/api/orders/10001'");
+            assertThat(sql).contains("`meta.http.method` = 'GET'");
             assertThat(sql).doesNotContain("LIKE '%/api/orders/10001%'");
-            assertThat(sql).contains("= 'GET'");
-            assertThat(sql).contains("`meta.http.method`");
+            assertThat(sql).doesNotContain("COALESCE(`meta.http.url`");
             assertThat(sql).containsAnyOf("9bf61532d56eb7b5", "service-a");
             assertThat(sql).containsAnyOf("5457a0119281bb98", "service-b");
             return 1L;

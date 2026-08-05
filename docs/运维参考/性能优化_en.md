@@ -71,7 +71,7 @@ When the ring is full, `AsyncTask` increments `overflowCount` after failed `tryP
 
 ### How to change ingest settings (Docker)
 
-For the one-line install layout (default directory `/opt/databuff-ai-apm`; confirm with `echo $APM_INSTALL_DIR`). Prefer `docker-compose.override.yml` so upgrades keep your overrides; full steps including Kubernetes are in [Parameter Configuration](参数配置_en.md#2-adjust-ingest-task-parameters).
+For the one-line install layout (default directory `/opt/databuff-ai-apm`; confirm with `echo $APM_INSTALL_DIR`). Prefer `docker-compose.override.yml` so upgrades keep your overrides; full steps including Kubernetes are in [Parameter Configuration](参数配置_en.md#4-adjust-ingest-task-parameters).
 
 1. **Back up and edit compose**
 
