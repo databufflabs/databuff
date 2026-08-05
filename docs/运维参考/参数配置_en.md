@@ -135,51 +135,72 @@ kubectl -n databuff exec deploy/ai-apm-web -- printenv | grep '^DORIS_USER\|^DOR
 
 ## 3. Configure Doris FE / BE addresses
 
-The app accepts **only a single hostname or IP plus ports**. Comma-separated address lists and built-in FE/BE failover are not supported.
+Supports **comma-separated multi-FE / multi-BE** (`host` or `host:port` lists + health round-robin). Single-node defaults for one-line installs are unchanged.
+
+### What each port is for
+
+| Port (default) | Environment variable | Used by | Purpose |
+|----------------|----------------------|---------|---------|
+| **9030** | `DORIS_FE_QUERY_PORT` | Web, Ingest | FE **JDBC** (MySQL protocol reads) |
+| **8030** | `DORIS_FE_HTTP_PORT` | Mainly Ingest | FE **HTTP**; used for Stream Load **only when** `DORIS_BE_HTTP_HOST` is **unset** — PUT FE `_stream_load`, then 307 to BE |
+| **8040** | `DORIS_BE_HTTP_PORT` | **Ingest only** | BE **HTTP**; when `DORIS_BE_HTTP_HOST` is set, Stream Load goes **directly to BE** (recommended) |
+
+One-line installs set `DORIS_BE_HTTP_HOST` by default, so writes use **BE:8040** and **8030 is rarely used**. Web queries use **9030** only — no Stream Load, no BE setting.
+
+```text
+Query:  Web/Ingest  --JDBC-->  FE:9030
+Write:  Ingest  --Stream Load-->  BE:8040           (BE configured; default)
+   or:  Ingest  --Stream Load-->  FE:8030 -307-> BE (BE unset)
+```
 
 ### Parameters
 
 | Purpose | Component | YAML key | Environment variable | Default |
 |---------|-----------|----------|----------------------|---------|
-| FE host | Web / Ingest | `apm.doris.fe-host` / `ingest.doris.fe-host` | `DORIS_FE_HOST` | `127.0.0.1` |
+| FE host (multi OK) | Web / Ingest | `apm.doris.fe-host` / `ingest.doris.fe-host` | `DORIS_FE_HOST` | `127.0.0.1` |
 | FE query port (JDBC) | Web / Ingest | `*.fe-query-port` | `DORIS_FE_QUERY_PORT` | `9030` |
-| FE HTTP port | Web / Ingest | `*.fe-http-port` | `DORIS_FE_HTTP_PORT` | `8030` |
-| BE HTTP host (Stream Load) | **Ingest only** | `ingest.doris.be-http-host` | `DORIS_BE_HTTP_HOST` | empty (see below) |
-| BE HTTP port | **Ingest only** | `ingest.doris.be-http-port` | `DORIS_BE_HTTP_PORT` | `8040` |
-
-Web talks to FE only (JDBC queries). Ingest uses FE for JDBC and BE (or FE redirect) for Stream Load writes.
+| FE HTTP port (only when Stream Load goes via FE, i.e. BE unset) | Ingest (mainly) | `*.fe-http-port` | `DORIS_FE_HTTP_PORT` | `8030` |
+| BE HTTP host (multi OK, Stream Load) | **Ingest only** | `ingest.doris.be-http-host` | `DORIS_BE_HTTP_HOST` | empty (see below) |
+| BE HTTP port (default when host has no port) | **Ingest only** | `ingest.doris.be-http-port` | `DORIS_BE_HTTP_PORT` | `8040` |
 
 One-line Docker / K8s defaults:
 
 | Environment variable | Docker Compose default | Notes |
 |----------------------|------------------------|-------|
-| `DORIS_FE_HOST` | `ai-apm-doris-fe` | Must resolve for both Web and Ingest |
-| `DORIS_BE_HTTP_HOST` | `ai-apm-doris-be` | **Ingest only**; direct Stream Load to BE |
+| `DORIS_FE_HOST` | `ai-apm-doris-fe` | Host for JDBC and (optional) FE HTTP |
+| `DORIS_BE_HTTP_HOST` | `ai-apm-doris-be` | Ingest direct Stream Load to BE |
 
-### Single host / IP only
+### Address and port format
 
-- Valid: `ai-apm-doris-fe`, `192.168.1.10`, `doris-fe.example.com`
-- **Invalid** (not parsed as multi-node): `fe1,fe2`, `be1:8040,be2:8040`
-- Configure ports separately (`DORIS_FE_*_PORT` / `DORIS_BE_HTTP_PORT`); do not embed ports in the host string (e.g. `host:9030`)
+Both FE and BE `*_HOST` values support these three forms (comma-separated; host-only and host:port may be mixed):
+
+| Form | FE example | BE example |
+|------|------------|------------|
+| Single host | `DORIS_FE_HOST=fe1` | `DORIS_BE_HTTP_HOST=be1` |
+| Multi-host (shared port) | `DORIS_FE_HOST=fe1,fe2` | `DORIS_BE_HTTP_HOST=be1,be2` |
+| Multi-host (per-entry port) | `DORIS_FE_HOST=fe1:19030,fe2:19031` | `DORIS_BE_HTTP_HOST=be1:8040,be2:8041` |
+
+**When an entry omits the port**, use the matching PORT env var above; if unset, defaults are 9030 / 8030 / 8040.
+
+Notes:
+
+- `fe1,fe2`: JDBC uses **9030 (query)**; FE Stream Load (if used) uses **8030 (http)** — each default applies on its path.
+- `fe1:p1,fe2:p2`: the explicit port applies to **both** JDBC and FE HTTP for that entry (one host field, one port). If query and http ports differ, prefer `fe1,fe2` + separate PORT vars.
+- `be1,be2` + `DORIS_BE_HTTP_PORT=8040` matches the pre-multi-node host/port split; `be1:8040,be2:8040` also works.
+- Multi-FE JDBC uses `jdbc:mysql:loadbalance://...`.
 
 ### With vs without BE host
 
 | Scenario | Behavior |
 |----------|----------|
-| **`DORIS_BE_HTTP_HOST` set** (recommended; Docker default) | Ingest Stream Load goes **directly to that BE** HTTP endpoint, avoiding FE 307 redirects |
-| **Unset** (empty) | Stream Load hits FE `_stream_load`, follows 307 to a BE, and rewrites the Location host. Less reliable with split FE/BE; keep BE set for one-line installs |
+| **`DORIS_BE_HTTP_HOST` set** (recommended; Docker default) | Stream Load goes **directly to BE:8040**; multi-BE health round-robin, failover, `/api/health` probes. **Does not use** FE:8030 |
+| **Unset** (empty) | Stream Load hits **FE:8030** `_stream_load`, then 307 to BE; less reliable with split FE/BE — keep BE set for one-line installs |
 
-> Web has **no** BE setting; queries do not use Stream Load.
+### Multi-host guidance
 
-### Multiple hosts
-
-You **cannot** list multiple FE/BE hosts in app config. If the Doris cluster already has several FE/BE nodes:
-
-1. **VIP / load balancer in front**: Point multiple FE:9030/8030 (or BE:8040) at one VIP/DNS name; the app still configures that single entry.
-2. **Pin one node**: Put one reachable FE / BE in the env vars (that node down → JDBC / Stream Load fails; no automatic switch).
-3. **Change the code**: Add FE/BE lists and retries yourself (not in the current open-source build).
-
-Note: Doris table replicas (`replication_num ≥ 2`) provide cluster-side redundancy; they do **not** mean the app accepts multiple configured addresses.
+1. **Writes (recommended):** `DORIS_BE_HTTP_HOST=be1,be2,be3` + `DORIS_BE_HTTP_PORT=8040` (or `be1:8040,be2:8040`).
+2. **Queries:** `DORIS_FE_HOST=fe1,fe2` + `DORIS_FE_QUERY_PORT`; you usually do not need to change `DORIS_FE_HTTP_PORT` for writes.
+3. Table replicas (`replication_num ≥ 2`) are cluster-side redundancy and complement the app address list.
 
 ### Docker example
 
@@ -192,16 +213,18 @@ cat > docker-compose.override.yml <<'EOF'
 services:
   ai-apm-web:
     environment:
-      DORIS_FE_HOST: "192.168.1.10"
+      DORIS_FE_HOST: "192.168.1.10,192.168.1.11"
       DORIS_FE_QUERY_PORT: "9030"
       DORIS_FE_HTTP_PORT: "8030"
   ai-apm-ingest:
     environment:
-      DORIS_FE_HOST: "192.168.1.10"
+      DORIS_FE_HOST: "192.168.1.10,192.168.1.11"
       DORIS_FE_QUERY_PORT: "9030"
       DORIS_FE_HTTP_PORT: "8030"
-      DORIS_BE_HTTP_HOST: "192.168.1.11"
+      # Compatible form: hosts + shared port (same as pre-multi-node)
+      DORIS_BE_HTTP_HOST: "192.168.1.20,192.168.1.21"
       DORIS_BE_HTTP_PORT: "8040"
+      # Or ultra-style: DORIS_BE_HTTP_HOST: "192.168.1.20:8040,192.168.1.21:8040"
 EOF
 
 docker compose up -d ai-apm-web ai-apm-ingest
@@ -216,10 +239,10 @@ kubectl -n databuff edit configmap ai-apm-config
 Under `data:`, for example:
 
 ```yaml
-  DORIS_FE_HOST: "192.168.1.10"
+  DORIS_FE_HOST: "192.168.1.10,192.168.1.11"
   DORIS_FE_QUERY_PORT: "9030"
   DORIS_FE_HTTP_PORT: "8030"
-  DORIS_BE_HTTP_HOST: "192.168.1.11"
+  DORIS_BE_HTTP_HOST: "192.168.1.20,192.168.1.21"
   DORIS_BE_HTTP_PORT: "8040"
 ```
 

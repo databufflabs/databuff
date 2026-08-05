@@ -29,6 +29,7 @@ apm:
       connect-string: ${APM_CLUSTER_ZOOKEEPER_CONNECT_STRING:${ZK_CONNECT_STRING:}}
   # node.worker-id: 1  # optional snowflake worker id (0-1023); defaults to hostname hash
   doris:
+    # Comma-separated FE hosts supported (JDBC loadbalance when more than one)
     fe-host: ${DORIS_FE_HOST:127.0.0.1}
     fe-query-port: ${DORIS_FE_QUERY_PORT:9030}
     fe-http-port: ${DORIS_FE_HTTP_PORT:8030}

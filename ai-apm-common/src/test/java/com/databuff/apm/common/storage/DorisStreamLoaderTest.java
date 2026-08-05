@@ -169,4 +169,55 @@ class DorisStreamLoaderTest {
         assertThat(result.success()).isTrue();
         assertThat(authSeen).isTrue();
     }
+
+    @Test
+    void directBeFailsOverToSecondEndpoint() throws Exception {
+        server.stop(0);
+        HttpServer bad = HttpServer.create(new InetSocketAddress(0), 0);
+        int badPort = bad.getAddress().getPort();
+        bad.createContext("/api/databuff/metric_service/_stream_load", exchange -> {
+            byte[] body = "{\"Status\": \"Fail\"}".getBytes(StandardCharsets.UTF_8);
+            exchange.sendResponseHeaders(500, body.length);
+            try (OutputStream os = exchange.getResponseBody()) {
+                os.write(body);
+            }
+        });
+        bad.createContext("/api/health", exchange -> {
+            exchange.sendResponseHeaders(500, -1);
+        });
+        bad.start();
+
+        server = HttpServer.create(new InetSocketAddress(0), 0);
+        port = server.getAddress().getPort();
+        server.createContext("/api/databuff/metric_service/_stream_load", exchange -> {
+            byte[] ok = "{\"Status\": \"Success\"}".getBytes(StandardCharsets.UTF_8);
+            exchange.sendResponseHeaders(200, ok.length);
+            try (OutputStream os = exchange.getResponseBody()) {
+                os.write(ok);
+            }
+        });
+        server.createContext("/api/health", exchange -> {
+            byte[] ok = "{\"status\":\"OK\"}".getBytes(StandardCharsets.UTF_8);
+            exchange.sendResponseHeaders(200, ok.length);
+            try (OutputStream os = exchange.getResponseBody()) {
+                os.write(ok);
+            }
+        });
+        server.start();
+
+        try {
+            String beList = "127.0.0.1:" + badPort + ",127.0.0.1:" + port;
+            DorisStreamLoader loader = new DorisStreamLoader(
+                    new DorisConnectionConfig("127.0.0.1", 9030, 8030, beList, 8040), "root", "");
+            DorisStreamLoader.StreamLoadResult result = loader.loadJsonLines(
+                    "databuff", "metric_service", "{\"cnt\":1}".getBytes(StandardCharsets.UTF_8));
+            assertThat(result.success()).isTrue();
+            assertThat(loader.beRouterForTest().healthySnapshot())
+                    .extracting(DorisHttpEndpoint::port)
+                    .contains(port)
+                    .doesNotContain(badPort);
+        } finally {
+            bad.stop(0);
+        }
+    }
 }

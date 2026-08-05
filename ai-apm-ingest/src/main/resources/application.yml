@@ -57,6 +57,7 @@ ingest:
     fe-host: ${DORIS_FE_HOST:127.0.0.1}
     fe-http-port: ${DORIS_FE_HTTP_PORT:8030}
     fe-query-port: ${DORIS_FE_QUERY_PORT:9030}
+    # Comma-separated BE HTTP endpoints for direct Stream Load, e.g. be1:8040,be2:8040
     be-http-host: ${DORIS_BE_HTTP_HOST:}
     be-http-port: ${DORIS_BE_HTTP_PORT:8040}
     metric-database: databuff
