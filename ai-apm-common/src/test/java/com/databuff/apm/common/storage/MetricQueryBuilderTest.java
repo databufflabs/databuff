@@ -885,6 +885,15 @@ class MetricQueryBuilderTest {
     }
 
     @Test
+    void buildsGlobalTopologyServicesSql() {
+        String sql = MetricQueryBuilder.globalTopologyServicesSql("databuff", 0L, 3_600_000L, 100);
+        assertThat(sql).contains("databuff.`metric_service`");
+        assertThat(sql).contains("`service` NOT LIKE '[%'");
+        assertThat(sql).contains("LIMIT 100");
+        assertThat(sql).contains("GROUP BY `service`");
+    }
+
+    @Test
     void buildsGlobalTopologyPeerEdgesSqlForInbound() {
         String sql = MetricQueryBuilder.globalTopologyPeerEdgesSql(
                 "databuff", "metric_service_rpc", 0L, 3_600_000L, 100, 1, null);

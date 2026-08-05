@@ -1,6 +1,7 @@
 package com.databuff.apm.web.portal;
 
 import com.databuff.apm.common.query.ApmQueryModels.ServiceFlowEdge;
+import com.databuff.apm.common.query.ApmQueryModels.ServiceSummaryPoint;
 import com.databuff.apm.common.util.PortalServiceIdResolver;
 import com.databuff.apm.web.monitor.Alarm;
 import com.databuff.apm.web.monitor.AlarmStore;
@@ -36,6 +37,7 @@ class GlobalTopologyPortalServiceTest {
         when(queryService.listEdges(anyLong(), anyLong(), anyInt())).thenReturn(List.of(
                 new ServiceFlowEdge("order", "pay", 100, 5, 12.5, "order-id", "pay-id"),
                 new ServiceFlowEdge("gateway", "order", 200, 0, 8.0, "gw-id", "order-id")));
+        when(queryService.listServices(anyLong(), anyLong(), anyInt())).thenReturn(List.of());
 
         GlobalTopologyPortalService service = service(queryService, emptyAlarmStore());
         Map<String, Object> data = service.graph(Map.of("fromTime", 0L, "toTime", 3_600_000L));
@@ -52,10 +54,37 @@ class GlobalTopologyPortalServiceTest {
     }
 
     @Test
+    void includesIsolatedServicesWithoutEdges() {
+        GlobalTopologyQueryService queryService = Mockito.mock(GlobalTopologyQueryService.class);
+        when(queryService.listEdges(anyLong(), anyLong(), anyInt())).thenReturn(List.of());
+        when(queryService.listServices(anyLong(), anyLong(), anyInt())).thenReturn(List.of(
+                new ServiceSummaryPoint("lonely", "lonely-id", 42, 2, 42_000_000_000.0, 2_000_000_000.0)));
+
+        GlobalTopologyPortalService service = service(queryService, emptyAlarmStore());
+        Map<String, Object> data = service.graph(Map.of("fromTime", 0L, "toTime", 3_600_000L));
+
+        @SuppressWarnings("unchecked")
+        List<Map<String, Object>> services = (List<Map<String, Object>>) data.get("services");
+        @SuppressWarnings("unchecked")
+        List<Map<String, Object>> edges = (List<Map<String, Object>>) data.get("serviceEdges");
+
+        assertThat(edges).isEmpty();
+        assertThat(services).hasSize(1);
+        String lonelyId = PortalServiceIdResolver.normalize("lonely-id");
+        Map<String, Object> node = services.get(0);
+        assertThat(node).containsEntry("id", lonelyId);
+        assertThat(node).containsEntry("name", "lonely");
+        assertThat(node).containsEntry("callCnt", 42L);
+        assertThat(node).containsEntry("errCnt", 2L);
+        assertThat(node).containsEntry("avgLatency", 1000.0);
+    }
+
+    @Test
     void infersVirtualServiceTypeFromMetricName() {
         GlobalTopologyQueryService queryService = Mockito.mock(GlobalTopologyQueryService.class);
         when(queryService.listEdges(anyLong(), anyLong(), anyInt())).thenReturn(List.of(
                 new ServiceFlowEdge("order", "[db]mysql", 10, 0, 5.0, "order-id", null)));
+        when(queryService.listServices(anyLong(), anyLong(), anyInt())).thenReturn(List.of());
 
         GlobalTopologyPortalService service = service(queryService, emptyAlarmStore());
         Map<String, Object> data = service.graph(Map.of("fromTime", 0L, "toTime", 3_600_000L));
@@ -100,6 +129,7 @@ class GlobalTopologyPortalServiceTest {
         GlobalTopologyQueryService queryService = Mockito.mock(GlobalTopologyQueryService.class);
         when(queryService.listEdges(anyLong(), anyLong(), anyInt())).thenReturn(List.of(
                 new ServiceFlowEdge("order", "pay", 100, 0, 12.5, "order-id", "pay-id")));
+        when(queryService.listServices(anyLong(), anyLong(), anyInt())).thenReturn(List.of());
 
         AlarmStore alarmStore = mock(AlarmStore.class);
         Instant triggeredAt = Instant.ofEpochMilli(1_800_000L);
@@ -131,6 +161,7 @@ class GlobalTopologyPortalServiceTest {
         GlobalTopologyQueryService queryService = Mockito.mock(GlobalTopologyQueryService.class);
         when(queryService.listEdges(anyLong(), anyLong(), anyInt())).thenReturn(List.of(
                 new ServiceFlowEdge("order", "pay", 100, 10, 12.5, "order-id", "pay-id")));
+        when(queryService.listServices(anyLong(), anyLong(), anyInt())).thenReturn(List.of());
 
         GlobalTopologyPortalService service = service(queryService, emptyAlarmStore());
         Map<String, Object> data = service.graph(Map.of("fromTime", 0L, "toTime", 3_600_000L));

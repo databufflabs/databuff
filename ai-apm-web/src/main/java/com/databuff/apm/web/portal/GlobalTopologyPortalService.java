@@ -1,6 +1,7 @@
 package com.databuff.apm.web.portal;
 
 import com.databuff.apm.common.query.ApmQueryModels.ServiceFlowEdge;
+import com.databuff.apm.common.query.ApmQueryModels.ServiceSummaryPoint;
 import com.databuff.apm.common.util.PortalServiceIdResolver;
 
 import static com.databuff.apm.common.util.PortalServiceIdResolver.normalize;
@@ -31,7 +32,8 @@ public class GlobalTopologyPortalService {
         long to = PortalTimeParser.rangeTo(body, now);
         int limit = Math.min(ServicePortalService.intValue(body.get("limit"), 500), 500);
         List<ServiceFlowEdge> edges = globalTopologyQueryService.listEdges(from, to, limit);
-        return buildGraph(edges, from, to);
+        List<ServiceSummaryPoint> services = globalTopologyQueryService.listServices(from, to, limit);
+        return buildGraph(edges, services, from, to);
     }
 
     public Map<String, Object> verticalTree(Map<String, Object> body) {
@@ -95,7 +97,8 @@ public class GlobalTopologyPortalService {
         return data;
     }
 
-    private Map<String, Object> buildGraph(List<ServiceFlowEdge> edges, long from, long to) {
+    private Map<String, Object> buildGraph(
+            List<ServiceFlowEdge> edges, List<ServiceSummaryPoint> services, long from, long to) {
         Map<String, Map<String, Object>> nodeMap = new LinkedHashMap<>();
         List<Map<String, Object>> serviceEdges = new ArrayList<>();
 
@@ -126,6 +129,25 @@ public class GlobalTopologyPortalService {
 
             accumulateNode(nodeMap.get(srcId), callCnt, errCnt, edge.avgDuration());
             accumulateNode(nodeMap.get(dstId), callCnt, errCnt, edge.avgDuration());
+        }
+
+        // Isolated services (no peer/virtual edges) still appear as nodes.
+        for (ServiceSummaryPoint summary : services) {
+            String id = resolveNodeId(summary.serviceId(), summary.service());
+            if (id.isBlank() || nodeMap.containsKey(id)) {
+                continue;
+            }
+            ensureNode(nodeMap, id, summary.service());
+            long callCnt = summary.requestCount();
+            long errCnt = summary.errorCount();
+            double avgLatencyMs = callCnt > 0 ? summary.sumDurationNs() / callCnt / 1_000_000.0 : 0;
+            Map<String, Object> node = nodeMap.get(id);
+            node.put("callCnt", callCnt);
+            node.put("errCnt", errCnt);
+            if (callCnt > 0 && avgLatencyMs > 0) {
+                node.put("_latencyCallCnt", callCnt);
+                node.put("_sumLatency", avgLatencyMs * callCnt);
+            }
         }
 
         finalizeNodes(nodeMap);

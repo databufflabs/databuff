@@ -1,6 +1,7 @@
 package com.databuff.apm.web.portal;
 
 import com.databuff.apm.common.query.ApmQueryModels.ServiceFlowEdge;
+import com.databuff.apm.common.query.ApmQueryModels.ServiceSummaryPoint;
 import com.databuff.apm.common.query.ApmQueryModels.TopologyEdge;
 import com.databuff.apm.common.util.PortalServiceIdResolver;
 import com.databuff.apm.common.storage.ApmReadRepository;
@@ -62,6 +63,16 @@ public class GlobalTopologyQueryService {
                 outbound.addAll(queryVirtualEdges(table, fromMillis, toMillis, limit, null, 1));
             }
             return mergePreferOutbound(inbound, outbound);
+        } catch (Exception e) {
+            return Collections.emptyList();
+        }
+    }
+
+    /** Real services with metric_service traffic in the window (including isolated services). */
+    public List<ServiceSummaryPoint> listServices(long fromMillis, long toMillis, int limit) {
+        try {
+            String sql = MetricQueryBuilder.globalTopologyServicesSql(metricDatabase, fromMillis, toMillis, limit);
+            return readRepository.queryServiceSummaries(sql);
         } catch (Exception e) {
             return Collections.emptyList();
         }

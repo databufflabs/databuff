@@ -2248,6 +2248,32 @@ public final class MetricQueryBuilder {
                 Math.max(1, Math.min(limit, 500)));
     }
 
+    /**
+     * Real application services observed in {@code metric_service} within the window.
+     * Used by global topology so isolated services (no peer/virtual edges) still appear as nodes.
+     */
+    public static String globalTopologyServicesSql(
+            String database, long fromMillis, long toMillis, int limit) {
+        return """
+                SELECT `service`,
+                       MAX(COALESCE(NULLIF(`service_id`, ''), `service`)) AS service_id,
+                       SUM(`cnt`) AS request_cnt,
+                       SUM(`error`) AS error_cnt,
+                       SUM(`sumDuration`) AS sum_duration_ns,
+                       MAX(`maxDuration`) AS max_duration_ns
+                FROM %s.`metric_service`
+                WHERE %s
+                  AND `service` IS NOT NULL AND `service` != ''
+                  AND `service` NOT LIKE '[%%'
+                GROUP BY `service`
+                ORDER BY request_cnt DESC, `service` ASC
+                LIMIT %d
+                """.formatted(
+                database,
+                metricTsWhere(fromMillis, toMillis),
+                Math.max(1, Math.min(limit, 500)));
+    }
+
     public static String serviceFlowSql(
             String database, String service, long fromMillis, long toMillis, int limit) {
         return """
