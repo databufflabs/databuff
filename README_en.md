@@ -13,6 +13,8 @@
 <p align="center">
   <a href="https://demo.databuff.ai">Live Demo</a>
   &nbsp;|&nbsp;
+  <a href="https://databuff.ai/en/opensource-apm/">Open Source APM</a>
+  &nbsp;|&nbsp;
   <a href="docs/README_en.md">Documentation</a>
   &nbsp;|&nbsp;
   <a href="README.md">中文</a>
@@ -37,6 +39,22 @@
 <p align="center">
   <img src="docs/images/feature-pillars-en.png" alt="OpenTelemetry APM and AI Native capabilities" width="880" />
 </p>
+
+---
+
+
+<h2>Open Source APM</h2>
+
+<p><strong>DataBuff</strong> is an <strong>open source APM</strong> (application performance monitoring) backend for teams that standardize on OpenTelemetry and want self-hosted traces, metrics, and topology with AI-assisted troubleshooting.</p>
+
+<ul>
+  <li><a href="https://databuff.ai/en/opensource-apm/">Open Source APM selection guide</a> — landscape, evaluation checklist, and install</li>
+  <li><a href="https://dev.to/logan_zhang_8ca3575087c5b/top-10-open-source-apm-tools-in-2026-1fh9">Top 10 Open Source APM Tools in 2026</a> (Dev.to)</li>
+  <li><a href="https://dev.to/logan_zhang_8ca3575087c5b/top-5-open-source-apm-tools-in-2026-1437">Top 5 Open Source APM Tools in 2026</a> (Dev.to)</li>
+  <li><a href="https://dev.to/logan_zhang_8ca3575087c5b/open-source-apm-tools-a-practical-guide-for-2026-2f7k">Open Source APM Tools: A Practical Guide for 2026</a> (Dev.to)</li>
+  <li><a href="https://dev.to/logan_zhang_8ca3575087c5b/how-to-pick-an-opentelemetry-apm-backend-in-2026-2ecg">How to Pick an OpenTelemetry APM Backend in 2026</a> (Dev.to)</li>
+  <li><a href="https://dev.to/logan_zhang_8ca3575087c5b/open-source-observability-stack-from-lgtm-to-unified-apm-49fi">Open Source Observability Stack: From LGTM to Unified APM</a> (Dev.to)</li>
+</ul>
 
 ---
 
