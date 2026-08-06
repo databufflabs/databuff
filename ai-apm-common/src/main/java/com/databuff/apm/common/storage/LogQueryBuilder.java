@@ -41,7 +41,7 @@ public final class LogQueryBuilder {
                 query,
                 fromMillis,
                 toMillis);
-        sql.append(" ORDER BY time_ns ASC");
+        sql.append(" ORDER BY time_ns DESC");
         sql.append(" LIMIT ").append(Math.max(1, limit));
         sql.append(" OFFSET ").append(Math.max(0, offset));
         return sql.toString();

@@ -100,6 +100,7 @@ class LogQueryBuilderTest {
         assertThat(sql).contains("service_instance");
         assertThat(sql).contains("service_instance IN ('pod-1')");
         assertThat(sql).contains("severity IN ('ERROR')");
+        assertThat(sql).contains("ORDER BY time_ns DESC");
         assertThat(sql).doesNotContain("attributes_json");
         assertThat(sql).doesNotContain("resource_json");
     }
