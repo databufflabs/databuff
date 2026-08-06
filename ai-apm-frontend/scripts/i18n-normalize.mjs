@@ -898,7 +898,7 @@ const FIXED_MESSAGES = [
   ['views.aiPlatform.chat', '会答疑', 'Answer'],
   ['views.aiPlatform.chat', '产品答疑专家，读自家文档比搜索靠谱', 'Product Q&A expert — reads our own docs, more reliable than search'],
   ['views.aiPlatform.chat', 'OpenTelemetry SDK 怎么接入？告警阈值在哪配？给操作路径。', 'How do I integrate the OpenTelemetry SDK? Where do I configure alert thresholds? Give me the navigation paths.'],
-  ['views.aiPlatform.chat', 'DataBuff 怎么用一条命令部署起来？需要哪些前置依赖？', 'How do I deploy DataBuff with a single command? What prerequisites do I need?'],
+  ['views.aiPlatform.chat', '对Databuff平台进行巡检，并出一份html巡检报告', 'Inspect the DataBuff platform and produce an HTML inspection report'],
   ['views.aiPlatform.chat', '立即体验', 'Try now'],
   ['views.aiPlatform.chat', '换一条', 'Another prompt'],
   ['views.aiPlatform.chat', '该专家未启用，无法体验', 'This expert is disabled and cannot be tried'],

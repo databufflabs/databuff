@@ -3,6 +3,8 @@ package com.databuff.apm.ingest.component;
 import com.databuff.apm.common.cluster.aggregate.ClusterPartialForwarder;
 import com.databuff.apm.common.cluster.coordination.ClusterPartitionMembership;
 import com.databuff.apm.common.model.DcSpan;
+import com.databuff.apm.common.platform.PlatformMetricNames;
+import com.databuff.apm.common.platform.PlatformMetrics;
 import com.databuff.apm.common.serde.DCSpanJsonDecoder;
 import com.databuff.apm.common.serde.DCSpanJsonEncoder;
 import com.databuff.apm.ingest.doris.DorisFlushScheduler;
@@ -179,6 +181,19 @@ public final class TraceComponent extends AbstractComponent<TraceComponent.Trace
         return ignored.get();
     }
 
+    /** Sum of traces waiting in all TraceAssemblyBuffer instances. */
+    public int pendingAssemblyTraces() {
+        TaskPool<TraceTask> pool = taskPool();
+        if (pool == null) {
+            return 0;
+        }
+        int pending = 0;
+        for (TraceTask task : pool.tasks()) {
+            pending += task.pendingTraces();
+        }
+        return pending;
+    }
+
     /**
      * 集群 owner 节点接收 ForwardPartial（stream={@link #TRACE_STREAM}）。
      * 反序列化后跳过 enrich，直接进入 traceId 聚合。
@@ -207,7 +222,7 @@ public final class TraceComponent extends AbstractComponent<TraceComponent.Trace
                 TraceComponent.this.remoteCallProcessor);
 
         TraceTask(int taskIndex) {
-            super(bufferSize, taskIndex);
+            super(bufferSize, taskIndex, PlatformMetricNames.PIPELINE_TRACE);
             this.assemblyBuffer = new TraceAssemblyBuffer(
                     TraceComponent.this.assemblyCheckIntervalMs,
                     (traceId, spans) -> {
@@ -331,6 +346,7 @@ public final class TraceComponent extends AbstractComponent<TraceComponent.Trace
 
         private void recordIgnored(String resource) {
             ignored.incrementAndGet();
+            PlatformMetrics.counter(PlatformMetricNames.TRACE_DROP_IGNORE).inc();
             if (log.isDebugEnabled()) {
                 log.debug("Ignored span by resource filter resource={}", resource);
             }
@@ -338,6 +354,10 @@ public final class TraceComponent extends AbstractComponent<TraceComponent.Trace
             if (count > 0) {
                 log.info("Ignored {} spans by resource filter in last 10s; latest resource={}", count, resource);
             }
+        }
+
+        int pendingTraces() {
+            return assemblyBuffer.pendingTraces();
         }
 
         private void assembleSpans(String serviceKey, List<DcSpan> spans) throws Exception {

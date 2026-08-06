@@ -5,20 +5,67 @@ import io.agentscope.core.message.MsgRole;
 import io.agentscope.core.model.ExecutionConfig;
 import io.agentscope.core.model.GenerateOptions;
 import io.agentscope.core.model.Model;
+import io.agentscope.core.model.transport.HttpTransport;
+import io.agentscope.core.model.transport.HttpTransportConfig;
+import io.agentscope.core.model.transport.HttpTransportFactory;
+import io.agentscope.core.model.transport.HttpVersion;
+import io.agentscope.core.model.transport.JdkHttpTransport;
 import io.agentscope.extensions.model.anthropic.AnthropicChatModel;
 import io.agentscope.extensions.model.openai.OpenAIChatModel;
 
 import java.net.URI;
 import java.time.Duration;
 import java.util.List;
+import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.regex.Pattern;
 
 public final class LlmChatModelFactory {
 
     private static final Pattern VERSION_IN_PATH = Pattern.compile(".*/v\\d+$");
     private static final Duration PROBE_TIMEOUT = Duration.ofSeconds(30);
+    private static final AtomicBoolean FORCE_HTTP11 = new AtomicBoolean(false);
+    private static final AtomicBoolean HTTP11_TRANSPORT_INSTALLED = new AtomicBoolean(false);
 
     private LlmChatModelFactory() {
+    }
+
+    /**
+     * Opt-in: when {@code true}, AgentScope LLM calls use HTTP/1.1 instead of the SDK default
+     * HTTP/2. Needed for cleartext {@code http://} local model servers (uvicorn / vLLM / SGLang
+     * etc.) that reject JDK's {@code Upgrade: h2c} with HTTP 400
+     * {@code Invalid HTTP request received.} Default is {@code false} (SDK default unchanged).
+     */
+    public static void configureForceHttp11(boolean enabled) {
+        FORCE_HTTP11.set(enabled);
+        if (enabled) {
+            installHttp11TransportIfNeeded();
+        }
+    }
+
+    public static boolean isForceHttp11() {
+        return FORCE_HTTP11.get();
+    }
+
+    private static void installHttp11TransportIfNeeded() {
+        if (HTTP11_TRANSPORT_INSTALLED.get()) {
+            return;
+        }
+        synchronized (HTTP11_TRANSPORT_INSTALLED) {
+            if (HTTP11_TRANSPORT_INSTALLED.get()) {
+                return;
+            }
+            HttpTransportConfig config = HttpTransportConfig.builder()
+                    .httpVersion(HttpVersion.HTTP_1_1)
+                    .build();
+            HttpTransport transport = JdkHttpTransport.builder().config(config).build();
+            HttpTransportFactory.setDefault(transport);
+            HTTP11_TRANSPORT_INSTALLED.set(true);
+        }
+    }
+
+    private static HttpTransport http11Transport() {
+        installHttp11TransportIfNeeded();
+        return HttpTransportFactory.getDefault();
     }
 
     /**
@@ -55,6 +102,10 @@ public final class LlmChatModelFactory {
         String baseUrl = normalizeBaseUrl(provider.baseUrl());
         if (LlmApiTypes.isAnthropic(provider.apiType())) {
             // Anthropic Java SDK always appends /v1/messages to baseUrl.
+            // Uses HttpTransportFactory.getDefault() (HTTP/1.1 only when force-http11 is on).
+            if (FORCE_HTTP11.get()) {
+                installHttp11TransportIfNeeded();
+            }
             return AnthropicChatModel.builder()
                     .apiKey(apiKey)
                     .modelName(resolvedModel)
@@ -63,12 +114,15 @@ public final class LlmChatModelFactory {
                     .build();
         }
         // OpenAI Java SDK always appends /v1/chat/completions (with /v1 stripped when base ends in /vN).
-        return OpenAIChatModel.builder()
+        OpenAIChatModel.Builder builder = OpenAIChatModel.builder()
                 .apiKey(apiKey)
                 .modelName(resolvedModel)
                 .baseUrl(baseUrl)
-                .stream(stream)
-                .build();
+                .stream(stream);
+        if (FORCE_HTTP11.get()) {
+            builder.httpTransport(http11Transport());
+        }
+        return builder.build();
     }
 
     /**

@@ -1245,11 +1245,9 @@ public final class MetricQueryBuilder {
         if (serviceIds != null && !serviceIds.isEmpty()) {
             filters.append(buildServiceIdsInFilter(serviceIds));
         }
-        if ("web".equalsIgnoreCase(listServiceCategory)) {
+        // web/custom both mean application services (exclude bracketed virtual components only).
+        if ("web".equalsIgnoreCase(listServiceCategory) || "custom".equalsIgnoreCase(listServiceCategory)) {
             filters.append(" AND `service` NOT LIKE '[%%' ");
-            filters.append(serviceSummaryWebExcludeClause());
-        } else if ("custom".equalsIgnoreCase(listServiceCategory)) {
-            filters.append(serviceSummaryCustomIncludeClause());
         }
         return filters.toString();
     }
@@ -1268,28 +1266,6 @@ public final class MetricQueryBuilder {
                 HAVING SUM(`cnt`) > 0
                     AND (SUM(`error`) * 1.0 / NULLIF(SUM(`cnt`), 0)) >= 0.05
                 """;
-    }
-
-    private static String serviceSummaryWebExcludeClause() {
-        return " AND NOT (" + serviceSummaryCustomKeywordPredicate() + ") ";
-    }
-
-    private static String serviceSummaryCustomIncludeClause() {
-        return " AND (" + serviceSummaryCustomKeywordPredicate() + ") ";
-    }
-
-    private static String serviceSummaryCustomKeywordPredicate() {
-        String[] keywords = {
-            "gateway", "external", "third", "remote", "openapi", "feign", "dubbo"
-        };
-        StringBuilder clause = new StringBuilder();
-        for (int i = 0; i < keywords.length; i++) {
-            if (i > 0) {
-                clause.append(" OR ");
-            }
-            clause.append("LOWER(`service`) LIKE '%").append(keywords[i]).append("%'");
-        }
-        return clause.toString();
     }
 
     /** Inbound component rollup for portal virtual-service lists ({@code dbList}, {@code cacheList}, …). */

@@ -59,8 +59,14 @@ public final class BuiltInExpertCatalog {
                         "bashTools.bashOutput", now),
                 tool("KillShell", "终止后台 Shell", "Kill a running background bash shell by its ID",
                         "bashTools.killShell", now),
-                tool("platform.queryDoris", "Doris 只读查询", "Execute read-only SQL against DataBuff Doris via the web JDBC pool",
-                        "platformTools.queryDoris", now),
+                tool("platform.queryDorisBusinessData", "Doris 业务数据查询",
+                        "Read-only SQL against Doris business/config tables to troubleshoot product UI business issues "
+                                + "(not DataBuff self-monitoring — use querySelfMonitorMetrics for that)",
+                        "platformTools.queryDorisBusinessData", now),
+                tool("platform.querySelfMonitorMetrics", "DataBuff 自监控指标查询",
+                        "Query DataBuff self-monitoring metrics (metric_platform) to troubleshoot the platform itself "
+                                + "(ingest/write/query/Doris health) — not business APM",
+                        "platformTools.querySelfMonitorMetrics", now),
                 tool("brain.dispatchExpertTask", "专家路由派发", "Dispatch a subtask to another digital expert; if one expert can finish the user request, pass the full user request as task; otherwise organize the needed info for each expert without dropping user goals",
                         "expertDispatchTool.dispatchExpertTask", now));
     }
@@ -74,7 +80,7 @@ public final class BuiltInExpertCatalog {
                 skill("skill.brain.routing", "大脑路由", "AI 大脑路由与专家派发规则", now),
                 skill("skill.data.metrics", "问数口径", "APM 指标、Trace、日志与告警查询规则", now),
                 skill("skill.inspection.health", "巡检流程", "服务健康巡检与异常诊断流程", now),
-                skill("skill.qa.product", "产品答疑", "产品使用、功能说明、配置含义与平台数据 Doris 实查规则", now),
+                skill("skill.qa.product", "产品答疑", "产品使用、功能说明、配置含义与 Doris 业务数据 / 自监控指标实查规则", now),
                 skill(SUMMARY_HTML_SKILL_ID, "总结产出", "总结与报告 HTML 产出规范（共享风格参考模版）", now));
     }
 
@@ -127,8 +133,17 @@ public final class BuiltInExpertCatalog {
                                 "data.queryServiceAlarms",
                                 "inspect.inspectService"),
                         List.of(SUMMARY_HTML_SKILL_ID), now),
-                expert("qa", "产品答疑", "解答产品使用与配置含义；可用 queryDoris 查配置及指标/Trace 等落库数据", ExpertType.SPECIALIST,
-                        List.of("Bash", "BashOutput", "KillShell", "platform.queryDoris"),
+                expert("qa", "产品答疑",
+                        "解答产品使用与配置含义；可用 queryDorisBusinessData 查业务/配置数据、querySelfMonitorMetrics 查平台自监控",
+                        ExpertType.SPECIALIST,
+                        List.of(
+                                "Bash",
+                                "BashOutput",
+                                "KillShell",
+                                "common.getCurrentTimeRange",
+                                "common.getTimeRangeAroundTime",
+                                "platform.queryDorisBusinessData",
+                                "platform.querySelfMonitorMetrics"),
                         List.of("skill.qa.product", SUMMARY_HTML_SKILL_ID), now));
     }
 
@@ -235,13 +250,17 @@ public final class BuiltInExpertCatalog {
                     必须基于命令真实输出回答，不要编造。用中文回答。
                     """);
             case "qa" -> withMermaidHint("""
-                    你是 DataBuff 产品答疑专家。用户问产品怎么用、配置/接口含义，或平台配置不生效时，按 Skill 检索文档并用平台接口查实数后回答。
+                    你是 DataBuff 产品答疑专家。用户问产品怎么用、配置/接口含义、平台配置不生效，或平台自监控/自运维排障时，按 Skill 检索文档并用平台接口查实数后回答。
                     回复前先调用 load_skill_through_path(skillId="skill.qa.product", path="SKILL.md") 加载答疑规则，再开始检索或排查。
 
                     工作范围：
                     1. 围绕 DataBuff 文档/实现与平台已保存配置、落库数据答疑；知识根目录固定为 /app/databuff。
-                    2. 可用工具 queryDoris 只读查询配置表及指标/Trace/日志/告警等相关表，用于解释产品行为或排查配置/接入问题；不排查主机/Docker/磁盘等纯运行环境（运维）。
-                    3. 配置类问题必须查平台实数：直接调用工具 queryDoris（platform.queryDoris，进程内 JDBC，无需登录）。若需调前端管理 API，账号密码按 Skill：先读 APM_SECURITY_SEED_USERNAME/PASSWORD，再读 /app/application.yml 的 apm.security.seed-*，最后才用默认 admin；登录 POST /webapi/user/login 字段为 account/password。禁止自己拼 Doris 连接，禁止只甩手册清单。
+                    2. 两个查数工具用途不同，不要混用：
+                       - queryDorisBusinessData（platform.queryDorisBusinessData）：查 Doris 中的业务/配置数据，用于排查界面业务问题（配置是否落库、业务指标/Trace/日志/告警表里有没有数据）。
+                       - querySelfMonitorMetrics（platform.querySelfMonitorMetrics）：查 DataBuff 自监控指标（metric_platform，与自监控页同一套 Portal API），用于排查平台自身问题（接入/写出失败、查询域失败变慢、Doris 可用性、pipeline 积压）。
+                    3. 不排查主机/Docker/磁盘等纯运行环境（运维）。
+                    4. 配置类 / 界面业务数据核对：直接调用 queryDorisBusinessData（进程内 JDBC，无需登录）。若需调前端管理 API，账号密码按 Skill：先读 APM_SECURITY_SEED_USERNAME/PASSWORD，再读 /app/application.yml 的 apm.security.seed-*，最后才用默认 admin；登录 POST /webapi/user/login 字段为 account/password。禁止自己拼 Doris 连接，禁止只甩手册清单。
+                    5. 平台自运维 / 自监控排障：先读 docs/运维参考/自监控指标清单.md，再用 getCurrentTimeRange + querySelfMonitorMetrics 查实数；禁止用 queryMetricData 查业务指标表冒充自监控。
 
                     开源版采集能力（重要）：
                     1. 当前开源版不支持 OneAgent / One-Agent；勿向用户推荐 OneAgent 安装或 /config/install?type=agent。
@@ -256,11 +275,11 @@ public final class BuiltInExpertCatalog {
                     5. 命令仅用于只读检索、阅读与经官方接口的只读查询；不要改文件、不要重启服务、不要执行破坏性操作。
 
                     回答要求：
-                    1. 用中文，先给结论，再列关键证据（Doris/管理 API 结果、文档章节、功能入口等）；需要引用相对路径时勿带 /app/databuff 前缀。
+                    1. 用中文，先给结论，再列关键证据（自监控指标、Doris/管理 API 结果、文档章节、功能入口等）；需要引用相对路径时勿带 /app/databuff 前缀。
                     2. 面向日常使用：解释清楚「是什么 / 在哪 / 怎么配或怎么用」，避免堆砌无关代码。
                     3. 必须基于本次检索或接口查询到的真实内容回答。
                     4. 对用户严禁暴露知识根目录 /app/databuff（不要出现该绝对路径）。
-                    5. 对用户不要提「源码」「读代码」「检索仓库」等说法；配置排查可说「查了平台配置数据」。
+                    5. 对用户不要提「源码」「读代码」「检索仓库」等说法；配置排查可说「查了平台配置数据」；自监控排障可说「查了平台自监控指标」。
                     """);
             default -> withMermaidHint("你是 DataBuff APM 数字专家。用中文回答。");
         };

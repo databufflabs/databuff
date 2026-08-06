@@ -34,7 +34,7 @@ export default class TreeFlameChart extends Vue {
   public $refs!: {
     flameChart: HTMLDivElement
   }
-  private chartLegends = ['web', 'db', 'cache', 'mq', 'custom', 'error']
+  private chartLegends = ['web', 'db', 'cache', 'mq', 'error']
 
   private chartDataIds: string[] = []; // 图表数据的ids
   private myChart: any = {};
@@ -121,7 +121,6 @@ export default class TreeFlameChart extends Vue {
       db: '#2BB9F1',
       cache: '#8F77FA',
       mq: '#35C8C0',
-      custom: '#F79F46',
       error: this.themeVars.colorDanger,
       slow: this.themeVars.colorWarning,
       browser: '#d9d9d9'
@@ -149,7 +148,8 @@ export default class TreeFlameChart extends Vue {
       if (!Number.isFinite(relativeTime) || (relativeTime === 0 && startNs > traceStartNs)) {
         relativeTime = traceStartNs > 0 && startNs > 0 ? startNs - traceStartNs : 0
       }
-      const color = colors[service_type] || colors.custom;
+      const colorKey = service_type === 'custom' ? 'web' : service_type
+      const color = colors[colorKey] || colors.web;
       categories.push(resource);
       pointData.push({
         name: resource,
@@ -346,9 +346,6 @@ export default class TreeFlameChart extends Vue {
     }
     &[data-type="mq"]::before {
       background: #35C8C0;
-    }
-    &[data-type="custom"]::before {
-      background: #F79F46;
     }
     &[data-type="error"]::before {
       border: 2px solid var(--color-danger);

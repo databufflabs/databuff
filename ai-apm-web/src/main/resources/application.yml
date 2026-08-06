@@ -33,6 +33,8 @@ apm:
     fe-host: ${DORIS_FE_HOST:127.0.0.1}
     fe-query-port: ${DORIS_FE_QUERY_PORT:9030}
     fe-http-port: ${DORIS_FE_HTTP_PORT:8030}
+    be-http-host: ${DORIS_BE_HTTP_HOST:}
+    be-http-port: ${DORIS_BE_HTTP_PORT:8040}
     config-database: databuff
     metric-database: databuff
     trace-database: databuff
@@ -42,6 +44,13 @@ apm:
       probe-interval-ms: ${DORIS_AVAILABILITY_PROBE_INTERVAL_MS:60000}
       connect-timeout-ms: ${DORIS_AVAILABILITY_CONNECT_TIMEOUT_MS:3000}
       socket-timeout-ms: ${DORIS_AVAILABILITY_SOCKET_TIMEOUT_MS:3000}
+  platform-metrics:
+    # Master switch for web self-metrics (noop instruments + no samplers when false)
+    enabled: ${APM_PLATFORM_METRICS_ENABLED:true}
+    # SHOW BACKENDS/FRONTENDS → HTTP GET each node's Host:HttpPort/metrics (web leader only)
+    doris-enabled: ${APM_PLATFORM_METRICS_DORIS_ENABLED:true}
+    # Second 50: before PlatformMetrics flush (~:02) so gauges stamp the closed minute
+    doris-sample-cron: ${APM_PLATFORM_METRICS_DORIS_SAMPLE_CRON:50 * * * * *}
   security:
     seed-username: admin
     seed-password: Databuff@123
@@ -74,6 +83,9 @@ apm:
     shell-command-denylist: ${APM_AGENT_SHELL_DENYLIST:}
     max-iters: ${APM_AGENT_MAX_ITERS:1000}
     llm-http-timeout-seconds: ${APM_AGENT_LLM_HTTP_TIMEOUT_SECONDS:300}
+    # 默认 false：走 AgentScope SDK 默认 HTTP/2。本地 http:// 模型连通性测不过（400 Invalid HTTP request
+    # received / curl 却通）时，设为 true 强制 HTTP/1.1，避免 JDK 明文 h2c Upgrade。
+    llm-force-http11: ${APM_AGENT_LLM_FORCE_HTTP11:false}
     expert-round-timeout-seconds: ${APM_AGENT_EXPERT_ROUND_TIMEOUT_SECONDS:1200}
     brain-agent-name: brain
     data-agent-name: data

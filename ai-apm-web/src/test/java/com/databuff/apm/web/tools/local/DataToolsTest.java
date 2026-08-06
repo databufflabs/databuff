@@ -74,7 +74,7 @@ class DataToolsTest {
                 .containsEntry("serviceName", "demo")
                 .containsKeys("fromTime", "toTime");
         assertServiceListDefaultHourWindow(captor.getValue());
-        assertThat(captor.getValue().get("serviceTypes")).isEqualTo(List.of("web", "custom"));
+        assertThat(captor.getValue().get("serviceTypes")).isEqualTo(List.of("web"));
         assertThat(output).contains("\"serviceType\":\"service\"").contains("\"demo\"");
     }
 

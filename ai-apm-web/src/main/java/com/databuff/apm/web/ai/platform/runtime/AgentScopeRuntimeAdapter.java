@@ -258,6 +258,9 @@ public class AgentScopeRuntimeAdapter {
                         "回复前先调用 load_skill_through_path(skillId=\"skill.inspection.health\", path=\"SKILL.md\") 加载巡检流程，再执行巡检和补充查询。",
                         "skill.inspection.health 已内嵌在上方系统提示中，请直接遵循。")
                 .replace(
+                        "回复前先调用 load_skill_through_path(skillId=\"skill.qa.product\", path=\"SKILL.md\") 加载答疑规则，再开始检索或排查。",
+                        "skill.qa.product 已内嵌在上方系统提示中，请直接遵循。")
+                        .replace(
                         "回复前先调用 load_skill_through_path(skillId=\"skill.qa.product\", path=\"SKILL.md\") 加载答疑规则，再开始检索。",
                         "skill.qa.product 已内嵌在上方系统提示中，请直接遵循。");
     }

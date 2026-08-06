@@ -15,6 +15,7 @@ export const ServiceTypeFilter = (type: string) => {
     case 'android':
       return 'Android';
     case 'web':
+    case 'custom': // legacy; display as Web
       return 'Web';
     case 'db':
       return i18n.t('modules.utils.filters.s_68051bf4') as string;
@@ -22,8 +23,6 @@ export const ServiceTypeFilter = (type: string) => {
       return i18n.t('modules.utils.filters.s_e80c310e') as string;
     case 'mq':
       return 'MQ';
-    case 'custom':
-      return i18n.t('modules.utils.filters.s_f1d4ff50') as string;
     case 'remote':
       return i18n.t('modules.utils.filters.s_71f31c96') as string;
     case 'instance':  // 问题详情相关页面使用

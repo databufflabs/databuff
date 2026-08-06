@@ -1,5 +1,7 @@
 package com.databuff.apm.ingest.doris;
 
+import com.databuff.apm.common.platform.PlatformMetricNames;
+import com.databuff.apm.common.platform.PlatformMetrics;
 import com.databuff.apm.ingest.meta.MetaServiceCollector;
 import com.databuff.apm.ingest.component.AggregateComponent;
 import com.databuff.apm.common.storage.DorisStreamLoadSink;
@@ -107,6 +109,7 @@ public class DorisFlushScheduler implements DisposableBean {
      */
     @Scheduled(fixedDelayString = "${ingest.doris.flush-check-interval-ms:5000}")
     public void flushBySize() {
+        updateQueueGauges();
         for (DorisStreamLoadSink sink : sinks) {
             if (!sink.hasReady()) {
                 continue;
@@ -120,6 +123,7 @@ public class DorisFlushScheduler implements DisposableBean {
      */
     @Scheduled(fixedDelayString = "${ingest.doris.flush-interval-ms:30000}")
     public void flush() {
+        updateQueueGauges();
         flushMetrics();
         for (DorisStreamLoadSink sink : sinks) {
             if (PARTITIONED_TABLES.contains(sink.table())) {
@@ -142,6 +146,20 @@ public class DorisFlushScheduler implements DisposableBean {
     private void stageMetaServices() {
         if (metaServiceCollector != null) {
             metaServiceCollector.stagePending();
+        }
+    }
+
+    private void updateQueueGauges() {
+        for (DorisStreamLoadSink sink : sinks) {
+            if (DorisTableNames.METRIC_PLATFORM.equals(sink.table())) {
+                continue;
+            }
+            String table = sink.table();
+            String dim = PlatformMetricNames.writeDim(table);
+            PlatformMetrics.gauge(PlatformMetricNames.write(PlatformMetricNames.KIND_QUEUE), dim)
+                    .set(sink.pendingCount());
+            PlatformMetrics.gauge(PlatformMetricNames.write(PlatformMetricNames.KIND_QUEUE_CAP), dim)
+                    .set(sink.maxReadyBatches());
         }
     }
 

@@ -50,6 +50,10 @@ spec:
           env:
             - name: TZ
               value: Asia/Shanghai
+            - name: POD_IP
+              valueFrom:
+                fieldRef:
+                  fieldPath: status.podIP
             - name: JAVA_TOOL_OPTIONS
               value: "-Xms512m -Xmx1536m -Duser.timezone=Asia/Shanghai"
           livenessProbe:

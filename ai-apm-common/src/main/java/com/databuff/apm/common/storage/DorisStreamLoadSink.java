@@ -1,5 +1,7 @@
 package com.databuff.apm.common.storage;
 
+import com.databuff.apm.common.platform.PlatformMetricNames;
+import com.databuff.apm.common.platform.PlatformMetrics;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -13,6 +15,7 @@ import java.util.concurrent.Executors;
 import java.util.concurrent.RejectedExecutionException;
 import java.util.concurrent.ThreadFactory;
 import java.util.concurrent.atomic.AtomicInteger;
+import java.util.concurrent.atomic.AtomicLong;
 
 /**
  * Flushes {@link DorisBatchWriter} ready batches via {@link DorisStreamLoader}.
@@ -28,7 +31,8 @@ import java.util.concurrent.atomic.AtomicInteger;
  * <p>
  * On Stream Load failure the batch is re-queued onto the ready queue; after
  * {@link #DEFAULT_MAX_CONSECUTIVE_FAILURES} consecutive failures for this sink the batch is
- * dropped (fail-soft).
+ * dropped (fail-soft). When the writer's ready queue is full, new hand-offs and
+ * requeues are dropped immediately (same {@code write.drop} counter).
  */
 public final class DorisStreamLoadSink {
 
@@ -39,6 +43,8 @@ public final class DorisStreamLoadSink {
 
     /** Default in-flight Stream Loads per sink (sequential drain). */
     public static final int DEFAULT_FLUSH_CONCURRENCY = 1;
+
+    private static final long DROP_LOG_INTERVAL_MS = 10_000L;
 
     private static final AtomicInteger FLUSH_THREAD_SEQ = new AtomicInteger();
     /** Shared across sinks; sized for multi-table + multi-batch parallel loads. */
@@ -55,6 +61,8 @@ public final class DorisStreamLoadSink {
     private final Executor flushExecutor;
     private final AtomicInteger inFlight = new AtomicInteger();
     private final AtomicInteger consecutiveFailures = new AtomicInteger();
+    private final AtomicLong lastQueueDropLogMs = new AtomicLong();
+    private final AtomicInteger queueDropsSinceLog = new AtomicInteger();
 
     public DorisStreamLoadSink(
             DorisBatchWriter batchWriter,
@@ -123,6 +131,7 @@ public final class DorisStreamLoadSink {
         this.flushConcurrency = Math.max(1, flushConcurrency);
         this.flushExecutor = Objects.requireNonNull(flushExecutor);
         this.batchWriter.setReadyListener(this::scheduleFlushReady);
+        this.batchWriter.setDropListener(this::onQueueDrop);
     }
 
     /**
@@ -201,6 +210,10 @@ public final class DorisStreamLoadSink {
         if (batch.isEmpty()) {
             return 0;
         }
+        // Skip self-metrics table to avoid recursive out.* on platform flush.
+        boolean selfMetric = DorisTableNames.METRIC_PLATFORM.equals(table);
+        long t0 = System.currentTimeMillis();
+        long bytes = estimateBatchBytes(batch);
         try {
             DorisStreamLoader.StreamLoadResult result = streamLoader.loadNdjsonRows(database, table, batch);
             if (!result.success()) {
@@ -215,9 +228,22 @@ public final class DorisStreamLoadSink {
             consecutiveFailures.set(0);
             logPipelineStreamLoad(table, batch.size(), sampleRow(batch), true, result.body());
             log.debug("Stream loaded {} rows to {}.{}", batch.size(), database, table);
+            if (!selfMetric) {
+                String dim = PlatformMetricNames.writeDim(table);
+                PlatformMetrics.counter(PlatformMetricNames.write(PlatformMetricNames.KIND_REQ), dim).inc();
+                PlatformMetrics.counter(PlatformMetricNames.write(PlatformMetricNames.KIND_BYTES), dim).add(bytes);
+                PlatformMetrics.timer(PlatformMetricNames.write(PlatformMetricNames.KIND_COST_MS), dim)
+                        .add(System.currentTimeMillis() - t0);
+            }
             return batch.size();
         } catch (IOException e) {
             int failures = consecutiveFailures.incrementAndGet();
+            if (!selfMetric) {
+                String dim = PlatformMetricNames.writeDim(table);
+                PlatformMetrics.counter(PlatformMetricNames.write(PlatformMetricNames.KIND_FAIL), dim).inc();
+                PlatformMetrics.timer(PlatformMetricNames.write(PlatformMetricNames.KIND_COST_MS), dim)
+                        .add(System.currentTimeMillis() - t0);
+            }
             if (failures < maxConsecutiveFailures) {
                 batchWriter.requeue(batch);
                 throw e;
@@ -232,8 +258,22 @@ public final class DorisStreamLoadSink {
                     sample,
                     e.toString());
             consecutiveFailures.set(0);
+            if (!selfMetric) {
+                PlatformMetrics.counter(
+                                PlatformMetricNames.write(PlatformMetricNames.KIND_DROP),
+                                PlatformMetricNames.writeDim(table))
+                        .add(batch.size());
+            }
             return 0;
         }
+    }
+
+    private static long estimateBatchBytes(List<DorisJsonRow> batch) {
+        long n = 0L;
+        for (DorisJsonRow row : batch) {
+            n += row.estimatedBytes();
+        }
+        return n;
     }
 
     /** Visible for tests: materialize NDJSON bytes (join with newlines). */
@@ -259,6 +299,51 @@ public final class DorisStreamLoadSink {
     /** Whether the ready queue has handed-off batches waiting for Stream Load. */
     public boolean hasReady() {
         return batchWriter.hasReady();
+    }
+
+    /** Rows waiting in thread buffers + ready batches. */
+    public int pendingCount() {
+        return batchWriter.pendingCount();
+    }
+
+    /** Ready-queue capacity in batches. */
+    public int maxReadyBatches() {
+        return batchWriter.maxReadyBatches();
+    }
+
+    /** Handed-off batches waiting for Stream Load. */
+    public int readyBatchCount() {
+        return batchWriter.readyBatchCount();
+    }
+
+    private void onQueueDrop(int rows) {
+        if (rows <= 0) {
+            return;
+        }
+        if (!DorisTableNames.METRIC_PLATFORM.equals(table)) {
+            PlatformMetrics.counter(
+                            PlatformMetricNames.write(PlatformMetricNames.KIND_DROP),
+                            PlatformMetricNames.writeDim(table))
+                    .add(rows);
+        }
+        int since = queueDropsSinceLog.addAndGet(rows);
+        long now = System.currentTimeMillis();
+        long prev = lastQueueDropLogMs.get();
+        if (now - prev >= DROP_LOG_INTERVAL_MS && lastQueueDropLogMs.compareAndSet(prev, now)) {
+            int reported = queueDropsSinceLog.getAndSet(0);
+            log.warn(
+                    "Doris ready queue full — dropped {} rows for {}.{} (readyBatches={}/{})",
+                    reported > 0 ? reported : since,
+                    database,
+                    table,
+                    batchWriter.readyBatchCount(),
+                    batchWriter.maxReadyBatches());
+        }
+    }
+
+    /** In-flight Stream Load workers for this sink. */
+    public int inFlight() {
+        return inFlight.get();
     }
 
     /** Visible for tests / ops. */

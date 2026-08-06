@@ -1,5 +1,7 @@
 package com.databuff.apm.ingest.component;
 
+import com.databuff.apm.common.platform.PlatformMetricNames;
+import com.databuff.apm.common.platform.PlatformMetrics;
 import com.databuff.apm.common.cluster.aggregate.ClusterAggregator;
 import com.databuff.apm.common.cluster.aggregate.ClusterPartialForwarder;
 import com.databuff.apm.common.cluster.coordination.ClusterPartitionMembership;
@@ -24,6 +26,7 @@ import org.slf4j.LoggerFactory;
 
 import java.util.List;
 import java.util.Optional;
+import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.AtomicLong;
 
 /**
@@ -176,12 +179,14 @@ public final class AggregateComponent extends AbstractComponent<AggregateCompone
 
     /**
      * Step 5 入口：trace fill 提取的 OptimizedMetric。
-     * trace 抽取指标走分钟窗口聚合；agent 直报指标走 {@link #acceptFromMetric}。
+     * trace 抽取指标走分钟窗口聚合（不经 Aggregate Disruptor）；agent 直报指标走 {@link #acceptFromMetric}。
+     * 自监控仍记入 {@code pipeline.aggregate.*}，否则 UI「Aggregate」行在纯 OTLP Trace 场景下会一直空。
      */
     public void acceptExtractedMetrics(String serviceKey, List<OptimizedMetric> metrics) {
         if (metrics == null || metrics.isEmpty()) {
             return;
         }
+        long startNs = System.nanoTime();
         try {
             for (OptimizedMetric metric : metrics) {
                 if (TraceMetricMinuteBucket.requiresMinuteAggregation(metric.measurement())) {
@@ -191,6 +196,14 @@ public final class AggregateComponent extends AbstractComponent<AggregateCompone
                 }
             }
             processed.incrementAndGet();
+            PlatformMetrics.counter(
+                            PlatformMetricNames.pipeline(
+                                    PlatformMetricNames.PIPELINE_AGGREGATE, PlatformMetricNames.KIND_REQ))
+                    .add(metrics.size());
+            PlatformMetrics.timer(
+                            PlatformMetricNames.pipeline(
+                                    PlatformMetricNames.PIPELINE_AGGREGATE, PlatformMetricNames.KIND_COST_MS))
+                    .add(Math.max(0L, TimeUnit.NANOSECONDS.toMillis(System.nanoTime() - startNs)));
         } catch (Exception e) {
             log.warn("Failed to store extracted metrics for {}: {}", serviceKey, e.getMessage());
         }
@@ -243,7 +256,7 @@ public final class AggregateComponent extends AbstractComponent<AggregateCompone
         private final OptimizedMetricAccumulator accumulator = new OptimizedMetricAccumulator();
 
         AggregateTask(int taskIndex) {
-            super(bufferSize, taskIndex);
+            super(bufferSize, taskIndex, PlatformMetricNames.PIPELINE_AGGREGATE);
         }
 
         @Override

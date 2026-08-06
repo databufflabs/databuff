@@ -415,7 +415,7 @@ export default {
         "s_2fcec854": "Answer",
         "s_43746844": "Product Q&A expert — reads our own docs, more reliable than search",
         "s_9b248373": "How do I integrate the OpenTelemetry SDK? Where do I configure alert thresholds? Give me the navigation paths.",
-        "s_e0ed9228": "How do I deploy DataBuff with a single command? What prerequisites do I need?",
+        "s_95f54d6f": "Inspect the DataBuff platform and produce an HTML inspection report",
         "s_4eb19ee1": "Try now",
         "s_7bcf1bf2": "Another prompt",
         "s_307325a8": "This expert is disabled and cannot be tried",

@@ -39,7 +39,14 @@ class ExpertManagementServiceTest {
         assertThat(service.find("ops").orElseThrow().toolIds())
                 .contains("Bash", "BashOutput", "KillShell", "inspect.inspectService");
         assertThat(service.find("qa").orElseThrow().toolIds())
-                .containsExactly("Bash", "BashOutput", "KillShell", "platform.queryDoris");
+                .contains(
+                        "Bash",
+                        "BashOutput",
+                        "KillShell",
+                        "common.getCurrentTimeRange",
+                        "common.getTimeRangeAroundTime",
+                        "platform.queryDorisBusinessData",
+                        "platform.querySelfMonitorMetrics");
         assertThat(service.find("qa").orElseThrow().skillIds())
                 .contains("skill.qa.product");
         assertThat(service.delete("brain")).isFalse();
@@ -163,9 +170,43 @@ class ExpertManagementServiceTest {
 
         AiExpertDefinition upgraded = service.find("qa").orElseThrow();
         assertThat(upgraded.systemPrompt())
-                .contains("queryDoris")
+                .contains("queryDorisBusinessData")
+                .contains("querySelfMonitorMetrics")
                 .doesNotContain("不要硬查源码凑答案");
-        assertThat(upgraded.toolIds()).contains("platform.queryDoris");
+        assertThat(upgraded.toolIds())
+                .contains("platform.queryDorisBusinessData", "platform.querySelfMonitorMetrics", "common.getCurrentTimeRange");
+    }
+
+    @Test
+    void persistedQaPromptWithoutPlatformMetricsUpgrades() {
+        ExpertManagementService service = service();
+        AiExpertDefinition qa = service.find("qa").orElseThrow();
+        String almostCurrent = """
+                你是 DataBuff 产品答疑专家。用户问产品怎么用、配置/接口含义，或平台配置不生效时，按 Skill 检索文档并用平台接口查实数后回答。
+                需要输出拓扑、调用关系、流程图时，用 Markdown 的 mermaid 代码块。
+                可用工具 queryDoris 只读查询配置表。
+                """;
+        service.applyPersistedRows(List.of(new AiExpertDefinition(
+                qa.expertId(),
+                qa.name(),
+                qa.category(),
+                qa.description(),
+                qa.type(),
+                qa.modelProviderCode(),
+                qa.modelName(),
+                almostCurrent,
+                List.of("Bash", "BashOutput", "KillShell", "platform.queryDorisBusinessData"),
+                qa.skillIds(),
+                qa.options(),
+                qa.enabled(),
+                true,
+                qa.version(),
+                qa.createdAt(),
+                qa.updatedAt())));
+
+        AiExpertDefinition upgraded = service.find("qa").orElseThrow();
+        assertThat(upgraded.systemPrompt()).contains("querySelfMonitorMetrics");
+        assertThat(upgraded.toolIds()).contains("platform.querySelfMonitorMetrics");
     }
 
     @Test

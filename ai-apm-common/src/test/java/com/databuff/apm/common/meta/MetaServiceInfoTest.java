@@ -132,4 +132,32 @@ class MetaServiceInfoTest {
         assertThat(virtualRow.get("service_type")).isEqualTo("mq");
         assertThat(virtualRow.get("virtual_service")).isEqualTo(1);
     }
+
+    @Test
+    void mergePrefersIncomingServiceTypeWhenClassificationChanges() {
+        MetaServiceInfo legacyCustom = MetaServiceInfo.fromPoint(new com.databuff.apm.common.query.ApmQueryModels.MetaServicePoint(
+                "gw-id", "payment-gateway", "payment-gateway", "custom", null, "custom",
+                "custom", null, "OTLP", null, null, null, Boolean.FALSE, null, null, null, null));
+        MetaServiceInfo latestWeb = MetaServiceInfo.fromNames(
+                "gw-id", "payment-gateway", "payment-gateway", java.util.Map.of(), false);
+
+        MetaServiceInfo merged = legacyCustom.merge(latestWeb);
+        var row = merged.toRow("2026-06-05 10:00:00");
+        assertThat(row.get("service_type")).isEqualTo("web");
+        assertThat(row.get("type")).isEqualTo("web");
+        assertThat(row.get("virtual_service")).isEqualTo(0);
+        assertThat(legacyCustom.enrichmentDiffers(merged)).isTrue();
+    }
+
+    @Test
+    void mergeKeepsExistingTypeWhenIncomingClassificationBlank() {
+        MetaServiceInfo existing = MetaServiceInfo.fromNames(
+                "svc-id", "demo-order", "demo-order", java.util.Map.of(), false);
+        MetaServiceInfo blankType = MetaServiceInfo.fromPoint(new com.databuff.apm.common.query.ApmQueryModels.MetaServicePoint(
+                "svc-id", "demo-order", "demo-order", null, null, null,
+                null, null, null, null, null, null, false, null, null, null, null));
+
+        MetaServiceInfo merged = existing.merge(blankType);
+        assertThat(merged.toRow("2026-06-05 10:00:00").get("service_type")).isEqualTo("web");
+    }
 }

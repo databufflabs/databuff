@@ -74,6 +74,10 @@ docker compose logs ai-apm-doris-fe ai-apm-doris-be
 
 服务未就绪时，`start.sh` 超时后会提示检查 ingest / web 日志。
 
+## 平台自监控
+
+安装后可在 Web **部署配置 → 安装部署 → 状态** 查看 ingest / 集群 / 查询 / Doris 自监控曲线。指标含义与排障对照见 [平台自监控指标清单](自监控指标清单.md)；AI 产品答疑专家可通过同一套 Portal 查询接口读取这些指标。
+
 ## 常见故障
 
 | 现象 | 处理 |

@@ -179,15 +179,24 @@ export default class ChatAI extends Vue {
       }
       if (this.scrollContainer && !this.scrollHandle) {
         this.scrollHandle = () => {
-          if (this.programmaticScroll) {
-            return;
+          if (!this.scrollContainer) {
+            return
           }
-          const { scrollHeight, clientHeight, scrollTop } = this.scrollContainer;
-          const distanceFromBottom = scrollHeight - clientHeight - scrollTop;
-          // 贴底则继续跟随；离开底部则停止自动滚动，方便上翻查看
-          this.isUserScrolling = distanceFromBottom > this.stickBottomThreshold;
-        };
-        this.scrollContainer.addEventListener('scroll', this.scrollHandle);
+          const { scrollHeight, clientHeight, scrollTop } = this.scrollContainer
+          const distanceFromBottom = scrollHeight - clientHeight - scrollTop
+          const nearBottom = distanceFromBottom <= this.stickBottomThreshold
+          // 程序化贴底时仍允许检测「已离开底部」，避免自动滚动窗口吞掉用户上滑
+          if (this.programmaticScroll) {
+            if (!nearBottom) {
+              this.isUserScrolling = true
+              this.programmaticScroll = false
+            }
+            return
+          }
+          this.isUserScrolling = !nearBottom
+        }
+        this.scrollContainer.addEventListener('scroll', this.scrollHandle)
+        this.scrollContainer.addEventListener('wheel', this.onChatWheel, { passive: true })
       }
       if (this.scrollContainer && !this.scrollToBottomTimer) {
         this.loopScrollToBottom();
@@ -214,6 +223,7 @@ export default class ChatAI extends Vue {
     }
     if (this.scrollContainer) {
       this.scrollContainer.removeEventListener('scroll', this.scrollHandle)
+      this.scrollContainer.removeEventListener('wheel', this.onChatWheel)
       this.scrollContainer = null
       this.scrollHandle = null
     }
@@ -334,6 +344,13 @@ export default class ChatAI extends Vue {
   }
 
   // 自动滚动：仅在用户贴底时跟随最新内容
+  private onChatWheel = (event: WheelEvent) => {
+    if (event.deltaY < 0) {
+      this.isUserScrolling = true
+      this.programmaticScroll = false
+    }
+  }
+
   private loopScrollToBottom () {
     if (this.scrollToBottomTimer) {
       window.clearInterval(this.scrollToBottomTimer);

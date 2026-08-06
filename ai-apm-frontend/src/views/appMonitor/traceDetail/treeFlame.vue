@@ -217,7 +217,7 @@ export default class TreeFlame extends Vue {
   // 执行占比
   private excutePctMap: any = {};
 
-  private chartLegends = ['web', 'db', 'cache', 'mq', 'custom', 'error'];
+  private chartLegends = ['web', 'db', 'cache', 'mq', 'error'];
 
 
   // 是否有性能剖析
@@ -577,7 +577,7 @@ $itemHeight: 47px;
       color: var(--color-white);
     }
 
-    &[data-type="web"], &[data-type="browser"] {
+    &[data-type="web"], &[data-type="browser"], &[data-type="custom"] {
       background: #5180FF;
     }
     &[data-type="db"] {
@@ -588,9 +588,6 @@ $itemHeight: 47px;
     }
     &[data-type="mq"] {
       background: #35C8C0;
-    }
-    &[data-type="custom"] {
-      background: #F79F46;
     }
     &[data-type="error"] {
       border: 2px solid var(--color-danger);
@@ -743,9 +740,6 @@ $itemHeight: 47px;
     }
     &[data-type="mq"]::before {
       background: #35C8C0;
-    }
-    &[data-type="custom"]::before {
-      background: #F79F46;
     }
     &[data-type="error"]::before {
       border: 2px solid var(--color-danger);

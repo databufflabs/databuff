@@ -121,7 +121,24 @@ public class JavaBeanToolExecutor {
                     safeRequest.size());
             case "inspectTools.inspectService" -> inspectTools.inspectService(
                     firstNonBlank(safeRequest.serviceName(), safeRequest.service()));
-            case "platformTools.queryDoris" -> platformTools.queryDoris(safeRequest.sql(), safeRequest.maxRows());
+            case "platformTools.queryDorisBusinessData" ->
+                    platformTools.queryDorisBusinessData(safeRequest.sql(), safeRequest.maxRows());
+            case "platformTools.querySelfMonitorMetrics" ->
+                    platformTools.querySelfMonitorMetrics(
+                    safeRequest.fromTime(),
+                    safeRequest.toTime(),
+                    safeRequest.mode(),
+                    safeRequest.metrics(),
+                    safeRequest.metricPrefixes(),
+                    safeRequest.metricSuffixes(),
+                    safeRequest.components(),
+                    safeRequest.instances(),
+                    safeRequest.dims(),
+                    splitCsv(safeRequest.groupBy()),
+                    firstNonBlank(safeRequest.value(), safeRequest.valueMode()),
+                    safeRequest.stepSeconds(),
+                    safeRequest.tag(),
+                    firstNonNull(safeRequest.limit(), safeRequest.size()));
             default -> throw AiPlatformApiException.badRequest("unsupported implementation: " + implementation);
         };
     }
@@ -146,6 +163,24 @@ public class JavaBeanToolExecutor {
             return first;
         }
         return second;
+    }
+
+    private static Integer firstNonNull(Integer first, Integer second) {
+        return first != null ? first : second;
+    }
+
+    private static List<String> splitCsv(String raw) {
+        if (raw == null || raw.isBlank()) {
+            return null;
+        }
+        String text = raw.trim();
+        if (!text.contains(",")) {
+            return List.of(text);
+        }
+        return java.util.Arrays.stream(text.split(","))
+                .map(String::trim)
+                .filter(s -> !s.isEmpty())
+                .toList();
     }
 
     public record TestToolRequest(
@@ -183,7 +218,19 @@ public class JavaBeanToolExecutor {
             Integer rangeMinutes,
             List<TrendChartSpec> charts,
             String sql,
-            Integer maxRows) {
+            Integer maxRows,
+            String mode,
+            List<String> metrics,
+            List<String> metricPrefixes,
+            List<String> metricSuffixes,
+            List<String> components,
+            List<String> instances,
+            List<String> dims,
+            String value,
+            String valueMode,
+            Integer stepSeconds,
+            String tag,
+            Integer limit) {
 
         public static TestToolRequest empty() {
             return new TestToolRequest(
@@ -191,7 +238,8 @@ public class JavaBeanToolExecutor {
                     null, null, null, null, null, null, null, null,
                     null, null, null, null,
                     null, null, null, null, null, null, null, null, null, null, null,
-                    null, null);
+                    null, null,
+                    null, null, null, null, null, null, null, null, null, null, null, null);
         }
     }
 }

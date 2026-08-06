@@ -178,13 +178,20 @@ public final class MetaServiceInfo {
         if (other == null) {
             return this;
         }
+        String mergedServiceType = preferLatestClassification(serviceType, other.serviceType);
+        String mergedType = preferLatestClassification(type, other.type);
+        boolean classificationChanged = !Objects.equals(serviceType, mergedServiceType)
+                || !Objects.equals(type, mergedType);
         return new Builder()
                 .id(id)
                 .name(pick(other.name, name))
                 .service(pick(other.service, service))
-                .serviceType(pick(serviceType, other.serviceType))
-                .type(pick(type, other.type))
-                .technology(pick(technology, other.technology))
+                .serviceType(mergedServiceType)
+                .type(mergedType)
+                // When service_type/type is corrected, take the incoming technology too.
+                .technology(classificationChanged
+                        ? pick(other.technology, technology)
+                        : pick(technology, other.technology))
                 .language(pick(language, other.language))
                 .processRuntimeName(pick(processRuntimeName, other.processRuntimeName))
                 .processRuntimeVersion(pick(processRuntimeVersion, other.processRuntimeVersion))
@@ -281,7 +288,7 @@ public final class MetaServiceInfo {
             }
             String rpcSystem = OtelAttributeMaps.firstNonBlank(attributes, "rpc.system");
             if (rpcSystem != null && !rpcSystem.isBlank()) {
-                return new ServiceTypeClassifier.Classification("custom", rpcSystem.toLowerCase(), rpcSystem.toLowerCase());
+                return new ServiceTypeClassifier.Classification("remote", rpcSystem.toLowerCase(), rpcSystem.toLowerCase());
             }
         }
         return ServiceTypeClassifier.classify(nameForPattern);
@@ -375,6 +382,17 @@ public final class MetaServiceInfo {
 
     private static String pick(String preferred, String fallback) {
         return preferred != null && !preferred.isBlank() ? preferred : fallback;
+    }
+
+    /**
+     * Prefer the incoming classification when present so catalog rows can be corrected
+     * (e.g. legacy name-keyword {@code custom} → current {@code web}).
+     */
+    private static String preferLatestClassification(String existing, String incoming) {
+        if (incoming != null && !incoming.isBlank()) {
+            return incoming;
+        }
+        return existing;
     }
 
     private static String firstNonBlank(String primary, String fallback) {

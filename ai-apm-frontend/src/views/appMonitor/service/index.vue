@@ -8,8 +8,6 @@
           :filter-list="filterList"
           @on-change="getData"
           @on-remove-tag="getData" />
-
-        <db-radio v-model='serviceTypeModel' :options='serviceTypeList' @change='getData' class="ml-16"></db-radio>
       </div>
 
       <chart-group
@@ -62,10 +60,9 @@ export default class ServiceManage extends Vue {
   private queryLoading = false;
 
   get getQueryParams () {
-    const serviceTypeModel = this.serviceTypeModel
     return {
       ...this.queryParams,
-      serviceTypes: [serviceTypeModel],
+      serviceTypes: ['web'],
     }
   }
   get getTableParams () {
@@ -83,13 +80,6 @@ export default class ServiceManage extends Vue {
   private filterList: any[] = []
 
   private serviceList: any[] = []
-
-  private serviceTypeList = [
-    { label: 'Web', value: 'web' },
-    { label: i18n.t('modules.views.appMonitor.service.s_f1d4ff50') as string, labelKey: 'modules.utils.filters.s_f1d4ff50', value: 'custom' },
-  ]
-
-  private serviceTypeModel = 'web'
 
   get filterListInit () {
     const list = [
@@ -141,7 +131,7 @@ export default class ServiceManage extends Vue {
       fromTime,
       toTime,
       ignoreTime: 0,
-      serviceTypes: ['web', 'custom']
+      serviceTypes: ['web']
     }))
     if (!error) {
       const { data = [] } = result || {};

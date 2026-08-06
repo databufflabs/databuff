@@ -107,6 +107,7 @@ services:
       TZ: Asia/Shanghai
       JAVA_TOOL_OPTIONS: -Xms128m -Xmx300m -Duser.timezone=Asia/Shanghai
       DORIS_FE_HOST: ai-apm-doris-fe
+      DORIS_BE_HTTP_HOST: ai-apm-doris-be
     volumes:
       - ./run/web:/app
       - ../common/skills:/app/skills:ro

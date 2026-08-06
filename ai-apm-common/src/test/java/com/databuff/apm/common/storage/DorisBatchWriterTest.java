@@ -78,4 +78,39 @@ class DorisBatchWriterTest {
         assertThat(writer.drainIfReady()).hasSize(1);
         assertThat(writer.flushAll()).isEmpty();
     }
+
+    @Test
+    void dropsHandOffWhenReadyQueueFull() {
+        // Tiny batch size so each offer that crosses threshold is its own hand-off batch.
+        DorisBatchWriter writer = new DorisBatchWriter(1, TimeUnit.HOURS.toMillis(1), 2);
+        AtomicInteger dropped = new AtomicInteger();
+        writer.setDropListener(dropped::addAndGet);
+
+        writer.offer(new byte[]{1}); // hand-off batch #1
+        writer.offer(new byte[]{2}); // hand-off batch #2
+        writer.offer(new byte[]{3}); // ready full → drop
+
+        assertThat(writer.maxReadyBatches()).isEqualTo(2);
+        assertThat(writer.readyBatchCount()).isEqualTo(2);
+        assertThat(dropped.get()).isEqualTo(1);
+        assertThat(writer.drainIfReady()).hasSize(1);
+        assertThat(writer.drainIfReady()).hasSize(1);
+        assertThat(writer.hasReady()).isFalse();
+    }
+
+    @Test
+    void dropsRequeueWhenReadyQueueFull() {
+        DorisBatchWriter writer = new DorisBatchWriter(10_000, TimeUnit.HOURS.toMillis(1), 1);
+        AtomicInteger dropped = new AtomicInteger();
+        writer.setDropListener(dropped::addAndGet);
+
+        writer.requeue(List.of(DorisJsonRow.ofBytes(new byte[]{1})));
+        writer.requeue(List.of(
+                DorisJsonRow.ofBytes(new byte[]{2}),
+                DorisJsonRow.ofBytes(new byte[]{3})));
+
+        assertThat(writer.readyBatchCount()).isEqualTo(1);
+        assertThat(dropped.get()).isEqualTo(2);
+        assertThat(writer.drainIfReady()).hasSize(1);
+    }
 }

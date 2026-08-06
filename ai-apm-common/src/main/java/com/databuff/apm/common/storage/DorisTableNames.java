@@ -29,6 +29,7 @@ public final class DorisTableNames {
     public static final String METRIC_SERVICE_THREAD_POOL = "metric_service_thread_pool";
     public static final String METRIC_JVM = "metric_jvm";
     public static final String METRIC_JVM_GC = "metric_jvm_gc";
+    public static final String METRIC_PLATFORM = "metric_platform";
 
     public static final String META_SERVICE = "meta_service";
 

@@ -159,7 +159,7 @@ public class DataTools {
 
     private static void applyServiceTypeFilter(Map<String, Object> body, String normalized) {
         switch (normalized) {
-            case "service", "web" -> body.put("serviceTypes", List.of("web", "custom"));
+            case "service", "web" -> body.put("serviceTypes", List.of("web"));
             case "db" -> body.put("serviceType", "db");
             case "mq" -> body.put("serviceType", "mq");
             case "cache" -> body.put("serviceType", "cache");

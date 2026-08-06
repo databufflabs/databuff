@@ -38,7 +38,8 @@ class ToolManagementServiceTest {
                         "Bash",
                         "BashOutput",
                         "KillShell",
-                        "platform.queryDoris");
+                        "platform.queryDorisBusinessData",
+                        "platform.querySelfMonitorMetrics");
         assertThat(service.delete("data.queryServicesAll")).isFalse();
     }
 

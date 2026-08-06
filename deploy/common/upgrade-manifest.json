@@ -1,6 +1,6 @@
 {
-  "schema_version": 5,
+  "schema_version": 7,
   "upgrade_type": "A",
   "min_upgrade_from": "0.1.0",
-  "notes": "V005 reduces dynamic partition buckets. time_series compaction (former V006) removed \u2014 regresses Trace list query latency."
+  "notes": "V007 adds metric_platform for DataBuff self-monitoring (1min flush; lean dim tag). Aligns with product v0.1.7."
 }

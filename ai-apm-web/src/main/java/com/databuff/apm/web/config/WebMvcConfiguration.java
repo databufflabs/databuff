@@ -41,6 +41,7 @@ public class WebMvcConfiguration implements WebMvcConfigurer {
                         "/webapi/monitor/**",
                         "/webapi/slowInterface/**",
                         "/webapi/metrics/**",
+                        "/webapi/platform/**",
                         "/webapi/notify/**",
                         "/webapi/respPolicy/**",
                         "/webapi/meta/**")

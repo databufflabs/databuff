@@ -97,6 +97,7 @@ services:
       TZ: Asia/Shanghai
       JAVA_TOOL_OPTIONS: -Xms512m -Xmx1536m -Duser.timezone=Asia/Shanghai
       DORIS_FE_HOST: ai-apm-doris-fe
+      DORIS_BE_HTTP_HOST: ai-apm-doris-be
     volumes:
       - ./data/web:/app/data
     ports:

@@ -44,4 +44,9 @@ public final class TaskPool<T extends Task> {
     public int getTaskSize() {
         return taskSize;
     }
+
+    /** Snapshot of pooled tasks (same array instance; do not mutate). */
+    public T[] tasks() {
+        return tasks;
+    }
 }

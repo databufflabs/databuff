@@ -4,6 +4,8 @@ import com.databuff.apm.cluster.v1.AggregationPartialRequest;
 import com.databuff.apm.cluster.v1.ClusterCoordinationServiceGrpc;
 import com.databuff.apm.common.cluster.aggregate.ClusterPartialForwarder;
 import com.databuff.apm.common.cluster.coordination.ClusterInstanceCoordinator;
+import com.databuff.apm.common.platform.PlatformMetricNames;
+import com.databuff.apm.common.platform.PlatformMetrics;
 import com.databuff.apm.ingest.support.LogRateLimiter;
 import io.grpc.ManagedChannel;
 import io.grpc.ManagedChannelBuilder;
@@ -38,6 +40,7 @@ public final class GrpcClusterPartialForwarder implements ClusterPartialForwarde
             byte[] partial) {
         String endpoint = coordinator.endpointFor(targetNodeId).orElse(null);
         if (endpoint == null) {
+            recordForwardFail(stream);
             warnThrottled(
                     "Cluster forward out failed stream={} target={} reason=no-endpoint partition={} windowMs={} bytes={} {}",
                     stream,
@@ -48,6 +51,7 @@ public final class GrpcClusterPartialForwarder implements ClusterPartialForwarde
                     ClusterAggregationLog.membershipBrief(coordinator));
             return;
         }
+        long t0 = System.currentTimeMillis();
         try {
             ClusterCoordinationServiceGrpc.ClusterCoordinationServiceBlockingStub stub =
                     ClusterCoordinationServiceGrpc.newBlockingStub(channel(endpoint))
@@ -60,7 +64,11 @@ public final class GrpcClusterPartialForwarder implements ClusterPartialForwarde
                     .addPartials(com.google.protobuf.ByteString.copyFrom(partial))
                     .setOriginNodeId(originNodeId)
                     .build());
+            long costMs = System.currentTimeMillis() - t0;
             if (!response.getAccepted()) {
+                recordForwardFail(stream);
+                PlatformMetrics.timer(PlatformMetricNames.clusterForward(stream, PlatformMetricNames.KIND_COST_MS))
+                        .add(costMs);
                 warnThrottled(
                         "Cluster forward out rejected stream={} origin={} target={} endpoint={} partition={} windowMs={} bytes={}",
                         stream,
@@ -70,8 +78,19 @@ public final class GrpcClusterPartialForwarder implements ClusterPartialForwarde
                         ClusterAggregationLog.partitionKeyBrief(partitionKey),
                         windowStart,
                         partial.length);
+                return;
+            }
+            PlatformMetrics.counter(PlatformMetricNames.clusterForward(stream, PlatformMetricNames.KIND_REQ)).inc();
+            PlatformMetrics.timer(PlatformMetricNames.clusterForward(stream, PlatformMetricNames.KIND_COST_MS))
+                    .add(costMs);
+            if (partial != null && partial.length > 0) {
+                PlatformMetrics.counter(PlatformMetricNames.clusterForward(stream, PlatformMetricNames.KIND_BYTES))
+                        .add(partial.length);
             }
         } catch (Exception e) {
+            recordForwardFail(stream);
+            PlatformMetrics.timer(PlatformMetricNames.clusterForward(stream, PlatformMetricNames.KIND_COST_MS))
+                    .add(System.currentTimeMillis() - t0);
             warnThrottled(
                     "Cluster forward out failed stream={} origin={} target={} endpoint={} partition={} windowMs={} bytes={}: {}",
                     stream,
@@ -83,6 +102,11 @@ public final class GrpcClusterPartialForwarder implements ClusterPartialForwarde
                     partial == null ? 0 : partial.length,
                     e.toString());
         }
+    }
+
+    private static void recordForwardFail(String stream) {
+        PlatformMetrics.counter(PlatformMetricNames.clusterForward(stream, PlatformMetricNames.KIND_FAIL)).inc();
+        PlatformMetrics.counter(PlatformMetricNames.clusterDrop(stream)).inc();
     }
 
     private static void warnThrottled(String template, Object... args) {

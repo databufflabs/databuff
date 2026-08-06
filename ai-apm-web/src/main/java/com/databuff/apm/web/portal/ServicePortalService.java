@@ -455,7 +455,7 @@ public class ServicePortalService {
         DB("db", "db", DorisTableNames.METRIC_SERVICE_DB, "dbType", "mysql", false),
         MQ("mq", "mq", DorisTableNames.METRIC_SERVICE_MQ, "type", "kafka", true),
         CACHE("cache", "cache", DorisTableNames.METRIC_SERVICE_REDIS, "command", "redis", false),
-        REMOTE("remote", "custom", DorisTableNames.METRIC_SERVICE_REMOTE, "remoteType", "custom", false);
+        REMOTE("remote", "remote", DorisTableNames.METRIC_SERVICE_REMOTE, "remoteType", "remote", false);
 
         private final String catalogServiceType;
         private final String rowServiceType;
@@ -1113,13 +1113,16 @@ public class ServicePortalService {
     }
 
     private Map<String, Object> toBasicServiceRowFromId(String serviceId) {
-        String serviceType = inferServiceCategory(serviceId);
+        boolean virtual = isVirtualServiceName(serviceId);
+        String serviceType = normalizeLegacyApplicationServiceType(
+                inferServiceCategory(serviceId), virtual);
         Map<String, Object> row = new LinkedHashMap<>();
         row.put("id", serviceId);
         row.put("name", serviceId);
         row.put("service", serviceId);
         row.put("service_type", serviceType);
         row.put("type", inferServiceTypeIcon(serviceId, serviceType));
+        row.put("virtual_service", virtual);
         return row;
     }
 
@@ -1128,13 +1131,16 @@ public class ServicePortalService {
         List<String> serviceTypes = parseStringList(body.get("serviceTypes"));
         List<String> datasources = parseStringList(body.get("datasources"));
         int virtualService = intValue(body.get("virtualService"), -1);
-        String pointType = firstNonBlank(point.serviceType(), inferServiceCategory(point.id()));
+        Boolean isVirtual = point.virtualService();
+        String pointType = normalizeLegacyApplicationServiceType(
+                firstNonBlank(point.serviceType(), inferServiceCategory(point.id())),
+                isVirtual);
 
-        if (serviceType != null && !serviceType.equalsIgnoreCase(pointType)) {
+        if (serviceType != null && !serviceTypeMatches(pointType, serviceType, isVirtual)) {
             return false;
         }
         if (!serviceTypes.isEmpty()
-                && serviceTypes.stream().noneMatch(type -> type.equalsIgnoreCase(pointType))) {
+                && serviceTypes.stream().noneMatch(type -> serviceTypeMatches(pointType, type, isVirtual))) {
             return false;
         }
         if (!datasources.isEmpty()) {
@@ -1144,11 +1150,11 @@ public class ServicePortalService {
             }
         }
         if (virtualService >= 0) {
-            boolean isVirtual = Boolean.TRUE.equals(point.virtualService());
-            if (virtualService == 0 && isVirtual) {
+            boolean virtual = Boolean.TRUE.equals(isVirtual);
+            if (virtualService == 0 && virtual) {
                 return false;
             }
-            if (virtualService == 1 && !isVirtual) {
+            if (virtualService == 1 && !virtual) {
                 return false;
             }
         }
@@ -1163,11 +1169,14 @@ public class ServicePortalService {
         String serviceType = stringValue(body.get("serviceType"), null);
         List<String> serviceTypes = parseStringList(body.get("serviceTypes"));
         String rowType = stringValue(row.get("service_type"), "web");
-        if (serviceType != null && !serviceType.equalsIgnoreCase(rowType)) {
+        Boolean isVirtual = Boolean.TRUE.equals(row.get("virtual_service"))
+                || isVirtualServiceName(stringValue(row.get("service"), null))
+                || isVirtualServiceName(stringValue(row.get("name"), null));
+        if (serviceType != null && !serviceTypeMatches(rowType, serviceType, isVirtual)) {
             return false;
         }
         return serviceTypes.isEmpty()
-                || serviceTypes.stream().anyMatch(type -> type.equalsIgnoreCase(rowType));
+                || serviceTypes.stream().anyMatch(type -> serviceTypeMatches(rowType, type, isVirtual));
     }
 
     private static String normalizeServiceNameFilter(String serviceName) {
@@ -1199,7 +1208,11 @@ public class ServicePortalService {
             service = name;
         }
         String serviceType = firstNonBlank(point.serviceType(), inferServiceCategory(id));
+        serviceType = normalizeLegacyApplicationServiceType(serviceType, point.virtualService());
         String type = firstNonBlank(point.type(), inferServiceTypeIcon(id, serviceType));
+        if ("custom".equalsIgnoreCase(type) && "web".equalsIgnoreCase(serviceType)) {
+            type = "web";
+        }
         Map<String, Object> row = new LinkedHashMap<>();
         row.put("id", id);
         row.put("name", name);
@@ -1598,7 +1611,7 @@ public class ServicePortalService {
             case "service.db" -> "db";
             case "service.mq" -> "mq";
             case "service.redis" -> "cache";
-            case "service.remote" -> "custom";
+            case "service.remote" -> "remote";
             default -> "web";
         };
     }
@@ -2066,12 +2079,12 @@ public class ServicePortalService {
     }
 
     private static String resolveListServiceCategory(List<String> serviceTypes) {
-        if (serviceTypes.size() != 1) {
+        if (serviceTypes == null || serviceTypes.isEmpty()) {
             return null;
         }
-        String category = serviceTypes.get(0);
-        if ("web".equalsIgnoreCase(category) || "custom".equalsIgnoreCase(category)) {
-            return category.toLowerCase(Locale.ROOT);
+        // web / legacy custom (and any mix) all mean application services.
+        if (serviceTypes.stream().allMatch(ServicePortalService::isApplicationServiceType)) {
+            return "web";
         }
         return null;
     }
@@ -2095,9 +2108,14 @@ public class ServicePortalService {
         String serviceType = meta != null && !isBlank(meta.serviceType())
                 ? meta.serviceType()
                 : inferServiceCategory(serviceId);
+        Boolean isVirtual = meta != null && Boolean.TRUE.equals(meta.virtualService());
+        serviceType = normalizeLegacyApplicationServiceType(serviceType, isVirtual);
         String typeIcon = meta != null && !isBlank(meta.type())
                 ? meta.type()
                 : inferServiceTypeIcon(serviceId, serviceType);
+        if ("custom".equalsIgnoreCase(typeIcon) && "web".equalsIgnoreCase(serviceType)) {
+            typeIcon = "web";
+        }
         String collectedService = meta != null && !isBlank(meta.service()) ? meta.service() : serviceId;
 
         String resolvedId = meta != null && !isBlank(meta.id())
@@ -2359,6 +2377,9 @@ public class ServicePortalService {
     }
 
     private static String inferServiceCategory(String serviceId) {
+        if (serviceId != null && serviceId.regionMatches(true, 0, "[remote]", 0, 8)) {
+            return "remote";
+        }
         if (DB_PATTERN.matcher(serviceId).find()) {
             return "db";
         }
@@ -2367,9 +2388,6 @@ public class ServicePortalService {
         }
         if (CACHE_PATTERN.matcher(serviceId).find()) {
             return "cache";
-        }
-        if (REMOTE_PATTERN.matcher(serviceId).find()) {
-            return "custom";
         }
         return "web";
     }
@@ -2384,7 +2402,7 @@ public class ServicePortalService {
             return firstNonBlank(meta.serviceType(), inferServiceCategory(serviceName));
         }
         if (meta != null && !isBlank(meta.serviceType())) {
-            return meta.serviceType();
+            return normalizeLegacyApplicationServiceType(meta.serviceType(), false);
         }
         return inferServiceCategory(firstNonBlank(serviceName, serviceId));
     }
@@ -2399,8 +2417,54 @@ public class ServicePortalService {
             return true;
         }
         String resolvedId = PortalServiceIdResolver.resolve(null, serviceName);
+        MetaServicePoint meta = resolveMetaPoint(resolvedId, metaById);
+        if (meta == null) {
+            meta = resolveMetaPoint(serviceName, metaById);
+        }
+        Boolean isVirtual = meta != null
+                ? meta.virtualService()
+                : isVirtualServiceName(serviceName);
         String serviceType = resolveListServiceType(resolvedId, serviceName, metaById);
-        return serviceTypes.stream().anyMatch(type -> type.equalsIgnoreCase(serviceType));
+        return serviceTypes.stream().anyMatch(type -> serviceTypeMatches(serviceType, type, isVirtual));
+    }
+
+    /**
+     * Legacy name-keyword classification wrote non-virtual application services as {@code custom}.
+     * Legacy remote virtual peers were also stored as {@code custom}; normalize both on read.
+     */
+    private static String normalizeLegacyApplicationServiceType(String serviceType, Boolean virtualService) {
+        if ("custom".equalsIgnoreCase(serviceType)) {
+            return Boolean.TRUE.equals(virtualService) ? "remote" : "web";
+        }
+        return serviceType;
+    }
+
+    private static boolean serviceTypeMatches(String actual, String filter, Boolean virtualService) {
+        if (actual == null || filter == null) {
+            return false;
+        }
+        // Application service list must never include virtual/external peers.
+        if (isApplicationServiceType(filter) && Boolean.TRUE.equals(virtualService)) {
+            return false;
+        }
+        if (actual.equalsIgnoreCase(filter)) {
+            return true;
+        }
+        // Non-virtual legacy custom ≡ web application bucket.
+        if (!Boolean.TRUE.equals(virtualService)
+                && isApplicationServiceType(actual)
+                && isApplicationServiceType(filter)) {
+            return true;
+        }
+        // Historical remote peers stored as custom still match remote filters.
+        if ("remote".equalsIgnoreCase(filter) && "custom".equalsIgnoreCase(actual)) {
+            return true;
+        }
+        return false;
+    }
+
+    private static boolean isApplicationServiceType(String type) {
+        return "web".equalsIgnoreCase(type) || "custom".equalsIgnoreCase(type);
     }
 
     private static String inferServiceTypeIcon(String serviceId, String serviceType) {
@@ -2408,7 +2472,7 @@ public class ServicePortalService {
             case "db" -> inferDbTypeIcon(serviceId);
             case "mq" -> "kafka";
             case "cache" -> "redis";
-            case "custom" -> "custom";
+            case "remote", "custom" -> "remote";
             default -> "web";
         };
     }

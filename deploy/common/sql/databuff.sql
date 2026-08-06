@@ -1557,10 +1557,10 @@ VALUES
    '会预测', '容量预测', '',
    '["预测下service-a未来一周的请求量趋势图","预测下service-b未来一周的请求量趋势图","预测下mysql未来一周的请求量趋势图","预测下redis未来一周的请求量趋势图"]'),
   ('7',        '会答疑',   '答疑专家',         'qa',
-   '["DataBuff 怎么用一条命令部署起来？需要哪些前置依赖？","Databuff 的整体架构是什么样的？","如何配置告警？","如何修改 DataBuff 7 大 AI 能力中的推荐？"]',
+   '["对Databuff平台进行巡检，并出一份html巡检报告","Databuff 的整体架构是什么样的？","如何配置告警？","如何修改 DataBuff 7 大 AI 能力中的推荐？"]',
    1, 1, 1, NOW(), NOW(),
    '会答疑', '答疑专家', 'qa',
-   '["DataBuff 怎么用一条命令部署起来？需要哪些前置依赖？","Databuff 的整体架构是什么样的？","如何配置告警？","如何修改 DataBuff 7 大 AI 能力中的推荐？"]');
+   '["对Databuff平台进行巡检，并出一份html巡检报告","Databuff 的整体架构是什么样的？","如何配置告警？","如何修改 DataBuff 7 大 AI 能力中的推荐？"]');
 
 
 CREATE TABLE config_alarm_silence (
@@ -1586,6 +1586,37 @@ VALUES
   ('errorRateThreshold', '0.05', NOW()),
   ('minRequestCount', '10', NOW());
 
+-- Platform self-monitoring (1min flush from ingest/web). Sole tag column: dim.
+CREATE TABLE metric_platform (
+  `metric_time` DATETIME     NOT NULL COMMENT 'closed minute bucket (Asia/Shanghai)',
+  `ts`          BIGINT       NOT NULL COMMENT 'closed minute start epoch ms',
+  `component`   VARCHAR(32)  NOT NULL COMMENT 'ingest|web',
+  `instance`    VARCHAR(128) NOT NULL COMMENT 'hostname/pod; doris.* uses Doris Host',
+  `metric`      VARCHAR(128) NOT NULL COMMENT 'qualified name; dimensions encoded when possible',
+  `dim`         VARCHAR(128) NOT NULL DEFAULT "" COMMENT 'write.*: Doris table; doris.*.cpu: mode; else empty',
+  `cnt`         BIGINT SUM           COMMENT 'counter delta / timer count',
+  `val_sum`     DOUBLE SUM           COMMENT 'timer sum (ms) / bytes sum',
+  `val_max`     DOUBLE MAX,
+  `val_min`     DOUBLE MIN,
+  `val_gauge`   DOUBLE REPLACE       COMMENT 'queue depth / cpu / heap / lag',
+  INDEX idx_component (`component`) USING INVERTED COMMENT 'inverted index for tag component',
+  INDEX idx_metric (`metric`) USING INVERTED COMMENT 'inverted index for tag metric',
+  INDEX idx_instance (`instance`) USING INVERTED COMMENT 'inverted index for tag instance',
+  INDEX idx_dim (`dim`) USING INVERTED COMMENT 'inverted index for tag dim'
+) ENGINE=OLAP
+AGGREGATE KEY(`metric_time`, `ts`, `component`, `instance`, `metric`, `dim`)
+PARTITION BY RANGE(`metric_time`) ()
+DISTRIBUTED BY HASH(`component`) BUCKETS 3
+PROPERTIES (
+  "replication_num" = "1",
+  "dynamic_partition.enable" = "true",
+  "dynamic_partition.time_unit" = "DAY",
+  "dynamic_partition.start" = "-30",
+  "dynamic_partition.end" = "3",
+  "dynamic_partition.prefix" = "p",
+  "dynamic_partition.buckets" = "3"
+);
+
 CREATE TABLE schema_version (
   `id`         INT      NOT NULL COMMENT 'singleton row id',
   `version`    INT      NOT NULL COMMENT 'applied migration version',
@@ -1596,4 +1627,4 @@ DISTRIBUTED BY HASH(`id`) BUCKETS 1
 PROPERTIES ("replication_num" = "1");
 
 INSERT INTO schema_version (id, version, applied_at)
-VALUES (1, 5, NOW());
+VALUES (1, 7, NOW());

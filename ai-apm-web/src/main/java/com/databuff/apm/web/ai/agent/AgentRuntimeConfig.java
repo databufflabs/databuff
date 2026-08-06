@@ -56,6 +56,12 @@ public class AgentRuntimeConfig {
     private int maxIters = 1000;
     /** Per-request LLM HTTP timeout (OpenAI-compatible and AgentScope model calls). */
     private int llmHttpTimeoutSeconds = 300;
+    /**
+     * When true, AgentScope LLM HTTP uses HTTP/1.1 instead of the SDK default HTTP/2.
+     * Enable for local cleartext ({@code http://}) OpenAI-compatible servers that reject
+     * JDK {@code Upgrade: h2c} (typically 400 {@code Invalid HTTP request received.}).
+     */
+    private boolean llmForceHttp11;
     /** Orchestrator wait for a full expert turn (stream or sync). */
     private int expertRoundTimeoutSeconds = 1200;
 
@@ -63,10 +69,12 @@ public class AgentRuntimeConfig {
     void logReady() {
         log.info(
                 "Agent runtime ready (agentscopeEnabled={}, maxIters={}, llmHttpTimeoutSeconds={},"
-                        + " expertRoundTimeoutSeconds={}, builtinSkillsDir={}, customSkillsDir={}, workspaceDir={})",
+                        + " llmForceHttp11={}, expertRoundTimeoutSeconds={}, builtinSkillsDir={},"
+                        + " customSkillsDir={}, workspaceDir={})",
                 agentscopeEnabled,
                 maxIters,
                 llmHttpTimeoutSeconds,
+                llmForceHttp11,
                 expertRoundTimeoutSeconds,
                 builtinSkillsDir,
                 customSkillsDir,
@@ -219,6 +227,14 @@ public class AgentRuntimeConfig {
 
     public void setLlmHttpTimeoutSeconds(int llmHttpTimeoutSeconds) {
         this.llmHttpTimeoutSeconds = llmHttpTimeoutSeconds;
+    }
+
+    public boolean isLlmForceHttp11() {
+        return llmForceHttp11;
+    }
+
+    public void setLlmForceHttp11(boolean llmForceHttp11) {
+        this.llmForceHttp11 = llmForceHttp11;
     }
 
     public int getExpertRoundTimeoutSeconds() {

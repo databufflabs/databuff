@@ -17,9 +17,6 @@ public final class ServiceTypeClassifier {
     private static final Pattern CACHE_PATTERN = Pattern.compile(
             "redis|memcached|cache|ehcache|caffeine|hazelcast",
             Pattern.CASE_INSENSITIVE);
-    private static final Pattern REMOTE_PATTERN = Pattern.compile(
-            "gateway|external|third|remote|openapi|feign|dubbo",
-            Pattern.CASE_INSENSITIVE);
     private static final int MAX_CACHE_SIZE = 10_000;
     private static final Map<String, Classification> CACHE = new ConcurrentHashMap<>();
 
@@ -48,6 +45,10 @@ public final class ServiceTypeClassifier {
     }
 
     private static String inferServiceType(String serviceId) {
+        String component = bracketComponent(serviceId);
+        if (component != null && "remote".equalsIgnoreCase(component)) {
+            return "remote";
+        }
         if (DB_PATTERN.matcher(serviceId).find()) {
             return "db";
         }
@@ -57,9 +58,6 @@ public final class ServiceTypeClassifier {
         if (CACHE_PATTERN.matcher(serviceId).find()) {
             return "cache";
         }
-        if (REMOTE_PATTERN.matcher(serviceId).find()) {
-            return "custom";
-        }
         return "web";
     }
 
@@ -68,7 +66,7 @@ public final class ServiceTypeClassifier {
             case "db" -> inferDbTypeIcon(serviceId);
             case "mq" -> "kafka";
             case "cache" -> "redis";
-            case "custom" -> "custom";
+            case "remote" -> "remote";
             default -> "web";
         };
     }

@@ -12,4 +12,6 @@ apm:
     workspace-dir: ./data/ai-workspaces
     max-iters: ${APM_AGENT_MAX_ITERS:1000}
     llm-http-timeout-seconds: ${APM_AGENT_LLM_HTTP_TIMEOUT_SECONDS:300}
+    # Local http:// model APIs that reject JDK h2c Upgrade: set true (or APM_AGENT_LLM_FORCE_HTTP11=true).
+    llm-force-http11: ${APM_AGENT_LLM_FORCE_HTTP11:false}
     expert-round-timeout-seconds: ${APM_AGENT_EXPERT_ROUND_TIMEOUT_SECONDS:1200}

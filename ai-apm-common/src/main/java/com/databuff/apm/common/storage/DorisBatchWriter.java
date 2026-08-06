@@ -3,17 +3,21 @@ package com.databuff.apm.common.storage;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Set;
+import java.util.concurrent.ArrayBlockingQueue;
 import java.util.concurrent.ConcurrentHashMap;
-import java.util.concurrent.ConcurrentLinkedQueue;
 import java.util.concurrent.TimeUnit;
 
 /**
  * Batches {@link DorisJsonRow}s for Doris Stream Load with low offer-path contention.
  * <p>
- * Modeled after Ultra {@code TraceOlapSinkV2Function}: each ingest thread owns a private
- * buffer; size/time flush is a hand-off into a lock-free ready queue. Stream Load consumers
- * only drain the ready queue (and rarely rotate idle thread buffers) — they never hold a
- * global lock while HTTP is in flight.
+ * Each ingest thread owns a private buffer. When the buffer hits {@code maxBatchBytes}
+ * (default 50 MiB) or {@code flushIntervalMs} (default 30s), it hands off <em>one batch</em>
+ * into a <strong>bounded</strong> ready queue ({@link ArrayBlockingQueue}). Stream Load
+ * consumers only drain that queue — they never hold a global lock while HTTP is in flight.
+ * <p>
+ * When the ready queue is full, the handed-off batch (or a failed-load requeue) is
+ * <strong>dropped</strong> so a stalled Doris cannot grow unbounded heap. Dropped rows are
+ * reported via {@link DropListener}. Thread-local buffers are not counted in the queue cap.
  */
 public class DorisBatchWriter {
 
@@ -27,14 +31,27 @@ public class DorisBatchWriter {
     /** Default per-thread buffer age before hand-off (time fallback on the offer path). */
     public static final long DEFAULT_FLUSH_INTERVAL_MS = 30_000L;
 
+    /**
+     * Default ready-queue capacity in <em>batches</em> (not rows).
+     * Worst-case ready heap ≈ {@code maxReadyBatches × maxBatchBytes} per writer/table.
+     */
+    public static final int DEFAULT_MAX_READY_BATCHES = 16;
+
     @FunctionalInterface
     public interface ReadyListener {
         void onBatchReady();
     }
 
+    /** Invoked when a batch is dropped because the ready queue is full. */
+    @FunctionalInterface
+    public interface DropListener {
+        void onDropped(int rows);
+    }
+
     private final long maxBatchBytes;
     private final long flushIntervalNanos;
-    private final ConcurrentLinkedQueue<List<DorisJsonRow>> ready = new ConcurrentLinkedQueue<>();
+    private final int maxReadyBatches;
+    private final ArrayBlockingQueue<List<DorisJsonRow>> ready;
     private final Set<ThreadBuffer> activeBuffers = ConcurrentHashMap.newKeySet();
     private final ThreadLocal<ThreadBuffer> localBuffer = ThreadLocal.withInitial(() -> {
         ThreadBuffer buffer = new ThreadBuffer();
@@ -43,22 +60,33 @@ public class DorisBatchWriter {
     });
 
     private volatile ReadyListener readyListener;
+    private volatile DropListener dropListener;
 
     public DorisBatchWriter() {
-        this(DEFAULT_MAX_BATCH_BYTES, DEFAULT_FLUSH_INTERVAL_MS);
+        this(DEFAULT_MAX_BATCH_BYTES, DEFAULT_FLUSH_INTERVAL_MS, DEFAULT_MAX_READY_BATCHES);
     }
 
     public DorisBatchWriter(long maxBatchBytes) {
-        this(maxBatchBytes, DEFAULT_FLUSH_INTERVAL_MS);
+        this(maxBatchBytes, DEFAULT_FLUSH_INTERVAL_MS, DEFAULT_MAX_READY_BATCHES);
     }
 
     public DorisBatchWriter(long maxBatchBytes, long flushIntervalMs) {
+        this(maxBatchBytes, flushIntervalMs, DEFAULT_MAX_READY_BATCHES);
+    }
+
+    public DorisBatchWriter(long maxBatchBytes, long flushIntervalMs, int maxReadyBatches) {
         this.maxBatchBytes = Math.max(1L, maxBatchBytes);
         this.flushIntervalNanos = TimeUnit.MILLISECONDS.toNanos(Math.max(1L, flushIntervalMs));
+        this.maxReadyBatches = Math.max(1, maxReadyBatches);
+        this.ready = new ArrayBlockingQueue<>(this.maxReadyBatches);
     }
 
     public void setReadyListener(ReadyListener readyListener) {
         this.readyListener = readyListener;
+    }
+
+    public void setDropListener(DropListener dropListener) {
+        this.dropListener = dropListener;
     }
 
     public void offer(byte[] row) {
@@ -72,7 +100,7 @@ public class DorisBatchWriter {
         List<DorisJsonRow> handedOff = localBuffer.get().appendAndMaybeHandOff(
                 row, row.estimatedBytes(), maxBatchBytes, flushIntervalNanos);
         if (handedOff != null) {
-            enqueueReady(handedOff);
+            enqueueReadyOrDrop(handedOff);
         }
     }
 
@@ -88,20 +116,20 @@ public class DorisBatchWriter {
             List<DorisJsonRow> handedOff = buffer.appendAndMaybeHandOff(
                     row, row.estimatedBytes(), maxBatchBytes, flushIntervalNanos);
             if (handedOff != null) {
-                enqueueReady(handedOff);
+                enqueueReadyOrDrop(handedOff);
             }
         }
     }
 
     /**
-     * Re-queue a failed Stream Load batch onto the ready queue (not the hot thread buffer),
-     * so retries do not contend with ingest offer threads.
+     * Re-queue a failed Stream Load batch onto the ready queue (not the hot thread buffer).
+     * Drops the batch when the ready queue is full.
      */
     public void requeue(List<DorisJsonRow> batch) {
         if (batch == null || batch.isEmpty()) {
             return;
         }
-        enqueueReady(batch);
+        enqueueReadyOrDrop(batch);
     }
 
     /** Poll one handed-off batch; empty list when nothing is ready. */
@@ -117,12 +145,13 @@ public class DorisBatchWriter {
     /**
      * Time-fallback / shutdown: rotate every thread buffer into the ready queue, then drain
      * all ready batches into one list (test helper and {@link DorisStreamLoadSink#flushAll()}).
+     * Rotate may drop batches if the ready queue is already full.
      */
     public List<DorisJsonRow> flushAll() {
         rotateAll();
         List<DorisJsonRow> merged = new ArrayList<>();
         List<DorisJsonRow> batch;
-        while ((batch = ready.poll()) != null) {
+        while (!(batch = drainIfReady()).isEmpty()) {
             merged.addAll(batch);
         }
         return merged;
@@ -134,11 +163,12 @@ public class DorisBatchWriter {
             List<DorisJsonRow> handedOff = buffer.forceHandOff();
             if (handedOff != null) {
                 // Do not notify per buffer — caller drains / schedules once.
-                ready.offer(handedOff);
+                enqueueReadyOrDrop(handedOff);
             }
         }
     }
 
+    /** Rows waiting in thread buffers + ready batches (for gauges / ops). */
     public int pendingCount() {
         int count = 0;
         for (List<DorisJsonRow> batch : ready) {
@@ -150,11 +180,27 @@ public class DorisBatchWriter {
         return count;
     }
 
-    private void enqueueReady(List<DorisJsonRow> batch) {
-        ready.offer(batch);
-        ReadyListener listener = readyListener;
+    /** Ready-queue capacity in batches. */
+    public int maxReadyBatches() {
+        return maxReadyBatches;
+    }
+
+    /** Handed-off batches currently waiting for Stream Load. */
+    public int readyBatchCount() {
+        return ready.size();
+    }
+
+    private void enqueueReadyOrDrop(List<DorisJsonRow> batch) {
+        if (ready.offer(batch)) {
+            ReadyListener listener = readyListener;
+            if (listener != null) {
+                listener.onBatchReady();
+            }
+            return;
+        }
+        DropListener listener = dropListener;
         if (listener != null) {
-            listener.onBatchReady();
+            listener.onDropped(batch.size());
         }
     }
 

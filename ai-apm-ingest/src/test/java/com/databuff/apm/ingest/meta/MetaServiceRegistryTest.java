@@ -89,4 +89,22 @@ class MetaServiceRegistryTest {
         assertThat(json).contains("\"language\":\"java\"");
         assertThat(json).contains("\"technology\":\"jvm\"");
     }
+
+    @Test
+    void stagesUpdateWhenLegacyCustomIsReclassifiedToWeb() throws Exception {
+        ApmReadRepository reader = mock(ApmReadRepository.class);
+        when(reader.queryMetaServices(anyString())).thenReturn(List.of(
+                new MetaServicePoint(
+                        "gw-id", "payment-gateway", "payment-gateway", "custom", null, "custom",
+                        "custom", null, "OTLP", null, null, null, Boolean.FALSE, null, null, null, null)));
+        registry = new MetaServiceRegistry(reader, "databuff", 60_000L);
+        registry.start();
+
+        registry.remember(MetaServiceInfo.minimal("gw-id", "payment-gateway"));
+        DorisBatchWriter writer = new DorisBatchWriter();
+        assertThat(registry.stagePending(writer)).isEqualTo(1);
+        String json = new String(DorisJsonRow.toByteArray(writer.flushAll().get(0)));
+        assertThat(json).contains("\"service_type\":\"web\"");
+        assertThat(json).doesNotContain("\"service_type\":\"custom\"");
+    }
 }

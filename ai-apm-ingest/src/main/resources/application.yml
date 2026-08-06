@@ -74,6 +74,9 @@ ingest:
     # Primary flush trigger: per-thread buffer hand-off at this estimated NDJSON size (default 50 MiB).
     # Prefer large/infrequent loads over small/frequent ones (BE: "Please reduce the frequency of loading data").
     flush-batch-bytes: ${INGEST_DORIS_FLUSH_BATCH_BYTES:52428800}
+    # Bounded ready queue depth in batches. Full → drop batch (write.drop).
+    # Env: INGEST_DORIS_MAX_READY_BATCHES
+    max-ready-batches: ${INGEST_DORIS_MAX_READY_BATCHES:16}
     # Safety poll for leftover ready-queue batches (size flush is mostly async on hand-off).
     # Only sinks with hasReady() are touched; default 5s to cut idle scheduler noise.
     flush-check-interval-ms: ${INGEST_DORIS_FLUSH_CHECK_INTERVAL_MS:5000}
@@ -83,3 +86,11 @@ ingest:
     flush-timeout-ms: ${INGEST_DORIS_FLUSH_TIMEOUT_MS:60000}
     username: ${DORIS_USER:root}
     password: ${DORIS_PASSWORD:}
+
+apm:
+  platform-metrics:
+    # Master switch for ingest self-metrics (noop instruments + no pipeline sampler when false)
+    enabled: ${APM_PLATFORM_METRICS_ENABLED:true}
+    pipeline-sample-interval-ms: ${APM_PLATFORM_METRICS_PIPELINE_SAMPLE_INTERVAL_MS:10000}
+    # Second 50: before PlatformMetrics flush (~:02) so gauges stamp the closed minute
+    cluster-sample-cron: ${APM_PLATFORM_METRICS_CLUSTER_SAMPLE_CRON:50 * * * * *}

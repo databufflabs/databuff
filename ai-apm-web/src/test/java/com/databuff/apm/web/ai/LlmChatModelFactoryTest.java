@@ -55,6 +55,76 @@ class LlmChatModelFactoryTest {
     }
 
     @Test
+    void probeDoesNotSendH2cUpgradeWhenForceHttp11Enabled() throws Exception {
+        // Opt-in apm.agent.llm-force-http11: local http:// servers (uvicorn etc.) reject h2c Upgrade.
+        boolean previous = LlmChatModelFactory.isForceHttp11();
+        LlmChatModelFactory.configureForceHttp11(true);
+        java.net.ServerSocket ss = new java.net.ServerSocket();
+        ss.bind(new java.net.InetSocketAddress("127.0.0.1", 0));
+        int port = ss.getLocalPort();
+        java.util.concurrent.ExecutorService es = java.util.concurrent.Executors.newSingleThreadExecutor();
+        java.util.concurrent.Future<String> raw = es.submit(() -> {
+            try (java.net.Socket s = ss.accept()) {
+                s.setSoTimeout(5000);
+                java.io.InputStream in = s.getInputStream();
+                java.io.ByteArrayOutputStream buf = new java.io.ByteArrayOutputStream();
+                byte[] tmp = new byte[4096];
+                long deadline = System.currentTimeMillis() + 3000;
+                while (System.currentTimeMillis() < deadline) {
+                    if (in.available() > 0) {
+                        int n = in.read(tmp);
+                        if (n < 0) {
+                            break;
+                        }
+                        buf.write(tmp, 0, n);
+                        String soFar = buf.toString(java.nio.charset.StandardCharsets.ISO_8859_1);
+                        if (soFar.contains("\r\n\r\n")) {
+                            Thread.sleep(50);
+                            while (in.available() > 0) {
+                                n = in.read(tmp);
+                                if (n < 0) {
+                                    break;
+                                }
+                                buf.write(tmp, 0, n);
+                            }
+                            break;
+                        }
+                    } else {
+                        Thread.sleep(10);
+                    }
+                }
+                byte[] respBody = """
+                        {"id":"t","object":"chat.completion","choices":[{"index":0,"message":{"role":"assistant","content":"pong"},"finish_reason":"stop"}]}
+                        """.getBytes(java.nio.charset.StandardCharsets.UTF_8);
+                byte[] hdr = ("HTTP/1.1 200 OK\r\nContent-Type: application/json\r\nContent-Length: "
+                        + respBody.length + "\r\nConnection: close\r\n\r\n")
+                        .getBytes(java.nio.charset.StandardCharsets.UTF_8);
+                s.getOutputStream().write(hdr);
+                s.getOutputStream().write(respBody);
+                s.getOutputStream().flush();
+                return buf.toString(java.nio.charset.StandardCharsets.ISO_8859_1);
+            }
+        });
+        try {
+            var provider = new OpenAiCompatibleChatClient.ResolvedLlmProvider(
+                    "local",
+                    "http://127.0.0.1:" + port + "/v1",
+                    "deepseek-v4-flash",
+                    "sk-test",
+                    LlmApiTypes.OPENAI_COMPLETIONS);
+            LlmChatModelFactory.probe(provider, "deepseek-v4-flash");
+            String request = raw.get(5, java.util.concurrent.TimeUnit.SECONDS);
+            assertThat(request).contains("POST /v1/chat/completions HTTP/1.1");
+            assertThat(request).doesNotContainIgnoringCase("Upgrade: h2c");
+            assertThat(request).doesNotContainIgnoringCase("HTTP2-Settings");
+        } finally {
+            LlmChatModelFactory.configureForceHttp11(previous);
+            ss.close();
+            es.shutdownNow();
+        }
+    }
+
+    @Test
     void buildsAnthropicModelForAnthropicApiType() {
         var provider = new OpenAiCompatibleChatClient.ResolvedLlmProvider(
                 "minimax",

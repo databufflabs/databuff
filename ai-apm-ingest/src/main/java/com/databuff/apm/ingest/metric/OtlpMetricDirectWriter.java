@@ -1,5 +1,7 @@
 package com.databuff.apm.ingest.metric;
 
+import com.databuff.apm.common.platform.PlatformMetricNames;
+import com.databuff.apm.common.platform.PlatformMetrics;
 import com.databuff.apm.common.serde.MetricDorisJsonRow;
 import com.databuff.apm.common.storage.DorisTableNames;
 import com.databuff.apm.ingest.meta.MetaServiceCollector;
@@ -12,6 +14,7 @@ import java.util.Map;
 import java.util.Optional;
 import java.util.Set;
 import java.util.TreeSet;
+import java.util.concurrent.TimeUnit;
 
 /**
  * Maps OTLP metric lines and writes them directly to Doris batch writers.
@@ -35,10 +38,15 @@ public final class OtlpMetricDirectWriter {
         this(metricWriteRouter, null);
     }
 
+    /**
+     * OTLP/SW JVM 指标直写路径（不经 Metric Disruptor）。
+     * 仍记 {@code pipeline.metric.*}，否则自监控「Metric」行在常见 OTLP 场景下会一直空。
+     */
     public void write(List<OtlMetricLine> lines) {
         if (lines == null || lines.isEmpty()) {
             return;
         }
+        long startNs = System.nanoTime();
         Map<String, Map<String, Object>> jvmRows = new LinkedHashMap<>();
         Map<String, Integer> jvmPartialCounts = new LinkedHashMap<>();
         int skippedMap = 0;
@@ -83,6 +91,14 @@ public final class OtlpMetricDirectWriter {
                     metricFields);
             metricWriteRouter.offerJvmRow(MetricDorisJsonRow.ofMap(row));
         }
+        PlatformMetrics.counter(
+                        PlatformMetricNames.pipeline(
+                                PlatformMetricNames.PIPELINE_METRIC, PlatformMetricNames.KIND_REQ))
+                .add(lines.size());
+        PlatformMetrics.timer(
+                        PlatformMetricNames.pipeline(
+                                PlatformMetricNames.PIPELINE_METRIC, PlatformMetricNames.KIND_COST_MS))
+                .add(Math.max(0L, TimeUnit.NANOSECONDS.toMillis(System.nanoTime() - startNs)));
     }
 
     private static void mergeJvmRow(

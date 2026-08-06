@@ -45,7 +45,7 @@ public final class OpenSourceMenuCatalog {
         menus.add(menu(18, 1807, "错误分析", "/aiMonitor/errors", null, true, true, 8, true, true));
         menus.add(menu(0, 12, "安装部署", "/deploy", "db-icon-deploy", true, false, 9.5, false, false));
         menus.add(menu(12, 1201, "数据接入", "/deploy/access", null, true, true, 1, false, false));
-        menus.add(menu(12, 1202, "部署状态", "/deploy/status", null, true, true, 2, false, false));
+        menus.add(menu(12, 1202, "部署状态", "/deploy/status", null, true, true, 2, true, true));
         menus.add(menu(0, 1003, "配置管理", "/config/manage", "db-icon-deploy", true, false, 12, false, false));
         menus.add(menu(1003, 1020, "告警配置", "/config/alarm", null, true, true, 1, false, false));
         menus.add(menu(1003, 1035, "模型配置", "/config/llm", null, true, true, 2, false, false));

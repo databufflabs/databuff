@@ -18,8 +18,11 @@ public class StorageConfiguration {
     DorisConnectionConfig dorisConnectionConfig(
             @Value("${apm.doris.fe-host:127.0.0.1}") String feHost,
             @Value("${apm.doris.fe-query-port:9030}") int queryPort,
-            @Value("${apm.doris.fe-http-port:8030}") int httpPort) {
-        return new DorisConnectionConfig(feHost, queryPort, httpPort);
+            @Value("${apm.doris.fe-http-port:8030}") int httpPort,
+            @Value("${apm.doris.be-http-host:}") String beHttpHost,
+            @Value("${apm.doris.be-http-port:8040}") int beHttpPort) {
+        String be = (beHttpHost == null || beHttpHost.isBlank()) ? null : beHttpHost;
+        return new DorisConnectionConfig(feHost, queryPort, httpPort, be, beHttpPort);
     }
 
     @Bean

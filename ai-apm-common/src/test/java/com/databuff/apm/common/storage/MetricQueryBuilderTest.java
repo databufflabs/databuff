@@ -627,6 +627,7 @@ class MetricQueryBuilderTest {
                 "databuff", 0L, 3_600_000L, "callCnt", "desc", 0, 20,
                 null, null, null, "web");
         assertThat(sql).contains("NOT LIKE '[%%'");
+        assertThat(sql).doesNotContain("gateway");
         assertThat(sql).contains("LIMIT 20 OFFSET 0");
     }
 
@@ -639,7 +640,8 @@ class MetricQueryBuilderTest {
         assertThat(sql).contains("`service_id` IN ('" + PortalServiceIdResolver.normalize("service-a") + "')");
         assertThat(sql).doesNotContain(" AND `service` IN (");
         assertThat(sql).contains("HAVING SUM(`cnt`) = 0");
-        assertThat(sql).contains("gateway");
+        assertThat(sql).contains("NOT LIKE '[%%'");
+        assertThat(sql).doesNotContain("gateway");
     }
 
     @Test

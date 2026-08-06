@@ -11,6 +11,8 @@ import com.databuff.apm.cluster.v1.InvalidateCacheResponse;
 import com.databuff.apm.cluster.v1.ReplicateCacheRequest;
 import com.databuff.apm.cluster.v1.ReplicateCacheResponse;
 import com.databuff.apm.common.cluster.coordination.ClusterInstanceCoordinator;
+import com.databuff.apm.common.platform.PlatformMetricNames;
+import com.databuff.apm.common.platform.PlatformMetrics;
 import com.databuff.apm.ingest.component.AggregateComponent;
 import com.databuff.apm.ingest.component.TraceComponent;
 import com.databuff.apm.ingest.event.AggregateEvent;
@@ -48,6 +50,9 @@ public final class ClusterCoordinationGrpcService
     @Override
     public void forwardPartial(
             AggregationPartialRequest request, StreamObserver<AggregationPartialResponse> responseObserver) {
+        String stream = request.getStream() == null || request.getStream().isBlank()
+                ? "unknown"
+                : request.getStream();
         try {
             if (TraceComponent.TRACE_STREAM.equals(request.getStream())) {
                 for (com.google.protobuf.ByteString partial : request.getPartialsList()) {
@@ -69,9 +74,11 @@ public final class ClusterCoordinationGrpcService
                             AggregateEvent.fromBytes(partial.toByteArray()));
                 }
             }
+            PlatformMetrics.counter(PlatformMetricNames.clusterForwardIn(stream, PlatformMetricNames.KIND_REQ)).inc();
             responseObserver.onNext(AggregationPartialResponse.newBuilder().setAccepted(true).build());
             responseObserver.onCompleted();
         } catch (Exception e) {
+            PlatformMetrics.counter(PlatformMetricNames.clusterForwardIn(stream, PlatformMetricNames.KIND_FAIL)).inc();
             log.warn("ForwardPartial ingest failed from {}: {}", request.getOriginNodeId(), e.toString());
             responseObserver.onNext(AggregationPartialResponse.newBuilder().setAccepted(false).build());
             responseObserver.onCompleted();

@@ -93,7 +93,7 @@
   "DNS超时请求数": "views.npm.topology.s_84a5ae7c",
   "DataBuff APM Ingest 默认监听以下端口，请确保应用所在环境能访问对应地址：": "views.deployInstall.apm.s_6962ee60",
   "DataBuff Ingest 已支持 OTLP Logs（gRPC": "views.deployInstall.log.s_4c71150a",
-  "DataBuff 怎么用一条命令部署起来？需要哪些前置依赖？": "views.aiPlatform.chat.s_e0ed9228",
+  "对Databuff平台进行巡检，并出一份html巡检报告": "views.aiPlatform.chat.s_95f54d6f",
   "DataBuff 支持哪些语言的 SDK 接入？分别给一个最小可跑的接入示例。": "views.aiPlatform.chat.s_f6b7f663",
   "DataBuff 的 7 个 AI 能力": "views.aiPlatform.chat.s_80a7c078",
   "DataBuff 的 ai-apm-web 容器起不来，帮我 SSH 上去 docker logs 看一下，是配置问题就帮我改好。": "views.aiPlatform.chat.s_b6196a6b",

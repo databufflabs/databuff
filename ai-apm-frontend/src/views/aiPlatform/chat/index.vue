@@ -18,6 +18,7 @@
       ref="messageBox"
       :class="['chat-layout', { 'chat-layout-scroll': conversationStarted }]"
       @scroll="onMessageScroll"
+      @wheel="onMessageWheel"
     >
       <div class="chat-card">
         <div :class="['chat-main', { 'chat-main-idle': !conversationStarted }]">
@@ -716,7 +717,7 @@ const AI_CAPABILITIES: AiCapability[] = [
     theme: 'closing',
     expertId: 'qa',
     prompts: [
-      'DataBuff 怎么用一条命令部署起来？需要哪些前置依赖？',
+      '对Databuff平台进行巡检，并出一份html巡检报告',
       'Databuff 的整体架构是什么样的？',
       '如何配置告警？',
       '如何修改 DataBuff 7 大 AI 能力中的推荐？',
@@ -2262,17 +2263,46 @@ export default class AiPlatformChat extends Vue {
     if (target.closest('textarea, .el-textarea__inner, .el-select-dropdown, .el-dropdown-menu, .tool-detail-content')) {
       return
     }
+    // 转发滚轮前先记录意图，避免打字机贴底滚动把上翻意图盖掉
+    this.applyWheelStickIntent(event.deltaY)
     event.preventDefault()
     box.scrollTop += event.deltaY
+    this.syncStickToBottomFromScroll()
+  }
+
+  /** 用户滚轮上翻时立刻取消贴底，避免与打字机 12ms 强制滚动竞态 */
+  private onMessageWheel = (event: WheelEvent) => {
+    this.applyWheelStickIntent(event.deltaY)
+  }
+
+  private applyWheelStickIntent (deltaY: number) {
+    if (deltaY < 0) {
+      this.stickToBottom = false
+      this.programmaticScroll = false
+    }
   }
 
   private onMessageScroll = () => {
+    this.syncStickToBottomFromScroll()
+  }
+
+  private syncStickToBottomFromScroll () {
     const box = this.$refs.messageBox
-    if (!box || this.programmaticScroll) {
+    if (!box) {
       return
     }
     const distanceFromBottom = box.scrollHeight - box.clientHeight - box.scrollTop
-    this.stickToBottom = distanceFromBottom <= this.stickBottomThreshold
+    const nearBottom = distanceFromBottom <= this.stickBottomThreshold
+    // 程序化贴底时仍允许「已离开底部」取消跟随；否则打字机期间 programmaticScroll
+    // 几乎常亮，用户上滑事件会被吞掉并一直被拉回最新输出
+    if (this.programmaticScroll) {
+      if (!nearBottom) {
+        this.stickToBottom = false
+        this.programmaticScroll = false
+      }
+      return
+    }
+    this.stickToBottom = nearBottom
   }
 
   private withProgrammaticScroll (apply: () => void) {

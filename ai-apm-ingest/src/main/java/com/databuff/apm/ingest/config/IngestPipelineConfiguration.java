@@ -89,22 +89,25 @@ public class IngestPipelineConfiguration {
     @Bean
     DorisBatchWriter traceBatchWriter(
             @Value("${ingest.doris.flush-batch-bytes:52428800}") long flushBatchBytes,
-            @Value("${ingest.doris.flush-interval-ms:30000}") long flushIntervalMs) {
-        return new DorisBatchWriter(flushBatchBytes, flushIntervalMs);
+            @Value("${ingest.doris.flush-interval-ms:30000}") long flushIntervalMs,
+            @Value("${ingest.doris.max-ready-batches:16}") int maxReadyBatches) {
+        return new DorisBatchWriter(flushBatchBytes, flushIntervalMs, maxReadyBatches);
     }
 
     @Bean
     DorisBatchWriter logBatchWriter(
             @Value("${ingest.doris.flush-batch-bytes:52428800}") long flushBatchBytes,
-            @Value("${ingest.doris.flush-interval-ms:30000}") long flushIntervalMs) {
-        return new DorisBatchWriter(flushBatchBytes, flushIntervalMs);
+            @Value("${ingest.doris.flush-interval-ms:30000}") long flushIntervalMs,
+            @Value("${ingest.doris.max-ready-batches:16}") int maxReadyBatches) {
+        return new DorisBatchWriter(flushBatchBytes, flushIntervalMs, maxReadyBatches);
     }
 
     @Bean
     DorisBatchWriter metaServiceBatchWriter(
             @Value("${ingest.doris.flush-batch-bytes:52428800}") long flushBatchBytes,
-            @Value("${ingest.doris.flush-interval-ms:30000}") long flushIntervalMs) {
-        return new DorisBatchWriter(flushBatchBytes, flushIntervalMs);
+            @Value("${ingest.doris.flush-interval-ms:30000}") long flushIntervalMs,
+            @Value("${ingest.doris.max-ready-batches:16}") int maxReadyBatches) {
+        return new DorisBatchWriter(flushBatchBytes, flushIntervalMs, maxReadyBatches);
     }
 
     @Bean
@@ -205,9 +208,10 @@ public class IngestPipelineConfiguration {
             @Value("${ingest.doris.metric-database:databuff}") String database,
             @Value("${ingest.doris.stream-load-max-failures:3}") int streamLoadMaxFailures,
             @Value("${ingest.doris.flush-batch-bytes:52428800}") long flushBatchBytes,
-            @Value("${ingest.doris.flush-interval-ms:30000}") long flushIntervalMs) {
+            @Value("${ingest.doris.flush-interval-ms:30000}") long flushIntervalMs,
+            @Value("${ingest.doris.max-ready-batches:16}") int maxReadyBatches) {
         return MetricTableWriterRegistry.create(
-                loader, database, streamLoadMaxFailures, flushBatchBytes, flushIntervalMs);
+                loader, database, streamLoadMaxFailures, flushBatchBytes, flushIntervalMs, maxReadyBatches);
     }
 
     @Bean

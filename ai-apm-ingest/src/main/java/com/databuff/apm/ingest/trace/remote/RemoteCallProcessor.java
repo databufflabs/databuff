@@ -162,7 +162,7 @@ public final class RemoteCallProcessor {
                 serviceId,
                 named.service(),
                 named.serviceInstance(),
-                "custom",
+                "remote",
                 type.toLowerCase(),
                 peerHostname,
                 extractPort(meta));

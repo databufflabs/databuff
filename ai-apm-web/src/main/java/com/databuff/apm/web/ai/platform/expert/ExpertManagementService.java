@@ -183,6 +183,8 @@ public class ExpertManagementService {
                     || systemPrompt.contains("不要硬查源码凑答案")
                     || systemPrompt.contains("不负责查 APM 指标/Trace/告警")
                     || systemPrompt.contains("**不**查 APM 指标")
+                    || (systemPrompt.startsWith("你是 DataBuff 产品答疑专家")
+                    && !systemPrompt.contains("querySelfMonitorMetrics"))
                     || (missingMermaidHint && systemPrompt.startsWith("你是 DataBuff 产品答疑专家"));
             default -> false;
         };

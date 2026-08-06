@@ -194,9 +194,11 @@ public final class DorisStreamLoader {
             List<? extends DorisJsonRow> rows,
             DorisStreamLoadProfile profile,
             Duration timeout) throws IOException {
-        // Supplier creates a fresh stream per subscribe (HttpClient may retry).
-        HttpRequest.BodyPublisher body = HttpRequest.BodyPublishers.ofInputStream(
-                () -> new NdjsonRowsInputStream(rows));
+        // Materialize NDJSON so the request has Content-Length.
+        // Chunked ofInputStream fails on Doris FE/BE ("There is no 100-continue header").
+        // Do NOT set Expect:100-continue — java.net.http.HttpClient rejects it as a
+        // restricted header (IllegalArgumentException). Content-Length alone is enough.
+        byte[] payload = materializeNdjson(rows);
         HttpRequest.Builder builder = HttpRequest.newBuilder()
                 .uri(URI.create(url))
                 .timeout(timeout)
@@ -204,20 +206,29 @@ public final class DorisStreamLoader {
                 .header("label", label)
                 .header("format", "json")
                 .header("read_json_by_line", "true")
-                .PUT(body);
+                .PUT(HttpRequest.BodyPublishers.ofByteArray(payload));
         if (profile != null) {
             for (Map.Entry<String, String> header : profile.headers().entrySet()) {
                 builder.header(header.getKey(), header.getValue());
             }
         }
-        // Chunked streaming body + Expect: 100-continue breaks on FE 307 with JDK HttpClient.
-        // Direct-BE path already skips expectContinue; keep FE redirects on a plain PUT.
         try {
             return httpClient.send(builder.build(), HttpResponse.BodyHandlers.ofString());
         } catch (InterruptedException e) {
             Thread.currentThread().interrupt();
             throw new IOException("Stream load interrupted", e);
         }
+    }
+
+    private static byte[] materializeNdjson(List<? extends DorisJsonRow> rows) throws IOException {
+        java.io.ByteArrayOutputStream out = new java.io.ByteArrayOutputStream(Math.max(256, rows.size() * 64));
+        for (int i = 0; i < rows.size(); i++) {
+            if (i > 0) {
+                out.write('\n');
+            }
+            rows.get(i).writeTo(out);
+        }
+        return out.toByteArray();
     }
 
     String rewriteRedirectLocation(String location) {

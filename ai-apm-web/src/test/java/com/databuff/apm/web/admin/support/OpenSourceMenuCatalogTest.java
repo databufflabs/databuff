@@ -111,4 +111,19 @@ class OpenSourceMenuCatalogTest {
                 "/config/llm",
                 "/config/login");
     }
+
+    @Test
+    void deployStatusHasTimeAndRefresh() {
+        List<Map<String, Object>> menus = OpenSourceMenuCatalog.menus();
+        Map<String, Object> status = menus.stream()
+                .filter(m -> "/deploy/status".equals(m.get("path")))
+                .findFirst()
+                .orElseThrow();
+        assertThat(status)
+                .containsEntry("name", "部署状态")
+                .containsEntry("time", true)
+                .containsEntry("refresh", true);
+        assertThat(menus.stream().noneMatch(m -> String.valueOf(m.get("path")).startsWith("/selfMonitor")))
+                .isTrue();
+    }
 }

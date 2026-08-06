@@ -116,8 +116,9 @@ public final class VirtualServiceExtractor {
 
     private static boolean isRemoteVirtual(
             VirtualServiceResolver.ResolvedVirtualService resolved, DcSpan span) {
-        return "custom".equals(resolved.serviceType())
-                && (DcSpanUtil.isHttpSpan(span) || DcSpanUtil.isRpcSpan(span));
+        String serviceType = resolved.serviceType();
+        boolean remoteType = "remote".equals(serviceType) || "custom".equals(serviceType);
+        return remoteType && (DcSpanUtil.isHttpSpan(span) || DcSpanUtil.isRpcSpan(span));
     }
 
     private static void markRemote(DcSpan span) {

@@ -826,7 +826,6 @@ const npm: OptionalPropMenu[] = [
   },
 ];
 
-
 // 安装部署 12
 const deployInstall: OptionalPropMenu[] = [
   {
@@ -858,6 +857,8 @@ const deployInstall: OptionalPropMenu[] = [
     isMenu: true,
     leaf: true,
     order: 2,
+    time: true,
+    refresh: true,
   },
 ];
 

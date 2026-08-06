@@ -27,7 +27,8 @@ public final class MetricTableWriterRegistry {
                 database,
                 DorisStreamLoadSink.DEFAULT_MAX_CONSECUTIVE_FAILURES,
                 DorisBatchWriter.DEFAULT_MAX_BATCH_BYTES,
-                DorisBatchWriter.DEFAULT_FLUSH_INTERVAL_MS);
+                DorisBatchWriter.DEFAULT_FLUSH_INTERVAL_MS,
+                DorisBatchWriter.DEFAULT_MAX_READY_BATCHES);
     }
 
     public static MetricTableWriterRegistry create(
@@ -36,10 +37,26 @@ public final class MetricTableWriterRegistry {
             int streamLoadMaxFailures,
             long flushBatchBytes,
             long flushIntervalMs) {
+        return create(
+                loader,
+                database,
+                streamLoadMaxFailures,
+                flushBatchBytes,
+                flushIntervalMs,
+                DorisBatchWriter.DEFAULT_MAX_READY_BATCHES);
+    }
+
+    public static MetricTableWriterRegistry create(
+            DorisStreamLoader loader,
+            String database,
+            int streamLoadMaxFailures,
+            long flushBatchBytes,
+            long flushIntervalMs,
+            int maxReadyBatches) {
         Map<String, DorisBatchWriter> writers = new LinkedHashMap<>();
         List<DorisStreamLoadSink> sinkList = new ArrayList<>();
         for (String table : MetricSchemaRegistry.allTableNames()) {
-            DorisBatchWriter writer = new DorisBatchWriter(flushBatchBytes, flushIntervalMs);
+            DorisBatchWriter writer = new DorisBatchWriter(flushBatchBytes, flushIntervalMs, maxReadyBatches);
             writers.put(table, writer);
             sinkList.add(new DorisStreamLoadSink(writer, loader, database, table, streamLoadMaxFailures));
         }

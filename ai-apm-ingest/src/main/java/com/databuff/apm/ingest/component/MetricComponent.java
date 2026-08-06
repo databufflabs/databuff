@@ -1,5 +1,6 @@
 package com.databuff.apm.ingest.component;
 
+import com.databuff.apm.common.platform.PlatformMetricNames;
 import com.databuff.apm.ingest.event.MetricEvent;
 import com.databuff.apm.ingest.metric.OtlpMetricDirectWriter;
 import com.databuff.apm.ingest.pipeline.component.AbstractComponent;
@@ -49,7 +50,7 @@ public final class MetricComponent extends AbstractComponent<MetricComponent.Met
     final class MetricTask extends AsyncTask {
 
         MetricTask(int taskIndex) {
-            super(bufferSize, taskIndex);
+            super(bufferSize, taskIndex, PlatformMetricNames.PIPELINE_METRIC);
         }
 
         @Override

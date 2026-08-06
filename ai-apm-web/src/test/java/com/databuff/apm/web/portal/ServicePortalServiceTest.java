@@ -2437,4 +2437,134 @@ class ServicePortalServiceTest {
     assertThat(rows).isEmpty();
     verify(reader, never()).queryDistinctTags(anyString());
   }
+
+  @Test
+  void basicServicesWebFilterIncludesLegacyNonVirtualCustom() throws Exception {
+    ApmReadRepository reader = mock(ApmReadRepository.class);
+    when(reader.queryMetaServices(anyString())).thenReturn(List.of(
+            new MetaServicePoint(
+                    "gw-id", "payment-gateway", "payment-gateway", "custom", null, "custom",
+                    null, null, "OTLP", null, null, null, Boolean.FALSE, null, null, null, null),
+            new MetaServicePoint(
+                    "remote-id", "[remote]ext-api", "[remote]ext-api", "custom", null, "http",
+                    null, null, "OTLP", null, null, null, Boolean.TRUE, null, null, null, null)));
+
+    ServicePortalService service = TestStorageSupport.servicePortalService(reader);
+    List<Map<String, Object>> rows = service.basicServices(Map.of(
+            "ignoreTime", 1,
+            "serviceTypes", List.of("web")));
+
+    assertThat(rows).extracting(row -> row.get("id")).containsExactly("gw-id");
+    assertThat(rows.get(0).get("service_type")).isEqualTo("web");
+  }
+
+  @Test
+  void basicServicesWebFilterExcludesRemoteVirtualEvenWhenTypedCustom() throws Exception {
+    ApmReadRepository reader = mock(ApmReadRepository.class);
+    when(reader.queryMetaServices(anyString())).thenReturn(List.of(
+            new MetaServicePoint(
+                    "remote-id", "[remote]api.example.com:443", "[remote]api.example.com:443", "custom",
+                    null, "http", null, null, "OTLP", null, null, null, Boolean.TRUE, null, null, null, null)));
+
+    ServicePortalService service = TestStorageSupport.servicePortalService(reader);
+    List<Map<String, Object>> rows = service.basicServices(Map.of(
+            "ignoreTime", 1,
+            "serviceTypes", List.of("web")));
+
+    assertThat(rows).isEmpty();
+  }
+
+  @Test
+  void basicServicesRemoteFilterIncludesLegacyCustomVirtual() throws Exception {
+    ApmReadRepository reader = mock(ApmReadRepository.class);
+    when(reader.queryMetaServices(anyString())).thenReturn(List.of(
+            new MetaServicePoint(
+                    "remote-id", "[remote]api.example.com:443", "[remote]api.example.com:443", "custom",
+                    null, "http", null, null, "OTLP", null, null, null, Boolean.TRUE, null, null, null, null)));
+
+    ServicePortalService service = TestStorageSupport.servicePortalService(reader);
+    List<Map<String, Object>> rows = service.basicServices(Map.of(
+            "ignoreTime", 1,
+            "serviceType", "remote",
+            "virtualService", 1));
+
+    assertThat(rows).hasSize(1);
+    assertThat(rows.get(0).get("service_type")).isEqualTo("remote");
+  }
+
+  @Test
+  void listWithWebStillExcludesBracketVirtualServices() throws Exception {
+    ApmReadRepository reader = mock(ApmReadRepository.class);
+    when(reader.queryServiceSummaries(anyString())).thenAnswer(invocation -> {
+      String sql = invocation.getArgument(0);
+      if (sql.contains("NOT LIKE '[%%'")) {
+        return List.of(new ServiceSummaryPoint("payment-gateway", null, 100, 5, 1_000_000_000, 0));
+      }
+      return List.of(
+              new ServiceSummaryPoint("payment-gateway", null, 100, 5, 1_000_000_000, 0),
+              new ServiceSummaryPoint("[mysql]demo_apm", "c72cc83a8831e407", 50, 0, 500_000_000, 0));
+    });
+    when(reader.queryDistinctCount(anyString())).thenAnswer(invocation -> {
+      String sql = invocation.getArgument(0);
+      return sql.contains("NOT LIKE '[%%'") ? 1L : 2L;
+    });
+    when(reader.queryMetaServices(anyString())).thenReturn(List.of(
+            new MetaServicePoint(
+                    "gw-id", "payment-gateway", "payment-gateway", "custom", null, "custom",
+                    null, null, "OTLP", null, null, null, Boolean.FALSE, null, null, null, null)));
+
+    ServicePortalService service = TestStorageSupport.servicePortalService(reader);
+    Map<String, Object> resp = service.list(Map.of(
+            "fromTime", "2026-06-05 23:17:00",
+            "toTime", "2026-06-05 23:32:00",
+            "offset", 0,
+            "size", 50,
+            "serviceTypes", List.of("web")));
+
+    @SuppressWarnings("unchecked")
+    List<Map<String, Object>> rows = (List<Map<String, Object>>) resp.get("data");
+    assertThat(rows).hasSize(1);
+    assertThat(rows.get(0).get("service")).isEqualTo("payment-gateway");
+    assertThat(resp.get("total")).isEqualTo(1L);
+  }
+
+  @Test
+  void serviceInfoNormalizesLegacyNonVirtualCustomToWeb() throws Exception {
+    ApmReadRepository reader = mock(ApmReadRepository.class);
+    when(reader.queryMetaServices(anyString())).thenReturn(List.of(
+            new MetaServicePoint(
+                    "gw-id", "payment-gateway", "payment-gateway", "custom", null, "custom",
+                    null, null, "OTLP", null, null, null, Boolean.FALSE, null, null, null, null)));
+    when(reader.queryServiceSummaries(anyString())).thenReturn(List.of());
+    when(reader.queryTopGroups(anyString())).thenReturn(List.of());
+
+    ServicePortalService service = TestStorageSupport.servicePortalService(reader);
+    Map<String, Object> info = service.serviceInfo(Map.of(
+            "serviceId", "gw-id",
+            "fromTime", "2026-06-04 11:00:00",
+            "toTime", "2026-06-04 12:00:00"));
+
+    assertThat(info.get("service_type")).isEqualTo("web");
+    assertThat(info.get("type")).isEqualTo("web");
+  }
+
+  @Test
+  void serviceInfoNormalizesLegacyVirtualCustomToRemote() throws Exception {
+    ApmReadRepository reader = mock(ApmReadRepository.class);
+    when(reader.queryMetaServices(anyString())).thenReturn(List.of(
+            new MetaServicePoint(
+                    "remote-id", "[remote]api.example.com:443", "[remote]api.example.com:443", "custom",
+                    null, "http", null, null, "OTLP", null, null, null, Boolean.TRUE, null, null, null, null)));
+    when(reader.queryServiceSummaries(anyString())).thenReturn(List.of());
+    when(reader.queryTopGroups(anyString())).thenReturn(List.of());
+
+    ServicePortalService service = TestStorageSupport.servicePortalService(reader);
+    Map<String, Object> info = service.serviceInfo(Map.of(
+            "serviceId", "remote-id",
+            "fromTime", "2026-06-04 11:00:00",
+            "toTime", "2026-06-04 12:00:00"));
+
+    assertThat(info.get("service_type")).isEqualTo("remote");
+    assertThat(info.get("virtual_service")).isEqualTo(true);
+  }
 }
