@@ -114,6 +114,47 @@ class SpanResourceIgnoreFilterTest {
         assertThat(filter.isEmpty()).isFalse();
     }
 
+    @Test
+    void allBlankConfigEntriesProduceEmptyFilter() {
+        SpanResourceIgnoreFilter filter = new SpanResourceIgnoreFilter(
+                List.of("", "  "), List.of("", " "));
+
+        assertThat(filter.isEmpty()).isTrue();
+        assertThat(filter.shouldIgnore(span("/anything"))).isFalse();
+    }
+
+    @Test
+    void nullCollectionsProduceEmptyFilter() {
+        SpanResourceIgnoreFilter filter = new SpanResourceIgnoreFilter(null, null);
+
+        assertThat(filter.isEmpty()).isTrue();
+        assertThat(filter.shouldIgnore(span("/anything"))).isFalse();
+    }
+
+    @Test
+    void exposesDescriptiveStringAndEqualitySemantics() {
+        SpanResourceIgnoreFilter filter = new SpanResourceIgnoreFilter(
+                List.of("/x"), List.of("^/y$"));
+        SpanResourceIgnoreFilter same = new SpanResourceIgnoreFilter(
+                List.of("/x"), List.of("^/y$"));
+        SpanResourceIgnoreFilter differentRegex = new SpanResourceIgnoreFilter(
+                List.of("/x"), List.of("^/z$"));
+        SpanResourceIgnoreFilter differentRegexCount = new SpanResourceIgnoreFilter(
+                List.of("/x"), List.of("^/y$", "^/z$"));
+        SpanResourceIgnoreFilter differentExact = new SpanResourceIgnoreFilter(
+                List.of("/w"), List.of("^/y$"));
+
+        assertThat(filter).isEqualTo(filter);
+        assertThat(filter).isEqualTo(same);
+        assertThat(filter).isNotEqualTo(differentRegex);
+        assertThat(filter).isNotEqualTo(differentRegexCount);
+        assertThat(filter).isNotEqualTo(differentExact);
+        assertThat(filter).isNotEqualTo("not-a-filter");
+        assertThat(filter).isNotEqualTo(null);
+        assertThat(filter).hasSameHashCodeAs(same);
+        assertThat(filter.toString()).contains("exact=1").contains("regex=1");
+    }
+
     private static DcSpan span(String resource) {
         DcSpan span = new DcSpan();
         span.resource = resource;

@@ -1,10 +1,13 @@
 package com.databuff.apm.ingest.component;
 
 import com.databuff.apm.common.cluster.aggregate.ClusterAggregator;
+import com.databuff.apm.common.cluster.aggregate.ClusterPartialForwarder;
 import com.databuff.apm.common.cluster.aggregate.RecordingClusterPartialForwarder;
 import com.databuff.apm.ingest.event.AggregateEvent;
 import com.databuff.apm.ingest.event.MetricEvent;
+import com.databuff.apm.ingest.meta.MetaServiceCollector;
 import com.databuff.apm.ingest.metric.MetricWriteRouter;
+import com.databuff.apm.ingest.otel.OtlMetricLine;
 import com.databuff.apm.ingest.support.IngestTestComponents;
 import com.databuff.apm.ingest.support.TestClusterMembership;
 import com.databuff.apm.common.metric.TraceMetricMinuteBucket;
@@ -19,6 +22,11 @@ import java.util.List;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.awaitility.Awaitility.await;
+import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.Mockito.doThrow;
+import static org.mockito.Mockito.mock;
+import static org.mockito.Mockito.verify;
+import static org.mockito.Mockito.when;
 
 class AggregateComponentTest {
 
@@ -161,6 +169,105 @@ class AggregateComponentTest {
 
         component.flushPendingMetrics();
         assertThat(writer.pendingCount()).isEqualTo(1);
+    }
+
+    @Test
+    void fourArgConstructorWithBatchWriterAndForwarder() {
+        DorisBatchWriter writer = new DorisBatchWriter();
+        RecordingClusterPartialForwarder forwarder = new RecordingClusterPartialForwarder();
+        component = new AggregateComponent(
+                new ClusterAggregator("n1"),
+                TestClusterMembership.standalone("n1"),
+                writer,
+                forwarder);
+        assertThat(component.processedCount()).isZero();
+    }
+
+    @Test
+    void flushPendingMetricsBeforeStartIsSafe() {
+        component = IngestTestComponents.aggregate(new DorisBatchWriter());
+        component.flushPendingMetrics();
+    }
+
+    @Test
+    void acceptExtractedMetricsIgnoresNullAndEmpty() {
+        DorisBatchWriter writer = new DorisBatchWriter();
+        component = IngestTestComponents.aggregate(writer);
+        component.acceptExtractedMetrics("svc", null);
+        component.acceptExtractedMetrics("svc", List.of());
+        assertThat(component.processedCount()).isZero();
+        assertThat(writer.pendingCount()).isZero();
+    }
+
+    @Test
+    void acceptExtractedMetricsRoutesNonMinuteMetricToRouter() {
+        DorisBatchWriter writer = new DorisBatchWriter();
+        component = IngestTestComponents.aggregate(writer);
+        OptimizedMetric instance = sampleMetric(5).withMeasurement("service.instance");
+        component.acceptExtractedMetrics("svc", List.of(instance));
+        assertThat(writer.pendingCount()).isEqualTo(1);
+    }
+
+    @Test
+    void acceptExtractedMetricsCatchesRouterFailures() {
+        MetricWriteRouter router = mock(MetricWriteRouter.class);
+        doThrow(new RuntimeException("boom")).when(router).offer(any());
+        component = new AggregateComponent(
+                new ClusterAggregator("n1"),
+                TestClusterMembership.standalone("n1"),
+                router);
+        component.acceptExtractedMetrics("svc", List.of(sampleMetric(6).withMeasurement("service.instance")));
+        assertThat(component.processedCount()).isZero();
+    }
+
+    @Test
+    void acceptForwardedTraceMinutePartialIncrementsProcessed() {
+        DorisBatchWriter writer = new DorisBatchWriter();
+        component = IngestTestComponents.aggregate(writer);
+        byte[] partial = OptimizedMetricUtil.serialize(sampleMetric(7));
+        component.acceptForwardedTraceMinutePartial("svc", 1_700_000_000_000L, 1_700_000_060_000L, partial);
+        assertThat(component.processedCount()).isEqualTo(1);
+    }
+
+    @Test
+    void acceptFromTraceDelegatesToExtractedMetrics() {
+        DorisBatchWriter writer = new DorisBatchWriter();
+        component = IngestTestComponents.aggregate(writer);
+        component.acceptFromTrace("svc", List.of(sampleMetric(8)));
+        assertThat(component.processedCount()).isEqualTo(1);
+    }
+
+    @Test
+    void acceptFromMetricWithOtlpLineRemembersViaMetaCollector() {
+        DorisBatchWriter writer = new DorisBatchWriter();
+        MetaServiceCollector metaServiceCollector = mock(MetaServiceCollector.class);
+        component = new AggregateComponent(
+                new ClusterAggregator("n1"),
+                TestClusterMembership.standalone("n1"),
+                MetricWriteRouter.singleTable(writer),
+                ClusterPartialForwarder.NOOP,
+                metaServiceCollector);
+        component.start(1);
+        OtlMetricLine line = new OtlMetricLine(1_700_000_000_000L, "svc-id", "svc", "jvm.thread_count", 5,
+                "inst", "host", null, null, null, null, null, null);
+
+        component.acceptFromMetric("svc", MetricEvent.fromOtlp(line));
+
+        verify(metaServiceCollector).remember(line);
+        await().atMost(Duration.ofSeconds(2)).untilAsserted(() ->
+                assertThat(component.processedCount()).isEqualTo(1));
+    }
+
+    @Test
+    void acceptFromMetricWithOptimizedMetricUsesPipeline() {
+        DorisBatchWriter writer = new DorisBatchWriter();
+        component = IngestTestComponents.aggregate(writer);
+        component.start(1);
+
+        component.acceptFromMetric("svc", MetricEvent.fromOptimized(sampleMetric(9)));
+
+        await().atMost(Duration.ofSeconds(2)).untilAsserted(() ->
+                assertThat(component.processedCount()).isEqualTo(1));
     }
 
     private static OptimizedMetric sampleMetric(int tsId) {

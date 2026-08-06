@@ -1,14 +1,17 @@
 package com.databuff.apm.ingest.component;
 
 import com.databuff.apm.common.model.DcSpan;
+import com.databuff.apm.common.cluster.aggregate.ClusterPartialForwarder;
 import com.databuff.apm.common.cluster.cache.CacheRegionPolicy;
 import com.databuff.apm.common.cluster.cache.ClusterCacheRegistry;
+import com.databuff.apm.common.serde.DCSpanJsonEncoder;
 import com.databuff.apm.ingest.event.MetricEvent;
 import com.databuff.apm.ingest.event.TraceEvent;
 import com.databuff.apm.ingest.meta.IngestMetaCache;
 import com.databuff.apm.ingest.meta.MetaServiceRegistry;
 import com.databuff.apm.ingest.otel.OtlMetricLine;
 import com.databuff.apm.ingest.support.IngestTestComponents;
+import com.databuff.apm.ingest.support.TestClusterMembership;
 import com.databuff.apm.ingest.trace.SpanResourceIgnoreFilter;
 import com.databuff.apm.common.storage.ApmReadRepository;
 import com.databuff.apm.common.storage.DorisBatchWriter;
@@ -20,6 +23,7 @@ import java.util.List;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.awaitility.Awaitility.await;
+import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.anyString;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.when;
@@ -185,6 +189,88 @@ class TraceComponentTest {
         traceComponent.close();
         await().atMost(Duration.ofSeconds(2)).untilAsserted(() ->
                 assertThat(traceWriter.pendingCount()).isEqualTo(1));
+    }
+
+    @Test
+    void allConstructorOverloadsWireDependencies() {
+        aggregateComponent = IngestTestComponents.aggregate(new DorisBatchWriter());
+        ClusterPartialForwarder forwarder = ClusterPartialForwarder.NOOP;
+
+        TraceComponent eleven = new TraceComponent(
+                aggregateComponent, new DorisBatchWriter(), null, null, null, null, null,
+                TestClusterMembership.standalone("n1"), forwarder, null, 2_000L);
+        TraceComponent twelve = new TraceComponent(
+                aggregateComponent, new DorisBatchWriter(), null, null, null, null, null,
+                TestClusterMembership.standalone("n1"), forwarder, null, 2_000L, 64);
+        TraceComponent thirteen = new TraceComponent(
+                aggregateComponent, new DorisBatchWriter(), null, null, null, null, null,
+                TestClusterMembership.standalone("n1"), forwarder, null,
+                (SpanResourceIgnoreFilter) null, 2_000L, 64);
+
+        assertThat(eleven).isNotNull();
+        assertThat(twelve).isNotNull();
+        assertThat(thirteen).isNotNull();
+    }
+
+    @Test
+    void pendingAssemblyTracesIsZeroWithoutPoolAndAfterStart() {
+        aggregateComponent = IngestTestComponents.aggregate(new DorisBatchWriter());
+        traceComponent = IngestTestComponents.trace(aggregateComponent, new DorisBatchWriter());
+
+        assertThat(traceComponent.pendingAssemblyTraces()).isZero();
+        traceComponent.start(1);
+        assertThat(traceComponent.pendingAssemblyTraces()).isZero();
+    }
+
+    @Test
+    void acceptForwardedSpanDecodesAndEmits() throws Exception {
+        aggregateComponent = IngestTestComponents.aggregate(new DorisBatchWriter());
+        traceComponent = IngestTestComponents.trace(aggregateComponent, new DorisBatchWriter());
+        traceComponent.start(1);
+
+        DcSpan span = sampleSpan("trace-fwd", "sfwd", "/api/fwd");
+        byte[] encoded = DCSpanJsonEncoder.encode(span);
+
+        assertThat(traceComponent.acceptForwardedSpan("trace-fwd", encoded)).isTrue();
+        await().atMost(Duration.ofSeconds(2)).untilAsserted(() ->
+                assertThat(traceComponent.receivedCount()).isEqualTo(1));
+    }
+
+    @Test
+    void acceptForwardedSpanRejectsCorruptBytes() {
+        aggregateComponent = IngestTestComponents.aggregate(new DorisBatchWriter());
+        traceComponent = IngestTestComponents.trace(aggregateComponent, new DorisBatchWriter());
+
+        assertThat(traceComponent.acceptForwardedSpan("abcdefghijklmnopqrstuvwxyz", new byte[] {1, 2, 3}))
+                .isFalse();
+        assertThat(traceComponent.acceptForwardedSpan("short", new byte[] {1, 2, 3})).isFalse();
+    }
+
+    @Test
+    void taskFailuresAreCountedAndLoggedWithoutCrashing() {
+        SpanResourceIgnoreFilter throwingFilter = mock(SpanResourceIgnoreFilter.class);
+        when(throwingFilter.shouldIgnore(any())).thenThrow(new RuntimeException("boom"));
+        aggregateComponent = IngestTestComponents.aggregate(new DorisBatchWriter());
+        traceComponent = new TraceComponent(
+                aggregateComponent,
+                new DorisBatchWriter(),
+                null,
+                null,
+                null,
+                null,
+                null,
+                TestClusterMembership.standalone("n1"),
+                ClusterPartialForwarder.NOOP,
+                null,
+                throwingFilter,
+                2_000L,
+                16);
+        traceComponent.start(1);
+
+        assertThat(traceComponent.emit("k", new TraceEvent(sampleSpan("trace-fail", "sfail", "/x")))).isTrue();
+
+        await().atMost(Duration.ofSeconds(2)).untilAsserted(() ->
+                assertThat(traceComponent.receivedCount()).isEqualTo(1));
     }
 
     private static DcSpan sampleSpan(String traceId, String spanId, String resource) {

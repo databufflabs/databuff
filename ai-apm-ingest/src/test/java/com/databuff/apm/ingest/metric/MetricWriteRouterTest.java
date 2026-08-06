@@ -11,6 +11,7 @@ import org.junit.jupiter.api.Test;
 import java.util.Map;
 
 import static org.assertj.core.api.Assertions.assertThat;
+import static org.assertj.core.api.Assertions.assertThatThrownBy;
 
 class MetricWriteRouterTest {
 
@@ -84,5 +85,44 @@ class MetricWriteRouterTest {
         MetricWriteRouter router = MetricWriteRouter.singleTable(service);
         router.offer(new OptimizedMetric().withMeasurement("custom.metric").withFieldValues(1).initTsId());
         assertThat(service.pendingCount()).isEqualTo(1);
+    }
+
+    @Test
+    void offerRejectsNullMetric() {
+        MetricWriteRouter router = MetricWriteRouter.singleTable(new DorisBatchWriter());
+        assertThatThrownBy(() -> router.offer(null)).isInstanceOf(NullPointerException.class);
+    }
+
+    @Test
+    void offerOtlpSkipsUnmappedLines() {
+        DorisBatchWriter service = new DorisBatchWriter();
+        MetricWriteRouter router = MetricWriteRouter.singleTable(service);
+        router.offerOtlp(new OtlMetricLine(1_700_000_000_000L, "svc", "svc", "", 1,
+                null, null, null, null, null, null, null, null));
+        assertThat(service.pendingCount()).isZero();
+    }
+
+    @Test
+    void offerRawFallsBackToDefaultWriterWhenUnmapped() {
+        DorisBatchWriter service = new DorisBatchWriter();
+        MetricWriteRouter router = MetricWriteRouter.singleTable(service);
+        router.offerRaw("{}".getBytes());
+        assertThat(service.pendingCount()).isEqualTo(1);
+    }
+
+    @Test
+    void offerJvmRowRoutesToJvmWriter() {
+        DorisBatchWriter jvm = new DorisBatchWriter();
+        MetricWriteRouter router = new MetricWriteRouter(Map.of(DorisTableNames.METRIC_JVM, jvm));
+        router.offerJvmRow(DorisJsonRow.ofBytes("{\"service\":\"demo\"}".getBytes()));
+        assertThat(jvm.pendingCount()).isEqualTo(1);
+    }
+
+    @Test
+    void offerJvmRowIsNoopWithoutJvmWriter() {
+        DorisBatchWriter service = new DorisBatchWriter();
+        MetricWriteRouter router = MetricWriteRouter.singleTable(service);
+        router.offerJvmRow(DorisJsonRow.ofBytes("{\"service\":\"demo\"}".getBytes()));
+        assertThat(service.pendingCount()).isZero();
     }
 }
