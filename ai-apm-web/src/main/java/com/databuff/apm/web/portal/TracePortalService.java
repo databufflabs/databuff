@@ -602,6 +602,10 @@ public class TracePortalService {
         long from = PortalTimeParser.rangeFrom(body, now - 3_600_000L);
         long to = PortalTimeParser.rangeTo(body, now);
         int interval = ServicePortalService.intValue(body.get("interval"), 60);
+        if (hasTraceIdFilter(body)) {
+            Map<String, Object> graphs = bucketTraceSpanGraphs(body, from, to, interval);
+            return Map.of("errorCnts", graphs.getOrDefault("errorCnts", Map.of()));
+        }
         return Map.of("errorCnts", bucketTraceErrorGraphs(body, from, to, interval));
     }
 
@@ -964,12 +968,87 @@ public class TracePortalService {
         return (long) (avgDurationMs * 1_000_000L);
     }
 
+    /**
+     * Trace page overview charts (count / error / latency).
+     * <p>Default path reads {@code metric_service_trace} (fast). When {@code traceId}/{@code traceIds}
+     * are present, aggregates from {@code trace_dc_span} for those traces (metrics cannot filter by
+     * trace id).
+     */
     private Map<String, Object> buildSpanGraphs(Map<String, Object> body) {
         long now = System.currentTimeMillis();
         long from = PortalTimeParser.rangeFrom(body, now - 3_600_000L);
         long to = PortalTimeParser.rangeTo(body, now);
         int interval = ServicePortalService.intValue(body.get("interval"), 60);
+        if (hasTraceIdFilter(body)) {
+            return bucketTraceSpanGraphs(body, from, to, interval);
+        }
         return bucketTraceMetricGraphs(body, from, to, interval);
+    }
+
+    /**
+     * Aggregate overview charts from span detail when filtering by TraceID.
+     * Uses the same root-span scope as {@code metric_service_trace} ({@code parentId=0} →
+     * {@code is_parent=1}) so a single TraceID yields one request count / latency sample.
+     */
+    private Map<String, Object> bucketTraceSpanGraphs(
+            Map<String, Object> body, long from, long to, int interval) {
+        Map<String, Long> callCnts = new LinkedHashMap<>();
+        Map<String, Map<String, Long>> errorCnts = new LinkedHashMap<>();
+        Map<String, Double> sumDurationNs = new LinkedHashMap<>();
+
+        int bucketSec = Math.max(60, interval);
+        for (Map<String, Object> span : loadGraphSpans(body)) {
+            long startMs = toLong(span.get("start"));
+            if (startMs <= 0L) {
+                startMs = toLong(span.get("startTime"));
+            }
+            if (startMs < from || startMs >= to) {
+                continue;
+            }
+            String bucket = String.valueOf(TimeSeriesFillUtil.alignBucketEpochSec(startMs, bucketSec) * 1000L);
+            callCnts.merge(bucket, 1L, Long::sum);
+
+            if (ServicePortalService.intValue(span.get("error"), 0) != 0) {
+                String service = ServicePortalService.stringValue(span.get("service"), "unknown");
+                errorCnts.computeIfAbsent(bucket, key -> new LinkedHashMap<>());
+                errorCnts.get(bucket).merge(service, 1L, Long::sum);
+            }
+
+            long durationNs = toLong(span.get("duration"));
+            if (durationNs > 0L) {
+                sumDurationNs.merge(bucket, (double) durationNs, Double::sum);
+            }
+        }
+
+        return buildGraphResult(callCnts, errorCnts, sumDurationNs, from, to, interval);
+    }
+
+    private List<Map<String, Object>> loadGraphSpans(Map<String, Object> body) {
+        return applySpanListScope(filterPortalSpans(loadQueryParamsSpans(body), body), body);
+    }
+
+    private static List<Map<String, Object>> applySpanListScope(
+            List<Map<String, Object>> spans, Map<String, Object> body) {
+        SpanListScope scope = resolveSpanListScope(body);
+        if (scope.isParent() != null && scope.isParent() == 1) {
+            return spans.stream().filter(TracePortalService::isRootPortalSpan).toList();
+        }
+        if (scope.parentId() != null && !scope.parentId().isBlank()) {
+            String parentId = scope.parentId();
+            return spans.stream()
+                    .filter(row -> parentId.equals(String.valueOf(row.get("parent_id"))))
+                    .toList();
+        }
+        return spans;
+    }
+
+    private static boolean isRootPortalSpan(Map<String, Object> row) {
+        Object isParent = row.get("is_parent");
+        if (isParent != null && ServicePortalService.intValue(isParent, 0) == 1) {
+            return true;
+        }
+        String parentId = String.valueOf(row.getOrDefault("parent_id", "0")).trim();
+        return parentId.isEmpty() || "0".equals(parentId) || "null".equalsIgnoreCase(parentId);
     }
 
     private Map<String, Object> bucketTraceMetricGraphs(

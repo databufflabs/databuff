@@ -269,20 +269,6 @@ export default class ChatAI extends Vue {
       }));
       this.chatEnd = !!result?.end;
 
-      // TODO:测试代码
-      // messages.length = messages.length > 6 ? 6 : messages.length;
-      // const _messagesLength = messages.length;
-      // const _length01 = this.chatDoneList.length;
-      // const _length02 = this.chatAnimateList.length;
-      // const _length03 = this.chatQueuingList.length;
-      // let _totalLength = _length01 + _length02 + _length03;
-      // if (_totalLength < messages.length) {
-      //   _totalLength = _totalLength + 1;
-      //   messages.length = _totalLength;
-      // }
-      // this.chatEnd = !!result?.end && _totalLength >= _messagesLength;
-      // TODO:测试代码
-
       if (this.firstLoad && this.chatEnd) { // 首次加载并且对话已经结束
         this.chatDoneList = messages;
       } else {

@@ -518,6 +518,72 @@ class TracePortalServiceTest {
     }
 
     @Test
+    void cntGraphStatsWithTraceIdAggregatesFromSpans() throws Exception {
+        long startMs = PortalTimeParser.rangeFrom(Map.of("fromTime", "2026-06-06 06:20:00"), 0) + 60_000L;
+        long startNs = startMs * 1_000_000L;
+        long bucket = TimeSeriesFillUtil.alignBucketEpochSec(startMs, 60);
+
+        TraceQueryService traceQuery = mock(TraceQueryService.class);
+        when(traceQuery.traceDetail(any())).thenReturn(List.of(
+                new SpanDetail(
+                        "t1", "s1", "0", "demo-order", "demo-order", "GET /orders",
+                        "2026-06-06 06:21:00", startNs, 2_500_000L, 0, "host-1"),
+                new SpanDetail(
+                        "t1", "s2", "s1", "demo-order", "demo-order", "SELECT orders",
+                        "2026-06-06 06:21:00", startNs + 1_000_000L, 500_000L, 0, "host-1")));
+
+        ApmReadRepository reader = mock(ApmReadRepository.class);
+        TracePortalService service = new TracePortalService(
+                traceQuery, mock(ServiceFlowService.class), reader, TestStorageSupport.storage());
+        Map<String, Object> graphs = service.cntGraphStats(Map.of(
+                "traceId", "t1",
+                "fromTime", "2026-06-06 06:20:00",
+                "toTime", "2026-06-06 07:20:00",
+                "interval", 60,
+                "parentId", "0"));
+
+        verify(reader, never()).queryComponentTrendBuckets(anyString());
+        verify(traceQuery).traceDetail(any());
+        @SuppressWarnings("unchecked")
+        Map<String, Number> callCnts = (Map<String, Number>) graphs.get("callCnts");
+        assertThat(callCnts.get(String.valueOf(bucket * 1000L))).isEqualTo(1L);
+    }
+
+    @Test
+    void errorAndLatencyGraphStatsWithTraceIdAggregateFromSpans() throws Exception {
+        long startMs = PortalTimeParser.rangeFrom(Map.of("fromTime", "2026-06-06 07:34:00"), 0) + 30_000L;
+        long startNs = startMs * 1_000_000L;
+        long bucket = TimeSeriesFillUtil.alignBucketEpochSec(startMs, 60);
+
+        TraceQueryService traceQuery = mock(TraceQueryService.class);
+        when(traceQuery.traceDetail(any())).thenReturn(List.of(
+                new SpanDetail(
+                        "t-err", "s1", "0", "demo-order", "demo-order", "GET /orders",
+                        "2026-06-06 07:34:30", startNs, 3_000_000L, 1, "host-1")));
+
+        ApmReadRepository reader = mock(ApmReadRepository.class);
+        TracePortalService service = new TracePortalService(
+                traceQuery, mock(ServiceFlowService.class), reader, TestStorageSupport.storage());
+        Map<String, Object> body = Map.of(
+                "traceId", "t-err",
+                "fromTime", "2026-06-06 07:34:00",
+                "toTime", "2026-06-06 07:49:00",
+                "interval", 60,
+                "parentId", "0");
+
+        Map<String, Object> errors = service.errorCntGraphStats(body);
+        Map<String, Object> latency = service.graphStats(body);
+
+        verify(reader, never()).queryComponentTrendBuckets(anyString());
+        @SuppressWarnings("unchecked")
+        Map<String, Map<String, Long>> errorCnts = (Map<String, Map<String, Long>>) errors.get("errorCnts");
+        assertThat(errorCnts.get(String.valueOf(bucket * 1000L))).containsEntry("demo-order", 1L);
+        @SuppressWarnings("unchecked")
+        Map<String, Number> avgLatencys = (Map<String, Number>) latency.get("avgLatencys");
+        assertThat(avgLatencys.get(String.valueOf(bucket * 1000L))).isEqualTo(3_000_000.0);
+    }
+
+    @Test
     void buildsTraceDetailSpans() {
         TraceQueryService traceQuery = mock(TraceQueryService.class);
         long rootStartNs = 1_000_000_000_000_000_000L;
