@@ -16,7 +16,7 @@
 
     <metric-section
       title="写出 Stream Load"
-      desc="按 Doris 表（dim）分线"
+      desc="每行一类 · 写出字节 → 写出耗时 → 写出丢弃"
       :panels="writePanels"
       :timeParams="timeParams"
     />
@@ -96,6 +96,7 @@ function otelInboundPanels(): ChartPanelSpec[] {
   ];
   const panels: ChartPanelSpec[] = [];
   for (const s of signals) {
+    const isTrace = s.key === 'trace';
     panels.push(
       {
         metric: `ingest.otel.${s.key}.req`,
@@ -103,14 +104,16 @@ function otelInboundPanels(): ChartPanelSpec[] {
         value: 'cnt',
         components: ['ingest'],
         hint: '按实例',
+        ...(isTrace ? { asRate: true, unit: '/s' } : {}),
       },
       {
         metric: `ingest.otel.${s.key}.bytes`,
         title: `${s.label} bytes`,
         value: 'cnt',
-        unit: 'bytes',
+        unit: isTrace ? 'bytes/s' : 'bytes',
         components: ['ingest'],
         hint: '按实例',
+        ...(isTrace ? { asRate: true } : {}),
       },
       {
         metric: `ingest.otel.${s.key}.cost_ms`,
@@ -162,12 +165,58 @@ function pipelineTypePanels(): ChartPanelSpec[] {
   return panels;
 }
 
+/** Write Stream Load: one row per signal — bytes, cost_ms, drop. */
+function writeSignalPanels(): ChartPanelSpec[] {
+  const signals: Array<{ key: 'trace' | 'metric' | 'log'; label: string }> = [
+    { key: 'trace', label: 'Trace' },
+    { key: 'metric', label: 'Metric' },
+    { key: 'log', label: 'Log' },
+  ];
+  const panels: ChartPanelSpec[] = [];
+  for (const s of signals) {
+    panels.push(
+      {
+        metric: 'ingest.write.bytes',
+        title: `${s.label} 写出字节`,
+        value: 'cnt',
+        unit: 'bytes/s',
+        asRate: true,
+        components: ['ingest'],
+        dims: [s.key],
+        groupBy: ['instance'],
+        hint: '按实例',
+      },
+      {
+        metric: 'ingest.write.cost_ms',
+        title: `${s.label} 写出耗时`,
+        value: 'avg',
+        unit: 'ms',
+        components: ['ingest'],
+        dims: [s.key],
+        groupBy: ['instance'],
+        hint: '按实例',
+      },
+      {
+        metric: 'ingest.write.drop',
+        title: `${s.label} 写出丢弃`,
+        value: 'cnt',
+        components: ['ingest'],
+        dims: [s.key],
+        groupBy: ['instance'],
+        hint: '按实例',
+      },
+    );
+  }
+  return panels;
+}
+
 @Component({ components: { MetricSection } })
 export default class SelfMonitorIngest extends Vue {
   private timeParams: any = {};
   private discovering = false;
   private inboundPanels: ChartPanelSpec[] = otelInboundPanels();
   private pipelinePanels: ChartPanelSpec[] = pipelineTypePanels();
+  private writePanels: ChartPanelSpec[] = writeSignalPanels();
   private forwardOutPanels: ChartPanelSpec[] = [];
   private forwardInPanels: ChartPanelSpec[] = [];
   private dropPanels: ChartPanelSpec[] = [];
@@ -176,16 +225,6 @@ export default class SelfMonitorIngest extends Vue {
     { metric: 'ingest.cluster.member.count', title: '成员数', value: 'gauge' },
     { metric: 'ingest.cluster.leader', title: '本节点 Leader', value: 'gauge', unit: '0/1' },
     { metric: 'ingest.cluster.effective', title: '集群模式生效', value: 'gauge', unit: '0/1' },
-  ];
-
-  private writePanels: ChartPanelSpec[] = [
-    { metric: 'ingest.write.req', title: '写出成功', value: 'cnt', unit: '批' },
-    { metric: 'ingest.write.fail', title: '写出失败', value: 'cnt', unit: '批' },
-    { metric: 'ingest.write.queue', title: '写出队列', value: 'gauge' },
-    { metric: 'ingest.write.queue.cap', title: 'Ready 队列上限', value: 'gauge', unit: '批' },
-    { metric: 'ingest.write.drop', title: '写出丢弃', value: 'cnt' },
-    { metric: 'ingest.write.bytes', title: '写出字节', value: 'cnt', unit: 'bytes' },
-    { metric: 'ingest.write.cost_ms', title: '写出耗时', value: 'avg', unit: 'ms' },
   ];
 
   private tracePanels: ChartPanelSpec[] = [

@@ -1,7 +1,15 @@
 <template>
   <div v-loading="loading" class="sm-panel" :style="{ height: panelHeight + 'px' }">
     <div class="sm-panel-head">
-      <div class="sm-panel-title">{{ displayTitle }}</div>
+      <button
+        type="button"
+        class="sm-panel-title sm-panel-title-btn"
+        :title="helpDoc ? '查看指标说明' : displayTitle"
+        :disabled="!helpDoc"
+        @click="openHelp"
+      >
+        {{ displayTitle }}
+      </button>
       <div class="sm-panel-meta">
         <span v-if="seriesHint">{{ seriesHint }}</span>
         <span v-if="spec.unit" class="sm-panel-unit">{{ spec.unit }}</span>
@@ -18,12 +26,14 @@
         :colors="chartColors"
       />
     </div>
+    <metric-help-drawer :visible.sync="helpVisible" :doc="helpDoc" />
   </div>
 </template>
 
 <script lang="ts">
 import { Vue, Component, Prop, Watch } from 'vue-property-decorator';
 import BasicChart from '@/components/charts/basic-chart.vue';
+import MetricHelpDrawer from './MetricHelpDrawer.vue';
 import {
   ChartPanelSpec,
   queryPlatformSeries,
@@ -31,13 +41,14 @@ import {
   resolveSingleMetric,
   shortMetricLabel,
 } from '../shared';
+import { MetricHelpDoc, resolveMetricHelp } from '../metricHelp';
 
 const COLORS = [
   '#0f766e', '#2563eb', '#b45309', '#7c3aed',
   '#be123c', '#0369a1', '#4d7c0f', '#c2410c',
 ];
 
-@Component({ components: { BasicChart } })
+@Component({ components: { BasicChart, MetricHelpDrawer } })
 export default class MetricPanel extends Vue {
   @Prop({ required: true }) public timeParams!: { fromTime: string; toTime: string; interval?: number };
   @Prop({ required: true }) public spec!: ChartPanelSpec;
@@ -48,6 +59,7 @@ export default class MetricPanel extends Vue {
   private chartColors = COLORS;
   private chartGrid = { left: 44, right: 16, top: 28, bottom: 24 };
   private chartLegend = { top: 0, right: 4, itemWidth: 10, itemHeight: 8, textStyle: { fontSize: 11 } };
+  private helpVisible = false;
 
   get panelHeight() {
     return this.spec.height || this.height || 240;
@@ -59,6 +71,10 @@ export default class MetricPanel extends Vue {
     }
     const m = resolveSingleMetric(this.spec);
     return m ? shortMetricLabel(m) : '指标';
+  }
+
+  get helpDoc(): MetricHelpDoc | null {
+    return resolveMetricHelp(this.spec);
   }
 
   get seriesHint() {
@@ -73,6 +89,13 @@ export default class MetricPanel extends Vue {
       return '按维度';
     }
     return g.map(x => `按${x}`).join(' · ');
+  }
+
+  private openHelp() {
+    if (!this.helpDoc) {
+      return;
+    }
+    this.helpVisible = true;
   }
 
   @Watch('timeParams', { deep: true })
@@ -120,34 +143,50 @@ export default class MetricPanel extends Vue {
   align-items: baseline;
   justify-content: space-between;
   gap: 8px;
-  margin-bottom: 2px;
-  flex: none;
+  margin-bottom: 4px;
+  min-height: 20px;
 }
 
 .sm-panel-title {
   font-size: 13px;
   font-weight: 600;
   color: #0f172a;
-  letter-spacing: 0.01em;
-  min-width: 0;
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
+}
+
+.sm-panel-title-btn {
+  appearance: none;
+  border: 0;
+  background: transparent;
+  padding: 0;
+  margin: 0;
+  max-width: 70%;
+  text-align: left;
+  cursor: pointer;
+  border-bottom: 1px dashed transparent;
+
+  &:not(:disabled):hover {
+    color: #0f766e;
+    border-bottom-color: #99f6e4;
+  }
+
+  &:disabled {
+    cursor: default;
+  }
 }
 
 .sm-panel-meta {
   display: flex;
   align-items: center;
   gap: 8px;
-  flex: none;
   font-size: 11px;
   color: #94a3b8;
+  flex-shrink: 0;
 }
 
 .sm-panel-unit {
-  padding: 1px 6px;
-  border-radius: 999px;
-  background: #f1f5f9;
   color: #64748b;
 }
 

@@ -76,7 +76,7 @@ ingest:
     flush-batch-bytes: ${INGEST_DORIS_FLUSH_BATCH_BYTES:52428800}
     # Bounded ready queue depth in batches. Full → drop batch (write.drop).
     # Env: INGEST_DORIS_MAX_READY_BATCHES
-    max-ready-batches: ${INGEST_DORIS_MAX_READY_BATCHES:16}
+    max-ready-batches: ${INGEST_DORIS_MAX_READY_BATCHES:32}
     # Safety poll for leftover ready-queue batches (size flush is mostly async on hand-off).
     # Only sinks with hasReady() are touched; default 5s to cut idle scheduler noise.
     flush-check-interval-ms: ${INGEST_DORIS_FLUSH_CHECK_INTERVAL_MS:5000}

@@ -31,7 +31,7 @@ class PlatformMetricsTest {
 
         assertThat(req).isEqualTo("otel.trace.req");
         assertThat(queue).isEqualTo("write.queue");
-        assertThat(PlatformMetricNames.writeDim("trace_dc_span")).isEqualTo("trace_dc_span");
+        assertThat(PlatformMetricNames.writeDim("trace_dc_span")).isEqualTo("trace");
 
         PlatformMetrics.counter(req).add(10);
         PlatformMetrics.timer(cost).add(5);
@@ -62,7 +62,7 @@ class PlatformMetricsTest {
                 .filter(r -> "ingest.write.queue".equals(r.get("metric")))
                 .findFirst()
                 .orElseThrow();
-        assertThat(queueRow.get("dim")).isEqualTo("trace_dc_span");
+        assertThat(queueRow.get("dim")).isEqualTo("trace");
         assertThat(queueRow.get("val_gauge")).isEqualTo(3.0);
 
         assertThat(rows.stream().anyMatch(r -> {
@@ -112,14 +112,14 @@ class PlatformMetricsTest {
 
         PlatformMetrics.gauge("doris.up").set(1);
         PlatformMetrics.gauge("bad.sentinel").set(-1);
-        PlatformMetrics.gauge(PlatformMetricNames.write(PlatformMetricNames.KIND_QUEUE), "trace_dc_span").set(0);
+        PlatformMetrics.gauge(PlatformMetricNames.write(PlatformMetricNames.KIND_QUEUE), "trace").set(0);
         PlatformMetrics.flushNow();
 
         List<Map<String, Object>> rows = exported.get();
         assertThat(rows).isNotNull();
         assertThat(rows.stream().anyMatch(r -> "web.doris.up".equals(r.get("metric")))).isTrue();
         assertThat(rows.stream().anyMatch(r ->
-                "web.write.queue".equals(r.get("metric")) && "trace_dc_span".equals(r.get("dim")))).isTrue();
+                "web.write.queue".equals(r.get("metric")) && "trace".equals(r.get("dim")))).isTrue();
         assertThat(rows.stream().noneMatch(r -> "web.bad.sentinel".equals(r.get("metric")))).isTrue();
         assertThat(rows.stream().noneMatch(r -> {
             Object g = r.get("val_gauge");

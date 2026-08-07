@@ -5,7 +5,7 @@
     <div class="sm-group">
       <div class="sm-group-head">
         <h2 class="sm-group-title">ingest</h2>
-        <p class="sm-group-desc">入口 · 写入 · 延迟</p>
+        <p class="sm-group-desc">入站 · 出站</p>
       </div>
       <metric-section
         title="核心指标"
@@ -45,17 +45,6 @@ import { Vue, Component, Watch } from 'vue-property-decorator';
 import SummaryCards from '../components/SummaryCards.vue';
 import MetricSection from '../components/MetricSection.vue';
 import { ChartPanelSpec, SummaryCardSpec } from '../shared';
-
-function ingest(metric: string, title: string, extra: Partial<ChartPanelSpec> = {}): ChartPanelSpec {
-  return {
-    metric,
-    title,
-    components: ['ingest'],
-    groupBy: ['instance'],
-    hint: '按实例',
-    ...extra,
-  };
-}
 
 function doris(metric: string, title: string, extra: Partial<ChartPanelSpec> = {}): ChartPanelSpec {
   return {
@@ -124,14 +113,94 @@ export default class SelfMonitorOverview extends Vue {
     },
   ];
 
-  /** 入口流量 + 写入量 + 延迟，各挑关键信号 */
+  /** 入站 req/bytes/cost · 出站 drop/bytes/cost · 均按 trace / metric / log */
   private ingestPanels: ChartPanelSpec[] = [
-    ingest('ingest.otel.trace.req', 'Trace 入站', { value: 'cnt' }),
-    ingest('ingest.write.bytes', '写出字节', { value: 'cnt', unit: 'bytes' }),
-    ingest('ingest.write.cost_ms', '写出耗时', { value: 'avg', unit: 'ms' }),
-    ingest('ingest.write.fail', '写出失败', { value: 'cnt' }),
-    ingest('ingest.write.queue', '写出队列', { value: 'gauge' }),
-    ingest('ingest.pipeline.trace.queue', 'Trace 积压', { value: 'gauge' }),
+    {
+      title: '入站请求',
+      metrics: [
+        'ingest.otel.trace.req',
+        'ingest.otel.metric.req',
+        'ingest.otel.log.req',
+      ],
+      value: 'cnt',
+      components: ['ingest'],
+      groupBy: ['metric'],
+      asRate: true,
+      unit: '/s',
+      hint: 'trace / metric / log',
+      seriesNameMap: {
+        'ingest.otel.trace.req': 'trace',
+        'ingest.otel.metric.req': 'metric',
+        'ingest.otel.log.req': 'log',
+      },
+    },
+    {
+      title: '入站字节',
+      metrics: [
+        'ingest.otel.trace.bytes',
+        'ingest.otel.metric.bytes',
+        'ingest.otel.log.bytes',
+      ],
+      value: 'cnt',
+      components: ['ingest'],
+      groupBy: ['metric'],
+      asRate: true,
+      unit: 'bytes/s',
+      hint: 'trace / metric / log',
+      seriesNameMap: {
+        'ingest.otel.trace.bytes': 'trace',
+        'ingest.otel.metric.bytes': 'metric',
+        'ingest.otel.log.bytes': 'log',
+      },
+    },
+    {
+      title: '入站耗时',
+      metrics: [
+        'ingest.otel.trace.cost_ms',
+        'ingest.otel.metric.cost_ms',
+        'ingest.otel.log.cost_ms',
+      ],
+      value: 'avg',
+      components: ['ingest'],
+      groupBy: ['metric'],
+      unit: 'ms',
+      hint: 'trace / metric / log',
+      seriesNameMap: {
+        'ingest.otel.trace.cost_ms': 'trace',
+        'ingest.otel.metric.cost_ms': 'metric',
+        'ingest.otel.log.cost_ms': 'log',
+      },
+    },
+    {
+      title: '出站丢弃',
+      metric: 'ingest.write.drop',
+      value: 'cnt',
+      components: ['ingest'],
+      groupBy: ['dim'],
+      hint: 'trace / metric / log',
+      seriesNameMap: { trace: 'trace', metric: 'metric', log: 'log' },
+    },
+    {
+      title: '出站字节',
+      metric: 'ingest.write.bytes',
+      value: 'cnt',
+      unit: 'bytes/s',
+      asRate: true,
+      components: ['ingest'],
+      groupBy: ['dim'],
+      hint: 'trace / metric / log',
+      seriesNameMap: { trace: 'trace', metric: 'metric', log: 'log' },
+    },
+    {
+      title: '出站耗时',
+      metric: 'ingest.write.cost_ms',
+      value: 'avg',
+      unit: 'ms',
+      components: ['ingest'],
+      groupBy: ['dim'],
+      hint: 'trace / metric / log',
+      seriesNameMap: { trace: 'trace', metric: 'metric', log: 'log' },
+    },
   ];
 
   private dorisPanels: ChartPanelSpec[] = [

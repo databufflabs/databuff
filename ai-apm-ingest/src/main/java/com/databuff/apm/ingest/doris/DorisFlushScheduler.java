@@ -17,7 +17,9 @@ import org.springframework.scheduling.annotation.Scheduled;
 import org.springframework.stereotype.Component;
 
 import java.io.IOException;
+import java.util.HashMap;
 import java.util.List;
+import java.util.Map;
 import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.CompletionException;
 import java.util.concurrent.ExecutionException;
@@ -150,16 +152,23 @@ public class DorisFlushScheduler implements DisposableBean {
     }
 
     private void updateQueueGauges() {
+        // writeDim collapses many tables into trace/metric/log — sum pending/cap per signal.
+        Map<String, Long> pendingByDim = new HashMap<>();
+        Map<String, Long> capByDim = new HashMap<>();
         for (DorisStreamLoadSink sink : sinks) {
             if (DorisTableNames.METRIC_PLATFORM.equals(sink.table())) {
                 continue;
             }
-            String table = sink.table();
-            String dim = PlatformMetricNames.writeDim(table);
+            String dim = PlatformMetricNames.writeDim(sink.table());
+            pendingByDim.merge(dim, (long) sink.pendingCount(), Long::sum);
+            capByDim.merge(dim, (long) sink.maxReadyBatches(), Long::sum);
+        }
+        for (Map.Entry<String, Long> e : pendingByDim.entrySet()) {
+            String dim = e.getKey();
             PlatformMetrics.gauge(PlatformMetricNames.write(PlatformMetricNames.KIND_QUEUE), dim)
-                    .set(sink.pendingCount());
+                    .set(e.getValue());
             PlatformMetrics.gauge(PlatformMetricNames.write(PlatformMetricNames.KIND_QUEUE_CAP), dim)
-                    .set(sink.maxReadyBatches());
+                    .set(capByDim.getOrDefault(dim, 0L));
         }
     }
 

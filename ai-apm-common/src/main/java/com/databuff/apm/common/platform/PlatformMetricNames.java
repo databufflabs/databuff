@@ -7,8 +7,9 @@ package com.databuff.apm.common.platform;
  * {@code ingest}/{@code web}. Prefer encoding sparse dimensions in the metric name
  * (API domain, pipeline, GC name, cluster stream). Shared process tag: {@code instance}
  * (hostname/pod). For {@code doris.*}, callers pass Doris Host as {@code instance}.
- * Optional {@code dim}: CPU mode on {@code doris.*.cpu}, Doris <strong>table</strong>
- * on {@code write.*} (tables are too many to encode in the metric name).
+ * Optional {@code dim}: CPU mode on {@code doris.*.cpu}; on {@code write.*} a coarse
+ * signal ({@code trace}/{@code metric}/{@code log}/{@code other}) derived from the
+ * Doris target table prefix (not per-table).
  */
 public final class PlatformMetricNames {
 
@@ -61,15 +62,29 @@ public final class PlatformMetricNames {
 
     /**
      * Relative write kind only: {@code write.req} / {@code write.queue}.
-     * Pass table name as {@code dim} via {@link #writeDim(String)}.
+     * Pass Doris table to {@link #writeDim(String)} for the coarse signal dim.
      */
     public static String write(String kind) {
         return "write." + token(kind, "unknown");
     }
 
-    /** {@code dim} value for write.* series — Doris target table. */
+    /**
+     * {@code dim} for write.* — coarse signal from Doris table name:
+     * {@code trace_*} → {@link #SIGNAL_TRACE}, {@code log_*} → {@link #SIGNAL_LOG},
+     * {@code metric_*} → {@link #SIGNAL_METRIC}, else {@code other}.
+     */
     public static String writeDim(String table) {
-        return token(table, "unknown");
+        String t = token(table, "unknown");
+        if (t.startsWith("trace_") || SIGNAL_TRACE.equals(t)) {
+            return SIGNAL_TRACE;
+        }
+        if (t.startsWith("log_") || SIGNAL_LOG.equals(t)) {
+            return SIGNAL_LOG;
+        }
+        if (t.startsWith("metric_") || SIGNAL_METRIC.equals(t)) {
+            return SIGNAL_METRIC;
+        }
+        return "other";
     }
 
     /** Relative web query: {@code query.trace.req} — API domain encoded in the name. */

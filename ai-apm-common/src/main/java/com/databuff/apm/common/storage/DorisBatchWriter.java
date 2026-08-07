@@ -35,7 +35,7 @@ public class DorisBatchWriter {
      * Default ready-queue capacity in <em>batches</em> (not rows).
      * Worst-case ready heap ≈ {@code maxReadyBatches × maxBatchBytes} per writer/table.
      */
-    public static final int DEFAULT_MAX_READY_BATCHES = 16;
+    public static final int DEFAULT_MAX_READY_BATCHES = 32;
 
     @FunctionalInterface
     public interface ReadyListener {

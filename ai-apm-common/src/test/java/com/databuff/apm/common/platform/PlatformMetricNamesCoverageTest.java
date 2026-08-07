@@ -45,6 +45,18 @@ class PlatformMetricNamesCoverageTest {
     }
 
     @Test
+    void writeDim_mapsTablePrefixToSignal() {
+        assertThat(PlatformMetricNames.writeDim("trace_dc_span")).isEqualTo("trace");
+        assertThat(PlatformMetricNames.writeDim("log_dc_record")).isEqualTo("log");
+        assertThat(PlatformMetricNames.writeDim("metric_jvm")).isEqualTo("metric");
+        assertThat(PlatformMetricNames.writeDim("metric_service_http")).isEqualTo("metric");
+        assertThat(PlatformMetricNames.writeDim("meta_service")).isEqualTo("other");
+        assertThat(PlatformMetricNames.writeDim("config_alarm")).isEqualTo("other");
+        assertThat(PlatformMetricNames.writeDim(null)).isEqualTo("other");
+        assertThat(PlatformMetricNames.writeDim("")).isEqualTo("other");
+    }
+
+    @Test
     void systemGcAndDorisNameHelpers() {
         assertThat(PlatformMetricNames.systemGc("count", "G1YoungGen"))
                 .isEqualTo("system.gc.count.G1YoungGen");

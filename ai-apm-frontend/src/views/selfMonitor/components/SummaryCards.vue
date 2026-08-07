@@ -4,23 +4,42 @@
       v-for="(card, idx) in cards"
       :key="idx"
       :class="['sm-card', `tone-${card.tone || 'default'}`]">
-      <div class="sm-card-title">{{ card.title }}</div>
+      <button
+        type="button"
+        class="sm-card-title sm-card-title-btn"
+        title="查看指标说明"
+        @click="openHelp(card)"
+      >
+        {{ card.title }}
+      </button>
       <div class="sm-card-value">{{ display[idx] || '—' }}</div>
     </div>
+    <metric-help-drawer :visible.sync="helpVisible" :doc="helpDoc" />
   </div>
 </template>
 
 <script lang="ts">
 import { Vue, Component, Prop, Watch } from 'vue-property-decorator';
+import MetricHelpDrawer from './MetricHelpDrawer.vue';
 import { SummaryCardSpec, formatCardValue, queryPlatformSummary, timeWindowSeconds } from '../shared';
+import { MetricHelpDoc, resolveCardHelp } from '../metricHelp';
 
-@Component
+@Component({ components: { MetricHelpDrawer } })
 export default class SummaryCards extends Vue {
   @Prop({ required: true }) public cards!: SummaryCardSpec[];
   @Prop({ required: true }) public timeParams!: { fromTime: string; toTime: string };
 
   private loading = false;
   private display: string[] = [];
+  private helpVisible = false;
+  private helpDoc: MetricHelpDoc | null = null;
+
+  private openHelp(card: SummaryCardSpec) {
+    this.helpDoc = resolveCardHelp(card);
+    if (this.helpDoc) {
+      this.helpVisible = true;
+    }
+  }
 
   @Watch('timeParams', { deep: true })
   private onTime() {
@@ -115,6 +134,23 @@ export default class SummaryCards extends Vue {
   color: #64748b;
   margin-bottom: 10px;
   font-weight: 500;
+}
+
+.sm-card-title-btn {
+  appearance: none;
+  border: 0;
+  background: transparent;
+  padding: 0;
+  display: block;
+  max-width: 100%;
+  text-align: left;
+  cursor: pointer;
+  border-bottom: 1px dashed transparent;
+
+  &:hover {
+    color: #0f766e;
+    border-bottom-color: #99f6e4;
+  }
 }
 
 .sm-card-value {

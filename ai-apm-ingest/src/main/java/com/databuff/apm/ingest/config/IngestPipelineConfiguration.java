@@ -90,7 +90,7 @@ public class IngestPipelineConfiguration {
     DorisBatchWriter traceBatchWriter(
             @Value("${ingest.doris.flush-batch-bytes:52428800}") long flushBatchBytes,
             @Value("${ingest.doris.flush-interval-ms:30000}") long flushIntervalMs,
-            @Value("${ingest.doris.max-ready-batches:16}") int maxReadyBatches) {
+            @Value("${ingest.doris.max-ready-batches:32}") int maxReadyBatches) {
         return new DorisBatchWriter(flushBatchBytes, flushIntervalMs, maxReadyBatches);
     }
 
@@ -98,7 +98,7 @@ public class IngestPipelineConfiguration {
     DorisBatchWriter logBatchWriter(
             @Value("${ingest.doris.flush-batch-bytes:52428800}") long flushBatchBytes,
             @Value("${ingest.doris.flush-interval-ms:30000}") long flushIntervalMs,
-            @Value("${ingest.doris.max-ready-batches:16}") int maxReadyBatches) {
+            @Value("${ingest.doris.max-ready-batches:32}") int maxReadyBatches) {
         return new DorisBatchWriter(flushBatchBytes, flushIntervalMs, maxReadyBatches);
     }
 
@@ -106,7 +106,7 @@ public class IngestPipelineConfiguration {
     DorisBatchWriter metaServiceBatchWriter(
             @Value("${ingest.doris.flush-batch-bytes:52428800}") long flushBatchBytes,
             @Value("${ingest.doris.flush-interval-ms:30000}") long flushIntervalMs,
-            @Value("${ingest.doris.max-ready-batches:16}") int maxReadyBatches) {
+            @Value("${ingest.doris.max-ready-batches:32}") int maxReadyBatches) {
         return new DorisBatchWriter(flushBatchBytes, flushIntervalMs, maxReadyBatches);
     }
 
@@ -209,7 +209,7 @@ public class IngestPipelineConfiguration {
             @Value("${ingest.doris.stream-load-max-failures:3}") int streamLoadMaxFailures,
             @Value("${ingest.doris.flush-batch-bytes:52428800}") long flushBatchBytes,
             @Value("${ingest.doris.flush-interval-ms:30000}") long flushIntervalMs,
-            @Value("${ingest.doris.max-ready-batches:16}") int maxReadyBatches) {
+            @Value("${ingest.doris.max-ready-batches:32}") int maxReadyBatches) {
         return MetricTableWriterRegistry.create(
                 loader, database, streamLoadMaxFailures, flushBatchBytes, flushIntervalMs, maxReadyBatches);
     }

@@ -11,8 +11,10 @@ export interface ChartPanelSpec {
   metrics?: string[]
   metricPrefixes?: string[]
   metricSuffixes?: string[]
-  /** Default ['instance']; use ['dim'] for write table / Doris host */
+  /** Default ['instance']; use ['dim'] for write signal / Doris host */
   groupBy?: string[]
+  /** Exact dim filter sent to API (e.g. write signal trace/metric/log). */
+  dims?: string[]
   value?: PlatformMetricQueryBody['value']
   components?: string[]
   height?: number
@@ -20,6 +22,10 @@ export interface ChartPanelSpec {
   hint?: string
   /** Multiply series values for display (e.g. 0.001 for µs → ms). Storage stays unchanged. */
   scale?: number
+  /** Divide each bucket sum by stepSeconds → per-second rate (e.g. TPS, bytes/s). */
+  asRate?: boolean
+  /** When groupBy includes metric or dim, map tag value → legend label (key order = series order). */
+  seriesNameMap?: Record<string, string>
 }
 
 export interface SummaryCardSpec {
@@ -58,8 +64,22 @@ export function shortMetricLabel(metric: string): string {
   return metric.replace(/^(ingest|web)\./, '')
 }
 
-export function seriesDisplayName(series: any, groupBy: string[]): string {
+export function seriesDisplayName(
+  series: any,
+  groupBy: string[],
+  seriesNameMap?: Record<string, string>,
+): string {
   const tags = series?.tags || {}
+  if (seriesNameMap) {
+    const metricKey = tags.metric != null ? String(tags.metric) : ''
+    if (metricKey && seriesNameMap[metricKey]) {
+      return seriesNameMap[metricKey]
+    }
+    const dimKey = tags.dim != null ? String(tags.dim) : ''
+    if (dimKey && seriesNameMap[dimKey]) {
+      return seriesNameMap[dimKey]
+    }
+  }
   if (groupBy.length === 1) {
     const key = groupBy[0]
     const v = tags[key]
@@ -80,18 +100,39 @@ export function seriesToChartSource(
   series: any[],
   groupBy: string[] = ['instance'],
   scale = 1,
+  stepSeconds = 0,
+  asRate = false,
+  seriesNameMap?: Record<string, string>,
 ): Array<{ name: string; data: Array<{ key: string; value: number | null }> }> {
   if (!Array.isArray(series)) {
     return []
   }
   const factor = scale && Number.isFinite(scale) && scale !== 0 ? scale : 1
-  return series.map((s: any) => ({
-    name: seriesDisplayName(s, groupBy),
-    data: (s.points || []).map((p: any) => ({
-      key: formatEpochSec(Number(p.t) || 0),
-      value: p.v == null ? null : Number(p.v) * factor,
-    })),
-  })).filter(s => s.data.some((d: { key: string; value: number | null }) => d.value != null))
+  const rateDiv = asRate && stepSeconds > 0 ? stepSeconds : 1
+  const mapped = series.map((s: any) => {
+    const tags = s?.tags || {}
+    // Prefer groupBy key for legend ordering (dim / metric / instance).
+    const orderKey = groupBy.length === 1 && tags[groupBy[0]] != null
+      ? String(tags[groupBy[0]])
+      : (tags.metric != null ? String(tags.metric)
+        : tags.dim != null ? String(tags.dim)
+          : tags.instance != null ? String(tags.instance) : '')
+    return {
+      name: seriesDisplayName(s, groupBy, seriesNameMap),
+      data: (s.points || []).map((p: any) => ({
+        key: formatEpochSec(Number(p.t) || 0),
+        value: p.v == null ? null : (Number(p.v) * factor) / rateDiv,
+      })),
+      _orderKey: orderKey,
+    }
+  }).filter(s => s.data.some((d: { key: string; value: number | null }) => d.value != null))
+  if (seriesNameMap) {
+    const order = Object.keys(seriesNameMap)
+    const known = mapped.filter(s => order.includes(s._orderKey))
+    known.sort((a, b) => order.indexOf(a._orderKey) - order.indexOf(b._orderKey))
+    return known.map(({ name, data }) => ({ name, data }))
+  }
+  return mapped.map(({ name, data }) => ({ name, data }))
 }
 
 export function resolveGroupBy(spec: ChartPanelSpec): string[] {
@@ -125,6 +166,7 @@ export async function queryPlatformSeries(
     metricPrefixes: single ? undefined : spec.metricPrefixes,
     metricSuffixes: single ? undefined : spec.metricSuffixes,
     groupBy,
+    dims: spec.dims,
     value: spec.value || 'auto',
     components: spec.components,
     stepSeconds: time.interval || 60,
@@ -135,7 +177,15 @@ export async function queryPlatformSeries(
   if (error || !result || result.status !== 200) {
     return []
   }
-  return seriesToChartSource(result.data?.series || [], groupBy, spec.scale ?? 1)
+  const step = Number(result.data?.stepSeconds) || body.stepSeconds || 60
+  return seriesToChartSource(
+    result.data?.series || [],
+    groupBy,
+    spec.scale ?? 1,
+    step,
+    !!spec.asRate,
+    spec.seriesNameMap,
+  )
 }
 
 /** Expand prefixes into concrete metric names (for one-chart-per-metric pages). */

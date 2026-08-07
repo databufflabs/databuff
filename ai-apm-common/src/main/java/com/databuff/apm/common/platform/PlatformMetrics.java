@@ -31,8 +31,8 @@ import java.util.concurrent.atomic.LongAdder;
  * {@link #disable()} installs shared noop instruments and does not start any scheduler.
  * <p>
  * Prefer encoding sparse dimensions in the metric name. Shared tag: process {@code instance}.
- * Optional {@code dim}: type labels (e.g. CPU mode on {@code doris.*.cpu}), Doris table on
- * {@code write.*}, or empty. Callers may pass an explicit {@code instance} (Doris Host on
+ * Optional {@code dim}: type labels (e.g. CPU mode on {@code doris.*.cpu}), write signal on
+ * {@code write.*} ({@code trace}/{@code metric}/{@code log}/{@code other}), or empty. Callers may pass an explicit {@code instance} (Doris Host on
  * {@code doris.*}) via {@link #gauge(String, String, String)}.
  */
 public final class PlatformMetrics {
