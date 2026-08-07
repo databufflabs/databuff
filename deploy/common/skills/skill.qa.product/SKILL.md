@@ -11,25 +11,26 @@ description: 产品使用、功能说明、配置含义答疑，以及平台配�
 - 围绕 DataBuff 产品能力与仓库内文档/实现答疑；知识根目录固定为 `/app/databuff`。
 - **产品配置是否生效、落库是否正确、专家/工具/技能绑定是否一致** → **必须查平台实数**（见下），禁止只复述手册让用户自查。
 - **两个查数工具用途不同，不要混用**：
-  - `queryDorisBusinessData`：查 Doris 中的**业务/配置数据**，主要用于排查**界面业务问题**（配置表、指标/Trace/日志/告警等相关表是否有数据、是否落对）。
-  - `querySelfMonitorMetrics`：查 **DataBuff 自监控指标**（`metric_platform`），主要用于排查**平台自身问题**（接入/写出失败、查询变慢、Doris 可用性等）。
+  - `queryDorisBusinessData`：查 Doris 中的**业务/配置数据**，主要用于排查**界面业务问题**（配置表是否落库、绑定是否正确等）。**禁止** `SELECT COUNT(*)` 等全表聚合。
+  - `querySelfMonitorMetrics`：查 **DataBuff 自监控指标**（`metric_platform`），主要用于**平台巡检 / 平台自身问题**（接入/写出失败、查询变慢、Doris 可用性等）。平台巡检时**基本不推荐**调用 `queryDorisBusinessData`。
 - 以只读 SQL / Portal API 取证，不代替问数/巡检专家的专用工具链与报告流程。
 - **不**做主机 / Docker / 磁盘 / 进程等纯运行环境排障 → 交给运维专家（`ops`）。
 
-## 平台自监控（自运维排障）
+## 平台自监控 / 平台巡检（自运维排障）
 
 权威清单：`docs/运维参考/自监控指标清单.md`（指标全名、value/groupBy、现象→指标对照）。UI：部署配置 → 安装部署 → 状态。
 
-### 固定通道：工具 `querySelfMonitorMetrics`
+### 固定通道：工具 `querySelfMonitorMetrics`（平台巡检默认只用这条）
 
 直接调用 **`querySelfMonitorMetrics`**（工具 ID：`platform.querySelfMonitorMetrics`）：
 
-- **用途**：排查 DataBuff 平台自身健康（ingest / web / Doris），**不是**业务 APM。
+- **用途**：排查 / 巡检 DataBuff 平台自身健康（ingest / web / Doris），**不是**业务 APM。
 - **内部复用自监控统一 Portal API**（与前端相同）：
   - `mode=series`（默认）→ `PlatformMetricPortalService.query` ≡ `POST /webapi/platform/metrics/query`
   - `mode=summary` → `summary` ≡ `/platform/metrics/summary`
   - `mode=list` → `tagValues` ≡ `/platform/metrics/tagValues`（默认 `tag=metric`）
-- 查 `metric_platform`；**不要**用 `queryMetricData`（业务 APM 表），**不要**为自监控手写 JDBC（除非用 `queryDorisBusinessData` 做字段级核对）。
+- 查 `metric_platform`；**不要**用 `queryMetricData`（业务 APM 表），**不要**为自监控手写 JDBC。
+- **平台巡检 / 自运维排障时，基本不推荐调用 `queryDorisBusinessData`**；数量、失败率、积压、可用性等一律走自监控指标，不要用 SQL 扫业务大表「凑证据」。
 - 时间：先 `getCurrentTimeRange` / `getTimeRangeAroundTime`，`fromTime`/`toTime` 格式 `yyyy-MM-dd HH:mm:ss`。
 
 参数与清单一致：`metrics` / `metricPrefixes` / `metricSuffixes` / `components` / `instances` / `dims` / `groupBy` / `value` / `stepSeconds`。
@@ -46,16 +47,18 @@ description: 产品使用、功能说明、配置含义答疑，以及平台配�
 
 ## 平台配置 / 业务数据怎么查（固定通道，禁止乱试连接）
 
-配置类或界面业务数据问题按下面通道取数。**不要**自己拼 Doris FE/JDBC/`mysql` 连接，**不要**为了查库去登录 Web。
+配置类或界面业务数据问题按下面通道取数。**不要**自己拼 Doris FE/JDBC/`mysql` 连接，**不要**为了查库去登录 Web。  
+**平台自身健康巡检请回到上一节的 `querySelfMonitorMetrics`，不要默认走本通道。**
 
 ### 通道 A（优先）：工具 `queryDorisBusinessData`
 
 直接调用内置工具 **`queryDorisBusinessData`**（工具 ID：`platform.queryDorisBusinessData`）：
 
-- **用途**：查询 Doris 中的业务/配置数据，用于排查界面业务问题；**不要**用它查平台自监控（那是 `querySelfMonitorMetrics`）。
+- **用途**：查询 Doris 中的业务/配置数据，用于排查界面业务问题（配置是否落库、绑定是否正确等）；**不要**用它做平台自监控 / 平台巡检（那是 `querySelfMonitorMetrics`）。
 - 进程内走 web 同款 JDBC 连接池，**无需平台登录用户名/密码**，也无需 Bash。
 - 自动使用配置库（默认 `databuff`）。
 - 只允许 `SELECT` / `SHOW` / `DESCRIBE` / `DESC` / `EXPLAIN` / `WITH`。
+- **禁止** `SELECT COUNT(*)`、`COUNT(1)`、无时间/主键约束的全表聚合统计，以及同类「扫大表数行数」操作（易拖垮 Doris）；需要量级时改用对应业务查询工具或自监控指标，不要用本工具硬数。
 
 示例 SQL：
 
@@ -126,7 +129,7 @@ curl -sS -m 30 -H "Authorization: Bearer ${TOKEN}" "$BASE/webapi/api/v1/ai/tools
 |----------|------|
 | 配置落库 / 绑定 / 任意表字段核对 | **`queryDorisBusinessData`**（业务数据） |
 | 用库表数据验证产品行为（含指标/Trace/告警等） | **`queryDorisBusinessData`**（业务数据） |
-| 平台自监控 / 接入写出 / Doris 可用性 / 查询域失败率 | **清单 + `querySelfMonitorMetrics`**（平台自身） |
+| 平台自监控 / 平台巡检 / 接入写出 / Doris 可用性 / 查询域失败率 | **清单 + `querySelfMonitorMetrics`**（**不要**默认调 `queryDorisBusinessData`） |
 | 只要对照页面上的工具/专家对象 | 管理 API（非默认；能用 `queryDorisBusinessData` 就别登录） |
 | 配置不生效排查 | **`queryDorisBusinessData`** → 按产品语义解释；需要时再对照文档 |
 

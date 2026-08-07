@@ -36,11 +36,13 @@ public class PlatformTools {
 
     @Tool(converter = PlainTextToolResultConverter.class, description = """
             Query Doris business/config data (read-only SQL) to troubleshoot product UI business issues —
-            config tables, metric_service*, traces, logs, alarms, etc. Use when verifying whether data
-            landed correctly or config took effect in the product UI.
-            Do NOT use this for DataBuff platform self-monitoring (ingest/web/Doris health); use
-            querySelfMonitorMetrics instead. Only SELECT, SHOW, DESCRIBE/DESC, EXPLAIN, WITH are allowed.
-            Prefer this over inventing JDBC/mysql/FE-HTTP connections. maxRows defaults to 200 (hard cap 1000).
+            config tables, binding/config rows, etc. Use when verifying whether config landed correctly
+            in the product UI. Do NOT use for DataBuff platform self-monitoring / platform health checks
+            (ingest/web/Doris); prefer querySelfMonitorMetrics — generally avoid this tool for platform
+            inspection. Only SELECT, SHOW, DESCRIBE/DESC, EXPLAIN, WITH are allowed.
+            Forbidden: SELECT COUNT(*), COUNT(1), and unconstrained full-table aggregate counts
+            (expensive on Doris). Prefer this over inventing JDBC/mysql/FE-HTTP connections.
+            maxRows defaults to 200 (hard cap 1000).
             """)
     public String queryDorisBusinessData(
             @ToolParam(name = "sql", description = "Read-only SQL, single statement")

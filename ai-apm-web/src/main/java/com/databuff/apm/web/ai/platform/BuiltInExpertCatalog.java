@@ -61,7 +61,8 @@ public final class BuiltInExpertCatalog {
                         "bashTools.killShell", now),
                 tool("platform.queryDorisBusinessData", "Doris 业务数据查询",
                         "Read-only SQL against Doris business/config tables to troubleshoot product UI business issues "
-                                + "(not DataBuff self-monitoring — use querySelfMonitorMetrics for that)",
+                                + "(not platform self-monitoring/inspection — prefer querySelfMonitorMetrics; "
+                                + "forbid SELECT COUNT(*) and unconstrained full-table aggregates)",
                         "platformTools.queryDorisBusinessData", now),
                 tool("platform.querySelfMonitorMetrics", "DataBuff 自监控指标查询",
                         "Query DataBuff self-monitoring metrics (metric_platform) to troubleshoot the platform itself "
@@ -256,11 +257,11 @@ public final class BuiltInExpertCatalog {
                     工作范围：
                     1. 围绕 DataBuff 文档/实现与平台已保存配置、落库数据答疑；知识根目录固定为 /app/databuff。
                     2. 两个查数工具用途不同，不要混用：
-                       - queryDorisBusinessData（platform.queryDorisBusinessData）：查 Doris 中的业务/配置数据，用于排查界面业务问题（配置是否落库、业务指标/Trace/日志/告警表里有没有数据）。
-                       - querySelfMonitorMetrics（platform.querySelfMonitorMetrics）：查 DataBuff 自监控指标（metric_platform，与自监控页同一套 Portal API），用于排查平台自身问题（接入/写出失败、查询域失败变慢、Doris 可用性、pipeline 积压）。
+                       - queryDorisBusinessData（platform.queryDorisBusinessData）：查 Doris 中的业务/配置数据，用于排查界面业务问题（配置是否落库、绑定是否正确等）。禁止 SELECT COUNT(*)、COUNT(1) 及无约束全表聚合统计。
+                       - querySelfMonitorMetrics（platform.querySelfMonitorMetrics）：查 DataBuff 自监控指标（metric_platform，与自监控页同一套 Portal API），用于排查/巡检平台自身问题（接入/写出失败、查询域失败变慢、Doris 可用性、pipeline 积压）。
                     3. 不排查主机/Docker/磁盘等纯运行环境（运维）。
                     4. 配置类 / 界面业务数据核对：直接调用 queryDorisBusinessData（进程内 JDBC，无需登录）。若需调前端管理 API，账号密码按 Skill：先读 APM_SECURITY_SEED_USERNAME/PASSWORD，再读 /app/application.yml 的 apm.security.seed-*，最后才用默认 admin；登录 POST /webapi/user/login 字段为 account/password。禁止自己拼 Doris 连接，禁止只甩手册清单。
-                    5. 平台自运维 / 自监控排障：先读 docs/运维参考/自监控指标清单.md，再用 getCurrentTimeRange + querySelfMonitorMetrics 查实数；禁止用 queryMetricData 查业务指标表冒充自监控。
+                    5. 平台巡检 / 自运维 / 自监控排障：先读 docs/运维参考/自监控指标清单.md，再用 getCurrentTimeRange + querySelfMonitorMetrics 查实数；基本不推荐调用 queryDorisBusinessData；禁止用 queryMetricData 查业务指标表冒充自监控。
 
                     开源版采集能力（重要）：
                     1. 当前开源版不支持 OneAgent / One-Agent；勿向用户推荐 OneAgent 安装或 /config/install?type=agent。

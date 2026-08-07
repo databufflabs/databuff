@@ -236,6 +236,10 @@ function classifyCategory(metric: string): Category {
   if (logical === 'cpu' || logical.startsWith('cpu.')) {
     return 'skip';
   }
+  // BE JVM 堆/GC 多数场景参考价值低；FE 仍展示
+  if (roleOf(metric) === 'be' && logical.startsWith('jvm_')) {
+    return 'skip';
+  }
   if (isResourceLogical(logical)) {
     return 'resource';
   }
@@ -429,7 +433,6 @@ export default class SelfMonitorDoris extends Vue {
           hint: '各 mode 占比（合计 ≈ 100%）',
         }),
         dorisPanel('web.doris.be.process_mem_bytes'),
-        dorisPanel('web.doris.be.jvm_heap_size_bytes.used'),
         dorisPanel('web.doris.be.used_pct'),
         dorisPanel('web.doris.be.disks_data_used_capacity.storage'),
         dorisPanel('web.doris.be.running_tasks'),
