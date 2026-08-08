@@ -56,7 +56,11 @@ public final class OtelConverter {
                 continue;
             }
             String serviceKey = ServiceKeyUtil.of(serviceName);
-            String hostName = attribute(resourceSpans.getResource().getAttributesList(), "host.name");
+            List<KeyValue> resourceAttributes = resourceSpans.getResource().getAttributesList();
+            String hostName = firstNonBlank(
+                    attribute(resourceAttributes, "host.name"),
+                    attribute(resourceAttributes, "net.host.name"),
+                    attribute(resourceAttributes, "host.id"));
             if (hostName == null) {
                 hostName = "";
             }
@@ -67,7 +71,7 @@ public final class OtelConverter {
                                 serviceName,
                                 serviceKey,
                                 hostName,
-                                resourceSpans.getResource().getAttributesList(),
+                                resourceAttributes,
                                 span)));
                     } catch (IOException ignored) {
                         // skip malformed span
@@ -409,7 +413,6 @@ public final class OtelConverter {
         dc.hours = ApmTimeZones.wallClockHourBucket((epochSec / 3600) * 3600);
         dc.serviceId = serviceKey;
         dc.service = serviceName;
-        dc.serviceInstance = metaAttributes.get("service.instance.id");
         String otelName = span.getName();
         dc.resource = otelName;
         dc.name = TraceSpanNames.normalizeOtelName(otelName, metaAttributes);
@@ -428,8 +431,21 @@ public final class OtelConverter {
         dc.startTime = ApmTimeZones.formatWallClock(start / 1_000_000L);
         dc.error = errored ? 1 : 0;
         dc.slow = duration > 500_000_000L ? 1 : 0;
-        dc.hostName = hostName.isEmpty() ? "unknown" : hostName;
+        // Resource host.name first; fall back to merged attrs (e.g. nginx span net.host.name).
+        String resolvedHost = firstNonBlank(
+                hostName,
+                metaAttributes.get("host.name"),
+                metaAttributes.get("net.host.name"),
+                metaAttributes.get("host.id"));
+        dc.hostName = resolvedHost == null || resolvedHost.isBlank() ? "unknown" : resolvedHost;
         dc.host_id = dc.hostName;
+        // Align with log convert path; then host-like identity for bare agents (nginx-otel).
+        String serviceInstance = firstNonBlank(
+                metaAttributes.get("service.instance.id"),
+                metaAttributes.get("k8s.pod.name"),
+                metaAttributes.get("container.id"),
+                "unknown".equals(dc.hostName) ? null : dc.hostName);
+        dc.serviceInstance = serviceInstance == null ? "" : serviceInstance;
         dc.type = span.getKind().name();
         dc.isIn = 0;
         dc.isOut = 0;

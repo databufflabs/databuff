@@ -115,7 +115,69 @@ class OtelConverterTest {
                                         .setEndTimeUnixNano(1_700_000_010_000_000L))))
                 .build();
 
-        assertThat(converter.convertTraces(request).get(0).span().hostName).isEqualTo("unknown");
+        DcSpan span = converter.convertTraces(request).get(0).span();
+        assertThat(span.hostName).isEqualTo("unknown");
+        assertThat(span.serviceInstance).isEmpty();
+    }
+
+    @Test
+    void fallsBackServiceInstanceToK8sPodName() {
+        ExportTraceServiceRequest request = ExportTraceServiceRequest.newBuilder()
+                .addResourceSpans(ResourceSpans.newBuilder()
+                        .setResource(Resource.newBuilder()
+                                .addAttributes(kv("service.name", "api"))
+                                .addAttributes(kv("k8s.pod.name", "api-7d9f8b"))
+                                .addAttributes(kv("host.name", "node-1")))
+                        .addScopeSpans(ScopeSpans.newBuilder()
+                                .addSpans(Span.newBuilder()
+                                        .setName("GET /health")
+                                        .setStartTimeUnixNano(1_700_000_000_000_000_000L)
+                                        .setEndTimeUnixNano(1_700_000_010_000_000L))))
+                .build();
+
+        DcSpan span = converter.convertTraces(request).get(0).span();
+        assertThat(span.serviceInstance).isEqualTo("api-7d9f8b");
+        assertThat(span.hostName).isEqualTo("node-1");
+    }
+
+    @Test
+    void fallsBackServiceInstanceAndHostFromNetHostName() {
+        // nginx-otel often has no service.instance.id / host.name; only span net.host.name.
+        ExportTraceServiceRequest request = ExportTraceServiceRequest.newBuilder()
+                .addResourceSpans(ResourceSpans.newBuilder()
+                        .setResource(Resource.newBuilder()
+                                .addAttributes(kv("service.name", "nginx-otel-demo")))
+                        .addScopeSpans(ScopeSpans.newBuilder()
+                                .addSpans(Span.newBuilder()
+                                        .setName("GET /hello")
+                                        .setStartTimeUnixNano(1_700_000_000_000_000_000L)
+                                        .setEndTimeUnixNano(1_700_000_010_000_000L)
+                                        .addAttributes(kv("net.host.name", "127.0.0.1"))
+                                        .addAttributes(kv("http.target", "/hello")))))
+                .build();
+
+        DcSpan span = converter.convertTraces(request).get(0).span();
+        assertThat(span.hostName).isEqualTo("127.0.0.1");
+        assertThat(span.serviceInstance).isEqualTo("127.0.0.1");
+    }
+
+    @Test
+    void prefersServiceInstanceIdOverHostFallback() {
+        ExportTraceServiceRequest request = ExportTraceServiceRequest.newBuilder()
+                .addResourceSpans(ResourceSpans.newBuilder()
+                        .setResource(Resource.newBuilder()
+                                .addAttributes(kv("service.name", "api"))
+                                .addAttributes(kv("service.instance.id", "inst-1"))
+                                .addAttributes(kv("k8s.pod.name", "pod-a"))
+                                .addAttributes(kv("host.name", "host-1")))
+                        .addScopeSpans(ScopeSpans.newBuilder()
+                                .addSpans(Span.newBuilder()
+                                        .setName("GET /")
+                                        .setStartTimeUnixNano(1_700_000_000_000_000_000L)
+                                        .setEndTimeUnixNano(1_700_000_010_000_000L))))
+                .build();
+
+        assertThat(converter.convertTraces(request).get(0).span().serviceInstance).isEqualTo("inst-1");
     }
 
     @Test
