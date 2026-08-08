@@ -4,6 +4,7 @@ import com.databuff.apm.common.meta.OtelAttributeMaps;
 import com.databuff.apm.common.trace.HttpSqlStandardizer;
 import org.apache.skywalking.apm.network.language.agent.v3.SpanLayer;
 import org.apache.skywalking.apm.network.language.agent.v3.SpanObject;
+import org.apache.skywalking.apm.network.language.agent.v3.SpanType;
 
 import java.util.List;
 import java.util.Locale;
@@ -14,9 +15,10 @@ import java.util.Set;
  * Normalize SkyWalking span tags to OTel-compatible semantics before downstream fill/virtual-service extraction.
  * <p>
  * Legacy SkyWalking JDBC plugins often report {@code db.type=sql}; this maps them to concrete {@code db.system}
- * values (e.g. {@code mysql}) using component id and peer hints so virtual services become {@code [mysql]host:port}.
- * MQ plugins report {@code mq.topic}/{@code mq.broker}; this maps them to {@code messaging.*} so virtual services
- * become {@code [kafka]topic} the same way OTel producers do.
+ * values (e.g. {@code mysql}) from {@link SpanObject#getComponentId()} so virtual services become
+ * {@code [mysql]host:port}. Peer host/port and free-form operation names are never used to guess the system.
+ * MQ plugins report {@code mq.topic}/{@code mq.broker}; {@code messaging.system} comes from component id,
+ * and {@code messaging.operation} from {@link SpanType} (Exit=publish, Entry=process).
  */
 public final class SkyWalkingMetaNormalizer {
 
@@ -44,9 +46,6 @@ public final class SkyWalkingMetaNormalizer {
         String messagingSystem = OtelAttributeMaps.firstNonBlank(meta, "messaging.system");
         if (messagingSystem == null || messagingSystem.isBlank()) {
             String resolved = mqSystemFromSkyWalkingComponentId(span.getComponentId());
-            if (resolved == null) {
-                resolved = mqSystemFromOperationName(span.getOperationName());
-            }
             if (resolved != null && !resolved.isBlank()) {
                 meta.put("messaging.system", resolved);
             }
@@ -83,7 +82,7 @@ public final class SkyWalkingMetaNormalizer {
             }
         }
         if (OtelAttributeMaps.firstNonBlank(meta, "messaging.operation") == null) {
-            String operation = mqOperationFromOperationName(span.getOperationName());
+            String operation = mqOperationFromSpanType(span.getSpanType());
             if (operation != null) {
                 meta.put("messaging.operation", operation);
             }
@@ -112,48 +111,19 @@ public final class SkyWalkingMetaNormalizer {
         };
     }
 
-    private static String mqSystemFromOperationName(String operationName) {
-        if (operationName == null || operationName.isBlank()) {
-            return null;
-        }
-        String lower = operationName.toLowerCase(Locale.ROOT);
-        if (lower.startsWith("kafka/")) {
-            return "kafka";
-        }
-        if (lower.startsWith("rocketmq/")) {
-            return "rocketmq";
-        }
-        if (lower.startsWith("rabbitmq/")) {
-            return "rabbitmq";
-        }
-        if (lower.startsWith("activemq/")) {
-            return "activemq";
-        }
-        if (lower.startsWith("pulsar/")) {
-            return "pulsar";
-        }
-        return null;
-    }
-
     /**
-     * Map SkyWalking MQ operation names such as {@code Kafka/topic/Producer} to OTel
-     * {@code messaging.operation}. Callbacks are left unset so they are not treated as publish/consume.
+     * Map SkyWalking {@link SpanType} to OTel {@code messaging.operation}.
+     * Exit ≈ producer publish, Entry ≈ consumer process; Local (e.g. producer callback) left unset.
      */
-    static String mqOperationFromOperationName(String operationName) {
-        if (operationName == null || operationName.isBlank()) {
+    static String mqOperationFromSpanType(SpanType spanType) {
+        if (spanType == null) {
             return null;
         }
-        String lower = operationName.toLowerCase(Locale.ROOT);
-        if (lower.contains("callback")) {
-            return null;
-        }
-        if (lower.contains("producer") || lower.endsWith("/publish") || lower.contains("/publish")) {
-            return "publish";
-        }
-        if (lower.contains("consumer") || lower.contains("/process") || lower.contains("receive")) {
-            return "process";
-        }
-        return null;
+        return switch (spanType) {
+            case Exit -> "publish";
+            case Entry -> "process";
+            default -> null;
+        };
     }
 
     private static void normalizeDatabaseTags(SpanObject span, Map<String, String> meta) {
@@ -165,7 +135,7 @@ public final class SkyWalkingMetaNormalizer {
             meta.put("db.name", dbInstance);
         }
         String current = OtelAttributeMaps.firstNonBlank(meta, "db.system", "db.type");
-        String resolved = resolveDbSystem(span, meta, current);
+        String resolved = resolveDbSystem(span, current);
         if (resolved == null || resolved.isBlank()) {
             return;
         }
@@ -191,7 +161,10 @@ public final class SkyWalkingMetaNormalizer {
     }
 
     private static boolean isDatabaseSpan(SpanObject span, Map<String, String> meta) {
-        if (span.getSpanLayer() == SpanLayer.Database) {
+        if (span.getSpanLayer() == SpanLayer.Database || span.getSpanLayer() == SpanLayer.Cache) {
+            return true;
+        }
+        if (dbSystemFromSkyWalkingComponentId(span.getComponentId()) != null) {
             return true;
         }
         if (OtelAttributeMaps.firstNonBlank(meta, "db.statement", "db.sql", "db.operation") != null) {
@@ -200,7 +173,11 @@ public final class SkyWalkingMetaNormalizer {
         return OtelAttributeMaps.firstNonBlank(meta, "db.system", "db.type", "db.instance") != null;
     }
 
-    private static String resolveDbSystem(SpanObject span, Map<String, String> meta, String current) {
+    /**
+     * Resolve concrete {@code db.system} from an explicit tag, else SkyWalking {@code componentId}.
+     * Never infer from peer hostname / port.
+     */
+    private static String resolveDbSystem(SpanObject span, String current) {
         String canonical = canonicalDbSystem(current);
         if (canonical != null && !isGenericDbType(canonical)) {
             return canonical;
@@ -208,10 +185,6 @@ public final class SkyWalkingMetaNormalizer {
         String fromComponent = dbSystemFromSkyWalkingComponentId(span.getComponentId());
         if (fromComponent != null) {
             return fromComponent;
-        }
-        String fromPeer = inferDbSystemFromPeer(meta);
-        if (fromPeer != null) {
-            return fromPeer;
         }
         return canonical;
     }
@@ -239,72 +212,6 @@ public final class SkyWalkingMetaNormalizer {
             case 153 -> "derby";
             case 155 -> "db2";
             case 163 -> "dmdb";
-            default -> null;
-        };
-    }
-
-    private static String inferDbSystemFromPeer(Map<String, String> meta) {
-        String host = OtelAttributeMaps.firstNonBlank(
-                meta, "server.address", "net.peer.name", "db.connection_string");
-        String port = OtelAttributeMaps.firstNonBlank(meta, "server.port", "net.peer.port");
-        String fromHost = inferDbSystemFromHost(host);
-        if (fromHost != null) {
-            return fromHost;
-        }
-        return inferDbSystemFromPort(port);
-    }
-
-    private static String inferDbSystemFromHost(String host) {
-        if (host == null || host.isBlank()) {
-            return null;
-        }
-        String lower = host.trim().toLowerCase(Locale.ROOT);
-        if (lower.contains("mysql") || lower.contains("mariadb")) {
-            return lower.contains("mariadb") ? "mariadb" : "mysql";
-        }
-        if (lower.contains("postgres") || lower.contains("pgsql")) {
-            return "postgresql";
-        }
-        if (lower.contains("mongo")) {
-            return "mongodb";
-        }
-        if (lower.contains("redis")) {
-            return "redis";
-        }
-        if (lower.contains("oracle")) {
-            return "oracle";
-        }
-        if (lower.contains("clickhouse")) {
-            return "clickhouse";
-        }
-        if (lower.contains("elastic") || lower.equals("es")) {
-            return "elasticsearch";
-        }
-        if (lower.contains("sqlserver") || lower.contains("mssql")) {
-            return "mssql";
-        }
-        if (lower.contains("cassandra")) {
-            return "cassandra";
-        }
-        if (lower.contains("influx")) {
-            return "influxdb";
-        }
-        return null;
-    }
-
-    private static String inferDbSystemFromPort(String port) {
-        if (port == null || port.isBlank()) {
-            return null;
-        }
-        return switch (port.trim()) {
-            case "3306" -> "mysql";
-            case "5432" -> "postgresql";
-            case "6379" -> "redis";
-            case "9200", "9300" -> "elasticsearch";
-            case "27017" -> "mongodb";
-            case "1433" -> "mssql";
-            case "1521" -> "oracle";
-            case "8123" -> "clickhouse";
             default -> null;
         };
     }

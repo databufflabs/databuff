@@ -205,15 +205,13 @@ public final class SkyWalkingConverter {
         if (OtelAttributeMaps.firstNonBlank(meta, "rpc.system") != null) {
             return;
         }
+        // Prefer SkyWalking componentId / layer / structured tags — never invent from operationName.
         String rpcSystem = null;
         if (span.getComponentId() > 0) {
             rpcSystem = DcSpanUtil.rpcSystemFromSkyWalkingComponentId(span.getComponentId());
         }
-        if (rpcSystem == null && span.getSpanLayer() == SpanLayer.RPCFramework) {
-            rpcSystem = DcSpanUtil.resolveRpcSystem(meta, (String) null);
-        }
         if (rpcSystem == null) {
-            rpcSystem = DcSpanUtil.resolveRpcSystem(meta, span.getOperationName());
+            rpcSystem = DcSpanUtil.resolveRpcSystem(meta, (String) null);
         }
         if (rpcSystem != null) {
             meta.put("rpc.system", rpcSystem);

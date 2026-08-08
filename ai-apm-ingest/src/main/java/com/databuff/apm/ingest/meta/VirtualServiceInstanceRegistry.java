@@ -1,6 +1,5 @@
 package com.databuff.apm.ingest.meta;
 
-import com.databuff.apm.common.meta.ServiceTypeClassifier;
 import com.databuff.apm.common.meta.VirtualServiceResolver;
 import com.databuff.apm.common.metric.MetricSchemaRegistry;
 import com.databuff.apm.common.model.OptimizedMetric;
@@ -114,7 +113,8 @@ public final class VirtualServiceInstanceRegistry {
             String service,
             String serviceInstance,
             String hostname,
-            String ports) {
+            String ports,
+            String serviceType) {
 
         static CachedVirtualInstance from(VirtualServiceResolver.ResolvedVirtualService resolved) {
             return new CachedVirtualInstance(
@@ -122,7 +122,8 @@ public final class VirtualServiceInstanceRegistry {
                     resolved.service(),
                     resolved.serviceInstance(),
                     resolved.hostname(),
-                    resolved.ports());
+                    resolved.ports(),
+                    resolved.serviceType());
         }
 
         CachedVirtualInstance merge(VirtualServiceResolver.ResolvedVirtualService resolved) {
@@ -134,16 +135,20 @@ public final class VirtualServiceInstanceRegistry {
             if ((portValue == null || portValue.isBlank()) && resolved.ports() != null && !resolved.ports().isBlank()) {
                 portValue = resolved.ports();
             }
+            String type = serviceType;
+            if (resolved.serviceType() != null && !resolved.serviceType().isBlank()) {
+                type = resolved.serviceType();
+            }
             return new CachedVirtualInstance(
                     serviceId,
                     service,
                     serviceInstance,
                     host,
-                    portValue);
+                    portValue,
+                    type);
         }
 
         Map<String, String> tags() {
-            ServiceTypeClassifier.Classification classified = ServiceTypeClassifier.classify(service);
             Map<String, String> tags = new LinkedHashMap<>();
             tags.put("biz_pid_id", "");
             tags.put("containerId", "");
@@ -162,7 +167,7 @@ public final class VirtualServiceInstanceRegistry {
             tags.put("service", nullToEmpty(service));
             tags.put("service_id", normalizeServiceId(serviceId, service));
             tags.put("service_instance", nullToEmpty(serviceInstance));
-            tags.put("service_type", classified.serviceType());
+            tags.put("service_type", nullToEmpty(serviceType).isBlank() ? "web" : serviceType);
             tags.put("virtualService", "1");
             return tags;
         }

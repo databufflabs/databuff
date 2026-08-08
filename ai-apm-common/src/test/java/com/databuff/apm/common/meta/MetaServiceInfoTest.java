@@ -46,7 +46,7 @@ class MetaServiceInfoTest {
     }
 
     @Test
-    void classifiesDatabaseSpanAttributes() {
+    void fromDcSpanDoesNotClassifyApplicationServiceFromNameOrDbAttributes() {
         String meta = """
                 {"db.system":"mysql","host.name":"db-host"}
                 """;
@@ -55,26 +55,26 @@ class MetaServiceInfoTest {
         span.service = "[mysql]dc_databuff";
         span.meta = meta;
 
+        // fromDcSpan is the application-service path (virtual=false). Middleware types
+        // must come from fromVirtualService after span component recognition.
         var row = MetaServiceInfo.fromDcSpan(span).toRow("2026-06-05 10:00:00");
-        assertThat(row.get("service_type")).isEqualTo("db");
-        assertThat(row.get("type")).isEqualTo("mysql");
-        assertThat(row.get("technology")).isEqualTo("mysql");
+        assertThat(row.get("service_type")).isEqualTo("web");
     }
 
     @Test
-    void classifiesElasticsearchSpanAttributesAsDatabase() {
-        String meta = """
-                {"db.system":"elasticsearch","db.elasticsearch.index":"orders","host.name":"es"}
-                """;
-        DcSpan span = new DcSpan();
-        span.serviceId = "es-id";
-        span.service = "[elasticsearch]es:9200";
-        span.meta = meta;
-
-        var row = MetaServiceInfo.fromDcSpan(span).toRow("2026-06-05 10:00:00");
+    void classifiesVirtualServiceFromAttributesWhenVirtualFlagSet() {
+        var row = MetaServiceInfo.fromNames(
+                "es-id",
+                "[elasticsearch]es:9200",
+                "[elasticsearch]es:9200",
+                java.util.Map.of(
+                        "db.system", "elasticsearch",
+                        "db.elasticsearch.index", "orders",
+                        "host.name", "es"),
+                true).toRow("2026-06-05 10:00:00");
         assertThat(row.get("service_type")).isEqualTo("db");
         assertThat(row.get("type")).isEqualTo("elasticsearch");
-        assertThat(row.get("technology")).isEqualTo("elasticsearch");
+        assertThat(row.get("virtual_service")).isEqualTo(1);
     }
 
     @Test
@@ -147,6 +147,33 @@ class MetaServiceInfoTest {
         assertThat(row.get("type")).isEqualTo("web");
         assertThat(row.get("virtual_service")).isEqualTo(0);
         assertThat(legacyCustom.enrichmentDiffers(merged)).isTrue();
+    }
+
+    @Test
+    void mergeKeepsVirtualMiddlewareTypeWhenMetricPathEmitsWeb() {
+        MetaServiceInfo virtual = MetaServiceInfo.fromVirtualService(
+                "redis-peer-id", "[redis]10.0.0.9:6379", "cache", "redis");
+        MetaServiceInfo fromMetric = MetaServiceInfo.fromMetric(
+                "redis-peer-id", "[redis]10.0.0.9:6379", "{}");
+
+        MetaServiceInfo merged = virtual.merge(fromMetric);
+        var row = merged.toRow("2026-06-05 10:00:00");
+        assertThat(row.get("service_type")).isEqualTo("cache");
+        assertThat(row.get("type")).isEqualTo("redis");
+        assertThat(row.get("virtual_service")).isEqualTo(1);
+    }
+
+    @Test
+    void mergeKeepsVirtualMiddlewareTypeWhenLegacyAppCustomArrives() {
+        MetaServiceInfo virtual = MetaServiceInfo.fromVirtualService(
+                "mysql-peer-id", "[mysql]orders", "db", "mysql");
+        MetaServiceInfo legacyCustom = MetaServiceInfo.fromPoint(new com.databuff.apm.common.query.ApmQueryModels.MetaServicePoint(
+                "mysql-peer-id", "[mysql]orders", "[mysql]orders", "custom", null, "custom",
+                "custom", null, "OTLP", null, null, null, Boolean.FALSE, null, null, null, null));
+
+        MetaServiceInfo merged = virtual.merge(legacyCustom);
+        assertThat(merged.toRow("2026-06-05 10:00:00").get("service_type")).isEqualTo("db");
+        assertThat(merged.toRow("2026-06-05 10:00:00").get("virtual_service")).isEqualTo(1);
     }
 
     @Test

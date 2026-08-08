@@ -57,14 +57,13 @@ public final class MetaServiceInfo {
     public static MetaServiceInfo minimal(String id, String serviceName) {
         String trimmedId = truncate(id.trim(), MAX_FIELD);
         String name = truncate(firstNonBlank(serviceName, trimmedId), MAX_FIELD);
-        ServiceTypeClassifier.Classification classified = ServiceTypeClassifier.classify(trimmedId);
         return new Builder()
                 .id(trimmedId)
                 .name(name)
                 .service(name)
-                .serviceType(classified.serviceType())
-                .type(classified.type())
-                .technology(classified.technology())
+                .serviceType("web")
+                .type("web")
+                .technology("web")
                 .datasource("OTLP")
                 .build();
     }
@@ -143,7 +142,7 @@ public final class MetaServiceInfo {
         String trimmedId = truncate(id.trim(), MAX_FIELD);
         String collected = truncate(firstNonBlank(collectedService, trimmedId), MAX_FIELD);
         String display = truncate(firstNonBlank(displayName, collected), MAX_FIELD);
-        ServiceTypeClassifier.Classification classified = classifyFromAttributes(trimmedId, display, attributes, virtualService);
+        ServiceClassification classified = classifyFromAttributes(attributes, virtualService);
         String language = truncate(OtelAttributeMaps.firstNonBlank(attributes,
                 "telemetry.sdk.language", "language"), MAX_FIELD);
         String runtimeName = truncate(OtelAttributeMaps.firstNonBlank(attributes,
@@ -178,8 +177,17 @@ public final class MetaServiceInfo {
         if (other == null) {
             return this;
         }
-        String mergedServiceType = preferLatestClassification(serviceType, other.serviceType);
-        String mergedType = preferLatestClassification(type, other.type);
+        boolean thisVirtual = virtualService > 0;
+        boolean otherVirtual = other.virtualService > 0;
+        boolean protectVirtualClassification = thisVirtual && !otherVirtual
+                && isMiddlewareServiceType(serviceType)
+                && isApplicationServiceType(other.serviceType);
+        String mergedServiceType = protectVirtualClassification
+                ? serviceType
+                : preferLatestValue(serviceType, other.serviceType);
+        String mergedType = protectVirtualClassification
+                ? type
+                : preferLatestValue(type, other.type);
         boolean classificationChanged = !Objects.equals(serviceType, mergedServiceType)
                 || !Objects.equals(type, mergedType);
         return new Builder()
@@ -189,7 +197,9 @@ public final class MetaServiceInfo {
                 .serviceType(mergedServiceType)
                 .type(mergedType)
                 // When service_type/type is corrected, take the incoming technology too.
-                .technology(classificationChanged
+                .technology(protectVirtualClassification
+                        ? pick(technology, other.technology)
+                        : classificationChanged
                         ? pick(other.technology, technology)
                         : pick(technology, other.technology))
                 .language(pick(language, other.language))
@@ -269,33 +279,42 @@ public final class MetaServiceInfo {
                 || virtualService != other.virtualService;
     }
 
-  private static ServiceTypeClassifier.Classification classifyFromAttributes(
-            String serviceId,
-            String serviceName,
+    /** Local triple for fromNames; production virtual middleware uses {@link #fromVirtualService}. */
+    private record ServiceClassification(String serviceType, String type, String technology) {
+        static final ServiceClassification WEB = new ServiceClassification("web", "web", "web");
+    }
+
+    private static ServiceClassification classifyFromAttributes(
             Map<String, String> attributes,
             boolean virtualService) {
-        String nameForPattern = firstNonBlank(serviceName, serviceId);
-        if (virtualService) {
+        // Application services are always web. Virtual middleware types are set by
+        // VirtualServiceResolver / fromVirtualService from span component recognition —
+        // never by scanning free-form service names.
+        if (virtualService && attributes != null) {
             String dbSystem = OtelAttributeMaps.firstNonBlank(attributes, "db.system", "db.type");
             if (dbSystem != null) {
                 String type = normalizeDbType(dbSystem);
-                return new ServiceTypeClassifier.Classification("db", type, type);
+                if (type != null && (type.toLowerCase().contains("redis")
+                        || type.toLowerCase().contains("memcached"))) {
+                    return new ServiceClassification("cache", type, type);
+                }
+                return new ServiceClassification("db", type, type);
             }
             String messagingSystem = OtelAttributeMaps.firstNonBlank(attributes, "messaging.system");
             if (messagingSystem != null) {
                 String type = messagingSystem.toLowerCase();
-                return new ServiceTypeClassifier.Classification("mq", type.contains("kafka") ? "kafka" : type, type);
+                return new ServiceClassification("mq", type.contains("kafka") ? "kafka" : type, type);
             }
             String rpcSystem = OtelAttributeMaps.firstNonBlank(attributes, "rpc.system");
             if (rpcSystem != null && !rpcSystem.isBlank()) {
-                return new ServiceTypeClassifier.Classification("remote", rpcSystem.toLowerCase(), rpcSystem.toLowerCase());
+                return new ServiceClassification("remote", rpcSystem.toLowerCase(), rpcSystem.toLowerCase());
             }
         }
-        return ServiceTypeClassifier.classify(nameForPattern);
+        return ServiceClassification.WEB;
     }
 
     private static String resolveTechnology(
-            ServiceTypeClassifier.Classification classified,
+            ServiceClassification classified,
             String language,
             String runtimeName,
             Map<String, String> attributes) {
@@ -366,13 +385,16 @@ public final class MetaServiceInfo {
             return "mysql";
         }
         if (lower.contains("postgres")) {
-            return "postgres";
+            return "postgresql";
         }
         if (lower.contains("mongo")) {
-            return "mongo";
+            return "mongodb";
         }
         if (lower.contains("redis")) {
             return "redis";
+        }
+        if (lower.contains("memcached")) {
+            return "memcached";
         }
         if (lower.contains("elastic")) {
             return "elasticsearch";
@@ -386,13 +408,36 @@ public final class MetaServiceInfo {
 
     /**
      * Prefer the incoming classification when present so catalog rows can be corrected
-     * (e.g. legacy name-keyword {@code custom} → current {@code web}).
+     * (e.g. legacy application {@code custom} → {@code web}).
+     *
+     * <p>Application paths ({@link #fromDcSpan}, {@link #fromMetric}, {@link #minimal}) always
+     * emit {@code web}. They must not wipe middleware types already set by
+     * {@link #fromVirtualService} — that guard lives in {@link #merge}.
      */
-    private static String preferLatestClassification(String existing, String incoming) {
+    private static String preferLatestValue(String existing, String incoming) {
         if (incoming != null && !incoming.isBlank()) {
             return incoming;
         }
         return existing;
+    }
+
+    private static boolean isMiddlewareServiceType(String serviceType) {
+        if (serviceType == null || serviceType.isBlank()) {
+            return false;
+        }
+        return switch (serviceType.toLowerCase()) {
+            case "db", "cache", "mq", "remote", "custom", "rpc" -> true;
+            default -> false;
+        };
+    }
+
+    private static boolean isApplicationServiceType(String serviceType) {
+        if (serviceType == null || serviceType.isBlank()) {
+            return false;
+        }
+        String lower = serviceType.trim().toLowerCase();
+        // Non-virtual catalog rows: web, or legacy application custom.
+        return "web".equals(lower) || "custom".equals(lower);
     }
 
     private static String firstNonBlank(String primary, String fallback) {

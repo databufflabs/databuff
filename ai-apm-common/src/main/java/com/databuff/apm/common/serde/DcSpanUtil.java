@@ -6,7 +6,6 @@ import com.databuff.apm.common.metric.DurationRangeUtil;
 import com.databuff.apm.common.metric.MetricSchemaRegistry;
 import com.databuff.apm.common.metric.TraceMetricMinuteBucket;
 import com.databuff.apm.common.meta.OtelAttributeMaps;
-import com.databuff.apm.common.meta.ServiceTypeClassifier;
 import com.databuff.apm.common.meta.SpanDirectionUtil;
 import com.databuff.apm.common.util.ServiceKeyUtil;
 import com.databuff.apm.common.model.DcSpan;
@@ -165,7 +164,8 @@ public final class DcSpanUtil {
         tags.put("service", nullToEmpty(span.service));
         tags.put("service_id", normalizeMetricServiceId(span.serviceId, span.service));
         tags.put("service_instance", nullToEmpty(serviceInstance));
-        tags.put("service_type", ServiceTypeClassifier.classify(span.serviceId).serviceType());
+        // Application service.instance rows are always web; never infer from name keywords.
+        tags.put("service_type", "web");
         tags.put("virtualService", "0");
         return tags;
     }
@@ -391,6 +391,21 @@ public final class DcSpanUtil {
         return analyze(span).redis;
     }
 
+    /** Cache category (redis / memcached) for portal / virtual-service typing. */
+    public static boolean isCacheSpan(DcSpan span) {
+        if (isRedisSpan(span)) {
+            return true;
+        }
+        SpanAnalysis analysis = analyze(span);
+        if (!analysis.hasDbSystem || analysis.http || analysis.rpc || analysis.mq
+                || analysis.es || analysis.config || analysis.db) {
+            return false;
+        }
+        Map<String, String> meta = OtelAttributeMaps.parse(span);
+        String dbSystem = OtelAttributeMaps.firstNonBlank(meta, "db.system", "db.type");
+        return dbSystem != null && isCacheDbSystem(dbSystem);
+    }
+
     public static boolean isMqSpan(DcSpan span) {
         return analyze(span).mq;
     }
@@ -417,7 +432,7 @@ public final class DcSpanUtil {
     }
 
     public static String resolvePortalServiceType(DcSpan span) {
-        if (isRedisSpan(span)) {
+        if (isCacheSpan(span)) {
             return "cache";
         }
         if (isDbSpan(span) || isEsSpan(span)) {
@@ -435,7 +450,7 @@ public final class DcSpanUtil {
     private static String resolvePortalTypeIcon(DcSpan span, String serviceType) {
         Map<String, String> meta = OtelAttributeMaps.parse(span);
         return switch (serviceType) {
-            case "cache" -> "redis";
+            case "cache" -> resolveCacheTypeIcon(meta);
             case "db" -> resolveDbTypeIcon(meta);
             case "mq" -> resolveMqTypeIcon(meta);
             case "custom" -> resolveCustomTypeIcon(meta, span);
@@ -443,23 +458,34 @@ public final class DcSpanUtil {
         };
     }
 
+    private static String resolveCacheTypeIcon(Map<String, String> meta) {
+        String dbSystem = OtelAttributeMaps.firstNonBlank(meta, "db.system", "db.type");
+        if (dbSystem != null && dbSystem.toLowerCase(Locale.ROOT).contains("memcached")) {
+            return "memcached";
+        }
+        return "redis";
+    }
+
     private static String resolveDbTypeIcon(Map<String, String> meta) {
         String dbSystem = OtelAttributeMaps.firstNonBlank(meta, "db.system", "db.type");
         if (dbSystem == null || dbSystem.isBlank()) {
-            return "mysql";
+            return "db";
         }
         String lower = dbSystem.toLowerCase(Locale.ROOT);
         if (lower.contains("elastic")) {
             return "elasticsearch";
         }
         if (lower.contains("postgres")) {
-            return "postgres";
+            return "postgresql";
         }
         if (lower.contains("mongo")) {
-            return "mongo";
+            return "mongodb";
         }
         if (lower.contains("redis")) {
             return "redis";
+        }
+        if (lower.contains("memcached")) {
+            return "memcached";
         }
         if (lower.contains("mysql") || lower.contains("mariadb")) {
             return "mysql";
@@ -470,7 +496,7 @@ public final class DcSpanUtil {
     private static String resolveMqTypeIcon(Map<String, String> meta) {
         String messagingSystem = OtelAttributeMaps.firstNonBlank(meta, "messaging.system");
         if (messagingSystem == null || messagingSystem.isBlank()) {
-            return "kafka";
+            return "mq";
         }
         String lower = messagingSystem.toLowerCase(Locale.ROOT);
         if (lower.contains("kafka")) {
@@ -494,10 +520,6 @@ public final class DcSpanUtil {
         if (configType != null && !configType.isBlank()) {
             return configType.toLowerCase(Locale.ROOT);
         }
-        String serviceId = firstNonBlank(span.dstServiceId, span.serviceId);
-        if (serviceId != null && !serviceId.isBlank()) {
-            return ServiceTypeClassifier.classify(serviceId).type();
-        }
         return "custom";
     }
 
@@ -520,7 +542,12 @@ public final class DcSpanUtil {
     }
 
     private static boolean isRedisDbSystem(String system) {
-        return system.toLowerCase().contains("redis");
+        return system.toLowerCase(Locale.ROOT).contains("redis");
+    }
+
+    private static boolean isCacheDbSystem(String system) {
+        String lower = system.toLowerCase(Locale.ROOT);
+        return lower.contains("redis") || lower.contains("memcached");
     }
 
     private static boolean isConfigDbSystem(String lower) {
@@ -545,13 +572,13 @@ public final class DcSpanUtil {
     }
 
     public static String resolveRpcSystem(Map<String, String> meta, DcSpan span) {
-        String operation = span != null ? firstNonBlank(span.name, span.resource) : null;
-        return resolveRpcSystem(meta, operation);
+        return resolveRpcSystem(meta, (String) null);
     }
 
     /**
-     * Resolve RPC framework from OTel semconv or DataBuff Java agent tags
-     * ({@code component}, {@code dubbo-version}, operation names like {@code dubbo.call}).
+     * Resolve RPC framework from structured signals only.
+     *
+     * @param operationName ignored; retained for call-site compatibility
      */
     public static String resolveRpcSystem(Map<String, String> meta, String operationName) {
         String rpcSystem = OtelAttributeMaps.firstNonBlank(meta, "rpc.system");
@@ -571,11 +598,7 @@ public final class DcSpanUtil {
         if (urlRpc != null) {
             return urlRpc;
         }
-        String skyWalkingRpc = rpcSystemFromSkyWalkingMeta(meta);
-        if (skyWalkingRpc != null) {
-            return skyWalkingRpc;
-        }
-        return rpcSystemFromOperation(operationName);
+        return rpcSystemFromSkyWalkingMeta(meta);
     }
 
     /** {@code dubbo://}, {@code grpc://} and other RPC scheme URLs must not count as HTTP. */
@@ -660,23 +683,6 @@ public final class DcSpanUtil {
         return null;
     }
 
-    private static String rpcSystemFromOperation(String operation) {
-        if (operation == null || operation.isBlank()) {
-            return null;
-        }
-        String lower = operation.trim().toLowerCase(Locale.ROOT);
-        if (lower.startsWith("dubbo.") || lower.startsWith("dubbo ")) {
-            return "dubbo";
-        }
-        if (lower.startsWith("grpc.") || lower.startsWith("grpc ")) {
-            return "grpc";
-        }
-        if (lower.startsWith("sofarpc.") || lower.startsWith("sofarpc ")) {
-            return "sofarpc";
-        }
-        return null;
-    }
-
     private static final class SpanAnalysis {
         private static final SpanAnalysis EMPTY = new SpanAnalysis(
                 0, null, null, null, false, false, false, false, false, false, false, false);
@@ -744,7 +750,7 @@ public final class DcSpanUtil {
                     && isRedisDbSystem(dbSystem);
             boolean db = !http && !rpc && !mq && !config
                     && dbSystem != null
-                    && !isRedisDbSystem(dbSystem);
+                    && !isCacheDbSystem(dbSystem);
             return new SpanAnalysis(
                     span.metaRevision,
                     span.metaHttpMethod,

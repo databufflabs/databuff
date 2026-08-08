@@ -38,7 +38,37 @@ class VirtualServiceInstanceRegistryTest {
         String json = new String(DorisJsonRow.toByteArray(instanceWriter.flushAll().get(0)));
         assertThat(json).contains("\"service\":\"[mysql]orders\"");
         assertThat(json).contains("\"service_instance\":\"10.0.0.8\"");
+        assertThat(json).contains("\"service_type\":\"db\"");
         assertThat(json).contains("\"virtualService\":\"1\"");
         assertThat(json).contains("\"metricsVal\":1");
+    }
+
+    @Test
+    void mergeUpgradesWrongMiddlewareTypeFromLaterSpanRecognition() throws Exception {
+        DorisBatchWriter instanceWriter = new DorisBatchWriter();
+        MetricWriteRouter router = new MetricWriteRouter(
+                Map.of(DorisTableNames.METRIC_SERVICE_INSTANCE, instanceWriter));
+        VirtualServiceInstanceRegistry registry = new VirtualServiceInstanceRegistry(router, 60_000L);
+
+        registry.remember(new VirtualServiceResolver.ResolvedVirtualService(
+                "abc123",
+                "[redis]10.0.0.9:6379",
+                "10.0.0.9",
+                "db",
+                "db",
+                "10.0.0.9",
+                "6379"));
+        registry.remember(new VirtualServiceResolver.ResolvedVirtualService(
+                "abc123",
+                "[redis]10.0.0.9:6379",
+                "10.0.0.9",
+                "cache",
+                "redis",
+                "10.0.0.9",
+                "6379"));
+
+        registry.flushHeartbeats();
+        String json = new String(DorisJsonRow.toByteArray(instanceWriter.flushAll().get(0)));
+        assertThat(json).contains("\"service_type\":\"cache\"");
     }
 }

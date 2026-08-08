@@ -64,7 +64,7 @@ public final class VirtualServiceExtractor {
         if (resolved == null) {
             return;
         }
-        applyVirtualDestination(span, resolved);
+        applyVirtualDestination(span, resolved, remote);
         virtualServiceInstanceRegistry.remember(resolved);
         if (metaServiceCollector != null) {
             metaServiceCollector.remember(MetaServiceInfo.fromVirtualService(
@@ -85,7 +85,10 @@ public final class VirtualServiceExtractor {
         return services;
     }
 
-    private static void applyVirtualDestination(DcSpan span, VirtualServiceResolver.ResolvedVirtualService resolved) {
+    private static void applyVirtualDestination(
+            DcSpan span,
+            VirtualServiceResolver.ResolvedVirtualService resolved,
+            boolean remote) {
         // Legacy portal OutProcessor#initComponentService: reassign span to virtual service dimension.
         span.service = resolved.service();
         span.serviceId = resolved.serviceId();
@@ -98,7 +101,7 @@ public final class VirtualServiceExtractor {
         if (span.isOut == 0) {
             span.isOut = 1;
         }
-        if (isRemoteVirtual(resolved, span)) {
+        if (remote || isRemoteVirtual(resolved, span)) {
             markRemote(span);
         }
         clearRedundantPeerHostname(span);

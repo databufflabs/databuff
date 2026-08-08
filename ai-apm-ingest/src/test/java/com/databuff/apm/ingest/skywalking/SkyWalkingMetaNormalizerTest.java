@@ -28,20 +28,41 @@ class SkyWalkingMetaNormalizerTest {
     }
 
     @Test
-    void mapsGenericSqlDbTypeToMysqlFromPeerHost() {
-        DcSpan span = convertDbSpan(0, "sql", "mysql.test:3306", tag("db.statement", "SELECT 1"));
-        Map<String, String> meta = OtelAttributeMaps.parse(span);
+    void doesNotGuessDbSystemFromPeerHostOrPortWithoutComponentId() {
+        DcSpan fromHost = convertDbSpan(0, "sql", "mysql.test:3306", tag("db.statement", "SELECT 1"));
+        Map<String, String> hostMeta = OtelAttributeMaps.parse(fromHost);
+        // Generic sql stays generic when componentId is absent — no hostname/port guessing.
+        assertThat(hostMeta.get("db.system")).isEqualTo("sql");
 
-        assertThat(meta.get("db.system")).isEqualTo("mysql");
-        assertThat(meta.get("db.type")).isEqualTo("mysql");
+        DcSpan fromPort = convertDbSpan(0, "sql", "db.internal:3306", tag("db.statement", "SELECT 1"));
+        Map<String, String> portMeta = OtelAttributeMaps.parse(fromPort);
+        assertThat(portMeta.get("db.system")).isEqualTo("sql");
     }
 
     @Test
-    void mapsGenericSqlDbTypeToMysqlFromPeerPort() {
-        DcSpan span = convertDbSpan(0, "sql", "db.internal:3306", tag("db.statement", "SELECT 1"));
+    void mapsRedisFromCacheLayerComponentId() {
+        SpanObject.Builder spanBuilder = SpanObject.newBuilder()
+                .setSpanId(0)
+                .setParentSpanId(-1)
+                .setStartTime(1_700_000_000_000L)
+                .setEndTime(1_700_000_000_050L)
+                .setOperationName("Jedis/GET")
+                .setSpanType(SpanType.Exit)
+                .setSpanLayer(SpanLayer.Cache)
+                .setComponentId(7)
+                .setPeer("10.0.0.9:6379")
+                .addTags(tag("db.type", "Redis"));
+        SegmentObject segment = SegmentObject.newBuilder()
+                .setTraceId("trace-redis")
+                .setTraceSegmentId("segment-redis")
+                .setService("skyWalking-service-redis")
+                .addSpans(spanBuilder)
+                .build();
+        DcSpan span = converter.convertSegment(segment).get(0).span();
         Map<String, String> meta = OtelAttributeMaps.parse(span);
 
-        assertThat(meta.get("db.system")).isEqualTo("mysql");
+        assertThat(meta.get("db.system")).isEqualTo("redis");
+        assertThat(meta.get("skywalking.componentId")).isEqualTo("7");
     }
 
     @Test
@@ -181,10 +202,9 @@ class SkyWalkingMetaNormalizerTest {
     void mapsRocketAndRabbitComponentIds() {
         assertThat(SkyWalkingMetaNormalizer.mqSystemFromSkyWalkingComponentId(38)).isEqualTo("rocketmq");
         assertThat(SkyWalkingMetaNormalizer.mqSystemFromSkyWalkingComponentId(52)).isEqualTo("rabbitmq");
-        assertThat(SkyWalkingMetaNormalizer.mqOperationFromOperationName("RocketMQ/topic/Producer"))
-                .isEqualTo("publish");
-        assertThat(SkyWalkingMetaNormalizer.mqOperationFromOperationName("RabbitMQ/Topic/Queue/q/Producer"))
-                .isEqualTo("publish");
+        assertThat(SkyWalkingMetaNormalizer.mqOperationFromSpanType(SpanType.Exit)).isEqualTo("publish");
+        assertThat(SkyWalkingMetaNormalizer.mqOperationFromSpanType(SpanType.Entry)).isEqualTo("process");
+        assertThat(SkyWalkingMetaNormalizer.mqOperationFromSpanType(SpanType.Local)).isNull();
     }
 
     @Test

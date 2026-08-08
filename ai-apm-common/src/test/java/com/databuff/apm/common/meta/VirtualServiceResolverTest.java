@@ -62,6 +62,23 @@ class VirtualServiceResolverTest {
     }
 
     @Test
+    void resolvesRedisVirtualServiceTypeFromSpanComponentNotServiceName() {
+        DcSpan span = new DcSpan();
+        span.service = "java-redis-demo";
+        span.serviceId = "java-redis-demo-id";
+        span.isOut = 1;
+        span.type = "SPAN_KIND_CLIENT";
+        span.meta = "{\"db.system\":\"redis\",\"server.address\":\"10.0.0.9\",\"server.port\":\"6379\"}";
+
+        VirtualServiceResolver.ResolvedVirtualService resolved = VirtualServiceResolver.resolve(span);
+
+        assertThat(resolved).isNotNull();
+        assertThat(resolved.service()).isEqualTo("[redis]10.0.0.9:6379");
+        assertThat(resolved.serviceType()).isEqualTo("cache");
+        assertThat(resolved.typeIcon()).isEqualTo("redis");
+    }
+
+    @Test
     void ignoresNonOutboundSpan() {
         DcSpan span = new DcSpan();
         span.isOut = 0;
@@ -71,37 +88,43 @@ class VirtualServiceResolverTest {
     }
 
     @Test
-    void skipsRemoteVirtualServiceForInternalHttpPeerInSameTrace() {
-        DcSpan span = new DcSpan();
-        span.service = "service-a";
-        span.isOut = 1;
-        span.type = "SPAN_KIND_CLIENT";
-        span.metaHttpMethod = "GET";
-        span.meta = "{\"http.method\":\"GET\",\"server.address\":\"service-b\",\"server.port\":\"8080\"}";
+    void doesNotCreateHttpOrRpcVirtualServices_useRemoteCallProcessorInstead() {
+        DcSpan http = new DcSpan();
+        http.service = "service-a";
+        http.isOut = 1;
+        http.type = "SPAN_KIND_CLIENT";
+        http.metaHttpMethod = "GET";
+        http.meta = "{\"http.method\":\"GET\",\"server.address\":\"service-b\",\"server.port\":\"8080\"}";
+        assertThat(VirtualServiceResolver.resolve(http, Set.of("service-a", "service-b"))).isNull();
 
-        assertThat(VirtualServiceResolver.resolve(span, Set.of("service-a", "service-b"))).isNull();
+        DcSpan rpc = new DcSpan();
+        rpc.service = "service-a";
+        rpc.isOut = 1;
+        rpc.type = "SPAN_KIND_CLIENT";
+        rpc.meta = "{\"rpc.system\":\"dubbo\",\"net.peer.name\":\"service-b\",\"net.peer.port\":\"20880\"}";
+        assertThat(VirtualServiceResolver.resolve(rpc, Set.of("service-a", "service-b"))).isNull();
     }
 
     @Test
-    void skipsRpcVirtualServiceForInternalPeerInSameTrace() {
-        DcSpan span = new DcSpan();
-        span.service = "service-a";
-        span.isOut = 1;
-        span.type = "SPAN_KIND_CLIENT";
-        span.meta = "{\"rpc.system\":\"dubbo\",\"net.peer.name\":\"service-b\",\"net.peer.port\":\"20880\"}";
-
-        assertThat(VirtualServiceResolver.resolve(span, Set.of("service-a", "service-b"))).isNull();
+    void normalizePeerHostKeepsIpv6Literal() {
+        assertThat(VirtualServiceResolver.normalizePeerHost("[2001:db8::1]:3306"))
+                .isEqualTo("2001:db8::1");
+        assertThat(VirtualServiceResolver.normalizePeerHost("[2001:db8::1]"))
+                .isEqualTo("2001:db8::1");
+        assertThat(VirtualServiceResolver.normalizePeerHost("[mysql]10.0.0.8:3306"))
+                .isEqualTo("10.0.0.8");
     }
 
     @Test
-    void skipsRpcVirtualServiceWhenServerServiceMetaMatchesTracedPeer() {
+    void doesNotUseJdbcConnectionStringAsPeerHost() {
         DcSpan span = new DcSpan();
-        span.service = "service-a";
+        span.service = "checkout";
         span.isOut = 1;
         span.type = "SPAN_KIND_CLIENT";
-        span.meta = "{\"rpc.system\":\"dubbo\",\"server.service\":\"service-b\","
-                + "\"net.peer.name\":\"10.0.0.5\",\"net.peer.port\":\"20880\"}";
+        span.meta = "{\"db.system\":\"mysql\",\"db.connection_string\":\"jdbc:mysql://10.0.0.8:3306/orders\"}";
 
-        assertThat(VirtualServiceResolver.resolve(span, Set.of("service-a", "service-b"))).isNull();
+        VirtualServiceResolver.ResolvedVirtualService resolved = VirtualServiceResolver.resolve(span);
+        assertThat(resolved).isNotNull();
+        assertThat(resolved.service()).doesNotContain("jdbc:");
     }
 }

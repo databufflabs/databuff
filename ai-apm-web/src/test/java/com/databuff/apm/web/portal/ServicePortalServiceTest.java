@@ -265,11 +265,19 @@ class ServicePortalServiceTest {
     }
 
     @Test
-    void listInfersServiceIconFromName() throws Exception {
+    void listUsesMetaServiceTypeNotNameKeywords() throws Exception {
         ApmReadRepository reader = mock(ApmReadRepository.class);
         when(reader.queryServiceSummaries(anyString())).thenReturn(List.of(
-                new ServiceSummaryPoint("[mysql]demo_apm", "c72cc83a8831e407", 50, 0, 500_000_000, 0)));
-        when(reader.queryDistinctCount(anyString())).thenReturn(1L);
+                new ServiceSummaryPoint("[mysql]demo_apm", "c72cc83a8831e407", 50, 0, 500_000_000, 0),
+                new ServiceSummaryPoint("java-redis-demo", "e94e84f73dea3f7f", 20, 0, 100_000_000, 0)));
+        when(reader.queryMetaServices(anyString())).thenReturn(List.of(
+                new MetaServicePoint(
+                        "c72cc83a8831e407", "[mysql]demo_apm", "[mysql]demo_apm", "db", null, "mysql",
+                        null, null, "OTLP", null, null, null, Boolean.TRUE, null, null, null, null),
+                new MetaServicePoint(
+                        "e94e84f73dea3f7f", "java-redis-demo", "java-redis-demo", "web", null, "web",
+                        "jvm", "java", "OTLP", null, null, null, Boolean.FALSE, null, null, null, null)));
+        when(reader.queryDistinctCount(anyString())).thenReturn(2L);
 
         ServicePortalService service = TestStorageSupport.servicePortalService(reader);
         Map<String, Object> resp = service.list(Map.of(
@@ -280,9 +288,19 @@ class ServicePortalServiceTest {
 
         @SuppressWarnings("unchecked")
         List<Map<String, Object>> rows = (List<Map<String, Object>>) resp.get("data");
-        assertThat(rows).hasSize(1);
-        assertThat(rows.get(0).get("type")).isEqualTo("mysql");
-        assertThat(rows.get(0)).doesNotContainKey("service_type");
+        assertThat(rows).hasSize(2);
+        Map<String, Object> mysql = rows.stream()
+                .filter(row -> "c72cc83a8831e407".equals(row.get("serviceId")))
+                .findFirst()
+                .orElseThrow();
+        Map<String, Object> app = rows.stream()
+                .filter(row -> "e94e84f73dea3f7f".equals(row.get("serviceId")))
+                .findFirst()
+                .orElseThrow();
+        assertThat(mysql.get("type")).isEqualTo("mysql");
+        assertThat(mysql.get("service_type")).isEqualTo("db");
+        assertThat(app.get("type")).isEqualTo("web");
+        assertThat(app.get("service_type")).isEqualTo("web");
     }
 
     @Test
@@ -1817,8 +1835,15 @@ class ServicePortalServiceTest {
   void filtersMiddlewareServicesByKind() throws Exception {
     ApmReadRepository reader = mock(ApmReadRepository.class);
     when(reader.queryServiceSummaries(anyString())).thenReturn(List.of(
-            new ServiceSummaryPoint("mysql-order", null, 10, 0, 5_000_000, 0),
-            new ServiceSummaryPoint("demo-order", null, 20, 0, 8_000_000, 0)));
+            new ServiceSummaryPoint("[mysql]orders", "c72cc83a8831e407", 10, 0, 5_000_000, 0),
+            new ServiceSummaryPoint("java-redis-demo", "e94e84f73dea3f7f", 20, 0, 8_000_000, 0)));
+    when(reader.queryMetaServices(anyString())).thenReturn(List.of(
+            new MetaServicePoint(
+                    "c72cc83a8831e407", "[mysql]orders", "[mysql]orders", "db", null, "mysql",
+                    null, null, "OTLP", null, null, null, Boolean.TRUE, null, null, null, null),
+            new MetaServicePoint(
+                    "e94e84f73dea3f7f", "java-redis-demo", "java-redis-demo", "web", null, "web",
+                    "jvm", "java", "OTLP", null, null, null, Boolean.FALSE, null, null, null, null)));
     when(reader.queryDistinctCount(anyString())).thenReturn(2L);
 
     ServicePortalService service = TestStorageSupport.servicePortalService(reader);
@@ -1832,7 +1857,9 @@ class ServicePortalServiceTest {
     @SuppressWarnings("unchecked")
     List<Map<String, Object>> rows = (List<Map<String, Object>>) result.get("data");
     assertThat(rows).hasSize(1);
-    assertThat(rows.get(0).get("serviceId")).isEqualTo("f844978e4f424f86");
+    assertThat(rows.get(0).get("name")).isEqualTo("[mysql]orders");
+    assertThat(rows.get(0).get("serviceId")).isEqualTo("c72cc83a8831e407");
+    assertThat(rows.get(0).get("service_type")).isEqualTo("db");
   }
 
   @Test
