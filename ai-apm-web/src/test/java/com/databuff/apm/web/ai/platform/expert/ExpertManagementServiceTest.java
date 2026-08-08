@@ -172,6 +172,7 @@ class ExpertManagementServiceTest {
         assertThat(upgraded.systemPrompt())
                 .contains("queryDorisBusinessData")
                 .contains("querySelfMonitorMetrics")
+                .contains("平台自运维变更")
                 .doesNotContain("不要硬查源码凑答案");
         assertThat(upgraded.toolIds())
                 .contains("platform.queryDorisBusinessData", "platform.querySelfMonitorMetrics", "common.getCurrentTimeRange");
@@ -205,8 +206,51 @@ class ExpertManagementServiceTest {
                 qa.updatedAt())));
 
         AiExpertDefinition upgraded = service.find("qa").orElseThrow();
-        assertThat(upgraded.systemPrompt()).contains("querySelfMonitorMetrics");
+        assertThat(upgraded.systemPrompt())
+                .contains("querySelfMonitorMetrics")
+                .contains("平台自运维变更");
         assertThat(upgraded.toolIds()).contains("platform.querySelfMonitorMetrics");
+    }
+
+    @Test
+    void persistedQaPromptWithReadOnlyBoundaryUpgradesToPlatformSelfOps() {
+        ExpertManagementService service = service();
+        AiExpertDefinition qa = service.find("qa").orElseThrow();
+        String readOnlyPrompt = """
+                你是 DataBuff 产品答疑专家。用户问产品怎么用、配置/接口含义、平台配置不生效，或平台自监控/自运维排障时，按 Skill 检索文档并用平台接口查实数后回答。
+                需要输出拓扑、调用关系、流程图时，用 Markdown 的 mermaid 代码块。
+                工作范围：不排查主机/Docker/磁盘等纯运行环境（运维）。
+                可用工具 queryDorisBusinessData、querySelfMonitorMetrics。
+                命令仅用于只读检索、阅读与经官方接口的只读查询；不要改文件、不要重启服务、不要执行破坏性操作。
+                """;
+        service.applyPersistedRows(List.of(new AiExpertDefinition(
+                qa.expertId(),
+                qa.name(),
+                qa.category(),
+                qa.description(),
+                qa.type(),
+                qa.modelProviderCode(),
+                qa.modelName(),
+                readOnlyPrompt,
+                List.of(
+                        "Bash",
+                        "BashOutput",
+                        "KillShell",
+                        "platform.queryDorisBusinessData",
+                        "platform.querySelfMonitorMetrics",
+                        "common.getCurrentTimeRange"),
+                qa.skillIds(),
+                qa.options(),
+                qa.enabled(),
+                true,
+                qa.version(),
+                qa.createdAt(),
+                qa.updatedAt())));
+
+        AiExpertDefinition upgraded = service.find("qa").orElseThrow();
+        assertThat(upgraded.systemPrompt())
+                .contains("平台自运维变更")
+                .doesNotContain("不要改文件、不要重启服务");
     }
 
     @Test

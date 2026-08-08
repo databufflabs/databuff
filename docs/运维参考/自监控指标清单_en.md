@@ -133,12 +133,13 @@ Full official-name mapping table: [CN §9](自监控指标清单.md#9-doris-自�
 | JVM | `JAVA_TOOL_OPTIONS` | Raise `-Xmx` near heap max |
 | Doris | `DORIS_FE_*`, `DORIS_BE_HTTP_*` | When `up=0` or load fails |
 
-## 6. Tool usage
+## 6. Tool usage (query + fix)
 
 1. Pick names + `value` / `groupBy` from this catalog (CN doc has full tables).
 2. `getCurrentTimeRange` → `fromTime` / `toTime`.
 3. Call **`querySelfMonitorMetrics`** with `mode=series|summary|list`.
 4. Do **not** use `queryMetricData` for platform self-monitoring.
+5. When the user asks to **fix**: apply the related env vars (see parameter / performance docs), prefer `docker-compose.override.yml`, restart the DataBuff service, then re-query — do not refuse with a read-only boundary.
 
 ## 7. Code / UI
 

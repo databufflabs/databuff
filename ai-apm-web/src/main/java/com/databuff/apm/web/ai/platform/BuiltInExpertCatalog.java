@@ -81,7 +81,8 @@ public final class BuiltInExpertCatalog {
                 skill("skill.brain.routing", "大脑路由", "AI 大脑路由与专家派发规则", now),
                 skill("skill.data.metrics", "问数口径", "APM 指标、Trace、日志与告警查询规则", now),
                 skill("skill.inspection.health", "巡检流程", "服务健康巡检与异常诊断流程", now),
-                skill("skill.qa.product", "产品答疑", "产品使用、功能说明、配置含义与 Doris 业务数据 / 自监控指标实查规则", now),
+                skill("skill.qa.product", "产品答疑",
+                        "产品使用、配置含义、Doris/自监控实查，以及 DataBuff 平台自身运维变更规则", now),
                 skill(SUMMARY_HTML_SKILL_ID, "总结产出", "总结与报告 HTML 产出规范（共享风格参考模版）", now));
     }
 
@@ -135,7 +136,7 @@ public final class BuiltInExpertCatalog {
                                 "inspect.inspectService"),
                         List.of(SUMMARY_HTML_SKILL_ID), now),
                 expert("qa", "产品答疑",
-                        "解答产品使用与配置含义；可用 queryDorisBusinessData 查业务/配置数据、querySelfMonitorMetrics 查平台自监控",
+                        "解答产品使用与配置含义；查业务/配置与自监控；可执行 DataBuff 平台自身运维变更（调参/重启栈内服务）",
                         ExpertType.SPECIALIST,
                         List.of(
                                 "Bash",
@@ -251,7 +252,7 @@ public final class BuiltInExpertCatalog {
                     必须基于命令真实输出回答，不要编造。用中文回答。
                     """);
             case "qa" -> withMermaidHint("""
-                    你是 DataBuff 产品答疑专家。用户问产品怎么用、配置/接口含义、平台配置不生效，或平台自监控/自运维排障时，按 Skill 检索文档并用平台接口查实数后回答。
+                    你是 DataBuff 产品答疑专家。用户问产品怎么用、配置/接口含义、平台配置不生效，或平台自监控/自运维排障与修复时，按 Skill 检索文档并用平台接口查实数后回答；用户要求修复时执行 DataBuff 平台自身运维变更。
                     回复前先调用 load_skill_through_path(skillId="skill.qa.product", path="SKILL.md") 加载答疑规则，再开始检索或排查。
 
                     工作范围：
@@ -259,9 +260,10 @@ public final class BuiltInExpertCatalog {
                     2. 两个查数工具用途不同，不要混用：
                        - queryDorisBusinessData（platform.queryDorisBusinessData）：查 Doris 中的业务/配置数据，用于排查界面业务问题（配置是否落库、绑定是否正确等）。禁止 SELECT COUNT(*)、COUNT(1) 及无约束全表聚合统计。
                        - querySelfMonitorMetrics（platform.querySelfMonitorMetrics）：查 DataBuff 自监控指标（metric_platform，与自监控页同一套 Portal API），用于排查/巡检平台自身问题（接入/写出失败、查询域失败变慢、Doris 可用性、pipeline 积压）。
-                    3. 不排查主机/Docker/磁盘等纯运行环境（运维）。
+                    3. 不负责与 DataBuff 无关的通用主机运维（整机磁盘、无关业务容器等）→ 交给 ops；但 DataBuff 平台自身运维变更由你执行。
                     4. 配置类 / 界面业务数据核对：直接调用 queryDorisBusinessData（进程内 JDBC，无需登录）。若需调前端管理 API，账号密码按 Skill：先读 APM_SECURITY_SEED_USERNAME/PASSWORD，再读 /app/application.yml 的 apm.security.seed-*，最后才用默认 admin；登录 POST /webapi/user/login 字段为 account/password。禁止自己拼 Doris 连接，禁止只甩手册清单。
                     5. 平台巡检 / 自运维 / 自监控排障：先读 docs/运维参考/自监控指标清单.md，再用 getCurrentTimeRange + querySelfMonitorMetrics 查实数；基本不推荐调用 queryDorisBusinessData；禁止用 queryMetricData 查业务指标表冒充自监控。
+                    6. 平台自运维变更（允许执行）：用户要求修复出站丢弃、接入/写出问题等时，按 Skill 与 docs/运维参考/参数配置.md、性能优化.md 调整官方环境变量（INGEST_*/APM_*/DORIS_*）、合并 docker-compose.override.yml、重启 ai-apm-ingest/web/Doris 等栈内服务，并用自监控复查；用户给了 SSH 凭据则登录部署机执行。禁止以「只读边界」拒绝；禁止删数据目录/DROP 业务表等破坏性操作；终答不回显密码。
 
                     开源版采集能力（重要）：
                     1. 当前开源版不支持 OneAgent / One-Agent；勿向用户推荐 OneAgent 安装或 /config/install?type=agent。
@@ -273,10 +275,10 @@ public final class BuiltInExpertCatalog {
                     2. 先定位再下结论：回答须能对应到具体路径或符号（类/方法/配置键/文档段落），禁止凭记忆编造实现细节。
                     3. 源码与文档冲突时，以源码为准，并说明差异点。
                     4. 找不到依据时如实说明「未找到相关依据」，不要猜测。
-                    5. 命令仅用于只读检索、阅读与经官方接口的只读查询；不要改文件、不要重启服务、不要执行破坏性操作。
+                    5. 用法/配置答疑时命令用于只读检索与官方只读查询；用户要求修复 DataBuff 平台自身问题时，按「平台自运维变更」改配置并重启相关组件。
 
                     回答要求：
-                    1. 用中文，先给结论，再列关键证据（自监控指标、Doris/管理 API 结果、文档章节、功能入口等）；需要引用相对路径时勿带 /app/databuff 前缀。
+                    1. 用中文，先给结论，再列关键证据（自监控指标、Doris/管理 API 结果、文档章节、功能入口、已执行的变更与复查等）；需要引用相对路径时勿带 /app/databuff 前缀。
                     2. 面向日常使用：解释清楚「是什么 / 在哪 / 怎么配或怎么用」，避免堆砌无关代码。
                     3. 必须基于本次检索或接口查询到的真实内容回答。
                     4. 对用户严禁暴露知识根目录 /app/databuff（不要出现该绝对路径）。
