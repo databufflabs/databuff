@@ -35,6 +35,39 @@
 ---
 DataBuff 是一款面向 AI 智能体、微服务、云原生场景的 **AI 原生开源 APM 软件**，以 OpenTelemetry 标准接入，提供**全链路监控**、服务拓扑、RED 指标、智能体监控与 AI 工作台。
 
+## 生态认可 · OpenTelemetry Vendors × CNCF Landscape
+
+继入选 [OpenTelemetry 官方 Vendors](https://opentelemetry.io/ecosystem/vendors/)（标注 **OSS · Native OTLP**）之后，DataBuff 再被收录进 [CNCF Landscape](https://landscape.cncf.io/?item=observability-and-analysis--observability--databuff) 的 **Observability and Analysis → Observability**（另挂 AI Native Infra / Observability）——现有 OTel 埋点可零改造接入，也和全球可观测方案同屏对照。
+
+<table border="0" cellspacing="16" cellpadding="0" align="center">
+<tr>
+<td align="center" width="480" valign="top">
+  <p><strong>① 入选 OpenTelemetry Vendors</strong></p>
+  <p>与 Jaeger、SigNoz、Grafana 等并列，官网 Vendors 列表标注原生 OTLP。</p>
+  <img src="docs/images/otel-vendors-databuff.png" alt="OpenTelemetry Vendors 列表中的 DataBuff" width="460" />
+  <br/>
+  <sub>
+    <a href="https://opentelemetry.io/ecosystem/vendors/">官网列表</a>
+    ·
+    <a href="https://mp.weixin.qq.com/s/RGzh1LnzBzOQTizsoPZMGg">宣布文章</a>
+  </sub>
+</td>
+<td align="center" width="480" valign="top">
+  <p><strong>② 收录 CNCF Landscape</strong></p>
+  <p>云原生全景图 Observability 区可见 DataBuff。</p>
+  <img src="docs/images/cncf-landscape-databuff.png" alt="CNCF Landscape 中的 DataBuff" width="460" />
+  <br/>
+  <sub>
+    <a href="https://landscape.cncf.io/?item=observability-and-analysis--observability--databuff">Landscape 条目</a>
+    ·
+    <a href="https://mp.weixin.qq.com/s/9PS2SW_ug6sNx9ZjAyxKNw">宣布文章</a>
+  </sub>
+</td>
+</tr>
+</table>
+
+---
+
 ## 功能特性
 
 - 🤖 **AI 原生，不是外挂聊天框** — LLM 直接查询 Trace、指标、拓扑、告警，回答基于真实数据

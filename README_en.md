@@ -58,6 +58,39 @@
 
 ---
 
+## Ecosystem Recognition · OpenTelemetry Vendors × CNCF Landscape
+
+After joining the [OpenTelemetry official Vendors](https://opentelemetry.io/ecosystem/vendors/) list (**OSS · Native OTLP**), DataBuff is also listed on the [CNCF Landscape](https://landscape.cncf.io/?item=observability-and-analysis--observability--databuff) under **Observability and Analysis → Observability** (also tagged AI Native Infra / Observability). Bring your existing OTel instrumentation as-is, and find us alongside the global observability map.
+
+<table border="0" cellspacing="16" cellpadding="0" align="center">
+<tr>
+<td align="center" width="480" valign="top">
+  <p><strong>① OpenTelemetry Vendors</strong></p>
+  <p>Listed with Jaeger, SigNoz, Grafana, and others — marked Native OTLP on the official vendors page.</p>
+  <img src="docs/images/otel-vendors-databuff.png" alt="DataBuff on the OpenTelemetry Vendors list" width="460" />
+  <br/>
+  <sub>
+    <a href="https://opentelemetry.io/ecosystem/vendors/">Official list</a>
+    ·
+    <a href="https://mp.weixin.qq.com/s/RGzh1LnzBzOQTizsoPZMGg">Announcement</a>
+  </sub>
+</td>
+<td align="center" width="480" valign="top">
+  <p><strong>② CNCF Landscape</strong></p>
+  <p>Visible in the Observability sector of the cloud-native landscape.</p>
+  <img src="docs/images/cncf-landscape-databuff.png" alt="DataBuff on the CNCF Landscape" width="460" />
+  <br/>
+  <sub>
+    <a href="https://landscape.cncf.io/?item=observability-and-analysis--observability--databuff">Landscape entry</a>
+    ·
+    <a href="https://mp.weixin.qq.com/s/9PS2SW_ug6sNx9ZjAyxKNw">Announcement</a>
+  </sub>
+</td>
+</tr>
+</table>
+
+---
+
 <h2>Features</h2>
 
 - 🤖 **AI-native, not a bolt-on chat box** — LLM queries traces, metrics, topology, and alerts directly from real data

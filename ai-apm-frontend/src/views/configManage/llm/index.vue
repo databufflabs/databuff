@@ -15,19 +15,36 @@
         v-for="item in providers"
         :key="item.providerCode"
         class="provider-card"
-        :class="{ 'is-configured': item.configured, 'is-enabled': item.enabled }"
+        :class="{
+          'is-configured': item.configured,
+          'is-enabled': item.enabled,
+          'is-default': item.defaultProvider,
+        }"
         @click="openEditDialog(item)">
+        <div v-if="item.defaultProvider || item.enabled" class="provider-status">
+          <span
+            v-if="item.defaultProvider"
+            class="provider-default-badge"
+            :title="$t('modules.views.configManage.llm.s_18c63459')">
+            <i class="el-icon-star-on"></i>
+            {{ $t('modules.views.configManage.llm.s_18c63459') }}
+          </span>
+          <span
+            v-if="item.enabled"
+            class="provider-enabled-badge"
+            :title="$t('modules.views.help.startGuide.s_53ace430')">
+            <i class="el-icon-check"></i>
+          </span>
+        </div>
         <div class="provider-icon" :style="{ background: iconStyle(item).bg }">
           <span>{{ iconStyle(item).label }}</span>
         </div>
         <div class="provider-name">{{ item.displayName }}</div>
         <div class="provider-url" :title="item.baseUrl">{{ item.baseUrl }}</div>
         <div class="provider-meta">
-          <el-tag v-if="item.defaultProvider" size="mini" type="primary" effect="plain">{{ $t('modules.views.configManage.llm.s_18c63459') }}</el-tag>
           <el-tag size="mini" type="info" effect="plain">{{ $t('modules.views.configManage.llm.s_0c2e6e90', { value0: item.modelCount }) }}</el-tag>
-          <el-tag v-if="item.enabled" size="mini" type="success" effect="plain">{{ $t('modules.views.help.startGuide.s_53ace430') }}</el-tag>
-          <el-tag v-else-if="item.configured" size="mini" type="info" effect="plain">{{ $t('modules.views.configInstall.plugin.s_da208e9c') }}</el-tag>
-          <el-tag v-else size="mini" type="info" effect="plain">{{ $t('modules.views.configManage.llm.s_71dc8feb') }}</el-tag>
+          <el-tag v-if="!item.enabled && item.configured" size="mini" type="info" effect="plain">{{ $t('modules.views.configInstall.plugin.s_da208e9c') }}</el-tag>
+          <el-tag v-else-if="!item.configured" size="mini" type="info" effect="plain">{{ $t('modules.views.configManage.llm.s_71dc8feb') }}</el-tag>
         </div>
       </div>
     </div>
@@ -663,6 +680,7 @@ export default class LlmConfigPage extends Vue {
 }
 
 .provider-card {
+  position: relative;
   padding: 16px;
   background: var(--bg-color, #fff);
   border: 1px solid var(--border-color-lighter, #ebeef5);
@@ -676,7 +694,65 @@ export default class LlmConfigPage extends Vue {
   }
 
   &.is-enabled {
-    border-color: #bfdbfe;
+    border-color: #86efac;
+    background: linear-gradient(180deg, #f0fdf4 0%, var(--bg-color, #fff) 48%);
+  }
+
+  &.is-default {
+    border-color: #fcd34d;
+    background: linear-gradient(180deg, #fffbeb 0%, var(--bg-color, #fff) 48%);
+  }
+
+  &.is-default.is-enabled {
+    border-color: #86efac;
+    background: linear-gradient(135deg, #fffbeb 0%, #f0fdf4 55%, var(--bg-color, #fff) 100%);
+  }
+}
+
+.provider-status {
+  position: absolute;
+  top: 10px;
+  right: 10px;
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  z-index: 1;
+}
+
+.provider-default-badge {
+  display: inline-flex;
+  align-items: center;
+  gap: 3px;
+  height: 22px;
+  padding: 0 8px;
+  border-radius: 11px;
+  background: #d97706;
+  color: #fff;
+  font-size: 12px;
+  font-weight: 600;
+  line-height: 1;
+  box-shadow: 0 2px 6px rgba(217, 119, 6, 0.35);
+
+  i {
+    font-size: 12px;
+  }
+}
+
+.provider-enabled-badge {
+  width: 22px;
+  height: 22px;
+  border-radius: 50%;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  background: #22c55e;
+  color: #fff;
+  font-size: 12px;
+  line-height: 1;
+  box-shadow: 0 2px 6px rgba(34, 197, 94, 0.35);
+
+  i {
+    font-weight: 700;
   }
 }
 
