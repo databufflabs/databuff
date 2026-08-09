@@ -170,11 +170,12 @@ public class ServicePortalService {
     /**
      * Service detail SQL tab passes {@code serviceId=app} + {@code isIn=1}; after service.db tag semantics
      * changed to {@code service=db, srcService=app}, translate that to a caller-scoped query.
-     * Database detail passes {@code dbTarget=1} to keep {@code serviceId} as the downstream DB target.
+     * Database / cache / MQ resource detail passes {@code dbTarget=1} (or a bracket virtual service
+     * name) to keep {@code serviceId} as the downstream middleware target.
      */
     private static Map<String, Object> normalizeDbGraphStatsBody(Map<String, Object> body) {
         Map<String, Object> params = new LinkedHashMap<>(body);
-        if (isDbTargetFilter(body)) {
+        if (isDbTargetFilter(body) || isVirtualMiddlewareServiceHint(body)) {
             return params;
         }
         String serviceId = resolveServiceId(body);
@@ -196,6 +197,18 @@ public class ServicePortalService {
         return params;
     }
 
+    /** Bracket virtual names like {@code [mysql]demo_apm} mean the serviceId is the middleware target. */
+    private static boolean isVirtualMiddlewareServiceHint(Map<String, Object> body) {
+        for (String key : List.of("service", "name", "sn")) {
+            String value = stringValue(body.get(key), null);
+            if (value != null && value.startsWith("[")) {
+                return true;
+            }
+        }
+        String serviceId = resolveServiceId(body);
+        return serviceId != null && serviceId.startsWith("[");
+    }
+
     private Map<String, Object> componentGraphStats(Map<String, Object> body, String table) {
         long now = System.currentTimeMillis();
         long from = PortalTimeParser.rangeFrom(body, now - 3_600_000L);
@@ -213,8 +226,12 @@ public class ServicePortalService {
         Integer isSlow = parseOptionalFlag(body.get("isSlow"));
 
         Set<String> serviceKeys = metricServiceIdKeys(serviceId);
-        Set<String> srcKeys = metricServiceIdKeys(srcServiceId);
+        // metricServiceIdKeys returns immutable Set.of(); copy before optional mutation.
+        Set<String> srcKeys = new LinkedHashSet<>(metricServiceIdKeys(srcServiceId));
+        // App SQL tab: serviceId=app + isOut=1 means "I am the caller" → filter srcService.
+        // Database/middleware resource detail passes dbTarget=1 and must keep serviceId as target.
         if (DorisTableNames.METRIC_SERVICE_DB.equals(table)
+                && !isDbTargetFilter(body)
                 && isOut != null
                 && isOut == 1
                 && (isIn == null || isIn == 0)

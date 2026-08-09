@@ -341,13 +341,13 @@ export default class TabBaseinfo extends Vue {
       case 'service.http':
         return { isIn: 1 }
       case 'service.mq':
-        return { isIn: 1 }
+        // Middleware resource detail: keep serviceId as target (do not rewrite to srcService).
+        return { isIn: 1, dbTarget: 1 }
       case 'service.rpc':
-        return {}
+        return { isIn: 1 }
       case 'service.db':
-        return { isOut: 1 }
       case 'service.redis':
-        return { osOut: 0 }
+        return { isIn: 1, dbTarget: 1 }
       default:
         return {}
     }
@@ -407,7 +407,7 @@ export default class TabBaseinfo extends Vue {
       componentType: this.componentType,
       serviceId: this.serviceId,
       ...this.endpointMetricParams(),
-      isIn: 1,
+      ...this.inOutParamsByType,
       graphStats: ['callCnts', 'errorCnts', 'avgLatencys'],
     }
     if (this.serviceInstance) {

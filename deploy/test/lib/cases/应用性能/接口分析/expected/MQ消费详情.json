@@ -1,0 +1,15 @@
+{
+  "status": 200,
+  "message": "success",
+  "data": {
+    "resource": "order-events publish",
+    "serviceId": "c1fbe6792ea65d41",
+    "service": "[kafka]order-events",
+    "service_type": "mq",
+    "type": "kafka",
+    "callCnt": { "$range": [1, 1000] },
+    "errCnt": { "$range": [0, 1000] },
+    "avgLatency": { "$range": [1, 100000000000] },
+    "errRate": { "$range": [0, 1] }
+  }
+}

@@ -237,6 +237,49 @@ class MetricQueryBuilderTest {
     }
 
     @Test
+    void spanListSqlFiltersNonHttpByResourceColumn() {
+        String rpcSql = MetricQueryBuilder.spanListSql(
+                "databuff",
+                List.of("5457a0119281bb98"),
+                0L,
+                3_600_000L,
+                50,
+                0,
+                "2026-06-06 07:17:00",
+                "2026-06-06 08:17:00",
+                null,
+                null,
+                "startTime",
+                "desc",
+                "Dubbo DemoOrderService.findInventory",
+                null,
+                null,
+                "service.rpc");
+        assertThat(rpcSql).contains("COALESCE(NULLIF(`resource`, ''), `name`) = 'Dubbo DemoOrderService.findInventory'");
+        assertThat(rpcSql).doesNotContain("`meta.http.url` = 'Dubbo DemoOrderService.findInventory'");
+
+        String dbSql = MetricQueryBuilder.spanListSql(
+                "databuff",
+                List.of("c72cc83a8831e407"),
+                0L,
+                3_600_000L,
+                50,
+                0,
+                "2026-06-06 07:17:00",
+                "2026-06-06 08:17:00",
+                null,
+                null,
+                "startTime",
+                "desc",
+                "SELECT id, amount, status FROM demo_order WHERE id = ?",
+                null,
+                null,
+                "service.db");
+        assertThat(dbSql).contains("COALESCE(NULLIF(`resource`, ''), `name`) = 'SELECT id, amount, status FROM demo_order WHERE id = ?'");
+        assertThat(dbSql).contains("get_json_string(`meta`, '$.\"db.statement\"')");
+    }
+
+    @Test
     void errorSpanListSqlMatchesOwnedOrCallerServiceForWebApps() {
         String sql = MetricQueryBuilder.errorSpanListSql(
                 "databuff",

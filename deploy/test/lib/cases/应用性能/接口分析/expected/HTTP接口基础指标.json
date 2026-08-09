@@ -1,0 +1,11 @@
+{
+  "status": 200,
+  "message": "success",
+  "data": {
+    "callCnts": { "$minSeriesSum": 1 },
+    "errorCnts": { "$minSeriesSum": 0 },
+    "avgLatencys": { "$minSeriesSum": 1 },
+    "errorRates": { "$minSeriesSum": 0 },
+    "details": {}
+  }
+}

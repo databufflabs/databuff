@@ -12,7 +12,9 @@
       "reqRate": 0.1,
       "lastMinReqRate": 6.0,
       "type": "mysql",
-      "language": ""
+      "language": "",
+      "service_type": "db",
+      "virtual_service": true
     },
     {
       "serviceId": "94d612e1c2166206",
@@ -26,7 +28,9 @@
       "reqRate": 0.06666666666666667,
       "lastMinReqRate": 4.0,
       "type": "redis",
-      "language": ""
+      "language": "",
+      "service_type": "cache",
+      "virtual_service": true
     },
     {
       "serviceId": "5457a0119281bb98",
@@ -40,7 +44,9 @@
       "reqRate": 0.06666666666666667,
       "lastMinReqRate": 4.0,
       "type": "web",
-      "language": "java"
+      "language": "java",
+      "service_type": "web",
+      "virtual_service": false
     },
     {
       "serviceId": "c89bb188ecff78ec",
@@ -54,7 +60,9 @@
       "reqRate": 0.03333333333333333,
       "lastMinReqRate": 2.0,
       "type": "elasticsearch",
-      "language": ""
+      "language": "",
+      "service_type": "db",
+      "virtual_service": true
     },
     {
       "serviceId": "c1fbe6792ea65d41",
@@ -68,7 +76,9 @@
       "reqRate": 0.03333333333333333,
       "lastMinReqRate": 2.0,
       "type": "kafka",
-      "language": ""
+      "language": "",
+      "service_type": "mq",
+      "virtual_service": true
     },
     {
       "serviceId": "9bf61532d56eb7b5",
@@ -82,7 +92,9 @@
       "reqRate": 0.03333333333333333,
       "lastMinReqRate": 2.0,
       "type": "web",
-      "language": "java"
+      "language": "java",
+      "service_type": "web",
+      "virtual_service": false
     }
   ],
   "status": 200,

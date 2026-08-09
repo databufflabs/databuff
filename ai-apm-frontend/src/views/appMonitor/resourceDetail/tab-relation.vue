@@ -355,7 +355,11 @@ export default class TabRelation extends Vue {
       fromTime: dayjs(+new Date() - 1000 * 3660).format('YYYY-MM-DD HH:mm') + ':00',
       toTime: dayjs(+new Date() - 1000 * 60).format('YYYY-MM-DD HH:mm') + ':00',
       interval: 60,
+      isIn: 1,
       graphStats: ['callCnts'],
+    }
+    if (['service.db', 'service.redis', 'service.mq'].includes(this.componentType)) {
+      _params.dbTarget = 1
     }
     const { result, error } = await toAsyncWait(ApmApi.getServiceGraph(_params))
     if (!error) {

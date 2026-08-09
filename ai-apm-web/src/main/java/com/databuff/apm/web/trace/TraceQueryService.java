@@ -47,7 +47,8 @@ public class TraceQueryService {
                 request.sortOrder(),
                 request.resource(),
                 request.minDuration(),
-                request.error());
+                request.error(),
+                request.componentType());
     }
 
     public long spanListCount(SpanListRequest request) {
@@ -144,9 +145,10 @@ public class TraceQueryService {
             String sortOrder,
             String resource,
             Long minDuration,
-            Integer error) {
+            Integer error,
+            String componentType) {
         public SpanListRequest(String service, long from, long to, int limit) {
-            this(service, null, from, to, limit, 0, null, null, null, null, null, null, null, null, null);
+            this(service, null, from, to, limit, 0, null, null, null, null, null, null, null, null, null, null);
         }
 
         public SpanListRequest(
@@ -156,7 +158,7 @@ public class TraceQueryService {
                 int limit,
                 String fromTimeText,
                 String toTimeText) {
-            this(service, null, from, to, limit, 0, fromTimeText, toTimeText, null, null, null, null, null, null, null);
+            this(service, null, from, to, limit, 0, fromTimeText, toTimeText, null, null, null, null, null, null, null, null);
         }
 
         public SpanListRequest(
@@ -187,6 +189,42 @@ public class TraceQueryService {
                     sortOrder,
                     null,
                     null,
+                    null,
+                    null);
+        }
+
+        public SpanListRequest(
+                String service,
+                List<String> serviceIds,
+                long from,
+                long to,
+                int limit,
+                int offset,
+                String fromTimeText,
+                String toTimeText,
+                Integer isParent,
+                String parentId,
+                String sortField,
+                String sortOrder,
+                String resource,
+                Long minDuration,
+                Integer error) {
+            this(
+                    service,
+                    serviceIds,
+                    from,
+                    to,
+                    limit,
+                    offset,
+                    fromTimeText,
+                    toTimeText,
+                    isParent,
+                    parentId,
+                    sortField,
+                    sortOrder,
+                    resource,
+                    minDuration,
+                    error,
                     null);
         }
 

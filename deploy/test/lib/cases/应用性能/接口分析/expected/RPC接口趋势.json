@@ -1,0 +1,7 @@
+{
+  "status": 200,
+  "message": "success",
+  "data": {
+    "$minCallSum": 1
+  }
+}

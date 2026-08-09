@@ -69,6 +69,42 @@ public final class TraceSpanMetricDrilldownService {
             String resourceExact,
             Long minDurationNs,
             Integer error) {
+        return spanList(
+                service,
+                serviceIds,
+                fromMillis,
+                toMillis,
+                limit,
+                offset,
+                fromTimeText,
+                toTimeText,
+                isParent,
+                parentId,
+                sortField,
+                sortOrder,
+                resourceExact,
+                minDurationNs,
+                error,
+                null);
+    }
+
+    public List<ApmQueryModels.SpanSummary> spanList(
+            String service,
+            java.util.List<String> serviceIds,
+            long fromMillis,
+            long toMillis,
+            int limit,
+            int offset,
+            String fromTimeText,
+            String toTimeText,
+            Integer isParent,
+            String parentId,
+            String sortField,
+            String sortOrder,
+            String resourceExact,
+            Long minDurationNs,
+            Integer error,
+            String componentType) {
         int safeLimit = limit <= 0 ? 50 : Math.min(limit, 500);
         java.util.List<String> serviceKeys = resolveServiceKeys(service, serviceIds);
         try {
@@ -86,7 +122,8 @@ public final class TraceSpanMetricDrilldownService {
                     sortOrder,
                     resourceExact,
                     minDurationNs,
-                    error));
+                    error,
+                    componentType));
         } catch (Exception e) {
             // Do not swallow: portal/API boundary maps Throwable to a user-facing message.
             if (e instanceof RuntimeException runtime) {
@@ -168,6 +205,40 @@ public final class TraceSpanMetricDrilldownService {
             String resourceExact,
             Long minDurationNs,
             Integer error) {
+        return spanListSql(
+                serviceKeys,
+                fromMillis,
+                toMillis,
+                limit,
+                offset,
+                fromTimeText,
+                toTimeText,
+                isParent,
+                parentId,
+                sortField,
+                sortOrder,
+                resourceExact,
+                minDurationNs,
+                error,
+                null);
+    }
+
+    private String spanListSql(
+            java.util.List<String> serviceKeys,
+            long fromMillis,
+            long toMillis,
+            int limit,
+            int offset,
+            String fromTimeText,
+            String toTimeText,
+            Integer isParent,
+            String parentId,
+            String sortField,
+            String sortOrder,
+            String resourceExact,
+            Long minDurationNs,
+            Integer error,
+            String componentType) {
         return MetricQueryBuilder.spanListSql(
                 traceDatabase,
                 serviceKeys,
@@ -183,7 +254,8 @@ public final class TraceSpanMetricDrilldownService {
                 sortOrder,
                 resourceExact,
                 minDurationNs,
-                error);
+                error,
+                componentType);
     }
 
     private static java.util.List<String> resolveServiceKeys(String service, java.util.List<String> serviceIds) {

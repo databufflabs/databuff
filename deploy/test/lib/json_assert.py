@@ -229,6 +229,34 @@ def _match_special(actual: Any, expected: dict[str, Any], path: str) -> bool:
         if not (arg[0] <= actual <= arg[1]):
             raise JsonAssertError(path, f"expected {actual!r} in range {arg}")
         return True
+    if key == "$minCallSum":
+        if not isinstance(actual, dict):
+            raise JsonAssertError(path, f"expected object, got {type(actual).__name__}")
+        total = 0
+        for value in actual.values():
+            if isinstance(value, dict) and value.get("call") is not None:
+                call = value.get("call")
+                if isinstance(call, (int, float)) and not isinstance(call, bool):
+                    total += int(call)
+        if total < arg:
+            raise JsonAssertError(path, f"expected call sum >= {arg}, got {total}")
+        return True
+    if key == "$minSeriesSum":
+        if not isinstance(actual, dict):
+            raise JsonAssertError(path, f"expected object, got {type(actual).__name__}")
+        total = 0
+        for value in actual.values():
+            if isinstance(value, (int, float)) and not isinstance(value, bool):
+                total += int(value)
+            elif isinstance(value, dict):
+                for field in ("call", "slow", "error"):
+                    field_val = value.get(field)
+                    if isinstance(field_val, (int, float)) and not isinstance(field_val, bool):
+                        total += int(field_val)
+                        break
+        if total < arg:
+            raise JsonAssertError(path, f"expected series sum >= {arg}, got {total}")
+        return True
     if key == "$minLength":
         if not isinstance(actual, list):
             raise JsonAssertError(path, f"expected list, got {type(actual).__name__}")

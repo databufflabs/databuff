@@ -355,13 +355,16 @@ export default class ServiceTable extends Vue {
     try {
       const { fromTime, toTime, interval } = this.getGlobalTimeV2();
       const _field = `${field}s`
-      const params = {
+      const params: any = {
         componentType: this.componentType,
         fromTime, toTime, interval,
         resource: row.resource,
         isIn: 1,
         graphStats: [_field],
         serviceId: row.serviceId
+      }
+      if (this.$route.query.dbTarget || ['service.db', 'service.redis', 'service.mq'].includes(this.componentType)) {
+        params.dbTarget = 1
       }
       const { result, error } = await toAsyncWait(ApmApi.getServiceGraph(params, this.tooltipChart.cancelTokenSource.token))
       if (!error) {

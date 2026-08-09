@@ -1,0 +1,14 @@
+{
+  "status": 200,
+  "message": "success",
+  "data": {
+    "resource": "GET cart",
+    "serviceId": "94d612e1c2166206",
+    "service": "[redis]redis:6379",
+    "service_type": "cache",
+    "callCnt": { "$range": [1, 1000] },
+    "errCnt": { "$range": [0, 1000] },
+    "avgLatency": { "$range": [1, 100000000000] },
+    "errRate": { "$range": [0, 1] }
+  }
+}

@@ -150,7 +150,8 @@ public class TracePortalService {
                     sortField,
                     sortOrder,
                     resource,
-                    exception);
+                    exception,
+                    ServicePortalService.stringValue(body.get("componentType"), null));
             List<Map<String, Object>> spans = readRepository.querySpanSummaries(listSql).stream()
                     .map(this::toPortalSpan)
                     .toList();
@@ -1207,7 +1208,8 @@ public class TracePortalService {
                 ServicePortalService.stringValue(body.get("sortOrder"), "desc"),
                 resolveInterfaceUrlFilter(body),
                 parseSpanListMinDuration(body),
-                parseSpanListError(body));
+                parseSpanListError(body),
+                ServicePortalService.stringValue(body.get("componentType"), null));
     }
 
     /**
@@ -1658,8 +1660,12 @@ public class TracePortalService {
         String endpointFilter = resolveInterfaceUrlFilter(body);
         if (endpointFilter != null && !endpointFilter.isBlank()) {
             final String endpoint = endpointFilter;
-            if ("service.http".equals(ServicePortalService.stringValue(body.get("componentType"), null))) {
+            String componentType = ServicePortalService.stringValue(body.get("componentType"), null);
+            if ("service.http".equals(componentType)) {
                 rows.removeIf(row -> !matchesHttpSpanUrl(endpoint, row));
+            } else if ("service.db".equals(componentType)) {
+                // SQL already matched resource / db.statement / http.url; span.resource may be a
+                // short operation name while the portal endpoint is full sqlContent.
             } else {
                 rows.removeIf(row -> !endpoint.equals(String.valueOf(row.get("resource"))));
             }

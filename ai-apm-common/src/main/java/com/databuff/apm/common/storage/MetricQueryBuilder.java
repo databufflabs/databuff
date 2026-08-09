@@ -248,10 +248,46 @@ public final class MetricQueryBuilder {
             String resourceExact,
             Long minDurationNs,
             Integer error) {
+        return spanListSql(
+                database,
+                serviceKeys,
+                fromMillis,
+                toMillis,
+                limit,
+                offset,
+                fromTimeText,
+                toTimeText,
+                isParent,
+                parentId,
+                sortField,
+                sortOrder,
+                resourceExact,
+                minDurationNs,
+                error,
+                null);
+    }
+
+    public static String spanListSql(
+            String database,
+            java.util.Collection<String> serviceKeys,
+            long fromMillis,
+            long toMillis,
+            int limit,
+            int offset,
+            String fromTimeText,
+            String toTimeText,
+            Integer isParent,
+            String parentId,
+            String sortField,
+            String sortOrder,
+            String resourceExact,
+            Long minDurationNs,
+            Integer error,
+            String componentType) {
         String timeWhere = spanListTimeWhere(fromMillis, toMillis, fromTimeText, toTimeText, isParent);
         String filters = buildTraceServiceKeyOrFilter(serviceKeys)
                 + appendTraceSpanListScopeFilters(isParent, parentId)
-                + appendSpanListDetailFilters(resourceExact, minDurationNs, error);
+                + appendSpanListDetailFilters(resourceExact, minDurationNs, error, componentType);
         int safeLimit = Math.max(1, Math.min(limit, 500));
         int safeOffset = Math.max(0, offset);
         return """
@@ -320,7 +356,7 @@ public final class MetricQueryBuilder {
         String timeWhere = spanListTimeWhere(fromMillis, toMillis, fromTimeText, toTimeText, isParent);
         String filters = buildTraceServiceKeyOrFilter(serviceKeys)
                 + appendTraceSpanListScopeFilters(isParent, parentId)
-                + appendSpanListDetailFilters(resourceExact, minDurationNs, error);
+                + appendSpanListDetailFilters(resourceExact, minDurationNs, error, null);
         return """
                 SELECT COUNT(*) AS total_cnt
                 FROM %s.`trace_dc_span`
@@ -344,9 +380,41 @@ public final class MetricQueryBuilder {
             String sortOrder,
             String resourceExact,
             String exceptionContains) {
+        return errorSpanListSql(
+                database,
+                serviceKeys,
+                virtualServiceFilter,
+                fromMillis,
+                toMillis,
+                limit,
+                offset,
+                fromTimeText,
+                toTimeText,
+                sortField,
+                sortOrder,
+                resourceExact,
+                exceptionContains,
+                null);
+    }
+
+    public static String errorSpanListSql(
+            String database,
+            java.util.Collection<String> serviceKeys,
+            boolean virtualServiceFilter,
+            long fromMillis,
+            long toMillis,
+            int limit,
+            int offset,
+            String fromTimeText,
+            String toTimeText,
+            String sortField,
+            String sortOrder,
+            String resourceExact,
+            String exceptionContains,
+            String componentType) {
         String timeWhere = spanEndBucketTimeWhere(fromMillis, toMillis, fromTimeText, toTimeText);
         String filters = buildTraceErrorSpanListServiceFilter(serviceKeys, virtualServiceFilter)
-                + appendSpanListDetailFilters(resourceExact, null, 1)
+                + appendSpanListDetailFilters(resourceExact, null, 1, componentType)
                 + appendErrorSpanExceptionFilter(exceptionContains);
         int safeLimit = Math.max(1, Math.min(limit, 500));
         int safeOffset = Math.max(0, offset);
@@ -417,8 +485,13 @@ public final class MetricQueryBuilder {
     }
 
     private static String appendSpanListDetailFilters(String resourceExact, Long minDurationNs, Integer error) {
+        return appendSpanListDetailFilters(resourceExact, minDurationNs, error, null);
+    }
+
+    private static String appendSpanListDetailFilters(
+            String resourceExact, Long minDurationNs, Integer error, String componentType) {
         StringBuilder filters = new StringBuilder();
-        filters.append(appendSpanListResourceFilter(resourceExact));
+        filters.append(appendSpanListResourceFilter(resourceExact, componentType));
         if (minDurationNs != null && minDurationNs > 0) {
             filters.append(" AND `duration` >= ").append(minDurationNs).append(' ');
         }
@@ -429,16 +502,38 @@ public final class MetricQueryBuilder {
     }
 
     /**
-     * HTTP interface span list filter on path-only {@code url} (no host).
-     * Exact match on {@code meta.http.url} (ingest stores path-only URLs). Avoid COALESCE so
-     * Doris can prune on the column directly.
+     * Interface span list endpoint filter.
+     * <ul>
+     *   <li>{@code service.http} (or blank componentType): path-only match on {@code meta.http.url}</li>
+     *   <li>other component types (rpc / mq / db / redis…): exact match on span {@code resource}</li>
+     * </ul>
      */
-    static String appendSpanListResourceFilter(String urlPath) {
-        if (urlPath == null || urlPath.isBlank()) {
+    static String appendSpanListResourceFilter(String resourceOrUrl) {
+        return appendSpanListResourceFilter(resourceOrUrl, null);
+    }
+
+    static String appendSpanListResourceFilter(String resourceOrUrl, String componentType) {
+        if (resourceOrUrl == null || resourceOrUrl.isBlank()) {
             return "";
         }
-        String escaped = escapeLiteral(urlPath.trim());
-        return " AND `meta.http.url` = '" + escaped + "' ";
+        String escaped = escapeLiteral(resourceOrUrl.trim());
+        if (componentType == null
+                || componentType.isBlank()
+                || "service.http".equals(componentType)
+                || "service.trace".equals(componentType)) {
+            // Avoid COALESCE so Doris can prune on the HTTP URL column directly.
+            return " AND `meta.http.url` = '" + escaped + "' ";
+        }
+        // Non-HTTP interface detail: filter by span resource (frontend sends `resource`).
+        // DB endpoints list uses sqlContent as resource, while some spans keep a short
+        // operation name on `resource` and the full text in meta db.statement.
+        if ("service.db".equals(componentType)) {
+            String dbStatement = metaJsonString("db.statement");
+            return " AND (COALESCE(NULLIF(`resource`, ''), `name`) = '" + escaped + "'"
+                    + " OR " + dbStatement + " = '" + escaped + "'"
+                    + " OR `meta.http.url` = '" + escaped + "') ";
+        }
+        return " AND COALESCE(NULLIF(`resource`, ''), `name`) = '" + escaped + "' ";
     }
 
     private static String appendTraceSpanListScopeFilters(Integer isParent, String parentId) {
@@ -2855,9 +2950,22 @@ public final class MetricQueryBuilder {
         if (DorisTableNames.METRIC_SERVICE_HTTP.equals(table)) {
             if (url != null && !url.isBlank()) {
                 filters.append(" AND `url` = '").append(escapeLiteral(url.trim())).append("' ");
+            } else if (resource != null && !resource.isBlank()) {
+                // Fallback when callers only send resource for an HTTP interface.
+                filters.append(" AND `url` = '").append(escapeLiteral(resource.trim())).append("' ");
             }
-        } else if (resource != null && !resource.isBlank()) {
-            filters.append(" AND `resource` = '").append(escapeLiteral(resource.trim())).append("' ");
+        } else {
+            // Portal tab-log often sends the endpoint in `url` even for non-HTTP types.
+            String endpoint = (resource != null && !resource.isBlank()) ? resource : url;
+            if (endpoint != null && !endpoint.isBlank()) {
+                String escaped = escapeLiteral(endpoint.trim());
+                if (DorisTableNames.METRIC_SERVICE_DB.equals(table)) {
+                    filters.append(" AND (`sqlContent` = '").append(escaped).append("'")
+                            .append(" OR `resource` = '").append(escaped).append("') ");
+                } else {
+                    filters.append(" AND `resource` = '").append(escaped).append("' ");
+                }
+            }
         }
         appendMetricIsInFilter(filters, isIn, false);
         if (isOut != null) {

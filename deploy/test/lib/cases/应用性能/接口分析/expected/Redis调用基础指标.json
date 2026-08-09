@@ -1,0 +1,15 @@
+{
+  "status": 200,
+  "message": "success",
+  "data": {
+    "callCnts": { "$minSeriesSum": 1 },
+    "errorCnts": { "$minSeriesSum": 0 },
+    "avgLatencys": { "$minSeriesSum": 1 },
+    "maxLatencys": { "$minSeriesSum": 0 },
+    "minLatencys": { "$minSeriesSum": 0 },
+    "errorRates": { "$minSeriesSum": 0 },
+    "avgReadRows": { "$minSeriesSum": 0 },
+    "avgUpdateRows": { "$minSeriesSum": 0 },
+    "details": {}
+  }
+}

@@ -1,0 +1,17 @@
+{
+  "status": 200,
+  "message": "success",
+  "data": {
+    "resource": "SELECT id, amount, status FROM demo_order WHERE id = ?",
+    "serviceId": "c72cc83a8831e407",
+    "service": "[mysql]demo_apm",
+    "service_type": "db",
+    "sqlOperation": "",
+    "dbType": "mysql",
+    "sqlDatabase": "demo_apm",
+    "callCnt": { "$range": [1, 1000] },
+    "errCnt": { "$range": [0, 1000] },
+    "avgLatency": { "$range": [1, 100000000000] },
+    "errRate": { "$range": [0, 1] }
+  }
+}

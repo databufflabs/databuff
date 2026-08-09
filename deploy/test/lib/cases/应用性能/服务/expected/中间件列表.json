@@ -13,7 +13,8 @@
       "lastMinReqRate": 6.0,
       "type": "mysql",
       "language": "",
-      "service_type": "db"
+      "service_type": "db",
+      "virtual_service": true
     },
     {
       "serviceId": "c89bb188ecff78ec",
@@ -26,9 +27,10 @@
       "maxLatency": 18000000,
       "reqRate": 0.03333333333333333,
       "lastMinReqRate": 2.0,
-      "type": "mysql",
+      "type": "elasticsearch",
       "language": "",
-      "service_type": "db"
+      "service_type": "db",
+      "virtual_service": true
     }
   ],
   "status": 200,
