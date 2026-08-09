@@ -18,7 +18,9 @@
     "metaHttpUrl": "/api/orders/10001",
     "srcService": "service-a",
     "srcServiceId": "9bf61532d56eb7b5",
-    "srcServiceInstance": "service-a-1"
+    "srcServiceInstance": "service-a-1",
+    "meta": null,
+    "metrics": null
   },
   {
     "traceId": "7c81f41dedfc2e84bbfb3fc1ad25d922",
@@ -39,7 +41,9 @@
     "metaHttpUrl": "",
     "srcService": "service-a",
     "srcServiceId": "9bf61532d56eb7b5",
-    "srcServiceInstance": "service-a-1"
+    "srcServiceInstance": "service-a-1",
+    "meta": null,
+    "metrics": null
   },
   {
     "traceId": "7c81f41dedfc2e84bbfb3fc1ad25d922",
@@ -60,7 +64,9 @@
     "metaHttpUrl": "/api/risk/check",
     "srcService": "service-a",
     "srcServiceId": "9bf61532d56eb7b5",
-    "srcServiceInstance": "service-a-1"
+    "srcServiceInstance": "service-a-1",
+    "meta": null,
+    "metrics": null
   },
   {
     "traceId": "7c81f41dedfc2e84bbfb3fc1ad25d922",
@@ -81,7 +87,9 @@
     "metaHttpUrl": "/demo/checkout",
     "srcService": "",
     "srcServiceId": "",
-    "srcServiceInstance": ""
+    "srcServiceInstance": "",
+    "meta": null,
+    "metrics": null
   },
   {
     "traceId": "2883ce2a1ffee2ed1cff2501e64dbd50",
@@ -102,7 +110,9 @@
     "metaHttpUrl": "",
     "srcService": "service-a",
     "srcServiceId": "9bf61532d56eb7b5",
-    "srcServiceInstance": "service-a-1"
+    "srcServiceInstance": "service-a-1",
+    "meta": null,
+    "metrics": null
   },
   {
     "traceId": "2883ce2a1ffee2ed1cff2501e64dbd50",
@@ -123,7 +133,9 @@
     "metaHttpUrl": "/api/orders/10001",
     "srcService": "service-a",
     "srcServiceId": "9bf61532d56eb7b5",
-    "srcServiceInstance": "service-a-1"
+    "srcServiceInstance": "service-a-1",
+    "meta": null,
+    "metrics": null
   },
   {
     "traceId": "2883ce2a1ffee2ed1cff2501e64dbd50",
@@ -144,7 +156,9 @@
     "metaHttpUrl": "/api/risk/check",
     "srcService": "service-a",
     "srcServiceId": "9bf61532d56eb7b5",
-    "srcServiceInstance": "service-a-1"
+    "srcServiceInstance": "service-a-1",
+    "meta": null,
+    "metrics": null
   },
   {
     "traceId": "2883ce2a1ffee2ed1cff2501e64dbd50",
@@ -165,7 +179,9 @@
     "metaHttpUrl": "/demo/checkout",
     "srcService": "",
     "srcServiceId": "",
-    "srcServiceInstance": ""
+    "srcServiceInstance": "",
+    "meta": null,
+    "metrics": null
   },
   {
     "traceId": "f6fe7cb8d734cfe4b37909efdad66d4c",
@@ -186,7 +202,9 @@
     "metaHttpUrl": "",
     "srcService": "service-a",
     "srcServiceId": "9bf61532d56eb7b5",
-    "srcServiceInstance": "service-a-1"
+    "srcServiceInstance": "service-a-1",
+    "meta": null,
+    "metrics": null
   },
   {
     "traceId": "f6fe7cb8d734cfe4b37909efdad66d4c",
@@ -207,7 +225,9 @@
     "metaHttpUrl": "/api/orders/10001",
     "srcService": "service-a",
     "srcServiceId": "9bf61532d56eb7b5",
-    "srcServiceInstance": "service-a-1"
+    "srcServiceInstance": "service-a-1",
+    "meta": null,
+    "metrics": null
   },
   {
     "traceId": "f6fe7cb8d734cfe4b37909efdad66d4c",
@@ -228,7 +248,9 @@
     "metaHttpUrl": "/api/risk/check",
     "srcService": "service-a",
     "srcServiceId": "9bf61532d56eb7b5",
-    "srcServiceInstance": "service-a-1"
+    "srcServiceInstance": "service-a-1",
+    "meta": null,
+    "metrics": null
   },
   {
     "traceId": "f6fe7cb8d734cfe4b37909efdad66d4c",
@@ -249,7 +271,9 @@
     "metaHttpUrl": "/demo/checkout",
     "srcService": "",
     "srcServiceId": "",
-    "srcServiceInstance": ""
+    "srcServiceInstance": "",
+    "meta": null,
+    "metrics": null
   },
   {
     "traceId": "7699cb2ac334390daf4cdd3312f6d998",
@@ -270,7 +294,9 @@
     "metaHttpUrl": "/api/orders/10001",
     "srcService": "service-a",
     "srcServiceId": "9bf61532d56eb7b5",
-    "srcServiceInstance": "service-a-1"
+    "srcServiceInstance": "service-a-1",
+    "meta": null,
+    "metrics": null
   },
   {
     "traceId": "7699cb2ac334390daf4cdd3312f6d998",
@@ -291,7 +317,9 @@
     "metaHttpUrl": "/api/risk/check",
     "srcService": "service-a",
     "srcServiceId": "9bf61532d56eb7b5",
-    "srcServiceInstance": "service-a-1"
+    "srcServiceInstance": "service-a-1",
+    "meta": null,
+    "metrics": null
   },
   {
     "traceId": "7699cb2ac334390daf4cdd3312f6d998",
@@ -312,7 +340,9 @@
     "metaHttpUrl": "/demo/checkout",
     "srcService": "",
     "srcServiceId": "",
-    "srcServiceInstance": ""
+    "srcServiceInstance": "",
+    "meta": null,
+    "metrics": null
   },
   {
     "traceId": "7699cb2ac334390daf4cdd3312f6d998",
@@ -333,7 +363,9 @@
     "metaHttpUrl": "",
     "srcService": "service-a",
     "srcServiceId": "9bf61532d56eb7b5",
-    "srcServiceInstance": "service-a-1"
+    "srcServiceInstance": "service-a-1",
+    "meta": null,
+    "metrics": null
   },
   {
     "traceId": "d52af04aee7d06c78d14105d1cd4bcff",
@@ -354,7 +386,9 @@
     "metaHttpUrl": "/api/orders/10001",
     "srcService": "service-a",
     "srcServiceId": "9bf61532d56eb7b5",
-    "srcServiceInstance": "service-a-1"
+    "srcServiceInstance": "service-a-1",
+    "meta": null,
+    "metrics": null
   },
   {
     "traceId": "d52af04aee7d06c78d14105d1cd4bcff",
@@ -375,7 +409,9 @@
     "metaHttpUrl": "/api/risk/check",
     "srcService": "service-a",
     "srcServiceId": "9bf61532d56eb7b5",
-    "srcServiceInstance": "service-a-1"
+    "srcServiceInstance": "service-a-1",
+    "meta": null,
+    "metrics": null
   },
   {
     "traceId": "d52af04aee7d06c78d14105d1cd4bcff",
@@ -396,7 +432,9 @@
     "metaHttpUrl": "/demo/checkout",
     "srcService": "",
     "srcServiceId": "",
-    "srcServiceInstance": ""
+    "srcServiceInstance": "",
+    "meta": null,
+    "metrics": null
   },
   {
     "traceId": "d52af04aee7d06c78d14105d1cd4bcff",
@@ -417,6 +455,8 @@
     "metaHttpUrl": "",
     "srcService": "service-a",
     "srcServiceId": "9bf61532d56eb7b5",
-    "srcServiceInstance": "service-a-1"
+    "srcServiceInstance": "service-a-1",
+    "meta": null,
+    "metrics": null
   }
 ]
