@@ -75,7 +75,9 @@ public class ApmReadRepository implements AutoCloseable {
                         nullToEmpty(rs.getString("meta_http_url")),
                         nullToEmpty(rs.getString("srcService")),
                         nullToEmpty(rs.getString("srcServiceId")),
-                        nullToEmpty(rs.getString("srcServiceInstance"))));
+                        nullToEmpty(rs.getString("srcServiceInstance")),
+                        rs.getString("meta"),
+                        rs.getString("metrics")));
             }
         }
         return spans;

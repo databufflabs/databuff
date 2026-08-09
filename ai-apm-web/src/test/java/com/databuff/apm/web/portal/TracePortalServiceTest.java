@@ -232,6 +232,203 @@ class TracePortalServiceTest {
     }
 
     @Test
+    void resourceSpanListFillsDbMetaFromComponentType() {
+        TraceQueryService traceQuery = mock(TraceQueryService.class);
+        when(traceQuery.spanList(any())).thenReturn(List.of(
+                new SpanSummary(
+                        "t-db", "db1", "[mysql]demo_apm", "dad537de7e10e098",
+                        "SELECT demo_inventory",
+                        "2026-08-09 23:03:45", 30_000_000L, 1,
+                        "service-b-1",
+                        "SELECT sku, available FROM demo_inventory WHERE sku = ?",
+                        "demo-host-b",
+                        null,
+                        "InsufficientStockException",
+                        "parent-1",
+                        0,
+                        null,
+                        "service-b",
+                        "9bf61532d56eb7b5",
+                        "service-b-1",
+                        "{\"db.system\":\"mysql\",\"db.name\":\"demo_apm\","
+                                + "\"db.statement\":\"SELECT sku, available FROM demo_inventory WHERE sku = ?\"}",
+                        "{\"db.response.returned_rows\":\"0\"}")));
+
+        TracePortalService service = new TracePortalService(
+                traceQuery, mock(ServiceFlowService.class), mock(ApmReadRepository.class), TestStorageSupport.storage());
+        Map<String, Object> resp = service.spanList(Map.of(
+                "resource", "SELECT sku, available FROM demo_inventory WHERE sku = ?",
+                "componentType", "service.db",
+                "serviceId", "dad537de7e10e098",
+                "fromTime", "2026-08-09 22:00:00",
+                "toTime", "2026-08-09 23:30:00",
+                "offset", 0,
+                "size", 20));
+
+        @SuppressWarnings("unchecked")
+        Map<String, Object> data = (Map<String, Object>) resp.get("data");
+        @SuppressWarnings("unchecked")
+        List<Map<String, Object>> list = (List<Map<String, Object>>) data.get("list");
+        assertThat(list).hasSize(1);
+        @SuppressWarnings("unchecked")
+        Map<String, Object> meta = (Map<String, Object>) list.get(0).get("meta");
+        assertThat(meta.get("db.operation")).isEqualTo("SELECT");
+        assertThat(meta.get("db.instance")).isEqualTo("demo_apm");
+        assertThat(meta.get("db.type")).isEqualTo("mysql");
+        assertThat(meta.get("db.returnRows")).isEqualTo("0");
+        assertThat(list.get(0).get("srcService")).isEqualTo("service-b");
+    }
+
+    @Test
+    void resourceSpanListFillsMqMetaFromComponentType() {
+        TraceQueryService traceQuery = mock(TraceQueryService.class);
+        when(traceQuery.spanList(any())).thenReturn(List.of(
+                new SpanSummary(
+                        "t-mq", "mq1", "[kafka]orders", "kafkasvc",
+                        "orders",
+                        "2026-08-09 23:03:45", 12_000_000L, 0,
+                        "consumer-1", "orders", "host-1",
+                        null, null, null, null, null,
+                        "service-a", "svc-a", "a-1",
+                        "{\"messaging.system\":\"kafka\",\"messaging.destination.name\":\"orders\","
+                                + "\"messaging.kafka.consumer.group\":\"order-group\","
+                                + "\"messaging.kafka.partition\":\"3\",\"server.address\":\"kafka-1\"}",
+                        "{\"record.e2e.duration.ns\":\"45000000\"}")));
+
+        TracePortalService service = new TracePortalService(
+                traceQuery, mock(ServiceFlowService.class), mock(ApmReadRepository.class), TestStorageSupport.storage());
+        Map<String, Object> resp = service.spanList(Map.of(
+                "resource", "orders",
+                "componentType", "service.mq",
+                "fromTime", "2026-08-09 22:00:00",
+                "toTime", "2026-08-09 23:30:00",
+                "offset", 0,
+                "size", 20));
+
+        @SuppressWarnings("unchecked")
+        List<Map<String, Object>> list = (List<Map<String, Object>>) ((Map<?, ?>) resp.get("data")).get("list");
+        @SuppressWarnings("unchecked")
+        Map<String, Object> meta = (Map<String, Object>) list.get(0).get("meta");
+        assertThat(list.get(0).get("type")).isEqualTo("kafka");
+        assertThat(meta.get("mq.topic")).isEqualTo("orders");
+        assertThat(meta.get("mq.group")).isEqualTo("order-group");
+        assertThat(meta.get("partition")).isEqualTo("3");
+        assertThat(meta.get("mq.broker")).isEqualTo("kafka-1");
+        assertThat(meta.get("record.e2e_duration_ns")).isEqualTo("45000000");
+    }
+
+    @Test
+    void resourceSpanListFillsRpcRedisConfigAndHttpMeta() {
+        TraceQueryService traceQuery = mock(TraceQueryService.class);
+        when(traceQuery.spanList(any())).thenReturn(List.of(
+                new SpanSummary(
+                        "t-rpc", "rpc1", "service-b", "svc-b",
+                        "Dubbo DemoOrderService.findInventory",
+                        "2026-08-09 23:03:45", 20_000_000L, 0,
+                        "b-1", "Dubbo DemoOrderService.findInventory", "host-b",
+                        null, null, null, null, null,
+                        "service-a", "svc-a", "a-1",
+                        "{\"rpc.system\":\"dubbo\",\"rpc.service\":\"com.databuff.demo.OrderService\","
+                                + "\"rpc.method\":\"findInventory\",\"thread.name\":\"DubboServerHandler-1\"}",
+                        null)));
+
+        TracePortalService rpcService = new TracePortalService(
+                traceQuery, mock(ServiceFlowService.class), mock(ApmReadRepository.class), TestStorageSupport.storage());
+        Map<String, Object> rpcResp = rpcService.spanList(Map.of(
+                "resource", "Dubbo DemoOrderService.findInventory",
+                "componentType", "service.rpc",
+                "fromTime", "2026-08-09 22:00:00",
+                "toTime", "2026-08-09 23:30:00",
+                "offset", 0,
+                "size", 20));
+        @SuppressWarnings("unchecked")
+        List<Map<String, Object>> rpcList = (List<Map<String, Object>>) ((Map<?, ?>) rpcResp.get("data")).get("list");
+        @SuppressWarnings("unchecked")
+        Map<String, Object> rpcMeta = (Map<String, Object>) rpcList.get(0).get("meta");
+        assertThat(rpcList.get(0).get("type")).isEqualTo("dubbo");
+        assertThat(rpcMeta.get("rpc.system")).isEqualTo("dubbo");
+        assertThat(rpcMeta.get("rpc.method")).isEqualTo("findInventory");
+        assertThat(rpcMeta.get("thread.name")).isEqualTo("DubboServerHandler-1");
+
+        when(traceQuery.spanList(any())).thenReturn(List.of(
+                new SpanSummary(
+                        "t-redis", "r1", "[redis]cache", "redis-id",
+                        "GET cart:10001",
+                        "2026-08-09 23:03:45", 1_000_000L, 0,
+                        "c-1", "GET cart:10001", "host-c",
+                        null, null, null, null, null,
+                        "service-a", "svc-a", "a-1",
+                        "{\"db.system\":\"redis\",\"db.statement\":\"GET cart:10001\"}",
+                        null)));
+        Map<String, Object> redisResp = rpcService.spanList(Map.of(
+                "resource", "GET cart:10001",
+                "componentType", "service.redis",
+                "fromTime", "2026-08-09 22:00:00",
+                "toTime", "2026-08-09 23:30:00",
+                "offset", 0,
+                "size", 20));
+        @SuppressWarnings("unchecked")
+        List<Map<String, Object>> redisList =
+                (List<Map<String, Object>>) ((Map<?, ?>) redisResp.get("data")).get("list");
+        @SuppressWarnings("unchecked")
+        Map<String, Object> redisMeta = (Map<String, Object>) redisList.get(0).get("meta");
+        assertThat(redisList.get(0).get("type")).isEqualTo("redis");
+        assertThat(redisMeta.get("db.statement")).isEqualTo("GET cart:10001");
+
+        when(traceQuery.spanList(any())).thenReturn(List.of(
+                new SpanSummary(
+                        "t-cfg", "cfg1", "[nacos]config", "nacos-id",
+                        "GET /nacos/v1/cs/configs",
+                        "2026-08-09 23:03:45", 3_000_000L, 0,
+                        "cfg-1", "GET /nacos/v1/cs/configs", "host-cfg",
+                        null, null, null, null, null,
+                        "service-a", "svc-a", "a-1",
+                        "{\"config.type\":\"nacos\",\"config.operation\":\"GET\",\"db.system\":\"nacos\"}",
+                        null)));
+        Map<String, Object> cfgResp = rpcService.spanList(Map.of(
+                "resource", "GET /nacos/v1/cs/configs",
+                "componentType", "service.config",
+                "fromTime", "2026-08-09 22:00:00",
+                "toTime", "2026-08-09 23:30:00",
+                "offset", 0,
+                "size", 20));
+        @SuppressWarnings("unchecked")
+        List<Map<String, Object>> cfgList =
+                (List<Map<String, Object>>) ((Map<?, ?>) cfgResp.get("data")).get("list");
+        @SuppressWarnings("unchecked")
+        Map<String, Object> cfgMeta = (Map<String, Object>) cfgList.get(0).get("meta");
+        assertThat(cfgList.get(0).get("type")).isEqualTo("nacos");
+        assertThat(cfgMeta.get("config.type")).isEqualTo("nacos");
+        assertThat(cfgMeta.get("config.operation")).isEqualTo("GET");
+
+        when(traceQuery.spanList(any())).thenReturn(List.of(
+                new SpanSummary(
+                        "t-http", "h1", "service-b", "svc-b", "GET",
+                        "2026-08-09 23:03:45", 5_000_000L, 0,
+                        "b-1", "GET", "host-b",
+                        200, null, null, null,
+                        "http://service-b:8080/api/orders/10001",
+                        "service-a", "svc-a", "a-1",
+                        "{\"http.method\":\"GET\",\"http.url\":\"http://service-b:8080/api/orders/10001\"}",
+                        null)));
+        Map<String, Object> httpResp = rpcService.spanList(Map.of(
+                "url", "/api/orders/10001",
+                "componentType", "service.http",
+                "fromTime", "2026-08-09 22:00:00",
+                "toTime", "2026-08-09 23:30:00",
+                "offset", 0,
+                "size", 20));
+        @SuppressWarnings("unchecked")
+        List<Map<String, Object>> httpList =
+                (List<Map<String, Object>>) ((Map<?, ?>) httpResp.get("data")).get("list");
+        @SuppressWarnings("unchecked")
+        Map<String, Object> httpMeta = (Map<String, Object>) httpList.get(0).get("meta");
+        assertThat(httpMeta.get("http.url")).isEqualTo("/api/orders/10001");
+        assertThat(httpMeta.get("http.status_code")).isEqualTo(200);
+        assertThat(httpMeta.get("http.method")).isEqualTo("GET");
+    }
+
+    @Test
     void resourceSpanListMatchesAbsoluteHttpUrlAgainstPortalUrl() {
         TraceQueryService traceQuery = mock(TraceQueryService.class);
         when(traceQuery.spanList(any())).thenReturn(List.of(
@@ -272,7 +469,7 @@ class TracePortalServiceTest {
         @SuppressWarnings("unchecked")
         Map<String, Object> meta = (Map<String, Object>) list.get(0).get("meta");
         assertThat(meta.get("http.url"))
-                .isEqualTo("http://frontend-proxy:8080/api/recommendations?productIds=HQTGWGPNH4");
+                .isEqualTo("/api/recommendations?productIds=HQTGWGPNH4");
     }
 
     @Test

@@ -8,10 +8,24 @@ import org.assertj.core.api.Assertions;
 import org.junit.jupiter.api.Test;
 
 import java.util.List;
+import java.util.Map;
 
 import static org.assertj.core.api.Assertions.assertThat;
 
 class DcSpanUtilTest {
+
+    @Test
+    void resolveSqlOperationPrefersDbOperationThenStatementToken() {
+        assertThat(DcSpanUtil.resolveSqlOperation(
+                Map.of("db.operation", "insert"), "SELECT 1", null)).isEqualTo("INSERT");
+        assertThat(DcSpanUtil.resolveSqlOperation(
+                Map.of("db.statement", "SELECT sku FROM demo_inventory WHERE sku = ?"),
+                "SELECT demo_inventory",
+                null)).isEqualTo("SELECT");
+        assertThat(DcSpanUtil.resolveSqlOperation(Map.of(), "UPDATE demo_order SET status = ?", null))
+                .isEqualTo("UPDATE");
+        assertThat(DcSpanUtil.resolveSqlOperation(Map.of(), null, null)).isEmpty();
+    }
 
     @Test
     void skipsHttpMetricForNonHttpSpan() {
@@ -178,12 +192,50 @@ class DcSpanUtilTest {
                 .findFirst()
                 .orElseThrow();
         assertThat(db.fieldValues()[1]).isEqualTo(1L);
+        assertThat(db.fieldValues()).hasSize(5);
+        // error span with short duration must not inflate slow
+        assertThat(db.fieldValues()[4]).isEqualTo(0L);
+        assertThat(tagValue(db, "isSlow")).isEqualTo("0");
+
+        java.util.Map<String, Object> dbRow = new java.util.LinkedHashMap<>();
+        MetricSchemaRegistry.applyTagValues(dbRow, "service.db", db.tagValues());
+        MetricSchemaRegistry.applyFieldValues(dbRow, "service.db", db.fieldValues());
+        assertThat(dbRow.get("error")).isEqualTo(1L);
+        assertThat(dbRow.get("slow")).isEqualTo(0L);
 
         OptimizedMetric exceptionMetric = DcSpanUtil.virtualComponentExceptionMetric(span);
         assertThat(exceptionMetric).isNotNull();
         assertThat(tagValue(exceptionMetric, "service")).isEqualTo("[mysql]demo_apm");
         assertThat(tagValue(exceptionMetric, "componentService")).isEqualTo("checkout");
         assertThat(DcSpanUtil.serviceExceptionMetric(span)).isNull();
+    }
+
+    @Test
+    void dbSlowFlagFollowsSpanSlowNotError() {
+        DcSpan span = baseSpan();
+        span.type = "SPAN_KIND_CLIENT";
+        span.isOut = 1;
+        span.error = 0;
+        span.slow = 1;
+        span.duration = 600_000_000L;
+        span.dstService = "[mysql]demo_apm";
+        span.dstServiceId = "dad537de7e10e098";
+        span.meta = "{\"db.system\":\"mysql\",\"db.name\":\"demo_apm\","
+                + "\"db.statement\":\"SELECT sku FROM demo_inventory WHERE sku = ?\"}";
+
+        OptimizedMetric db = DcSpanUtil.parseSpanData(span).stream()
+                .filter(m -> "service.db".equals(m.measurement()))
+                .findFirst()
+                .orElseThrow();
+        assertThat(db.fieldValues()[1]).isEqualTo(0L);
+        assertThat(db.fieldValues()[4]).isEqualTo(1L);
+
+        java.util.Map<String, Object> dbRow = new java.util.LinkedHashMap<>();
+        MetricSchemaRegistry.applyTagValues(dbRow, "service.db", db.tagValues());
+        MetricSchemaRegistry.applyFieldValues(dbRow, "service.db", db.fieldValues());
+        assertThat(dbRow.get("error")).isEqualTo(0L);
+        assertThat(dbRow.get("slow")).isEqualTo(1L);
+        assertThat(dbRow.get("isSlow")).isEqualTo("1");
     }
 
     @Test

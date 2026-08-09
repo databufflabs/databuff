@@ -28,7 +28,9 @@ public final class ApmQueryModels {
             String metaHttpUrl,
             String srcService,
             String srcServiceId,
-            String srcServiceInstance) {
+            String srcServiceInstance,
+            String meta,
+            String metrics) {
 
         public SpanSummary(
                 String traceId,
@@ -58,6 +60,8 @@ public final class ApmQueryModels {
                     hostName,
                     metaHttpStatusCode,
                     metaErrorType,
+                    null,
+                    null,
                     null,
                     null,
                     null,
@@ -101,6 +105,52 @@ public final class ApmQueryModels {
                     isParent,
                     metaHttpUrl,
                     null,
+                    null,
+                    null,
+                    null,
+                    null);
+        }
+
+        public SpanSummary(
+                String traceId,
+                String spanId,
+                String service,
+                String serviceId,
+                String name,
+                String startTime,
+                long duration,
+                int error,
+                String serviceInstance,
+                String resource,
+                String hostName,
+                Integer metaHttpStatusCode,
+                String metaErrorType,
+                String parentId,
+                Integer isParent,
+                String metaHttpUrl,
+                String srcService,
+                String srcServiceId,
+                String srcServiceInstance) {
+            this(
+                    traceId,
+                    spanId,
+                    service,
+                    serviceId,
+                    name,
+                    startTime,
+                    duration,
+                    error,
+                    serviceInstance,
+                    resource,
+                    hostName,
+                    metaHttpStatusCode,
+                    metaErrorType,
+                    parentId,
+                    isParent,
+                    metaHttpUrl,
+                    srcService,
+                    srcServiceId,
+                    srcServiceInstance,
                     null,
                     null);
         }

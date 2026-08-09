@@ -302,13 +302,15 @@ public final class MetricQueryBuilder {
                        COALESCE(`meta.http.url`, '') AS meta_http_url,
                        COALESCE(`srcService`, '') AS srcService,
                        COALESCE(`srcServiceId`, '') AS srcServiceId,
-                       COALESCE(`srcServiceInstance`, '') AS srcServiceInstance
+                       COALESCE(`srcServiceInstance`, '') AS srcServiceInstance,
+                       %s
                 FROM %s.`trace_dc_span`
                 WHERE %s
                 %s
                 ORDER BY %s %s
                 LIMIT %d OFFSET %d
                 """.formatted(
+                spanListMetaMetricsSelect(componentType),
                 database,
                 timeWhere,
                 filters,
@@ -430,13 +432,15 @@ public final class MetricQueryBuilder {
                        COALESCE(`meta.http.url`, '') AS meta_http_url,
                        COALESCE(`srcService`, '') AS srcService,
                        COALESCE(`srcServiceId`, '') AS srcServiceId,
-                       COALESCE(`srcServiceInstance`, '') AS srcServiceInstance
+                       COALESCE(`srcServiceInstance`, '') AS srcServiceInstance,
+                       %s
                 FROM %s.`trace_dc_span`
                 WHERE %s
                 %s
                 ORDER BY %s %s
                 LIMIT %d OFFSET %d
                 """.formatted(
+                spanListMetaMetricsSelect(componentType),
                 database,
                 timeWhere,
                 filters,
@@ -482,6 +486,28 @@ public final class MetricQueryBuilder {
         }
         return " AND " + SPAN_EXCEPTION_NAME_EXPR
                 + " LIKE '%" + escapeLiteral(exceptionContains.trim()) + "%' ";
+    }
+
+    /**
+     * Resource-detail enrichment for db/mq/rpc/redis/config needs full span {@code meta}/{@code metrics}.
+     * Keep the default span list light by projecting NULL placeholders instead.
+     */
+    static boolean spanListNeedsComponentMeta(String componentType) {
+        if (componentType == null || componentType.isBlank()) {
+            return false;
+        }
+        return switch (componentType) {
+            case "service.db", "service.mq", "service.rpc", "service.redis", "service.config" -> true;
+            default -> false;
+        };
+    }
+
+    private static String spanListMetaMetricsSelect(String componentType) {
+        if (spanListNeedsComponentMeta(componentType)) {
+            return "`meta`, `metrics`";
+        }
+        // Keep column aliases stable for ApmReadRepository.querySpanSummaries.
+        return "NULL AS `meta`, NULL AS `metrics`";
     }
 
     private static String appendSpanListDetailFilters(String resourceExact, Long minDurationNs, Integer error) {

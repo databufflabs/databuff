@@ -79,7 +79,11 @@ public final class OptimizedMetric {
     }
 
     public OptimizedMetric merge(OptimizedMetric other) {
-        if (isLegacyTraceFieldShape(fieldValues) && isLegacyTraceFieldShape(other.fieldValues)) {
+        // service.flow uses (cnt, error, slow, srcCall, sumDuration) — all SUM — and must not
+        // enter the legacy (cnt, error, sumDuration, maxDuration, slow) merge path.
+        if (!"service.flow".equals(measurement)
+                && isLegacyTraceFieldShape(fieldValues)
+                && isLegacyTraceFieldShape(other.fieldValues)) {
             return withFieldValues(mergeLegacyTraceFields(
                     normalizeLegacyTraceFields(fieldValues),
                     normalizeLegacyTraceFields(other.fieldValues)));
@@ -97,20 +101,23 @@ public final class OptimizedMetric {
         return copy;
     }
 
-    /** Legacy trace metrics use (cnt, error, sumDuration[, maxDuration]). */
+    /** Legacy trace metrics use (cnt, error, sumDuration[, maxDuration[, slow]]). */
     private static boolean isLegacyTraceFieldShape(long[] fieldValues) {
-        return fieldValues.length == 3 || fieldValues.length == 4;
+        return fieldValues.length >= 3 && fieldValues.length <= 5;
     }
 
     private static long[] normalizeLegacyTraceFields(long[] fieldValues) {
-        if (fieldValues.length >= 4) {
-            return fieldValues.clone();
+        long cnt = fieldValues[0];
+        long error = fieldValues[1];
+        long sumDuration = fieldValues[2];
+        long maxDuration;
+        if (fieldValues.length >= 4 && fieldValues[3] > 0) {
+            maxDuration = fieldValues[3];
+        } else {
+            maxDuration = cnt == 1 ? sumDuration : 0L;
         }
-        if (fieldValues.length == 3) {
-            long maxDuration = fieldValues[0] == 1 ? fieldValues[2] : 0L;
-            return new long[] {fieldValues[0], fieldValues[1], fieldValues[2], maxDuration};
-        }
-        return fieldValues.clone();
+        long slow = fieldValues.length >= 5 ? Math.max(0L, fieldValues[4]) : 0L;
+        return new long[] {cnt, error, sumDuration, maxDuration, slow};
     }
 
     private static long[] mergeLegacyTraceFields(long[] left, long[] right) {
@@ -118,7 +125,8 @@ public final class OptimizedMetric {
             left[0] + right[0],
             left[1] + right[1],
             left[2] + right[2],
-            Math.max(left[3], right[3])
+            Math.max(left[3], right[3]),
+            left[4] + right[4]
         };
     }
 

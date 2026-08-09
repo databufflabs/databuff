@@ -110,7 +110,8 @@ public final class DcSpanUtil {
         tags.put("service_id", normalizeMetricServiceId(span.dstServiceId, span.dstService));
         tags.put("service_instance", nullToEmpty(span.dstServiceInstance));
         long error = span.error > 0 ? 1L : 0L;
-        return minuteAggregatedMetric("service", span, tags, 1L, error, span.duration, span.duration);
+        long slow = span.slow > 0 ? 1L : 0L;
+        return minuteAggregatedMetric("service", span, tags, 1L, error, span.duration, span.duration, slow);
     }
 
     static boolean isVirtualInboundComponent(DcSpan span) {
@@ -854,6 +855,23 @@ public final class DcSpanUtil {
         return operation.trim().toUpperCase();
     }
 
+    /**
+     * Prefer {@code db.operation}; otherwise take the first token of the SQL statement / resource.
+     */
+    public static String resolveSqlOperation(Map<String, String> meta, String resource, String name) {
+        String fromMeta = normalizeSqlOperation(OtelAttributeMaps.firstNonBlank(meta, "db.operation"));
+        if (!fromMeta.isBlank()) {
+            return fromMeta;
+        }
+        String statement = OtelAttributeMaps.firstNonBlank(meta, "db.statement", "db.sql");
+        String text = firstNonBlank(statement, firstNonBlank(resource, name));
+        if (text == null || text.isBlank()) {
+            return "";
+        }
+        String first = text.trim().split("\\s+", 2)[0];
+        return normalizeSqlOperation(first);
+    }
+
     public static String normalizeHttpUrl(String url) {
         if (url == null || url.isBlank()) {
             return "";
@@ -983,8 +1001,9 @@ public final class DcSpanUtil {
 
     /** Trace 抽取指标：按 span.end 所在分钟落桶，供分钟窗口聚合。 */
     private static OptimizedMetric minuteAggregatedMetric(String measurement, DcSpan span, Map<String, String> tags) {
+        long slow = span.slow > 0 ? 1L : 0L;
         return minuteAggregatedMetric(
-                measurement, span, tags, 1L, componentMetricError(span), span.duration, span.duration);
+                measurement, span, tags, 1L, componentMetricError(span), span.duration, span.duration, slow);
     }
 
     private static OptimizedMetric minuteAggregatedMetric(

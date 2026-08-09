@@ -116,9 +116,12 @@ public class TracePortalService {
         return queryResourceSpanList(body, null);
     }
 
-    /** Slow interface spans ({@code POST /webapi/trace/slowSpanList}). */
+    /**
+     * Slow interface spans ({@code POST /webapi/trace/slowSpanList}).
+     * Threshold matches ingest {@code span.slow}: duration &gt; 500ms (nanoseconds).
+     */
     public Map<String, Object> slowSpanList(Map<String, Object> body) {
-        return queryResourceSpanList(body, query -> query.put("minDuration", 1_000_000_000L));
+        return queryResourceSpanList(body, query -> query.put("minDuration", 500_000_000L));
     }
 
     /** Error interface spans ({@code POST /webapi/trace/errorSpanList}). */
@@ -137,6 +140,7 @@ public class TracePortalService {
         int limit = Math.max(1, Math.min(size <= 0 ? 50 : size, 500));
 
         try {
+            String componentType = ServicePortalService.stringValue(body.get("componentType"), null);
             String listSql = MetricQueryBuilder.errorSpanListSql(
                     traceDatabase,
                     serviceKeys,
@@ -151,9 +155,9 @@ public class TracePortalService {
                     sortOrder,
                     resource,
                     exception,
-                    ServicePortalService.stringValue(body.get("componentType"), null));
+                    componentType);
             List<Map<String, Object>> spans = readRepository.querySpanSummaries(listSql).stream()
-                    .map(this::toPortalSpan)
+                    .map(span -> toPortalSpan(span, componentType))
                     .toList();
             Map<String, Object> filterBody = new LinkedHashMap<>(body);
             filterBody.put("error", 1);
@@ -1176,14 +1180,16 @@ public class TracePortalService {
         int offset = ServicePortalService.intValue(body.get("offset"), 0);
         int size = ServicePortalService.intValue(body.get("size"), 50);
         List<SpanSummary> spans = traceQueryService.spanList(buildSpanListRequest(body, offset, size));
-        return spans.stream().map(this::toPortalSpan).toList();
+        String componentType = ServicePortalService.stringValue(body.get("componentType"), null);
+        return spans.stream().map(span -> toPortalSpan(span, componentType)).toList();
     }
 
     private List<Map<String, Object>> loadResourcePortalSpans(Map<String, Object> body) {
         int offset = ServicePortalService.intValue(body.get("offset"), 0);
         int size = ServicePortalService.intValue(body.get("size"), 50);
         List<SpanSummary> spans = traceQueryService.spanList(buildResourceSpanListRequest(body, offset, size));
-        return spans.stream().map(this::toPortalSpan).toList();
+        String componentType = ServicePortalService.stringValue(body.get("componentType"), null);
+        return spans.stream().map(span -> toPortalSpan(span, componentType)).toList();
     }
 
     private TraceQueryService.SpanListRequest buildResourceSpanListRequest(
@@ -1354,6 +1360,10 @@ public class TracePortalService {
     }
 
     private Map<String, Object> toPortalSpan(SpanSummary span) {
+        return toPortalSpan(span, null);
+    }
+
+    private Map<String, Object> toPortalSpan(SpanSummary span, String componentType) {
         long startMs = parseStartMillis(span.startTime());
         long durationNs = spanDurationNs(span.duration());
         String serviceInstance = ServicePortalService.stringValue(span.serviceInstance(), "");
@@ -1368,7 +1378,7 @@ public class TracePortalService {
             meta.put("http.status_code", span.metaHttpStatusCode());
         }
         if (span.metaHttpUrl() != null && !span.metaHttpUrl().isBlank()) {
-            meta.put("http.url", span.metaHttpUrl());
+            meta.put("http.url", DcSpanUtil.normalizeHttpUrl(span.metaHttpUrl()));
         }
         String httpMethod = resolveHttpMethod(span.resource(), span.name());
         if (httpMethod != null) {
@@ -1387,9 +1397,12 @@ public class TracePortalService {
         row.put("end", startMs + (long) Math.ceil(durationNs / 1_000_000.0));
         row.put("duration", durationNs);
         row.put("error", span.error());
+        applyComponentTypePortalMeta(componentType, span, row, meta);
         DcSpanUtil.PortalSpanDisplay portalDisplay = DcSpanUtil.resolvePortalSpanDisplay(toClassificationSpan(span, meta));
         row.put("service_type", portalDisplay.serviceType());
-        row.put("type", portalDisplay.typeIcon());
+        if (!row.containsKey("type") || String.valueOf(row.get("type")).isBlank()) {
+            row.put("type", portalDisplay.typeIcon());
+        }
         row.put("hostName", !hostName.isBlank() ? hostName : instance);
         row.put("srcService", nullToEmpty(span.srcService()));
         row.put("srcServiceId", nullToEmpty(span.srcServiceId()));
@@ -1410,6 +1423,196 @@ public class TracePortalService {
             row.put("errorType", resolvePortalErrorType(span));
         }
         return row;
+    }
+
+    /**
+     * Fill portal {@code meta.*} / row fields expected by resource-detail columns for each
+     * {@code componentType}.
+     */
+    private static void applyComponentTypePortalMeta(
+            String componentType, SpanSummary span, Map<String, Object> row, Map<String, Object> meta) {
+        if (componentType == null || componentType.isBlank()) {
+            return;
+        }
+        Map<String, String> attrs = OtelAttributeMaps.parse(span.meta());
+        Map<String, String> metrics = OtelAttributeMaps.parse(span.metrics());
+        switch (componentType) {
+            case "service.db" -> applyDbPortalMeta(attrs, metrics, span, meta);
+            case "service.mq" -> applyMqPortalMeta(attrs, metrics, row, meta);
+            case "service.http" -> applyHttpPortalMeta(attrs, span, meta);
+            case "service.rpc" -> applyRpcPortalMeta(attrs, row, meta);
+            case "service.redis" -> applyRedisPortalMeta(attrs, span, row, meta);
+            case "service.config" -> applyConfigPortalMeta(attrs, row, meta);
+            default -> {
+            }
+        }
+    }
+
+    private static void applyDbPortalMeta(
+            Map<String, String> attrs, Map<String, String> metrics, SpanSummary span, Map<String, Object> meta) {
+        String operation = DcSpanUtil.resolveSqlOperation(attrs, span.resource(), span.name());
+        putMetaIfPresent(meta, "db.operation", operation);
+        putMetaIfPresent(meta, "db.instance", OtelAttributeMaps.firstNonBlank(
+                attrs, "db.name", "db.instance", "db.elasticsearch.index", "elasticsearch.index"));
+        putMetaIfPresent(meta, "db.type", OtelAttributeMaps.firstNonBlank(attrs, "db.system", "db.type"));
+        putMetaIfPresent(meta, "db.updateRows", firstNonBlankMetric(
+                metrics, "db.update.rows", "db.rows_affected"));
+        putMetaIfPresent(meta, "db.returnRows", firstNonBlankMetric(
+                metrics, "db.response.returned_rows", "db.select.return.rows", "db.rows_returned"));
+    }
+
+    private static void applyMqPortalMeta(
+            Map<String, String> attrs,
+            Map<String, String> metrics,
+            Map<String, Object> row,
+            Map<String, Object> meta) {
+        putMetaIfPresent(meta, "mq.topic", OtelAttributeMaps.firstNonBlank(
+                attrs, "messaging.destination.name", "messaging.kafka.destination", "mq.topic"));
+        putMetaIfPresent(meta, "mq.group", OtelAttributeMaps.firstNonBlank(
+                attrs, "messaging.kafka.consumer.group", "messaging.consumer.group", "mq.group"));
+        putMetaIfPresent(meta, "partition", OtelAttributeMaps.firstNonBlank(
+                attrs, "messaging.kafka.partition", "partition"));
+        putMetaIfPresent(meta, "mq.broker", OtelAttributeMaps.firstNonBlank(
+                attrs, "net.peer.name", "server.address", "messaging.kafka.broker", "mq.broker"));
+        putMetaIfPresent(meta, "record.e2e_duration_ns", firstNonBlankMetric(
+                metrics, "record.e2e.duration.ns", "delay"));
+        String mqType = OtelAttributeMaps.firstNonBlank(attrs, "messaging.system", "component");
+        putMetaIfPresent(meta, "type", mqType);
+        putRowTypeIfPresent(row, resolveComponentTypeIcon("service.mq", attrs, null));
+    }
+
+    private static void applyHttpPortalMeta(
+            Map<String, String> attrs, SpanSummary span, Map<String, Object> meta) {
+        if (!meta.containsKey("http.method")) {
+            putMetaIfPresent(meta, "http.method", OtelAttributeMaps.firstNonBlank(
+                    attrs, "http.method", "http.request.method"));
+        }
+        if (!meta.containsKey("http.url")) {
+            String url = OtelAttributeMaps.firstNonBlank(attrs, "http.route", "http.url", "url.full");
+            if (url != null && !url.isBlank()) {
+                meta.put("http.url", DcSpanUtil.normalizeHttpUrl(url));
+            }
+        } else {
+            Object existing = meta.get("http.url");
+            if (existing != null) {
+                meta.put("http.url", DcSpanUtil.normalizeHttpUrl(String.valueOf(existing)));
+            }
+        }
+        if (!meta.containsKey("http.status_code") && span.metaHttpStatusCode() == null) {
+            putMetaIfPresent(meta, "http.status_code", OtelAttributeMaps.firstNonBlank(
+                    attrs, "http.status_code", "http.response.status_code"));
+        }
+    }
+
+    private static void applyRpcPortalMeta(
+            Map<String, String> attrs, Map<String, Object> row, Map<String, Object> meta) {
+        putMetaIfPresent(meta, "rpc.system", OtelAttributeMaps.firstNonBlank(attrs, "rpc.system"));
+        putMetaIfPresent(meta, "rpc.service", OtelAttributeMaps.firstNonBlank(attrs, "rpc.service"));
+        putMetaIfPresent(meta, "rpc.method", OtelAttributeMaps.firstNonBlank(attrs, "rpc.method"));
+        putMetaIfPresent(meta, "thread.name", OtelAttributeMaps.firstNonBlank(attrs, "thread.name"));
+        putRowTypeIfPresent(row, resolveComponentTypeIcon("service.rpc", attrs, null));
+    }
+
+    private static void applyRedisPortalMeta(
+            Map<String, String> attrs, SpanSummary span, Map<String, Object> row, Map<String, Object> meta) {
+        String dbSystem = OtelAttributeMaps.firstNonBlank(attrs, "db.system", "db.type");
+        putMetaIfPresent(meta, "db.system", dbSystem);
+        putMetaIfPresent(meta, "db.type", dbSystem);
+        String command = OtelAttributeMaps.firstNonBlank(attrs, "db.statement", "redis.command");
+        if (command == null || command.isBlank()) {
+            command = firstNonBlank(span.resource(), span.name());
+        }
+        putMetaIfPresent(meta, "db.statement", command);
+        putMetaIfPresent(meta, "redis.command", command);
+        putRowTypeIfPresent(row, resolveComponentTypeIcon("service.redis", attrs, null));
+    }
+
+    private static void applyConfigPortalMeta(
+            Map<String, String> attrs, Map<String, Object> row, Map<String, Object> meta) {
+        String configType = OtelAttributeMaps.firstNonBlank(
+                attrs, "config.type", "db.system", "db.type");
+        putMetaIfPresent(meta, "config.type", configType);
+        putMetaIfPresent(meta, "db.system", OtelAttributeMaps.firstNonBlank(attrs, "db.system", "db.type"));
+        putMetaIfPresent(meta, "config.operation", OtelAttributeMaps.firstNonBlank(
+                attrs, "config.operation", "db.operation", "operation.name"));
+        putRowTypeIfPresent(row, resolveComponentTypeIcon("service.config", attrs, configType));
+    }
+
+    private static String resolveComponentTypeIcon(
+            String componentType, Map<String, String> attrs, String fallback) {
+        return switch (componentType) {
+            case "service.mq" -> {
+                String messaging = OtelAttributeMaps.firstNonBlank(attrs, "messaging.system", "component");
+                if (messaging == null || messaging.isBlank()) {
+                    yield fallback != null ? fallback : "mq";
+                }
+                String lower = messaging.toLowerCase(Locale.ROOT);
+                if (lower.contains("kafka")) {
+                    yield "kafka";
+                }
+                if (lower.contains("rabbit")) {
+                    yield "rabbitmq";
+                }
+                if (lower.contains("rocket")) {
+                    yield "rocketmq";
+                }
+                yield lower;
+            }
+            case "service.rpc" -> {
+                String rpc = OtelAttributeMaps.firstNonBlank(attrs, "rpc.system");
+                yield rpc == null || rpc.isBlank()
+                        ? (fallback != null ? fallback : "custom")
+                        : rpc.toLowerCase(Locale.ROOT);
+            }
+            case "service.redis" -> {
+                String dbSystem = OtelAttributeMaps.firstNonBlank(attrs, "db.system", "db.type");
+                if (dbSystem != null && dbSystem.toLowerCase(Locale.ROOT).contains("memcached")) {
+                    yield "memcached";
+                }
+                yield "redis";
+            }
+            case "service.config" -> {
+                String configType = fallback != null
+                        ? fallback
+                        : OtelAttributeMaps.firstNonBlank(attrs, "config.type", "db.system", "db.type");
+                yield configType == null || configType.isBlank()
+                        ? "custom"
+                        : configType.toLowerCase(Locale.ROOT);
+            }
+            default -> fallback;
+        };
+    }
+
+    private static void putRowTypeIfPresent(Map<String, Object> row, String type) {
+        if (type != null && !type.isBlank()) {
+            row.put("type", type);
+        }
+    }
+
+    private static String firstNonBlank(String primary, String fallback) {
+        if (primary != null && !primary.isBlank()) {
+            return primary;
+        }
+        return fallback != null && !fallback.isBlank() ? fallback : null;
+    }
+
+    private static void putMetaIfPresent(Map<String, Object> meta, String key, String value) {
+        if (value != null && !value.isBlank()) {
+            meta.put(key, value);
+        }
+    }
+
+    private static String firstNonBlankMetric(Map<String, String> metrics, String... keys) {
+        if (metrics == null || metrics.isEmpty() || keys == null) {
+            return null;
+        }
+        for (String key : keys) {
+            String value = metrics.get(key);
+            if (value != null && !value.isBlank()) {
+                return value;
+            }
+        }
+        return null;
     }
 
     private static String resolvePortalErrorType(SpanSummary span) {
@@ -1542,7 +1745,9 @@ public class TracePortalService {
         if (httpMethod != null) {
             dcSpan.metaHttpMethod = httpMethod;
         }
-        if (!meta.isEmpty()) {
+        if (span.meta() != null && !span.meta().isBlank()) {
+            dcSpan.meta = span.meta();
+        } else if (!meta.isEmpty()) {
             Map<String, String> stringMeta = new LinkedHashMap<>();
             meta.forEach((key, value) -> {
                 if (value != null) {
@@ -2265,9 +2470,16 @@ public class TracePortalService {
                 String sqlOperation = OtelAttributeMaps.firstNonBlank(meta, "db.operation", "http.method");
                 if (sqlOperation != null) {
                     row.put("sqlOperation", DcSpanUtil.normalizeSqlOperation(sqlOperation));
+                } else {
+                    String inferred = DcSpanUtil.resolveSqlOperation(meta, span.resource(), span.name());
+                    if (!inferred.isBlank()) {
+                        row.put("sqlOperation", inferred);
+                    }
                 }
-                row.put("updateRows", metrics.getOrDefault("db.response.returned_rows", metrics.getOrDefault("db.update.rows", "")));
-                row.put("returnRows", metrics.getOrDefault("db.response.returned_rows", metrics.getOrDefault("db.select.return.rows", "")));
+                row.put("updateRows", nullToEmpty(firstNonBlankMetric(
+                        metrics, "db.update.rows", "db.rows_affected")));
+                row.put("returnRows", nullToEmpty(firstNonBlankMetric(
+                        metrics, "db.response.returned_rows", "db.select.return.rows", "db.rows_returned")));
             }
             case "service.http" -> {
                 String httpMethod = span.metaHttpMethod();
@@ -2302,6 +2514,10 @@ public class TracePortalService {
                 }
             }
             case "service.rpc" -> {
+                String rpcSystem = OtelAttributeMaps.firstNonBlank(meta, "rpc.system");
+                if (rpcSystem != null && !rpcSystem.isBlank()) {
+                    row.put("type", rpcSystem.toLowerCase(Locale.ROOT));
+                }
                 String threadName = OtelAttributeMaps.firstNonBlank(meta, "thread.name");
                 if (threadName != null) {
                     if (server != null) {
@@ -2311,6 +2527,23 @@ public class TracePortalService {
                         client.put("threadName", threadName);
                     }
                 }
+            }
+            case "service.redis" -> {
+                String dbSystem = OtelAttributeMaps.firstNonBlank(meta, "db.system", "db.type");
+                row.put("dbType", nullToEmpty(dbSystem));
+                row.put("type", dbSystem != null && dbSystem.toLowerCase(Locale.ROOT).contains("memcached")
+                        ? "memcached"
+                        : "redis");
+                row.put("command", nullToEmpty(OtelAttributeMaps.firstNonBlank(
+                        meta, "db.statement", "redis.command")));
+            }
+            case "service.config" -> {
+                String configType = OtelAttributeMaps.firstNonBlank(
+                        meta, "config.type", "db.system", "db.type");
+                row.put("type", nullToEmpty(configType == null ? null : configType.toLowerCase(Locale.ROOT)));
+                row.put("configType", nullToEmpty(configType));
+                row.put("configOperation", nullToEmpty(OtelAttributeMaps.firstNonBlank(
+                        meta, "config.operation", "db.operation", "operation.name")));
             }
             default -> {
             }

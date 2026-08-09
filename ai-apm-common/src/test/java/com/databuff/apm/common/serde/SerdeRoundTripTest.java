@@ -49,8 +49,8 @@ class SerdeRoundTripTest {
                 .withFieldValues(2, 1, 50);
         OptimizedMetric right = left.withFieldValues(3, 0, 70);
         OptimizedMetric merged = left.merge(right);
-        // Legacy trace merge normalizes 3-field payloads to (cnt, error, sumDuration, maxDuration).
-        assertThat(merged.fieldValues()).containsExactly(5, 1, 120, 0);
+        // Legacy trace merge normalizes to (cnt, error, sumDuration, maxDuration, slow).
+        assertThat(merged.fieldValues()).containsExactly(5, 1, 120, 0, 0);
     }
 
     @Test

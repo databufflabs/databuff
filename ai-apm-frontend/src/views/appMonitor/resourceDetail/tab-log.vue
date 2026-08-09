@@ -135,7 +135,13 @@ export default class TabLog extends Vue {
     { field: 'meta.db.instance', prop: 'meta.db.instance', label: i18n.t('modules.views.alarmCenter.eventDetail.s_5ccbbd01') as string, labelKey: 'modules.views.alarmCenter.eventDetail.s_5ccbbd01', sortable: true, minWidth: 120, defaultShow: true, filterType: ['service.db'] },
     { field: 'meta.db.type', prop: 'meta.db.type', label: i18n.t('modules.views.alarmCenter.eventDetail.s_c26c0d60') as string, labelKey: 'modules.views.alarmCenter.eventDetail.s_c26c0d60', sortable: true, minWidth: 120, defaultShow: true, filterType: ['service.db'] },
     { field: 'meta.db.updateRows', prop: 'meta.db.updateRows', label: i18n.t('modules.views.appMonitor.resourceDetail.s_d181886c') as string, labelKey: 'modules.views.appMonitor.resourceDetail.s_d181886c', sortable: true, minWidth: 120, defaultShow: true, filterType: ['service.db'] },
-    { field: 'meta.db.return Rows', prop: 'meta.db.returnRows', label: i18n.t('modules.views.appMonitor.resourceDetail.s_973a6f08') as string, labelKey: 'modules.views.appMonitor.resourceDetail.s_973a6f08', sortable: true, minWidth: 120, defaultShow: true, filterType: ['service.db'] },
+    { field: 'meta.db.returnRows', prop: 'meta.db.returnRows', label: i18n.t('modules.views.appMonitor.resourceDetail.s_973a6f08') as string, labelKey: 'modules.views.appMonitor.resourceDetail.s_973a6f08', sortable: true, minWidth: 120, defaultShow: true, filterType: ['service.db'] },
+    // Cache service.redis
+    { field: 'type', prop: 'type', label: i18n.t('modules.views.alarmCenter.eventDetail.s_226b0912') as string, labelKey: 'modules.views.aiPlatform.experts.s_226b0912', sortable: true, minWidth: 120, defaultShow: true, filterType: ['service.redis'] },
+    { field: 'meta.db.statement', prop: 'meta.db.statement', label: 'Command', sortable: true, minWidth: 160, defaultShow: true, filterType: ['service.redis'] },
+    // Config service.config
+    { field: 'type', prop: 'type', label: i18n.t('modules.views.alarmCenter.eventDetail.s_226b0912') as string, labelKey: 'modules.views.aiPlatform.experts.s_226b0912', sortable: true, minWidth: 120, defaultShow: true, filterType: ['service.config'] },
+    { field: 'meta.config.operation', prop: 'meta.config.operation', label: i18n.t('modules.views.alarmCenter.eventDetail.s_de9cc3dd') as string, labelKey: 'modules.views.alarmCenter.eventDetail.s_de9cc3dd', sortable: true, minWidth: 120, defaultShow: true, filterType: ['service.config'] },
     { field: 'trace_id', prop: 'trace_id', label: 'TraceID', minWidth: 120, defaultShow: true },
     { field: 'span_id', prop: 'span_id', label: 'SpanId', minWidth: 120, defaultShow: true },
   ];

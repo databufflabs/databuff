@@ -170,10 +170,15 @@ public final class MetricSchemaRegistry {
     }
 
     private static boolean isLegacyTraceFieldShape(String measurement, long[] fieldValues) {
-        if (fieldValues.length > 4) {
+        // Legacy shape: (cnt, error, sumDuration[, maxDuration[, slow]])
+        // service.flow uses a different 5-field layout: (cnt, error, slow, srcCall, sumDuration)
+        // and must keep positional schema mapping.
+        if (fieldValues.length > 5) {
             return false;
         }
-        if ("service.instance".equals(measurement) || "service.health_status".equals(measurement)) {
+        if ("service.instance".equals(measurement)
+                || "service.health_status".equals(measurement)
+                || "service.flow".equals(measurement)) {
             return false;
         }
         return isTraceDerived(measurement)
@@ -182,8 +187,7 @@ public final class MetricSchemaRegistry {
                 || measurement.startsWith("service.db")
                 || measurement.startsWith("service.redis")
                 || measurement.startsWith("service.mq")
-                || measurement.startsWith("service.config")
-                || "service.flow".equals(measurement);
+                || measurement.startsWith("service.config");
     }
 
     private static void applyLegacyTraceFields(Map<String, Object> row, String measurement, long[] fieldValues) {
@@ -214,8 +218,16 @@ public final class MetricSchemaRegistry {
             } else if (fieldValues.length > 0 && fieldValues[0] == 1 && fieldValues.length > 2) {
                 named.put("maxDuration", fieldValues[2]);
             }
-            if (fieldValues.length > 1 && named.containsKey("slow")) {
-                named.put("slow", fieldValues[1]);
+            if (named.containsKey("slow")) {
+                // slow must NOT reuse error (fieldValues[1]); prefer explicit 5th value,
+                // else fall back to isSlow tag when the measurement carries it (e.g. service.db).
+                if (fieldValues.length > 4) {
+                    named.put("slow", Math.max(0L, fieldValues[4]));
+                } else if ("1".equals(String.valueOf(row.get("isSlow")))) {
+                    named.put("slow", fieldValues.length > 0 ? fieldValues[0] : 1L);
+                } else {
+                    named.put("slow", 0L);
+                }
             }
         }
         named.forEach(row::put);

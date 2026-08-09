@@ -51,6 +51,9 @@ class MetricQueryBuilderTest {
         assertThat(sql).contains("(FLOOR(`end` / 1000000 / 60000) * 60000) < ");
         assertThat(sql).contains("`startTime` >=");
         assertThat(sql).contains("ORDER BY `startTime` DESC");
+        assertThat(sql).contains("NULL AS `meta`");
+        assertThat(sql).contains("NULL AS `metrics`");
+        assertThat(sql).doesNotContain("`meta`, `metrics`");
         assertThat(sql).contains("LIMIT 50 OFFSET 0");
 
         String countSql = MetricQueryBuilder.spanListCountSql(
@@ -257,6 +260,8 @@ class MetricQueryBuilderTest {
                 "service.rpc");
         assertThat(rpcSql).contains("COALESCE(NULLIF(`resource`, ''), `name`) = 'Dubbo DemoOrderService.findInventory'");
         assertThat(rpcSql).doesNotContain("`meta.http.url` = 'Dubbo DemoOrderService.findInventory'");
+        assertThat(rpcSql).contains("`meta`, `metrics`");
+        assertThat(rpcSql).doesNotContain("NULL AS `meta`");
 
         String dbSql = MetricQueryBuilder.spanListSql(
                 "databuff",
@@ -277,6 +282,40 @@ class MetricQueryBuilderTest {
                 "service.db");
         assertThat(dbSql).contains("COALESCE(NULLIF(`resource`, ''), `name`) = 'SELECT id, amount, status FROM demo_order WHERE id = ?'");
         assertThat(dbSql).contains("get_json_string(`meta`, '$.\"db.statement\"')");
+        assertThat(dbSql).contains("`meta`, `metrics`");
+        assertThat(dbSql).doesNotContain("NULL AS `meta`");
+
+        String httpSql = MetricQueryBuilder.spanListSql(
+                "databuff",
+                List.of("9bf61532d56eb7b5"),
+                0L,
+                3_600_000L,
+                50,
+                0,
+                "2026-06-06 07:17:00",
+                "2026-06-06 08:17:00",
+                null,
+                null,
+                "startTime",
+                "desc",
+                "/demo/checkout",
+                null,
+                null,
+                "service.http");
+        assertThat(httpSql).contains("NULL AS `meta`");
+        assertThat(httpSql).doesNotContain("`meta`, `metrics`");
+    }
+
+    @Test
+    void spanListNeedsComponentMetaOnlyForEnrichableTypes() {
+        assertThat(MetricQueryBuilder.spanListNeedsComponentMeta(null)).isFalse();
+        assertThat(MetricQueryBuilder.spanListNeedsComponentMeta("")).isFalse();
+        assertThat(MetricQueryBuilder.spanListNeedsComponentMeta("service.http")).isFalse();
+        assertThat(MetricQueryBuilder.spanListNeedsComponentMeta("service.db")).isTrue();
+        assertThat(MetricQueryBuilder.spanListNeedsComponentMeta("service.mq")).isTrue();
+        assertThat(MetricQueryBuilder.spanListNeedsComponentMeta("service.rpc")).isTrue();
+        assertThat(MetricQueryBuilder.spanListNeedsComponentMeta("service.redis")).isTrue();
+        assertThat(MetricQueryBuilder.spanListNeedsComponentMeta("service.config")).isTrue();
     }
 
     @Test

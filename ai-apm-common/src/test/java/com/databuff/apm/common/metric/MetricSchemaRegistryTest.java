@@ -36,6 +36,68 @@ class MetricSchemaRegistryTest {
         assertThat(row.get("error")).isEqualTo(2L);
         assertThat(row.get("sumDuration")).isEqualTo(900L);
         assertThat(row.get("maxDuration")).isEqualTo(0);
+        // error must not leak into slow
+        assertThat(row.get("slow")).isEqualTo(0L);
+    }
+
+    @Test
+    void errorDoesNotInflateSlowAcrossComponentTypes() {
+        for (String measurement : java.util.List.of(
+                "service.http",
+                "service.rpc",
+                "service.db",
+                "service.redis",
+                "service.mq",
+                "service.remote",
+                "service.config")) {
+            java.util.Map<String, Object> poisonedLegacy = new java.util.LinkedHashMap<>();
+            // Pre-fix shape: only (cnt, error, sumDuration) — slow must stay 0, not copy error.
+            MetricSchemaRegistry.applyFieldValues(poisonedLegacy, measurement, new long[] {5, 3, 100});
+            assertThat(poisonedLegacy.get("error"))
+                    .as("%s error", measurement)
+                    .isEqualTo(3L);
+            assertThat(poisonedLegacy.get("slow"))
+                    .as("%s slow must not copy error", measurement)
+                    .isEqualTo(0L);
+
+            java.util.Map<String, Object> withSlowField = new java.util.LinkedHashMap<>();
+            MetricSchemaRegistry.applyFieldValues(
+                    withSlowField, measurement, new long[] {5, 3, 100, 80, 1});
+            assertThat(withSlowField.get("error")).as("%s error", measurement).isEqualTo(3L);
+            assertThat(withSlowField.get("slow")).as("%s slow from 5th field", measurement).isEqualTo(1L);
+        }
+    }
+
+    @Test
+    void serviceFlowKeepsPositionalFiveFieldLayout() {
+        // ServiceFlowExtractor writes (cnt, error, slow, srcCall, sumDuration).
+        java.util.Map<String, Object> row = new java.util.LinkedHashMap<>();
+        MetricSchemaRegistry.applyFieldValues(row, "service.flow", new long[] {1, 0, 1, 2, 100});
+        assertThat(row.get("cnt")).isEqualTo(1L);
+        assertThat(row.get("error")).isEqualTo(0L);
+        assertThat(row.get("slow")).isEqualTo(1L);
+        assertThat(row.get("srcCall")).isEqualTo(2L);
+        assertThat(row.get("sumDuration")).isEqualTo(100L);
+    }
+
+    @Test
+    void appliesLegacyTraceSlowFromFifthField() {
+        java.util.Map<String, Object> row = new java.util.LinkedHashMap<>();
+        MetricSchemaRegistry.applyFieldValues(row, "service.db", new long[] {3, 2, 900, 400, 1});
+        assertThat(row.get("cnt")).isEqualTo(3L);
+        assertThat(row.get("error")).isEqualTo(2L);
+        assertThat(row.get("slow")).isEqualTo(1L);
+        assertThat(row.get("sumDuration")).isEqualTo(900L);
+        assertThat(row.get("maxDuration")).isEqualTo(400L);
+    }
+
+    @Test
+    void appliesLegacyTraceSlowFromIsSlowTagWhenFifthFieldAbsent() {
+        java.util.Map<String, Object> row = new java.util.LinkedHashMap<>();
+        row.put("isSlow", "1");
+        MetricSchemaRegistry.applyFieldValues(row, "service.db", new long[] {4, 1, 800, 200});
+        assertThat(row.get("error")).isEqualTo(1L);
+        assertThat(row.get("slow")).isEqualTo(4L);
     }
 
     @Test
