@@ -18,7 +18,14 @@
       <template slot="total" slot-scope="{ total }">
         <div class="describe">
           <span class="mr-15">{{ $t('modules.views.appMonitor.trace.s_1d0e7889', { value0: new Intl.NumberFormat().format(total) }) }}</span>
-          <span class="time-range">{{ $t('modules.views.appMonitor.serviceCallDetail.s_c4023f57', listTimeDisplay) }}</span>
+          <span
+            v-if="selectedBucketLabel"
+            class="bucket-tip cp"
+            @click="$emit('reset-bucket')">
+            {{ $t('modules.views.appMonitor.serviceCallDetail.s_c4023f57', listTimeDisplay) }}
+            <i class="el-icon-circle-close ml-2"></i>
+          </span>
+          <span v-else class="time-range">{{ $t('modules.views.appMonitor.serviceCallDetail.s_c4023f57', listTimeDisplay) }}</span>
         </div>
       </template>
       <el-table-column slot="suffix" :label="$t('modules.utils.static.s_456d29ef')" width="72" align="center" fixed="right">
@@ -44,6 +51,7 @@ import { formatCompactTimeRange } from '@/utils/timeFormat'
 export default class ServiceTable extends Vue {
   @Prop({ default: () => ({}) }) private query!: any;
   @Prop({ default: () => ({}) }) private filter!: any;
+  @Prop({ default: '' }) private selectedBucketLabel!: string;
 
   get queryParams () {
     return {
@@ -170,6 +178,17 @@ export default class ServiceTable extends Vue {
 .monitor-event-info-tip {
   margin-bottom: 5px;
   padding-left: 6px;
+}
+.bucket-tip {
+  display: inline-block;
+  font-size: 12px;
+  font-weight: normal;
+  color: var(--color-primary, #2962FF);
+  background: var(--color-primary-light-9, #E8F0FF);
+  border-radius: 10px;
+  padding: 2px 10px;
+  line-height: 18px;
+  vertical-align: middle;
 }
 </style>
 <style>

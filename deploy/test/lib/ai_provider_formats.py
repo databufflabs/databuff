@@ -6,7 +6,9 @@
 环境变量门控（未设置则尝试使用实例上已启用的同名 provider）：
   - ``DEEPSEEK_API_KEY`` → OpenAI Completions（deepseek / openai-completions）
   - ``MINIMAX_API_KEY``  → Anthropic Messages（minimax / anthropic-messages）
-  - ``AI_TEST_PROVIDER=deepseek|minimax`` → 只跑对应格式（与 memory/brain 一致）
+  - ``OPENCODE_API_KEY`` → OpenCode Go（opencode / openai-completions；未设置时
+    自动读 opencode CLI 的 ``auth.json``）
+  - ``AI_TEST_PROVIDER=deepseek|minimax|opencode`` → 只跑对应格式（与 memory/brain 一致）
 
 跳过整组：``TEST_SKIP_AI_PROVIDER_FORMATS=1``
 """
@@ -19,6 +21,8 @@ from typing import Any
 
 from ai_chat_integration import (
     _http_json,
+    ensure_ai_provider_exists,
+    opencode_go_api_key_from_cli,
     run_ai_chat_tool_loop,
     AiChatCaseResult,
 )
@@ -27,6 +31,7 @@ GROUP_PROVIDER_FORMATS = "接入格式"
 
 ENV_DEEPSEEK = "DEEPSEEK_API_KEY"
 ENV_MINIMAX = "MINIMAX_API_KEY"
+ENV_OPENCODE = "OPENCODE_API_KEY"
 
 # 聚焦会触发工具调用的问数题；每格式 1 轮，控制费用与耗时。
 FORMAT_QUESTIONS: list[tuple[str, str]] = [
@@ -65,12 +70,24 @@ PROVIDER_FORMATS: tuple[ProviderFormatProfile, ...] = (
         model="MiniMax-M3",
         env_key=ENV_MINIMAX,
     ),
+    ProviderFormatProfile(
+        label="OpenCode Go",
+        api_type="openai-completions",
+        provider_code="opencode",
+        base_url="https://opencode.ai/zen/go/v1",
+        model="deepseek-v4-flash",
+        env_key=ENV_OPENCODE,
+    ),
 )
 
 
 def provider_api_key(env_key: str) -> str | None:
     value = os.environ.get(env_key, "").strip()
-    return value or None
+    if value:
+        return value
+    if env_key == ENV_OPENCODE:
+        return opencode_go_api_key_from_cli()
+    return None
 
 
 def _list_providers(base: str, token: str, timeout: float = 30.0) -> list[dict[str, Any]]:
@@ -142,6 +159,16 @@ def ensure_provider_format(
 ) -> None:
     """写入 API Key / baseUrl / model，并显式固定 apiType（接入格式）。"""
     root = base.rstrip("/")
+    ensure_ai_provider_exists(
+        base,
+        token,
+        profile.provider_code,
+        display_name=profile.label,
+        base_url=profile.base_url,
+        api_key=api_key,
+        default_model=profile.model,
+        timeout=timeout,
+    )
     _http_json(
         "PUT",
         f"{root}/webapi/api/v1/config/ai/providers/{profile.provider_code}/detail",

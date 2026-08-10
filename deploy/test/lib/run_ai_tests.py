@@ -9,11 +9,12 @@
   - modelfail  模型失败可见性（单专家/多专家；会临时改专家绑定，suit=all 时在核心套件后串行）
 
 环境变量门控：
-  - AI_TEST_PROVIDER=deepseek|minimax：选择本轮模型（chat/formats/memory/brain/modelfail）
+  - AI_TEST_PROVIDER=deepseek|minimax|opencode：选择本轮模型（chat/formats/memory/brain/modelfail）
   - chat：已启用 LLM provider（TEST_SKIP_AI_CHAT=1 跳过）
-  - formats：按 AI_TEST_PROVIDER 只跑对应格式；Key 为 DEEPSEEK_API_KEY / MINIMAX_API_KEY
+  - formats：按 AI_TEST_PROVIDER 只跑对应格式；Key 为 DEEPSEEK_API_KEY / MINIMAX_API_KEY / OPENCODE_API_KEY
     （TEST_SKIP_AI_PROVIDER_FORMATS=1 跳过）
   - memory / brain / modelfail：由 AI_TEST_PROVIDER 对应 Key 门控
+    （opencode 未设置 OPENCODE_API_KEY 时自动读 opencode CLI 的 auth.json）
 """
 
 from __future__ import annotations

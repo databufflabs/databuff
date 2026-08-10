@@ -12,7 +12,6 @@
       <div class="chart-wrapper mt-10 mb-10 flex-none">
         <basic-chart
           :showEmpty="!chartGroup.trend.loading && !chartGroup.trend.source.length"
-          :key='key'
           :colors='chartGroup.trend.colors'
           :showLegend='true'
           :textSmallMode="true"
@@ -21,19 +20,21 @@
           :yAxisSplitNum="3"
           :interval="trendTimeParams.interval"
           :source='chartGroup.trend.source'
-          :clickEvent='onChartClick'></basic-chart>
+          :brushMode="false"
+          :axisClickEvent="onChartClick"></basic-chart>
       </div>
 
       <div class="list-wrapper flex-1">
         <db-table
           :queryApi='queryApi'
           :queryParams='tableQueryParams'
+          :timeMode='false'
           :offsetMode='true'
           :showTotal='false'
           :showSetting='true'
           :columnConfig='getColumns'
           @on-table-inited='tableInitedHandle'
-          @sort-change='refresh'
+          @sort-change='onSortChange'
           @on-fetch-end='onFetchEnd'
           :formatFunc='formatFunc'
           :row-style='{ cursor: "pointer" }'
@@ -174,6 +175,11 @@ export default class TabLog extends Vue {
     this.fetchAllData();
   }
 
+  // 排序只刷新表格，保留柱子选中的时间桶
+  private onSortChange () {
+    this.$refs.listTable && this.$refs.listTable.refresh();
+  }
+
   private fetchAllData () {
     this.tableInitedHandle();
     this.fetchTrendSource();
@@ -244,14 +250,14 @@ export default class TabLog extends Vue {
     }
   }
 
-  // 点击柱状图某个时间桶，表格收窄到该桶时间段
-  private onChartClick (params: any) {
-    if (!params || !params.name) {
+  // 点击柱状图某个时间桶，表格收窄到该桶；再次点击同一桶则取消，回到默认时间范围
+  private onChartClick (params: { xAxisName?: string; name?: string }) {
+    const bucketLabel = String(params?.xAxisName || params?.name || ''); // YYYY-MM-DD HH:mm
+    if (!bucketLabel) {
       return;
     }
-    const bucketLabel = String(params.name); // YYYY-MM-DD HH:mm
     const interval = this.trendTimeParams.interval || 60;
-    const fromMs = +new Date(bucketLabel);
+    const fromMs = +new Date(`${bucketLabel}:00`);
     if (!Number.isFinite(fromMs)) {
       return;
     }
@@ -261,8 +267,14 @@ export default class TabLog extends Vue {
     const toTime = Number.isFinite(globalToMs) && toMs > globalToMs
       ? this.trendTimeParams.toTime
       : dayjs(toMs).format('YYYY-MM-DD HH:mm:ss');
+    const nextLabel = `${fromTime} ~ ${toTime}`;
+    // 再次点击当前已选中的柱子 → 取消筛选
+    if (this.selectedBucketLabel === nextLabel) {
+      this.resetBucketHandle();
+      return;
+    }
     this.timeParams = { ...this.timeParams, fromTime, toTime };
-    this.selectedBucketLabel = `${bucketLabel}:00 ~ ${toTime}`;
+    this.selectedBucketLabel = nextLabel;
     this.$refs.listTable && this.$refs.listTable.refresh();
   }
 

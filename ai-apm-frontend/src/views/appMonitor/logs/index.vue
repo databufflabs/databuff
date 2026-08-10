@@ -174,7 +174,14 @@
           <template slot="total" slot-scope="{ total }">
             <div class="describe">
               <span class="mr-15">{{ $t('modules.views.appMonitor.trace.s_1d0e7889', { value0: new Intl.NumberFormat().format(total) }) }}</span>
-              <span class="time-range">{{ $t('modules.views.appMonitor.serviceCallDetail.s_c4023f57', listTimeDisplay) }}</span>
+              <span
+                v-if="selectedBucketLabel"
+                class="bucket-tip cp"
+                @click="resetBucketHandle">
+                {{ $t('modules.views.appMonitor.serviceCallDetail.s_c4023f57', listTimeDisplay) }}
+                <i class="el-icon-circle-close ml-2"></i>
+              </span>
+              <span v-else class="time-range">{{ $t('modules.views.appMonitor.serviceCallDetail.s_c4023f57', listTimeDisplay) }}</span>
             </div>
           </template>
           <template slot="status" slot-scope="{ row }">
@@ -246,6 +253,7 @@ export default class LogsAnalysis extends Vue {
   private listTimeRange = { fromTimeNs: '', toTimeNs: '' };
   private showList = false;
   private listScope: 'default' | 'minute' = 'default';
+  private selectedBucketLabel = '';
   private chartInitLoading = false;
   private chartQueryLoading = false;
   private tableReady = false;
@@ -311,13 +319,15 @@ export default class LogsAnalysis extends Vue {
     if (!this.globalTimeInited) {
       return;
     }
-    this.syncTimeAndReload();
+    // 修改全局时间范围时，清空柱子选中，按新范围重新查
+    this.syncTimeAndReload({ clearMinute: true });
   }
 
   @Watch('globalTimeInited', { immediate: true })
   private watchGlobalTimeInited (val: boolean) {
     if (val) {
-      this.syncTimeAndReload();
+      // 首次进入保留路由中的柱子选中（sf/st）
+      this.syncTimeAndReload({ clearMinute: false });
     }
   }
 
@@ -345,6 +355,7 @@ export default class LogsAnalysis extends Vue {
         fromTimeNs: `${fromMs * 1_000_000}`,
         toTimeNs: `${toMs * 1_000_000}`,
       };
+      this.selectedBucketLabel = `${dayjs(fromMs).format('YYYY-MM-DD HH:mm:ss')} ~ ${dayjs(toMs).format('YYYY-MM-DD HH:mm:ss')}`;
       this.showList = true;
       await this.loadConditions();
       this.$nextTick(() => {
@@ -363,10 +374,13 @@ export default class LogsAnalysis extends Vue {
     });
     if (!range) {
       this.showList = false;
+      this.listScope = 'default';
+      this.selectedBucketLabel = '';
       this.listTimeRange = { fromTimeNs: '', toTimeNs: '' };
       return;
     }
     this.listScope = 'default';
+    this.selectedBucketLabel = '';
     this.listTimeRange = {
       fromTimeNs: `${range.fromMs * 1_000_000}`,
       toTimeNs: `${range.toMs * 1_000_000}`,
@@ -384,16 +398,9 @@ export default class LogsAnalysis extends Vue {
   }
 
   private clearMinuteRoute () {
-    const nextQuery: Record<string, string> = {};
-    LogsAnalysis.ROUTE_PRESERVE_KEYS.forEach((key) => {
-      if (key === 'sf' || key === 'st') {
-        return;
-      }
-      const value = this.$route.query[key];
-      if (value !== null && value !== undefined && value !== '') {
-        nextQuery[key] = String(value);
-      }
-    });
+    const nextQuery = { ...this.$route.query } as Record<string, any>;
+    delete nextQuery.sf;
+    delete nextQuery.st;
     this.$router.replace({ path: this.$route.path, query: nextQuery });
   }
 
@@ -433,7 +440,9 @@ export default class LogsAnalysis extends Vue {
   }
 
   private mounted () {
-    this.$eventBus.$on('GlobalRefresh', this, this.syncTimeAndReload);
+    this.$eventBus.$on('GlobalRefresh', this, () => {
+      this.syncTimeAndReload({ clearMinute: true });
+    });
   }
 
   private beforeDestroy () {
@@ -555,14 +564,19 @@ export default class LogsAnalysis extends Vue {
     this.listTimeRange = { fromTimeNs: '', toTimeNs: '' };
   }
 
-  private async syncTimeAndReload () {
+  private async syncTimeAndReload (opts: { clearMinute?: boolean } = { clearMinute: true }) {
     if (!this.globalTimeInited) {
       return;
     }
+    const clearMinute = opts.clearMinute !== false;
     const seq = ++this.syncReloadSeq;
     this.listScope = 'default';
+    this.selectedBucketLabel = '';
     this.showList = false;
     this.resetTimeParams();
+    if (clearMinute) {
+      this.clearMinuteRoute();
+    }
     this.chartInitLoading = true;
     try {
       await this.loadConditions();
@@ -577,7 +591,11 @@ export default class LogsAnalysis extends Vue {
       if (seq !== this.syncReloadSeq) {
         return;
       }
-      await this.restoreChartSelectionFromRoute();
+      if (clearMinute) {
+        await this.applyDefaultListFromChart();
+      } else {
+        await this.restoreChartSelectionFromRoute();
+      }
     } finally {
       if (seq === this.syncReloadSeq) {
         this.chartInitLoading = false;
@@ -634,6 +652,7 @@ export default class LogsAnalysis extends Vue {
   private async onQueryTextChange (value?: string) {
     this.queryText = this.normalizeInputValue(value !== undefined ? value : this.queryText);
     this.listScope = 'default';
+    this.selectedBucketLabel = '';
     await this.loadConditions();
     await this.reloadChartAndList();
   }
@@ -641,6 +660,7 @@ export default class LogsAnalysis extends Vue {
   private async onTraceIdChange (value?: string) {
     this.traceIdText = this.normalizeInputValue(value !== undefined ? value : this.traceIdText);
     this.listScope = 'default';
+    this.selectedBucketLabel = '';
     await this.loadConditions();
     await this.reloadChartAndList();
   }
@@ -648,6 +668,7 @@ export default class LogsAnalysis extends Vue {
   private async onSpanIdChange (value?: string) {
     this.spanIdText = this.normalizeInputValue(value !== undefined ? value : this.spanIdText);
     this.listScope = 'default';
+    this.selectedBucketLabel = '';
     await this.loadConditions();
     await this.reloadChartAndList();
   }
@@ -686,14 +707,23 @@ export default class LogsAnalysis extends Vue {
   }
 
   private chartClickHandle (xAxisName: string, type?: string) {
-    this.listScope = 'minute';
     const { toTime, interval } = this.timeParams;
     const fromMs = +new Date(`${xAxisName}:00`);
     const toMs = Math.min(fromMs + interval * 1000, +new Date(toTime));
+    const fromTime = dayjs(fromMs).format('YYYY-MM-DD HH:mm:ss');
+    const resolvedToTime = dayjs(toMs).format('YYYY-MM-DD HH:mm:ss');
+    const nextLabel = `${fromTime} ~ ${resolvedToTime}`;
+    // 再次点击当前已选中的柱子 → 取消筛选，回到默认时间窗
+    if (this.listScope === 'minute' && this.selectedBucketLabel === nextLabel) {
+      this.resetBucketHandle();
+      return;
+    }
+    this.listScope = 'minute';
     this.listTimeRange = {
       fromTimeNs: `${fromMs * 1_000_000}`,
       toTimeNs: `${toMs * 1_000_000}`,
     };
+    this.selectedBucketLabel = nextLabel;
 
     if (!this.showList) {
       if (type === 'error') {
@@ -718,6 +748,19 @@ export default class LogsAnalysis extends Vue {
         this.chartQueryLoading = false;
       });
     });
+  }
+
+  // 叉掉柱子选中，列表回到图表默认时间窗
+  private async resetBucketHandle () {
+    this.selectedBucketLabel = '';
+    this.listScope = 'default';
+    this.clearMinuteRoute();
+    this.chartQueryLoading = true;
+    try {
+      await this.applyDefaultListFromChart();
+    } finally {
+      this.chartQueryLoading = false;
+    }
   }
 
   private resolveErrorSeverities () {
@@ -1007,6 +1050,18 @@ export default class LogsAnalysis extends Vue {
   :deep(.scroll-el-table-header) {
     padding-top: 0;
   }
+}
+
+.bucket-tip {
+  display: inline-block;
+  font-size: 12px;
+  font-weight: normal;
+  color: var(--color-primary, #2962FF);
+  background: var(--color-primary-light-9, #E8F0FF);
+  border-radius: 10px;
+  padding: 2px 10px;
+  line-height: 18px;
+  vertical-align: middle;
 }
 
 .log-level-tag {

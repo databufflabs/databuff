@@ -9,6 +9,7 @@ import urllib.error
 import urllib.request
 from concurrent.futures import ThreadPoolExecutor, as_completed
 from dataclasses import dataclass
+from pathlib import Path
 from typing import Any
 
 MODULE_AI_PLATFORM = "AI平台"
@@ -52,6 +53,71 @@ def _http_json(
     req = urllib.request.Request(url, data=data, headers=headers, method=method)
     with urllib.request.urlopen(req, timeout=timeout) as resp:
         return json.loads(resp.read().decode("utf-8"))
+
+
+def opencode_go_api_key_from_cli() -> str | None:
+    """OpenCode Go API key stored by the opencode CLI (``/connect`` → OpenCode Go).
+
+    The Go subscription is bound to the opencode account and has no manually
+    distributed key; the CLI mints one and keeps it in ``auth.json``. Read it
+    directly so tests can run with ``AI_TEST_PROVIDER=opencode`` without a
+    separately exported ``OPENCODE_API_KEY``.
+    """
+    try:
+        auth_file = Path(
+            os.environ.get("OPENCODE_AUTH_FILE")
+            or Path.home() / ".local" / "share" / "opencode" / "auth.json"
+        )
+        if not auth_file.is_file():
+            return None
+        data = json.loads(auth_file.read_text(encoding="utf-8"))
+        entry = data.get("opencode-go") or {}
+        key = str(entry.get("key") or "").strip()
+        return key or None
+    except (OSError, ValueError, TypeError, AttributeError):
+        return None
+
+
+def ensure_ai_provider_exists(
+    base: str,
+    token: str,
+    provider_code: str,
+    *,
+    display_name: str,
+    base_url: str,
+    api_key: str | None = None,
+    default_model: str = "default",
+    timeout: float = 30.0,
+) -> None:
+    """Create the LLM provider on the server if missing; tolerate ``already exists``.
+
+    databuff seeds only a fixed provider set (deepseek/minimax/...); custom codes
+    like ``opencode`` must be created once via ``POST /providers`` before the
+    detail PUT, otherwise the PUT fails with ``unknown provider``.
+    """
+    try:
+        _http_json(
+            "POST",
+            f"{base.rstrip('/')}/webapi/api/v1/config/ai/providers",
+            {
+                "providerCode": provider_code,
+                "displayName": display_name,
+                "baseUrl": base_url,
+                "defaultModel": default_model,
+                "apiKey": api_key or None,
+                "enabled": True,
+            },
+            token=token,
+            timeout=timeout,
+        )
+    except urllib.error.HTTPError as error:
+        body = ""
+        try:
+            body = error.read().decode("utf-8", "replace")
+        except OSError:
+            pass
+        if "already exists" not in body:
+            raise
 
 
 def _submit_chat(

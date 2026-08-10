@@ -16,7 +16,8 @@
 # 需要环境变量（可写在 ~/.zshrc）：
 #   DEEPSEEK_API_KEY=sk-...   OpenAI Completions
 #   MINIMAX_API_KEY=...       Anthropic Messages
-#   AI_TEST_PROVIDER=deepseek|minimax
+#   OPENCODE_API_KEY=...      OpenCode Go（可选：未设置时自动读 opencode CLI 的 auth.json）
+#   AI_TEST_PROVIDER=deepseek|minimax|opencode
 #       选择本轮实际调用的模型（chat/formats/memory/brain/modelfail 均按此切换；默认 deepseek）
 #   AI_TEST_MODEL=...         可选覆盖模型名
 #
@@ -25,6 +26,7 @@
 #   ./ai-tests.sh                          # 核心套件分进程并行，再串行 modelfail
 #   AI_TEST_PROVIDER=minimax ./ai-tests.sh # 临时覆盖走 MiniMax
 #   AI_TEST_PROVIDER=deepseek ./ai-tests.sh
+#   AI_TEST_PROVIDER=opencode ./ai-tests.sh # 走 OpenCode Go 套餐（无需 OPENCODE_API_KEY 也可，自动读 auth.json）
 #   ./ai-tests.sh --suite memory           # 只跑会话记忆
 #   ./ai-tests.sh --suite brain
 #   ./ai-tests.sh --suite modelfail        # 只跑模型失败可见性
@@ -66,9 +68,9 @@ export TEST_AI_CHAT_MAX_WORKERS="${TEST_AI_CHAT_MAX_WORKERS:-1}"
 export TEST_AI_BRAIN_MAX_WORKERS="${TEST_AI_BRAIN_MAX_WORKERS:-1}"
 export AI_TEST_PROVIDER="${AI_TEST_PROVIDER:-deepseek}"
 case "${AI_TEST_PROVIDER}" in
-  deepseek|minimax) ;;
+  deepseek|minimax|opencode) ;;
   *)
-    echo "[ai-tests] unsupported AI_TEST_PROVIDER=${AI_TEST_PROVIDER}; expected deepseek|minimax" >&2
+    echo "[ai-tests] unsupported AI_TEST_PROVIDER=${AI_TEST_PROVIDER}; expected deepseek|minimax|opencode" >&2
     exit 2
     ;;
 esac

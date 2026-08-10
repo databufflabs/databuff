@@ -1,9 +1,10 @@
 """AI 会话记忆集成测试 — (sessionId, expertId) 多轮上下文是否保留.
 
-默认走 DeepSeek；可用环境变量切到 MiniMax：
-  - ``AI_TEST_PROVIDER=deepseek|minimax``（默认 deepseek）
+默认走 DeepSeek；可用环境变量切换：
+  - ``AI_TEST_PROVIDER=deepseek|minimax|opencode``（默认 deepseek）
   - ``AI_TEST_MODEL`` 可选覆盖模型名
-  - 对应 API Key：``DEEPSEEK_API_KEY`` / ``MINIMAX_API_KEY``
+  - 对应 API Key：``DEEPSEEK_API_KEY`` / ``MINIMAX_API_KEY`` / ``OPENCODE_API_KEY``
+    （opencode 未设置时自动读 opencode CLI 的 ``auth.json``，走 OpenCode Go 套餐）
   - 未设置对应 Key → 跳过（CI 安全）
 """
 
@@ -15,7 +16,11 @@ import urllib.error
 from dataclasses import dataclass
 from typing import Any
 
-from ai_chat_integration import _http_json
+from ai_chat_integration import (
+    _http_json,
+    ensure_ai_provider_exists,
+    opencode_go_api_key_from_cli,
+)
 
 MODULE_AI_PLATFORM = "AI平台"
 GROUP_SESSION_MEMORY = "会话记忆"
@@ -32,6 +37,12 @@ _PROVIDER_PROFILES: dict[str, dict[str, str]] = {
         "base_url": "https://api.minimaxi.com/anthropic",
         "api_type": "anthropic-messages",
         "env_key": "MINIMAX_API_KEY",
+    },
+    "opencode": {
+        "model": "deepseek-v4-flash",
+        "base_url": "https://opencode.ai/zen/go/v1",
+        "api_type": "openai-completions",
+        "env_key": "OPENCODE_API_KEY",
     },
 }
 
@@ -66,9 +77,17 @@ class MemoryCaseResult:
 
 
 def test_llm_api_key() -> str | None:
-    """API key for the selected AI_TEST_PROVIDER."""
+    """API key for the selected AI_TEST_PROVIDER.
+
+    ``opencode`` has no manually distributed key: fall back to the key the
+    opencode CLI stores in ``~/.local/share/opencode/auth.json``.
+    """
     value = os.environ.get(ENV_API_KEY, "").strip()
-    return value or None
+    if value:
+        return value
+    if PROVIDER == "opencode":
+        return opencode_go_api_key_from_cli()
+    return None
 
 
 def deepseek_api_key() -> str | None:
@@ -79,6 +98,16 @@ def deepseek_api_key() -> str | None:
 def ensure_test_llm_provider(base: str, token: str, api_key: str, timeout: float = 30.0) -> None:
     """Configure / enable selected provider and set it as default."""
     provider = PROVIDER
+    ensure_ai_provider_exists(
+        base,
+        token,
+        provider,
+        display_name=provider,
+        base_url=BASE_URL,
+        api_key=api_key,
+        default_model=MODEL,
+        timeout=timeout,
+    )
     _http_json(
         "PUT",
         f"{base.rstrip('/')}/webapi/api/v1/config/ai/providers/{provider}/detail",

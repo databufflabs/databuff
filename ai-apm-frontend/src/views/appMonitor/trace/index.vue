@@ -37,6 +37,8 @@
           :query="queryParams"
           :filter="queryFilter"
           :queryLoading="queryLoading"
+          :selectedBucketLabel="selectedBucketLabel"
+          @reset-bucket="resetBucketHandle"
           class="list"
         />
       </div>
@@ -79,7 +81,8 @@ export default class Trace extends Vue {
 
   @Watch('globalTimeV2', { deep: true })
   private watchGlobalTime() {
-    this.durationChangeHandle()
+    // 修改全局时间范围时，清空柱子选中，按新范围重新查
+    this.durationChangeHandle({ clearMinute: true })
   }
 
   private timeParams = {
@@ -90,6 +93,7 @@ export default class Trace extends Vue {
 
   private showList = false;
   private listScope: 'default' | 'minute' = 'default';
+  private selectedBucketLabel = '';
   private queryParams: any = {}
   private queryFilter: any = {}
   private queryLoading = false;
@@ -108,12 +112,13 @@ export default class Trace extends Vue {
     // 监听全局的手动刷新事件，created中会有不触发的情况
     // 子组件绑定会被覆盖
     this.$eventBus.$on('GlobalRefresh', this, () => {
-      this.durationChangeHandle()
+      this.durationChangeHandle({ clearMinute: true })
     });
     await this.queryServiceIdNames();
-    await this.durationChangeHandle();
+    // 首次进入保留路由中的柱子选中（sf/st），由下方再 restore
+    await this.durationChangeHandle({ clearMinute: false });
     const { sf, st } = this.$route.query
-    if (sf && st && !isNaN(Number(sf)) && !isNaN(Number(st)) && sf.length === 13 && st.length === 13) {
+    if (sf && st && !isNaN(Number(sf)) && !isNaN(Number(st)) && String(sf).length === 13 && String(st).length === 13) {
       const _multisearch = decodeURIComponent(this.$route.query.multisearch as string || '');
       const _multiList: string[] = _multisearch.split(';')
       const _errorIdx = _multiList.findIndex((item: string) => item.indexOf('error=1') === 0);
@@ -126,8 +131,13 @@ export default class Trace extends Vue {
     this.$eventBus.$off('GlobalRefresh');
   }
 
-  private async durationChangeHandle () {
+  private async durationChangeHandle (opts: { clearMinute?: boolean } = { clearMinute: true }) {
+    const clearMinute = opts.clearMinute !== false
     this.listScope = 'default';
+    this.selectedBucketLabel = '';
+    if (clearMinute) {
+      this.clearMinuteRoute()
+    }
     this.regetGlobalTime()
     this.searchInitLoading = true
     try {
@@ -151,7 +161,10 @@ export default class Trace extends Vue {
       await this.$nextTick()
       await this.$refs.chartGroup?.getData()
       const { sf, st } = this.$route.query
-      const hasRouteMinute = sf && st && !isNaN(Number(sf)) && !isNaN(Number(st)) && String(sf).length === 13 && String(st).length === 13
+      const hasRouteMinute = !clearMinute
+        && sf && st
+        && !isNaN(Number(sf)) && !isNaN(Number(st))
+        && String(sf).length === 13 && String(st).length === 13
       if (!hasRouteMinute) {
         await this.applyDefaultListFromChart()
       }
@@ -171,6 +184,7 @@ export default class Trace extends Vue {
       return
     }
     this.listScope = 'default'
+    this.selectedBucketLabel = ''
     this.queryParams = {
       ...this.queryParams,
       fromTime: range.fromTime,
@@ -207,17 +221,29 @@ export default class Trace extends Vue {
     this.timeParams = { fromTime, toTime, interval }
   }
 
-  // 图表点击事件回调
+  // 图表点击事件回调：列表收窄到该时间桶；再次点击同一柱子则取消，回到默认时间窗
   private chartClickHandle (xAxisName: string, type?: string) {
-    this.listScope = 'minute'
     const { toTime, interval } = this.timeParams
-    this.queryParams.fromTime = xAxisName + ':00'
-    const _toTime = +new Date(xAxisName) + interval * 1000
-    if (_toTime <= +new Date(toTime)) {
-      this.queryParams.toTime = dayjs(_toTime).format('YYYY-MM-DD HH:mm:ss')
-    } else {
-      this.queryParams.toTime = toTime
+    const fromTime = `${xAxisName}:00`
+    const bucketEndMs = +new Date(xAxisName) + interval * 1000
+    const resolvedToTime = bucketEndMs <= +new Date(toTime)
+      ? dayjs(bucketEndMs).format('YYYY-MM-DD HH:mm:ss')
+      : toTime
+    const nextLabel = `${fromTime} ~ ${resolvedToTime}`
+    // 再次点击当前已选中的柱子 → 取消筛选
+    if (this.listScope === 'minute' && this.selectedBucketLabel === nextLabel) {
+      this.resetBucketHandle()
+      return
     }
+    this.listScope = 'minute'
+    // 整体替换，确保表格「时间」展示随点击更新
+    this.queryParams = {
+      ...this.queryParams,
+      fromTime,
+      toTime: resolvedToTime,
+      size: DEFAULT_CHART_LIST_LIMIT,
+    }
+    this.selectedBucketLabel = nextLabel
     const isErrorChart = type === 'error'
     // 错误统计图表点击，需要选中状态为“错误”的筛选项；其他图表清除状态筛选
     let _multisearch = decodeURIComponent(this.$route.query.multisearch as string || '');
@@ -243,8 +269,9 @@ export default class Trace extends Vue {
       query: {
         ...this.$route.query,
         multisearch: encodeURIComponent(_multiList.join(';')),
-        sf: String(new Date(this.queryParams.fromTime).valueOf()),
-        st: String(new Date(this.queryParams.fromTime).valueOf()),
+        // sf/st 标记选中柱子起点，restore 时用 sf 还原点击
+        sf: String(new Date(fromTime).valueOf()),
+        st: String(new Date(fromTime).valueOf()),
       }
     })
     this.queryLoading = true;
@@ -257,6 +284,19 @@ export default class Trace extends Vue {
         this.queryLoading = false;
       }).catch(() => this.queryLoading = false)
     })
+  }
+
+  // 叉掉柱子选中，列表回到图表默认时间窗
+  private async resetBucketHandle () {
+    this.selectedBucketLabel = ''
+    this.listScope = 'default'
+    this.clearMinuteRoute()
+    this.queryLoading = true
+    try {
+      await this.applyDefaultListFromChart()
+    } finally {
+      this.queryLoading = false
+    }
   }
 
   private searchChangeHandle (data: any, routerQuery: any) {
@@ -272,6 +312,7 @@ export default class Trace extends Vue {
       return
     }
     this.listScope = 'default'
+    this.selectedBucketLabel = ''
     this.clearFilter(routerQuery);
     this.traceIdOversize = (data.traceIds || []).length > 100
     if (data.traceIds) {
