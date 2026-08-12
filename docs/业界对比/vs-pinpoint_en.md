@@ -41,9 +41,10 @@ Largest gap: Pinpoint has no AI platform; DataBuff uses APM telemetry as AI cont
 | 16–18. Logs & log↔trace | ❌ No log platform | ✅ including span-level link |
 | 19. Profiling | △ Java call stacks / active threads | ❌ not yet |
 | 20. Custom dashboards | ❌ | ❌ not yet |
+| 21. Rich self-monitoring | ❌ No platform self-monitoring product surface | ✅ Deploy status (ingest / web / Doris) + metric help + AI inspect / diagnose / repair |
 | Protocol / languages | Proprietary Java Agent | OTLP multi-language + SkyWalking gRPC |
 
-Pinpoint leads on **Java method-level Call Tree** and the classic **Server Map + Scatter + Apdex** workspace. DataBuff leads on **multi-language OTel**, **call analysis / service flow**, **middleware pages**, **log↔trace**, and **AI**.
+Pinpoint leads on **Java method-level Call Tree** and the classic **Server Map + Scatter + Apdex** workspace. DataBuff leads on **multi-language OTel**, **call analysis / service flow**, **middleware pages**, **log↔trace**, **self-monitoring**, and **AI**.
 
 **Alerting**
 
@@ -120,8 +121,8 @@ All shots from **192.168.50.140**.
 
 ## Further reading
 
-- [Docker install](/docs/en/guide/docker-install)
-- [Java OTel agent](/docs/en/manual/agent-integration)
-- [Migrate from Pinpoint to DataBuff](/docs/en/migration/from-pinpoint-to-databuff)
+- [Docker install](../快速入门/docker安装部署_en.md)
+- [Java OTel agent](../使用手册/Agent集成_en.md)
+- [Migrate from Pinpoint to DataBuff](../迁移指南/from-pinpoint-to-databuff_en.md)
 
 Star us: https://github.com/databufflabs/databuff

@@ -41,8 +41,9 @@
 | 16. 日志列表 / 搜索 | ❌ | ✅ 日志分析列表 / 搜索 |
 | 17. 日志详情 | ❌ | ✅ |
 | 18. 日志关联 Trace | ❌ | ✅ Log → Trace，并可落到具体 Span |
+| 19. 丰富的自监控能力 | ❌ 无平台自监控产品面 | ✅ 部署状态页（ingest / web / Doris）+ 指标说明书 + AI 巡检 / 诊断 / 修复 |
 
-Jaeger 在**纯 Trace 搜索与瀑布图**上成熟、好用；其余 APM 面（服务黄金指标、多级拓扑 / 调用分析、服务流、中间件专页、日志）基本空白。DataBuff 领先在这些纵深能力与 **Span↔日志双向**。
+Jaeger 在**纯 Trace 搜索与瀑布图**上成熟、好用；其余 APM 面（服务黄金指标、多级拓扑 / 调用分析、服务流、中间件专页、日志、自监控）基本空白。DataBuff 领先在这些纵深能力与 **Span↔日志双向**。
 
 **告警**
 
@@ -141,7 +142,7 @@ Jaeger Dependencies 只回答「连谁」，没有服务级 / 实例级 / 接口
 
 ## 延伸阅读
 
-- [OpenTelemetry OTLP 接入](/docs/zh/guide/otel-otlp-ingestion)
-- [迁移指南：从 Jaeger 到 DataBuff](/docs/zh/migration/from-jaeger-to-databuff)
+- [OpenTelemetry OTLP 接入](../opentelemetry-otlp-ingestion.md)
+- [迁移指南：从 Jaeger 到 DataBuff](../迁移指南/from-jaeger-to-databuff.md)
 
 欢迎 Star：https://github.com/databufflabs/databuff

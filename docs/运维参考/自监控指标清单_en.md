@@ -111,7 +111,7 @@ Probe: `up` / `be.alive` / `fe.alive` / `fe.is_master`. Prometheus-mapped counte
 
 **Connect**: `DORIS_FE_HOST` / `DORIS_FE_HTTP_PORT` / `DORIS_FE_QUERY_PORT`. Compaction / stream_load pressure → same `INGEST_DORIS_*` knobs as write section.
 
-Full official-name mapping table: [CN §9](自监控指标清单.md#9-doris-自监控由-web-采样).
+Full official-name mapping table: [CN §9](/zh/operations/self-monitoring-metrics#_9-doris-自监控-由-web-采样).
 
 ## 4. Overview KPI cards
 

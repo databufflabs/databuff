@@ -42,6 +42,7 @@ Largest gap: SigNoz home is Traces / Metrics / Logs Explorer — no AI platform.
 | 17. Log detail | ✅ | ✅ |
 | 18. Log → Trace | ✅ | ✅ Down to Span |
 | 19. Custom dashboards | ✅ Dashboards V2 (Perses / PromQL) | ❌ Not yet |
+| 20. Rich self-monitoring | ❌ No platform self-monitoring product surface | ✅ Deploy status (ingest / web / Doris) + metric help + AI inspect / diagnose / repair |
 
 **Alerting**
 
@@ -140,6 +141,6 @@ Screenshots from **192.168.50.140**.
 
 ## Further reading
 
-- [Migrate from SigNoz to DataBuff](/docs/en/migration/from-signoz-to-databuff)
+- [Migrate from SigNoz to DataBuff](../迁移指南/from-signoz-to-databuff_en.md)
 
 Star us: https://github.com/databufflabs/databuff

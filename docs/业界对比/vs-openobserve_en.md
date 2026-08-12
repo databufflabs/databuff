@@ -49,8 +49,9 @@ Largest gap: OpenObserve has no equivalent AI platform (Traces has an LLM Insigh
 | 22. RUM | ✅ Built-in RUM (Real User Monitoring) | ❌ Not yet |
 | 23. Pipelines | ✅ Realtime / Scheduled: transform / enrich / filter / route after ingest (VRL); logs→metrics, etc. | ❌ Not yet |
 | 24. Reports | ✅ Scheduled / Cached reports; timed generate & distribute | ❌ Not yet |
+| 25. Rich self-monitoring | ❌ No platform self-monitoring product surface | ✅ Deploy status (ingest / web / Doris) + metric help + AI inspect / diagnose / repair |
 
-Shared base: service list & golden metrics, Trace list/waterfall, logs, and Span↔log links. DataBuff leads on **topology / service·instance·endpoint call analysis / service flow / middleware pages**. OpenObserve leads on **log search & cost, SQL/PromQL, custom dashboards, Pipelines, Reports, unified L/M/T + RUM**.
+Shared base: service list & golden metrics, Trace list/waterfall, logs, and Span↔log links. DataBuff leads on **topology / service·instance·endpoint call analysis / service flow / middleware pages / self-monitoring**. OpenObserve leads on **log search & cost, SQL/PromQL, custom dashboards, Pipelines, Reports, unified L/M/T + RUM**.
 
 **Alerting**
 
@@ -171,8 +172,8 @@ These pages are depth beyond “middleware Spans in Trace” — the APM differe
 
 ## See also
 
-- [OpenTelemetry OTLP ingestion](/docs/en/guide/otel-otlp-ingestion)
-- [Migrate from OpenObserve to DataBuff](/docs/en/migration/from-openobserve-to-databuff)
+- [OpenTelemetry OTLP ingestion](../opentelemetry-otlp-ingestion_en.md)
+- [Migrate from OpenObserve to DataBuff](../迁移指南/from-openobserve-to-databuff_en.md)
 
 If this was useful, a Star (and Issues / PRs) are welcome:  
 https://github.com/databufflabs/databuff

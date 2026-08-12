@@ -119,7 +119,7 @@ For TLS-terminated or remote deployments, point exporters at the reachable OTLP 
 
 ## Verify ingestion
 
-1. Install the optional [Demo app](快速入门/docker安装部署_en.md#3-install-the-demo-optional) — it reports sample traces to Ingest.
+1. Install the optional [Demo app](快速入门/docker安装部署_en.md#_3-install-the-demo-optional) — it reports sample traces to Ingest.
 2. In the Web UI, open **Application Performance** and confirm services and traces appear within a few minutes.
 
 For how data is stored and queried, see [Telemetry Pipeline and Storage](架构设计/遥测数据流_en.md).

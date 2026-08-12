@@ -15,4 +15,4 @@ This guide covers migrating from existing APM/observability systems to DataBuff.
 ## See Also
 
 - [DataBuff vs SkyWalking Write Performance](/blog/en/databuff-vs-skywalking-write-perf/)
-- [DataBuff vs SkyWalking](/docs/en/comparison/databuff-vs-skywalking)
+- [DataBuff vs SkyWalking](../业界对比/vs-skywalking_en.md)

@@ -43,8 +43,9 @@ Largest gap: SkyWalking has no equivalent AI platform; DataBuff exposes the seve
 | 18. Log → Trace | ✅ Log → Trace | ✅ Log → Trace, down to Span |
 | 19. Profiling (Tracing / AsyncProfiler / eBPF) | ✅ All three | ❌ Not yet |
 | 20. Custom dashboards | ✅ Built-in; service + middleware boards | ❌ Not yet |
+| 21. Rich self-monitoring | ✅ Official self-observability (OAP / cluster & component health boards) | ✅ Deploy status (ingest / web / Doris) + metric help + AI inspect / diagnose / repair |
 
-Basics (incl. Span↔logs) exist on both sides; SW also has middleware Dashboard boards (rows 11 / 20). DataBuff leads on call analysis, instance/endpoint topology, service flow, **APM pages linked to call analysis / Trace**, error depth, and Log→Trace down to Span. Profiling and **dashboard customization depth** are SkyWalking strengths DataBuff does not cover yet.
+Basics (incl. Span↔logs) exist on both sides; SW also has middleware Dashboard boards (rows 11 / 20). **Self-monitoring** has productized entry points on both sides (row 21). DataBuff leads on call analysis, instance/endpoint topology, service flow, **APM pages linked to call analysis / Trace**, error depth, and Log→Trace down to Span. Profiling and **dashboard customization depth** are SkyWalking strengths DataBuff does not cover yet.
 
 **Alerting**
 
@@ -152,7 +153,7 @@ These pages show integrated APM depth — vs SW Dashboard middleware boards, Dat
 
 ## Further reading
 
-- [SkyWalking ingestion](/docs/en/manual/skywalking-ingestion)
-- [Migrate from SkyWalking to DataBuff](/docs/en/migration/from-skywalking-to-databuff)
+- [SkyWalking ingestion](../使用手册/SkyWalking接入_en.md)
+- [Migrate from SkyWalking to DataBuff](../迁移指南/from-skywalking-to-databuff_en.md)
 
 Star us: https://github.com/databufflabs/databuff

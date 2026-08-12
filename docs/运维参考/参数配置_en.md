@@ -267,7 +267,7 @@ Ingest uses worker pools and ring buffers for Trace / Metric / aggregation. Defa
 | `ingest.pipeline.metric-buffer-size` | `INGEST_METRIC_BUFFER_SIZE` | `1024` | Ring slots per metric worker |
 | `ingest.pipeline.aggregate-buffer-size` | `INGEST_AGGREGATE_BUFFER_SIZE` | `1024` | Ring slots per aggregate worker |
 
-When buffers fill, events are dropped (`overflow`). If the UI misses data but ingest logs look healthy, raise `*_BUFFER_SIZE` or `*_TASKS` first. For Doris flush and related knobs, see [Performance Tuning — Ingest pipeline](性能优化_en.md#2-ingest-pipeline-tuning).
+When buffers fill, events are dropped (`overflow`). If the UI misses data but ingest logs look healthy, raise `*_BUFFER_SIZE` or `*_TASKS` first. For Doris flush and related knobs, see [Performance Tuning — Ingest pipeline](性能优化_en.md#_2-ingest-pipeline-tuning).
 
 ### Docker
 
@@ -424,7 +424,7 @@ cd /path/to/databuff-docker-offline-*-amd64
 ./install-offline.sh
 ```
 
-> This only bypasses the **installer** gate; it does not remove Doris's AVX2 dependency. Prefer AVX2-capable x86_64 or arm64 for production. Full risks and legacy-script workarounds: [Performance Tuning — Bypass AVX2 check](性能优化_en.md#7-bypass-avx2-check-on-x86_64-without-avx2).
+> This only bypasses the **installer** gate; it does not remove Doris's AVX2 dependency. Prefer AVX2-capable x86_64 or arm64 for production. Full risks and legacy-script workarounds: [Performance Tuning — Bypass AVX2 check](性能优化_en.md#_7-bypass-avx2-check-on-x86-64-without-avx2).
 
 ## Related docs
 

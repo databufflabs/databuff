@@ -47,8 +47,9 @@
 | 22. RUM | ✅ 内置 RUM（Real User Monitoring） | ❌ 暂不支持 |
 | 23. 数据流水线（Pipelines） | ✅ Realtime / Scheduled：接入后对数据做转换 / 富化 / 过滤 / 路由（VRL）；可做日志转指标等 | ❌ 暂不支持 |
 | 24. 报表（Reports） | ✅ Scheduled / Cached 报表；可定时生成与分发 | ❌ 暂不支持 |
+| 25. 丰富的自监控能力 | ❌ 无平台自监控产品面 | ✅ 部署状态页（ingest / web / Doris）+ 指标说明书 + AI 巡检 / 诊断 / 修复 |
 
-基础面：两端都有服务列表与黄金指标、Trace 列表 / 瀑布图、日志，以及 Span↔日志双向关联。DataBuff 领先在 拓扑 / 服务·实例·接口级调用分析 / 服务流 / 中间件专页 。OpenObserve 领先在 日志检索与成本、SQL/PromQL、可定制仪表盘、数据流水线、报表、统一三支柱 + RUM 。
+基础面：两端都有服务列表与黄金指标、Trace 列表 / 瀑布图、日志，以及 Span↔日志双向关联。DataBuff 领先在 拓扑 / 服务·实例·接口级调用分析 / 服务流 / 中间件专页 / **自监控** 。OpenObserve 领先在 日志检索与成本、SQL/PromQL、可定制仪表盘、数据流水线、报表、统一三支柱 + RUM 。
 
 告警
 
@@ -169,8 +170,8 @@ DataBuff 专页纵深 （对应上表数据库 / 缓存 / MQ / 外部 / 接口 /
 
 ## 延伸阅读
 
-- [OpenTelemetry OTLP 接入](/docs/zh/guide/otel-otlp-ingestion)
-- [迁移指南：从 OpenObserve 到 DataBuff](/docs/zh/migration/from-openobserve-to-databuff)
+- [OpenTelemetry OTLP 接入](../opentelemetry-otlp-ingestion.md)
+- [迁移指南：从 OpenObserve 到 DataBuff](../迁移指南/from-openobserve-to-databuff.md)
 
 欢迎 Star：https://github.com/databufflabs/databuff
 

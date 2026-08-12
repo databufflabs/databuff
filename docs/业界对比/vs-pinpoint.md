@@ -43,9 +43,10 @@
 | 18. 日志关联 Trace | ❌ | ✅ Log → Trace，并可落到具体 Span |
 | 19. Profiling | △ 侧重 Java 调用栈 / Active Thread 等 | ❌ 暂不支持 |
 | 20. 仪表盘（可定制 Dashboard） | ❌ 无等价可定制大盘 | ❌ 暂不支持 |
+| 21. 丰富的自监控能力 | ❌ 无平台自监控产品面 | ✅ 部署状态页（ingest / web / Doris）+ 指标说明书 + AI 巡检 / 诊断 / 修复 |
 | 接入协议 / 语言 | 专有 Java Agent（字节码增强） | OTLP 多语言 + SkyWalking gRPC |
 
-Pinpoint 明显更强在 **Java 方法级 Call Tree** 与 **Server Map + Scatter + Apdex 一体视图**。DataBuff 领先在 **多语言 OTel**、**服务/实例/接口调用分析与服务流**、**中间件专页**、**日志↔Trace** 与 **AI**。Inspector / URL Statistic / Error Analysis 本 lab 最小 compose 入口在、API 未就绪，按 △ 计。
+Pinpoint 明显更强在 **Java 方法级 Call Tree** 与 **Server Map + Scatter + Apdex 一体视图**。DataBuff 领先在 **多语言 OTel**、**服务/实例/接口调用分析与服务流**、**中间件专页**、**日志↔Trace**、**自监控** 与 **AI**。Inspector / URL Statistic / Error Analysis 本 lab 最小 compose 入口在、API 未就绪，按 △ 计。
 
 **告警**
 
@@ -136,8 +137,8 @@ Pinpoint 明显更强在 **Java 方法级 Call Tree** 与 **Server Map + Scatter
 
 ## 延伸阅读
 
-- [快速入门：Docker 安装部署](/docs/zh/guide/docker-install)
-- [Agent 集成：Java OTel](/docs/zh/manual/agent-integration)
-- [迁移指南：从 Pinpoint 到 DataBuff](/docs/zh/migration/from-pinpoint-to-databuff)
+- [快速入门：Docker 安装部署](../快速入门/docker安装部署.md)
+- [Agent 集成：Java OTel](../使用手册/Agent集成.md)
+- [迁移指南：从 Pinpoint 到 DataBuff](../迁移指南/from-pinpoint-to-databuff.md)
 
 欢迎 Star：https://github.com/databufflabs/databuff

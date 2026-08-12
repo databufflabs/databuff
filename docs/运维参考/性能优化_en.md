@@ -71,7 +71,7 @@ When the ring is full, `AsyncTask` increments `overflowCount` after failed `tryP
 
 ### How to change ingest settings (Docker)
 
-For the one-line install layout (default directory `/opt/databuff-ai-apm`; confirm with `echo $APM_INSTALL_DIR`). Prefer `docker-compose.override.yml` so upgrades keep your overrides; full steps including Kubernetes are in [Parameter Configuration](参数配置_en.md#4-adjust-ingest-task-parameters).
+For the one-line install layout (default directory `/opt/databuff-ai-apm`; confirm with `echo $APM_INSTALL_DIR`). Prefer `docker-compose.override.yml` so upgrades keep your overrides; full steps including Kubernetes are in [Parameter Configuration](参数配置_en.md#_4-adjust-ingest-task-parameters).
 
 1. **Back up and edit compose**
 
@@ -356,7 +356,7 @@ grep -m1 avx2 /proc/cpuinfo && echo "AVX2: yes" || echo "AVX2: no"
 | Slow web queries | UI time range; partition pruning; BE compaction | Narrow time window; check BE CPU/IO |
 | Rule evaluation slows web | `apm.monitor.pool.*`; rule count | Reduce rules; raise `max-size` if needed |
 | Metrics but no traces | Agent sampling; ingest buffer overflow | Raise sampling or trace pipeline buffers |
-| Install fails on AVX2 | `grep avx2 /proc/cpuinfo` | See [§7 Bypass AVX2](#7-bypass-avx2-check-on-x86_64-without-avx2); upgrade CPU or `DATABUFF_SKIP_AVX2_CHECK=1` |
+| Install fails on AVX2 | `grep avx2 /proc/cpuinfo` | See [§7 Bypass AVX2](#_7-bypass-avx2-check-on-x86-64-without-avx2); upgrade CPU or `DATABUFF_SKIP_AVX2_CHECK=1` |
 
 Logs:
 

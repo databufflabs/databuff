@@ -43,8 +43,9 @@
 | 18. 日志关联 Trace | ✅ Log → Trace | ✅ Log → Trace，并可落到具体 Span |
 | 19. Profiling（Tracing / AsyncProfiler / eBPF） | ✅ 三类均支持 | ❌ 暂不支持 |
 | 20. 仪表盘（可定制 Dashboard） | ✅ 内置 Dashboard；支持服务及各类中间件大盘（如 DB / 缓存 / MQ 等） | ❌ 暂不支持 |
+| 21. 丰富的自监控能力 | ✅ 官方自观测（OAP / 集群与组件健康大盘） | ✅ 部署状态页（ingest / web / Doris）+ 指标说明书 + AI 巡检 / 诊断 / 修复 |
 
-基础面（拓扑 / 服务列表 / Trace / 日志 / Span↔日志）两侧都有；SW 亦有中间件 Dashboard 大盘（见项 11 / 20）。DataBuff 领先在**服务级·实例级·接口级调用分析（含关联 Trace）**、**实例 / 接口级拓扑**、**服务流**、**APM 专页与调用分析 / Trace 联动**及**错误分析纵深**，以及 Log→Trace **落到具体 Span**。Profiling 与**可定制仪表盘深度**是 SkyWalking 明显更强、DataBuff 暂未覆盖的两块。
+基础面（拓扑 / 服务列表 / Trace / 日志 / Span↔日志）两侧都有；SW 亦有中间件 Dashboard 大盘（见项 11 / 20）。**自监控**两侧都有产品化入口（项 21）。DataBuff 领先在**服务级·实例级·接口级调用分析（含关联 Trace）**、**实例 / 接口级拓扑**、**服务流**、**APM 专页与调用分析 / Trace 联动**及**错误分析纵深**，以及 Log→Trace **落到具体 Span**。Profiling 与**可定制仪表盘深度**是 SkyWalking 明显更强、DataBuff 暂未覆盖的两块。
 
 **告警**
 
@@ -152,7 +153,7 @@ SkyWalking 有全局 / 服务拓扑与实例指标，但**没有**服务级 / �
 
 ## 延伸阅读
 
-- [SkyWalking 接入](/docs/zh/manual/skywalking-ingestion)
-- [迁移指南：从 SkyWalking 到 DataBuff](/docs/zh/migration/from-skywalking-to-databuff)
+- [SkyWalking 接入](../使用手册/SkyWalking接入.md)
+- [迁移指南：从 SkyWalking 到 DataBuff](../迁移指南/from-skywalking-to-databuff.md)
 
 欢迎 Star：https://github.com/databufflabs/databuff

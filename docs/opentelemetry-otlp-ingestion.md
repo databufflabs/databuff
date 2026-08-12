@@ -107,7 +107,7 @@ export OTEL_LOGS_EXPORTER=otlp
 
 ## 验证
 
-1. 可选安装 [Demo 应用](快速入门/docker安装部署.md#3-安装-demo-可选)，持续上报 Trace。
+1. 可选安装 [Demo 应用](快速入门/docker安装部署.md#_3-安装-demo-可选)，持续上报 Trace。
 2. 打开 Web UI（`http://<host>:27403`），在应用性能中查看服务与链路。
 
 深入了解数据如何写入与查询，见 [遥测数据流与存储](架构设计/遥测数据流.md)。

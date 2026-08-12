@@ -41,8 +41,9 @@ Largest gap: Jaeger is a distributed tracing backend with no equivalent AI platf
 | 16. Log list / search | ❌ | ✅ Log analysis list / search |
 | 17. Log detail | ❌ | ✅ |
 | 18. Log → Trace | ❌ | ✅ Log → Trace, down to Span |
+| 19. Rich self-monitoring | ❌ No platform self-monitoring product surface | ✅ Deploy status (ingest / web / Doris) + metric help + AI inspect / diagnose / repair |
 
-Jaeger is strong on **pure Trace search and waterfall**. Most other APM surfaces (golden metrics, multi-level topology / call analysis, service flow, middleware pages, logs) are absent. DataBuff leads there and on **Span↔log** linkage.
+Jaeger is strong on **pure Trace search and waterfall**. Most other APM surfaces (golden metrics, multi-level topology / call analysis, service flow, middleware pages, logs, self-monitoring) are absent. DataBuff leads there and on **Span↔log** linkage.
 
 **Alerting**
 
@@ -137,8 +138,8 @@ Screenshots from the same lab. Captions map to the matrix; focus on DataBuff’s
 
 ## See also
 
-- [OpenTelemetry OTLP ingestion](/docs/en/guide/otel-otlp-ingestion)
-- [Migrate from Jaeger to DataBuff](/docs/en/migration/from-jaeger-to-databuff)
+- [OpenTelemetry OTLP ingestion](../opentelemetry-otlp-ingestion_en.md)
+- [Migrate from Jaeger to DataBuff](../迁移指南/from-jaeger-to-databuff_en.md)
 
 If this was useful, a Star (and Issues / PRs) are welcome:  
 https://github.com/databufflabs/databuff

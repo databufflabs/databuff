@@ -119,7 +119,7 @@ java -javaagent:./opentelemetry-javaagent.jar \
 
 ## 可选：采样与导出频率
 
-生产环境可通过环境变量控制采样与指标导出间隔（详见 [性能优化](../运维参考/性能优化.md#如何配置-otel-采样应用侧)）：
+生产环境可通过环境变量控制采样与指标导出间隔（详见 [性能优化](../运维参考/性能优化.md#如何配置-otel-采样-应用侧)）：
 
 ```bash
 export OTEL_TRACES_SAMPLER=parentbased_traceidratio

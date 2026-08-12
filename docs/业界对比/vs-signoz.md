@@ -42,8 +42,9 @@
 | 17. 日志详情 | ✅ | ✅ |
 | 18. 日志关联 Trace | ✅ Log → Trace | ✅ Log → Trace，并可落到具体 Span |
 | 19. 仪表盘（可定制 Dashboard） | ✅ Dashboards V2（含 Perses / PromQL 生态） | ❌ 暂不支持 |
+| 20. 丰富的自监控能力 | ❌ 无平台自监控产品面 | ✅ 部署状态页（ingest / web / Doris）+ 指标说明书 + AI 巡检 / 诊断 / 修复 |
 
-基础面（Service Map / Services / Trace / Log / Span↔日志）两侧都有；DataBuff 领先在调用分析、服务流、中间件专页与错误分析，以及 Log→Trace 落到具体 Span。SigNoz 明显更强的是可定制仪表盘；Logs Explorer 也成熟可用。
+基础面（Service Map / Services / Trace / Log / Span↔日志）两侧都有；DataBuff 领先在调用分析、服务流、中间件专页、错误分析与**自监控**，以及 Log→Trace 落到具体 Span。SigNoz 明显更强的是可定制仪表盘；Logs Explorer 也成熟可用。
 
 **告警**
 
@@ -146,7 +147,7 @@
 
 ## 延伸阅读
 
-- [SkyWalking 接入](/docs/zh/manual/skywalking-ingestion)（同为 OTel 选型时可对照）
-- [迁移指南：从 SigNoz 到 DataBuff](/docs/zh/migration/from-signoz-to-databuff)
+- [SkyWalking 接入](../使用手册/SkyWalking接入.md)（同为 OTel 选型时可对照）
+- [迁移指南：从 SigNoz 到 DataBuff](../迁移指南/from-signoz-to-databuff.md)
 
 欢迎 Star：https://github.com/databufflabs/databuff

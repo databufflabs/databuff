@@ -14,7 +14,7 @@
 #
 # Optional:
 #   AUTO_BUILD_DEPS=1     缺少依赖时自动执行上述构建脚本
-#   OFFLINE_ARCHES=amd64,arm64  指定架构（逗号分隔，默认 amd64）
+#   OFFLINE_ARCHES=amd64,arm64  指定架构（逗号分隔，默认 amd64,arm64）
 #   SKIP_PKG_UPLOAD=1     跳过上传
 
 set -euo pipefail
@@ -98,6 +98,7 @@ offline_arch_list() {
     return 0
   fi
   printf '%s\n' amd64
+  printf '%s\n' arm64
 }
 
 ensure_offline_dependency() {
@@ -122,18 +123,20 @@ ensure_offline_dependency() {
 }
 
 ensure_offline_prerequisites() {
-  local sample_arch
-  sample_arch="$(offline_arch_list | head -1)"
+  local arch
   if ! resolve_docker_pkg >/dev/null; then
     ensure_offline_dependency \
       "${APM_BUILD_DIST}/${DOCKER_PKG_NAME}" \
       "${APM_DEPLOY_ROOT}/docker/build-docker.sh"
   fi
-  if ! resolve_apm_stack_tarball "$sample_arch" >/dev/null; then
-    ensure_offline_dependency \
-      "${APM_IMAGES_DIR}/$(image_tarball_name ai-apm-stack "$RELEASE_VERSION" "$sample_arch")" \
-      "${APM_DEPLOY_ROOT}/images/build-images.sh"
-  fi
+  while IFS= read -r arch; do
+    [[ -n "$arch" ]] || continue
+    if ! resolve_apm_stack_tarball "$arch" >/dev/null; then
+      ensure_offline_dependency \
+        "${APM_IMAGES_DIR}/$(image_tarball_name ai-apm-stack "$RELEASE_VERSION" "$arch")" \
+        "${APM_DEPLOY_ROOT}/images/build-images.sh"
+    fi
+  done < <(offline_arch_list)
   if ! resolve_demo_pkg >/dev/null; then
     ensure_offline_dependency \
       "${APM_BUILD_DIST}/${DEMO_PKG_NAME}" \

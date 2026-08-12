@@ -11,11 +11,12 @@
 | Topology | ✅ Built-in | ✅ Built-in | ❌ | ✅ Built-in | ❌ | ❌ |
 | Built-in Storage | ✅ Doris | ✅ H2/ES | ❌ External | ✅ H2/MySQL | ✅ ClickHouse | ✅ Zinc |
 | Self-ops | ✅ Built-in | ❌ | ❌ | ❌ | ❌ | ❌ |
+| Rich self-monitoring | ✅ Built-in | ✅ Official self-observability | ❌ | ❌ | ❌ | ❌ |
 
 ## Comparison Pages
 
-- [DataBuff vs SkyWalking](./vs-skywalking_en.md) — Same-host lab: 7 AI capabilities / APM 20 rows / alerting + screenshots
+- [DataBuff vs SkyWalking](./vs-skywalking_en.md) — Same-host lab: 7 AI capabilities / APM 21 rows / alerting + screenshots
 - [DataBuff vs Jaeger](./vs-jaeger.md)
 - [DataBuff vs Pinpoint](./vs-pinpoint.md)
-- [DataBuff vs SigNoz](./vs-signoz_en.md) — Same-host lab: 7 AI capabilities / APM 19 rows / alerting + screenshots
-- [DataBuff vs OpenObserve](./vs-openobserve.md) — Same-host lab: seven AI / full APM matrix (Pipelines/Reports/RUM) / alerting + screenshots
+- [DataBuff vs SigNoz](./vs-signoz_en.md) — Same-host lab: 7 AI capabilities / APM 20 rows / alerting + screenshots
+- [DataBuff vs OpenObserve](./vs-openobserve.md) — Same-host lab: seven AI / full APM matrix (Pipelines/Reports/RUM/self-monitoring) / alerting + screenshots
