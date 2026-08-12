@@ -37,6 +37,7 @@ export default {
   user: {
     profile: 'Profile',
     logout: 'Sign out',
+    version: 'Version {version}',
     editName: 'Edit name',
     nameRequired: 'Name is required',
     saveFailed: 'Save failed',

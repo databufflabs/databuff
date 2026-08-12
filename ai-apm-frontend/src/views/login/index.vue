@@ -26,7 +26,8 @@
 <script lang="ts">
 import { Vue, Component } from 'vue-property-decorator';
 import LoginForm from './loginForm.vue';
-import { LensVersionReg } from '@/utils/regexp';
+import { toAsyncWait } from '@/utils/common';
+import UserApi from '@/api/user';
 @Component({
   components: {
     LoginForm,
@@ -56,11 +57,9 @@ export default class Login extends Vue {
       window.localStorage.removeItem('DATABUFF_ADVANCED_UNLOCKING')
     }
 
-    try {
-      const originVersion = JSON.parse(window.localStorage.getItem('DATABUFF_VERSION') || '{}')?.productVersion || '';
-      this.version = LensVersionReg.test(originVersion) ? `${originVersion.substring(0, 1).toUpperCase()}${originVersion.substring(1)}` : originVersion
-    } catch (error) {
-      //
+    const { result, error } = await toAsyncWait(UserApi.getProductVersion());
+    if (!error && result?.data != null && result.data !== '') {
+      this.version = String(result.data);
     }
   }
 }

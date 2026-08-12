@@ -7,9 +7,16 @@
         :close-delay="0"
         popper-class="user-info-popover"
       >
-        <div slot="reference" :class="['user-avatar flex-h cp', collapse ? 'user-avatar-collapse' : '']">
+        <div
+          slot="reference"
+          :class="['user-avatar flex-h cp', collapse ? 'user-avatar-collapse' : '']"
+          :title="collapse && versionLabel ? versionLabel : undefined"
+        >
           <span class="user-avatar-icon">{{ (userInfo.account || '').slice(0, 1) | FirstLetterCapital }}</span>
-          <span class="user-avatar-text">{{ userInfo.account }}</span>
+          <div class="user-avatar-meta">
+            <span class="user-avatar-text">{{ userInfo.account }}</span>
+            <span v-if="version && !collapse" class="user-avatar-version">{{ versionLabel }}</span>
+          </div>
         </div>
 
         <div class="sub-nav-box user-info">
@@ -26,6 +33,7 @@
   import { namespace } from 'vuex-class';
   import UserApi from '@/api/user'
   import { removeTokenAndCid } from '@/utils/jsCookie'
+  import { toAsyncWait } from '@/utils/common'
 
   const UserModel = namespace('User');
 
@@ -34,6 +42,19 @@
     @Prop() private collapse!: boolean;
 
     @UserModel.State private userInfo!: any;
+
+    private version = ''
+
+    get versionLabel () {
+      return this.version ? this.$t('user.version', { version: this.version }) as string : '';
+    }
+
+    private async created() {
+      const { result, error } = await toAsyncWait(UserApi.getProductVersion());
+      if (!error && result?.data != null && result.data !== '') {
+        this.version = String(result.data);
+      }
+    }
 
     private showUserInfoHandle () {
       this.$router.push({
@@ -64,11 +85,12 @@
   margin-bottom: 4px;
   color: #CCCED4;
   .user-avatar {
-    padding: 0 6px 0 6px;
-    height: 32px;
+    padding: 4px 6px;
+    min-height: 32px;
     border-radius: 4px;
     user-select: none;
     position: relative;
+    align-items: center;
 
     &:hover {
       background: rgba(255, 255, 255, 0.08);
@@ -87,21 +109,43 @@
       color: #FFFFFF;
     }
 
-    .user-avatar-text {
-      margin: 0 2px 0 10px;
+    .user-avatar-meta {
+      margin-left: 10px;
       width: 92px;
+      min-width: 0;
+      display: flex;
+      flex-direction: column;
+      justify-content: center;
+      overflow: hidden;
+      transition: width 0.1s;
+    }
+
+    .user-avatar-text {
       font-size: 13px;
-      line-height: 32px;
+      line-height: 18px;
       font-weight: 500;
       font-family: PingFang SC;
       text-overflow: ellipsis;
       white-space: nowrap;
       overflow: hidden;
-      transition: width 0.1s;
     }
 
-    &.user-avatar-collapse .user-avatar-text {
-      width: 0;
+    .user-avatar-version {
+      margin-top: 1px;
+      font-size: 11px;
+      line-height: 14px;
+      font-weight: 400;
+      color: rgba(204, 206, 212, 0.65);
+      text-overflow: ellipsis;
+      white-space: nowrap;
+      overflow: hidden;
+    }
+
+    &.user-avatar-collapse {
+      .user-avatar-meta {
+        width: 0;
+        margin-left: 0;
+      }
     }
   }
 }

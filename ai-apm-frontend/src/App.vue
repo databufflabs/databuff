@@ -19,11 +19,11 @@ import dayjs from 'dayjs';
 import locale from 'element-ui/lib/locale';
 import elementZh from 'element-ui/lib/locale/lang/zh-CN';
 import elementEn from 'element-ui/lib/locale/lang/en';
-import { toAsyncWait } from '@/utils/common';
-import UserApi from '@/api/user';
 import { getToken } from '@/utils/jsCookie';
 import { startSessionIdleWatcher } from '@/utils/sessionIdle';
 import { AppLocale, hasStoredLocale, setAppLocale } from '@/i18n';
+import { toAsyncWait } from '@/utils/common';
+import UserApi from '@/api/user';
 
 @Component
 export default class App extends Vue {
@@ -78,7 +78,7 @@ export default class App extends Vue {
     $link && ($link.href = `/css/element-${theme}.css`);
   }
 
-  // 存储项目版本信息
+  /** Build/debug metadata for localStorage; product version from backend. */
   private setProjectVersion() {
     const formatTime = (time: any) => {
       if (time) {
@@ -103,8 +103,8 @@ export default class App extends Vue {
   private productVersion = ''
   private async getProductVersion () {
     const { result, error } = await toAsyncWait(UserApi.getProductVersion());
-    if (!error && result?.data) {
-      this.productVersion = result.data.split('|')[1] || '';
+    if (!error && result?.data != null && result.data !== '') {
+      this.productVersion = String(result.data);
     }
   }
 }

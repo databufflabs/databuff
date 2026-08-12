@@ -5,6 +5,9 @@ import com.databuff.apm.web.config.common.CommonResponse;
 import com.databuff.apm.web.admin.account.PortalUserAccount;
 import com.databuff.apm.web.admin.account.PortalUserManagementService;
 import com.databuff.apm.web.admin.support.OpenSourceMenuCatalog;
+import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.boot.info.BuildProperties;
+import org.springframework.lang.Nullable;
 import org.springframework.stereotype.Service;
 
 import java.util.LinkedHashMap;
@@ -18,10 +21,16 @@ public class UserService {
 
     private final AuthService authService;
     private final PortalUserManagementService portalUserManagementService;
+    @Nullable
+    private final BuildProperties buildProperties;
 
-    public UserService(AuthService authService, PortalUserManagementService portalUserManagementService) {
+    public UserService(
+            AuthService authService,
+            PortalUserManagementService portalUserManagementService,
+            @Autowired(required = false) @Nullable BuildProperties buildProperties) {
         this.authService = authService;
         this.portalUserManagementService = portalUserManagementService;
+        this.buildProperties = buildProperties;
     }
 
     public Map<String, Object> login(Map<String, Object> body) {
@@ -86,8 +95,19 @@ public class UserService {
         return CommonResponse.ok(List.of(role));
     }
 
+    /** Product UI version from Maven {@code project.version} (root pom {@code <revision>}). */
     public Map<String, Object> productVersion() {
-        return CommonResponse.ok("ai-apm|1.0.0|opensource");
+        return CommonResponse.ok(resolveProductVersion());
+    }
+
+    String resolveProductVersion() {
+        if (buildProperties != null) {
+            String version = buildProperties.getVersion();
+            if (version != null && !version.isBlank()) {
+                return version.trim();
+            }
+        }
+        return "dev";
     }
 
     public Map<String, Object> authLangs() {

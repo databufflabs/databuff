@@ -37,6 +37,7 @@ export default {
   user: {
     profile: '个人信息',
     logout: '退出登录',
+    version: '版本 {version}',
     editName: '编辑名称',
     nameRequired: '名称不能为空',
     saveFailed: '保存失败',
