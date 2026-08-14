@@ -6,7 +6,7 @@
 
 # Parameter Configuration
 
-How to skip the AVX2 CPU check at install time, and after install how to change the login account, configure Doris connection credentials and FE/BE addresses, tune Ingest pipeline task settings, configure Trace resource ignore filtering, and adjust telemetry retention. For directories and lifecycle, see [Docker Operations](Docker运维_en.md) and [Kubernetes Operations](K8s运维_en.md). For capacity planning and additional knobs, see [Performance Tuning](性能优化_en.md).
+How to skip the AVX2 CPU check at install time, and after install how to change the login account, configure Doris connection credentials and FE/BE addresses, tune Ingest pipeline task settings, configure Trace resource ignore filtering, SQL normalization, and adjust telemetry retention. For directories and lifecycle, see [Docker Operations](Docker运维_en.md) and [Kubernetes Operations](K8s运维_en.md). For capacity planning and additional knobs, see [Performance Tuning](性能优化_en.md).
 
 ## 1. Change login username and password
 
@@ -389,7 +389,37 @@ kubectl -n databuff rollout status deploy/ai-apm-ingest
 
 After restart, ingest logs should contain `Span resource ignore filter enabled` when rules are loaded.
 
-## 6. Adjust storage retention
+## 6. SkyWalking SQL normalization
+
+Applies only to **SkyWalking** ingest (raw SQL from the agent). OTLP / DataBuff agents already normalize on the client; ingest does not touch them. Default `mode=1` matches open-source before v0.1.7; override via env. When enabled (not `-1`), replaced literals are also written to OTel `db.query.parameter.0`, `1`, `2`, … (SQL only; HTTP unchanged).
+
+| YAML key | Environment variable | Default | Meaning |
+|----------|----------------------|---------|---------|
+| `ingest.skywalking.sql-normalized-type` | `INGEST_SQL_NORMALIZED_TYPE` | `1` | `-1` disables normalize and parameter extraction; `0` digit-prefix → `?`; `1` contains digit → `?` |
+
+### Docker
+
+```bash
+cd /opt/databuff-ai-apm   # or: echo $APM_INSTALL_DIR
+
+# Append under existing override ai-apm-ingest.environment, e.g. to disable:
+#   INGEST_SQL_NORMALIZED_TYPE: "-1"
+
+docker compose up -d ai-apm-ingest
+docker exec ai-apm-ingest printenv | grep '^INGEST_SQL_NORMALIZED_TYPE'
+```
+
+Startup log `SkyWalking SQL normalize mode=-1` (or `0`/`1`) means the setting is active.
+
+### Kubernetes
+
+Add `INGEST_SQL_NORMALIZED_TYPE: "-1"` under ConfigMap `data:`, then:
+
+```bash
+kubectl -n databuff rollout restart deploy/ai-apm-ingest
+```
+
+## 7. Adjust storage retention
 
 To keep data for 14 days, connect to Doris and run the following SQL (no FE / BE restart required):
 
@@ -401,7 +431,7 @@ ALTER TABLE metric_service SET ("dynamic_partition.start" = "-14");
 -- Repeat for other metric_* tables as needed
 ```
 
-## 7. Skip AVX2 CPU check (install time)
+## 8. Skip AVX2 CPU check (install time)
 
 Doris BE on **x86_64 / amd64** requires AVX2. Online/offline installers check the CPU and **exit 1** if the `avx2` flag is missing. For PoC or legacy VMs only, export this env var before install:
 

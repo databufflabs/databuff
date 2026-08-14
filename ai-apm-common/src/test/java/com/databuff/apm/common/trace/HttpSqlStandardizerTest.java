@@ -17,6 +17,29 @@ class HttpSqlStandardizerTest {
     }
 
     @Test
+    void standardizeSqlWithParametersCollectsReplacedLiterals() {
+        String sql = "select * from dc_db where apiKey = HW274HYFH2492H "
+                + "and startTriggerTime <= 1710224793 and lastTriggerTime >= 1710226306";
+
+        HttpSqlStandardizer.SqlNormalizeResult result =
+                HttpSqlStandardizer.standardizeSqlWithParameters(sql, 1);
+
+        assertThat(result.sql()).isEqualTo("select * from dc_db where apiKey = ? "
+                + "and startTriggerTime <= ? and lastTriggerTime >= ?");
+        assertThat(result.parameters())
+                .containsExactly("HW274HYFH2492H", "1710224793", "1710226306");
+    }
+
+    @Test
+    void standardizeSqlWithParametersModeMinusOneReturnsEmptyParams() {
+        String sql = "SELECT id FROM demo_order WHERE id = 10001";
+        HttpSqlStandardizer.SqlNormalizeResult result =
+                HttpSqlStandardizer.standardizeSqlWithParameters(sql, -1);
+        assertThat(result.sql()).isEqualTo(sql);
+        assertThat(result.parameters()).isEmpty();
+    }
+
+    @Test
     void standardizeSqlModeZeroKeepsStringLiteralsStartingWithLetters() {
         String sql = "select * from dc_db where apiKey = HW274HYFH2492H "
                 + "and startTriggerTime <= 1710224793 and lastTriggerTime >= 1710226306";

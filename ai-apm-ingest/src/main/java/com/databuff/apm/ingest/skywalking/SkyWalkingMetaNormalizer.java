@@ -19,16 +19,39 @@ import java.util.Set;
  * {@code [mysql]host:port}. Peer host/port and free-form operation names are never used to guess the system.
  * MQ plugins report {@code mq.topic}/{@code mq.broker}; {@code messaging.system} comes from component id,
  * and {@code messaging.operation} from {@link SpanType} (Exit=publish, Entry=process).
+ * <p>
+ * SQL literal standardization applies only here: SkyWalking agents send raw SQL, while OTLP / DataBuff agents
+ * already normalize on the client. When enabled ({@code mode != -1}), replaced literals are also written to
+ * OTel {@code db.query.parameter.<index>} (0-based). Default mode {@code 1} matches open-source before v0.1.7.
+ * Override via {@code ingest.skywalking.sql-normalized-type} / env {@code INGEST_SQL_NORMALIZED_TYPE}.
  */
 public final class SkyWalkingMetaNormalizer {
 
-    /** Align with portal global default {@code sql_normalized_type=1} (values containing digits → ?). */
+    /** Same default as pre-v0.1.7 hardcode (values containing digits → ?). */
     public static final int DEFAULT_SQL_NORMALIZED_TYPE = 1;
 
     private static final Set<String> GENERIC_DB_TYPES = Set.of(
             "sql", "jdbc", "database", "db", "unknown", "");
 
+    private static volatile int sqlNormalizedType = DEFAULT_SQL_NORMALIZED_TYPE;
+
     private SkyWalkingMetaNormalizer() {
+    }
+
+    public static int sqlNormalizedType() {
+        return sqlNormalizedType;
+    }
+
+    /**
+     * Apply SQL normalize mode from env/YAML. Out-of-range values fall back to
+     * {@link #DEFAULT_SQL_NORMALIZED_TYPE}.
+     *
+     * @return the mode actually applied
+     */
+    public static int setSqlNormalizedType(int mode) {
+        int applied = (mode < -1 || mode > 1) ? DEFAULT_SQL_NORMALIZED_TYPE : mode;
+        sqlNormalizedType = applied;
+        return applied;
     }
 
     public static void normalize(SpanObject span, Map<String, String> meta) {
@@ -141,7 +164,7 @@ public final class SkyWalkingMetaNormalizer {
         }
         meta.put("db.system", resolved);
         meta.put("db.type", resolved);
-        normalizeSqlStatement(meta, DEFAULT_SQL_NORMALIZED_TYPE);
+        normalizeSqlStatement(meta, sqlNormalizedType);
     }
 
     static void normalizeSqlStatement(Map<String, String> meta, int mode) {
@@ -153,9 +176,14 @@ public final class SkyWalkingMetaNormalizer {
             if (statement == null || statement.isBlank()) {
                 continue;
             }
-            String normalized = HttpSqlStandardizer.standardizeSql(statement, mode);
-            meta.put(key, normalized);
-            meta.put("normalized.resource", normalized);
+            HttpSqlStandardizer.SqlNormalizeResult result =
+                    HttpSqlStandardizer.standardizeSqlWithParameters(statement, mode);
+            meta.put(key, result.sql());
+            meta.put("normalized.resource", result.sql());
+            List<String> parameters = result.parameters();
+            for (int i = 0; i < parameters.size(); i++) {
+                meta.put("db.query.parameter." + i, parameters.get(i));
+            }
             return;
         }
     }

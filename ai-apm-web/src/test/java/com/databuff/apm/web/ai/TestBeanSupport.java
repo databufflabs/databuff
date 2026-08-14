@@ -243,6 +243,8 @@ public final class TestBeanSupport {
         setField(controller, "expertManagementService", expertManagementService);
         setField(controller, "javaBeanToolExecutor", javaBeanToolExecutor(
                 dataTools, timeTool, objectMapper));
+        setField(controller, "remoteMcpToolRegistrar", new RemoteMcpToolRegistrar(objectMapper));
+        setField(controller, "objectMapper", objectMapper);
         return controller;
     }
 

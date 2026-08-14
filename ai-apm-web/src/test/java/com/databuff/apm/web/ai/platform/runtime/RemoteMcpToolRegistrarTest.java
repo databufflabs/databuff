@@ -4,12 +4,15 @@ import com.databuff.apm.web.ai.platform.tool.AiToolDefinition;
 import com.databuff.apm.web.ai.platform.tool.ToolType;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import io.agentscope.core.tool.mcp.McpClientBuilder;
+import io.modelcontextprotocol.json.McpJsonMapperSupplier;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 
 import java.lang.reflect.Field;
 import java.time.Instant;
 import java.util.Map;
+import java.util.Optional;
+import java.util.ServiceLoader;
 
 import static org.assertj.core.api.Assertions.assertThat;
 
@@ -69,6 +72,25 @@ class RemoteMcpToolRegistrarTest {
         assertThat(readTransportHeaders(builder))
                 .as("headers applied before transport must be dropped by AgentScope")
                 .doesNotContainKey("Authorization");
+    }
+
+    @Test
+    void withAppClassLoaderExposesMcpJacksonSpiWhenThreadContextClassLoaderHidesIt() {
+        ClassLoader previous = Thread.currentThread().getContextClassLoader();
+        try {
+            Thread.currentThread().setContextClassLoader(ClassLoader.getPlatformClassLoader());
+            assertThat(ServiceLoader.load(McpJsonMapperSupplier.class).findFirst())
+                    .as("wrong TCCL hides mcp-json-jackson2 SPI — the production fat-jar failure mode")
+                    .isEmpty();
+
+            Optional<McpJsonMapperSupplier> found = RemoteMcpToolRegistrar.withAppClassLoader(
+                    () -> ServiceLoader.load(McpJsonMapperSupplier.class).findFirst());
+            assertThat(found)
+                    .as("application classloader must see Jackson McpJsonMapper SPI")
+                    .isPresent();
+        } finally {
+            Thread.currentThread().setContextClassLoader(previous);
+        }
     }
 
     @Test

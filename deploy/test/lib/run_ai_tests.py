@@ -6,6 +6,7 @@
   - formats    OpenAI / Anthropic 接入格式
   - memory     会话记忆
   - brain      大脑异步路由（套件内用例亦并行）
+  - mcp        远程 SSE / Streamable HTTP MCP + header 认证（不需要 LLM）
   - modelfail  模型失败可见性（单专家/多专家；会临时改专家绑定，suit=all 时在核心套件后串行）
 
 环境变量门控：
@@ -15,6 +16,7 @@
     （TEST_SKIP_AI_PROVIDER_FORMATS=1 跳过）
   - memory / brain / modelfail：由 AI_TEST_PROVIDER 对应 Key 门控
     （opencode 未设置 OPENCODE_API_KEY 时自动读 opencode CLI 的 auth.json）
+  - mcp：走 LLM 对话调用远端 echo_ping（TEST_SKIP_AI_MCP=1 跳过；无 Key 也跳过）
 """
 
 from __future__ import annotations
@@ -60,9 +62,13 @@ from ai_model_failure import (  # noqa: E402
     run_ai_model_failure_cases,
     ModelFailureCaseResult,
 )
+from ai_mcp_remote import (  # noqa: E402
+    run_ai_mcp_remote_cases,
+    McpCaseResult,
+)
 from run_tests import login  # noqa: E402
 
-CORE_SUITES = ("chat", "formats", "memory", "brain")
+CORE_SUITES = ("chat", "formats", "memory", "brain", "mcp")
 SUITES = (*CORE_SUITES, "modelfail")
 
 
@@ -203,6 +209,33 @@ def _run_brain(base: str, token: str, brain_async_poll_timeout: float) -> SuiteO
     return SuiteOutcome("brain", len(brain_results), failed, False)
 
 
+def _run_mcp(base: str, token: str, timeout: float, poll_timeout: float) -> SuiteOutcome:
+    if os.environ.get("TEST_SKIP_AI_MCP", "0") == "1":
+        print("[ai-tests:mcp] skip (TEST_SKIP_AI_MCP=1)", flush=True)
+        return SuiteOutcome("mcp", 0, 0, True, "TEST_SKIP_AI_MCP=1")
+    _print_section("AI 远程 MCP（SSE / Streamable HTTP + header 认证，走 LLM 对话）")
+    if not deepseek_api_key():
+        print(f"  skip: set {ENV_API_KEY} to enable", flush=True)
+        return SuiteOutcome("mcp", 0, 0, True, f"{ENV_API_KEY} unset")
+    if not is_llm_ready(base, token, timeout):
+        print("  skip: no enabled LLM provider with API key configured", flush=True)
+        return SuiteOutcome("mcp", 0, 0, True, "llm not ready")
+    print(
+        f"  LLM chat must call remote echo_ping and quote legal result "
+        f"(provider={PROVIDER}/{MODEL}, poll={poll_timeout:.0f}s)",
+        flush=True,
+    )
+    results: list[McpCaseResult] = run_ai_mcp_remote_cases(
+        base, token, timeout=timeout, poll_timeout_sec=poll_timeout
+    )
+    failed = 0
+    for item in results:
+        _print_result_row(item.name, item.ok, item.elapsed_ms, item.session_id, item.detail)
+        if not item.ok:
+            failed += 1
+    return SuiteOutcome("mcp", len(results), failed, False)
+
+
 def _run_modelfail(base: str, token: str, poll_timeout: float) -> SuiteOutcome:
     if os.environ.get("TEST_SKIP_AI_MODEL_FAILURE", "0") == "1":
         print("[ai-tests:modelfail] skip (TEST_SKIP_AI_MODEL_FAILURE=1)", flush=True)
@@ -261,6 +294,7 @@ def main() -> int:
     format_poll_timeout = float(os.environ.get("TEST_AI_PROVIDER_FORMAT_POLL_TIMEOUT", "180"))
     memory_poll_timeout = float(os.environ.get("TEST_AI_MEMORY_POLL_TIMEOUT", "240"))
     brain_async_poll_timeout = float(os.environ.get("TEST_AI_BRAIN_ASYNC_POLL_TIMEOUT", "900"))
+    mcp_poll_timeout = float(os.environ.get("TEST_AI_MCP_POLL_TIMEOUT", "180"))
     modelfail_poll_timeout = float(os.environ.get("TEST_AI_MODEL_FAILURE_POLL_TIMEOUT", "300"))
 
     print(
@@ -279,6 +313,7 @@ def main() -> int:
         "formats": lambda: _run_formats(base, token, format_rounds, format_poll_timeout),
         "memory": lambda: _run_memory(base, token, memory_poll_timeout),
         "brain": lambda: _run_brain(base, token, brain_async_poll_timeout),
+        "mcp": lambda: _run_mcp(base, token, timeout, mcp_poll_timeout),
         "modelfail": lambda: _run_modelfail(base, token, modelfail_poll_timeout),
     }
 

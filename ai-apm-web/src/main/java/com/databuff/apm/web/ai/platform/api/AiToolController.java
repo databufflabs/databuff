@@ -3,10 +3,14 @@ package com.databuff.apm.web.ai.platform.api;
 import com.databuff.apm.web.ai.mcp.standard.JavaBeanToolExecutor;
 import com.databuff.apm.web.ai.platform.AiPlatformApiException;
 import com.databuff.apm.web.ai.platform.expert.ExpertManagementService;
+import com.databuff.apm.web.ai.platform.runtime.RemoteMcpToolRegistrar;
 import com.databuff.apm.web.ai.platform.tool.AiToolDefinition;
 import com.databuff.apm.web.ai.platform.tool.JavaBeanToolAllowlist;
 import com.databuff.apm.web.ai.platform.tool.ToolManagementService;
 import com.databuff.apm.web.ai.platform.tool.ToolType;
+import com.fasterxml.jackson.core.type.TypeReference;
+import com.fasterxml.jackson.databind.JsonNode;
+import com.fasterxml.jackson.databind.ObjectMapper;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.web.bind.annotation.DeleteMapping;
 import org.springframework.web.bind.annotation.GetMapping;
@@ -18,6 +22,7 @@ import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RestController;
 
 import java.time.Instant;
+import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
 
@@ -31,6 +36,10 @@ public class AiToolController {
     private ExpertManagementService expertManagementService;
     @Autowired
     private JavaBeanToolExecutor javaBeanToolExecutor;
+    @Autowired
+    private RemoteMcpToolRegistrar remoteMcpToolRegistrar;
+    @Autowired
+    private ObjectMapper objectMapper;
 
     @GetMapping
     public List<AiToolDefinition> list() {
@@ -98,17 +107,40 @@ public class AiToolController {
     @PostMapping("/{toolId}/test")
     public Map<String, Object> test(
             @PathVariable String toolId,
-            @RequestBody(required = false) JavaBeanToolExecutor.TestToolRequest request) {
+            @RequestBody(required = false) JsonNode body) {
         AiToolDefinition tool = toolManagementService.find(toolId)
                 .orElseThrow(() -> AiPlatformApiException.notFound("tool", toolId));
-        if (tool.type() != ToolType.JAVA_BEAN) {
-            throw AiPlatformApiException.badRequest("only JAVA_BEAN tools can be tested in this release");
+        if (tool.type() == ToolType.MCP) {
+            return probeMcp(tool, body);
         }
-        JavaBeanToolExecutor.TestToolRequest safeRequest = request == null
+        if (tool.type() != ToolType.JAVA_BEAN) {
+            throw AiPlatformApiException.badRequest("unsupported tool type for test: " + tool.type());
+        }
+        JavaBeanToolExecutor.TestToolRequest safeRequest = body == null || body.isNull() || body.isEmpty()
                 ? JavaBeanToolExecutor.TestToolRequest.empty()
-                : request;
+                : objectMapper.convertValue(body, JavaBeanToolExecutor.TestToolRequest.class);
         String output = javaBeanToolExecutor.invoke(tool.implementation(), safeRequest);
         return Map.of("toolId", toolId, "ok", true, "output", output);
+    }
+
+    private Map<String, Object> probeMcp(AiToolDefinition tool, JsonNode body) {
+        String callName = null;
+        Map<String, Object> arguments = new LinkedHashMap<>();
+        if (body != null && body.isObject()) {
+            if (body.hasNonNull("name")) {
+                callName = body.get("name").asText(null);
+            } else if (body.hasNonNull("mcpToolName")) {
+                callName = body.get("mcpToolName").asText(null);
+            }
+            if (body.has("arguments") && body.get("arguments").isObject()) {
+                Map<String, Object> parsed = objectMapper.convertValue(
+                        body.get("arguments"), new TypeReference<Map<String, Object>>() {});
+                if (parsed != null) {
+                    arguments.putAll(parsed);
+                }
+            }
+        }
+        return remoteMcpToolRegistrar.probe(tool, callName, arguments);
     }
 
     private AiToolDefinition setEnabled(String toolId, boolean enabled) {

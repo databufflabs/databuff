@@ -125,6 +125,8 @@ services:
       timeout: 5s
       retries: 20
       start_period: 90s
+    extra_hosts:
+      - "host.docker.internal:host-gateway"
     networks:
       apm:
         ipv4_address: 172.20.80.4

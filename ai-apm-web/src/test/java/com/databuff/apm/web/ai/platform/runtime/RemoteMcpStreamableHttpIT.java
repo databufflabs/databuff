@@ -92,6 +92,30 @@ class RemoteMcpStreamableHttpIT {
     }
 
     @Test
+    void probeCallsRemoteToolAndReturnsLegalText() {
+        Map<String, Object> probed = registrar.probe(
+                mcpTool(server.endpointUrl()),
+                "echo_ping",
+                Map.of("token", "streamable-it"));
+
+        assertThat(probed.get("ok")).as("probe must succeed: %s", probed).isEqualTo(true);
+        assertThat(probed.get("initialized")).isEqualTo(true);
+        @SuppressWarnings("unchecked")
+        List<String> tools = (List<String>) probed.get("tools");
+        assertThat(tools).contains("echo_ping");
+        @SuppressWarnings("unchecked")
+        Map<String, Object> call = (Map<String, Object>) probed.get("call");
+        assertThat(call.get("name")).isEqualTo("echo_ping");
+        assertThat(call.get("isError")).isEqualTo(false);
+        assertThat(String.valueOf(call.get("text")))
+                .as("DataBuff must receive the remote MCP tools/call payload")
+                .contains("streamable-it")
+                .contains("streamable-executed");
+        assertThat(server.toolsCallWithSession.get()).isGreaterThanOrEqualTo(1);
+        assertThat(server.authHits.get()).isGreaterThanOrEqualTo(1);
+    }
+
+    @Test
     void streamableHttpFailsWhenAuthHeaderMissing() {
         Toolkit toolkit = new Toolkit();
         AiToolDefinition tool = mcpToolWithoutAuth(server.endpointUrl());
@@ -318,22 +342,36 @@ class RemoteMcpStreamableHttpIT {
                             "jsonrpc", "2.0",
                             "id", id,
                             "result", Map.of(
-                                    "tools", List.of(Map.of(
-                                            "name", "jenkins_list_jobs",
-                                            "description", "List Jenkins jobs",
-                                            "inputSchema", Map.of(
-                                                    "type", "object",
-                                                    "properties", Map.of(
-                                                            "folder", Map.of("type", "string"))))))));
+                                    "tools", List.of(
+                                            Map.of(
+                                                    "name", "jenkins_list_jobs",
+                                                    "description", "List Jenkins jobs",
+                                                    "inputSchema", Map.of(
+                                                            "type", "object",
+                                                            "properties", Map.of(
+                                                                    "folder", Map.of("type", "string")))),
+                                            Map.of(
+                                                    "name", "echo_ping",
+                                                    "description", "Echo a token to prove remote execution",
+                                                    "inputSchema", Map.of(
+                                                            "type", "object",
+                                                            "properties", Map.of(
+                                                                    "token", Map.of("type", "string"))))))));
                     return;
                 }
 
                 if ("tools/call".equals(rpcMethod)) {
                     toolsCallWithSession.incrementAndGet();
                     String toolName = root.path("params").path("name").asText("");
-                    String text = "jenkins_list_jobs".equals(toolName)
-                            ? "jobs: job-a, job-b"
-                            : "unknown tool: " + toolName;
+                    String text;
+                    if ("echo_ping".equals(toolName)) {
+                        String token = root.path("params").path("arguments").path("token").asText("");
+                        text = "echo:" + token + ":streamable-executed";
+                    } else if ("jenkins_list_jobs".equals(toolName)) {
+                        text = "jobs: job-a, job-b";
+                    } else {
+                        text = "unknown tool: " + toolName;
+                    }
                     writeJson(exchange, 200, Map.of(
                             "jsonrpc", "2.0",
                             "id", id,

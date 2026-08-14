@@ -11,6 +11,7 @@
 #   formats    OpenAI / Anthropic 接入格式
 #   memory     会话记忆
 #   brain      大脑异步路由
+#   mcp        远程 SSE / Streamable HTTP MCP + header 认证（走 LLM 对话，需要 API Key）
 #   modelfail  模型失败可见性（单专家/多专家；终态必须含 error；all 时在核心套件后串行）
 #
 # 需要环境变量（可写在 ~/.zshrc）：
@@ -29,6 +30,7 @@
 #   AI_TEST_PROVIDER=opencode ./ai-tests.sh # 走 OpenCode Go 套餐（无需 OPENCODE_API_KEY 也可，自动读 auth.json）
 #   ./ai-tests.sh --suite memory           # 只跑会话记忆
 #   ./ai-tests.sh --suite brain
+#   ./ai-tests.sh --suite mcp
 #   ./ai-tests.sh --suite modelfail        # 只跑模型失败可见性
 #   AI_TESTS_PARALLEL=0 ./ai-tests.sh      # 调试：单进程串行（发布门禁禁止）
 #   AI_TESTS_SUITE_CONCURRENCY=1           # 核心套件同时跑几个进程（默认 1，降速限）
@@ -38,6 +40,7 @@
 #   TEST_SKIP_AI_PROVIDER_FORMATS=1 ./ai-tests.sh
 #   TEST_SKIP_AI_MEMORY=1 ./ai-tests.sh
 #   TEST_SKIP_AI_BRAIN_ASYNC=1 ./ai-tests.sh
+#   TEST_SKIP_AI_MCP=1 ./ai-tests.sh
 #   TEST_SKIP_AI_MODEL_FAILURE=1 ./ai-tests.sh
 set -euo pipefail
 
@@ -130,7 +133,7 @@ fi
 LOG_DIR="${TMPDIR:-/tmp}/ai-tests-$$"
 mkdir -p "${LOG_DIR}"
 
-CORE_SUITES=(chat formats memory brain)
+CORE_SUITES=(chat formats memory brain mcp)
 active_pids=()
 for s in "${CORE_SUITES[@]}"; do
   # bash 3.2（macOS）无 wait -n；轮询已结束进程再开新套件

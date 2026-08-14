@@ -1,5 +1,7 @@
 package com.databuff.apm.common.trace;
 
+import java.util.ArrayList;
+import java.util.List;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
 
@@ -8,6 +10,9 @@ import java.util.regex.Pattern;
  * <p>
  * Modes mirror legacy portal {@code sql_normalized_type} / {@code url_path_normalized_type}:
  * {@code -1} no change; {@code 0} replace values that start with a digit; {@code 1} replace values containing a digit.
+ * <p>
+ * When SQL values are replaced with {@code ?}, the original values are collected in order for
+ * OTel {@code db.query.parameter.<index>} (0-based).
  */
 public final class HttpSqlStandardizer {
 
@@ -41,6 +46,13 @@ public final class HttpSqlStandardizer {
     private static final String LIST_SEPARATOR = "\\s*,\\s*";
 
     private HttpSqlStandardizer() {
+    }
+
+    /** Result of SQL normalize: sanitized statement + replaced literals in placeholder order. */
+    public record SqlNormalizeResult(String sql, List<String> parameters) {
+        public SqlNormalizeResult {
+            parameters = parameters == null ? List.of() : List.copyOf(parameters);
+        }
     }
 
     public static String standardizeHttpRequestLine(String requestLine, int mode) {
@@ -80,16 +92,26 @@ public final class HttpSqlStandardizer {
     }
 
     public static String standardizeSql(String sql, int mode) {
-        if (sql == null || mode == -1) {
-            return sql;
-        }
-
-        String processed = processInClauses(sql, mode);
-        processed = processComparisons(processed, mode);
-        return processFunctionArgs(processed, mode);
+        return standardizeSqlWithParameters(sql, mode).sql();
     }
 
-    private static String processInClauses(String sql, int mode) {
+    /**
+     * Normalize SQL and collect replaced literal values for {@code db.query.parameter.N}.
+     * When {@code mode == -1}, returns the original SQL and an empty parameter list.
+     */
+    public static SqlNormalizeResult standardizeSqlWithParameters(String sql, int mode) {
+        if (sql == null || mode == -1) {
+            return new SqlNormalizeResult(sql, List.of());
+        }
+
+        List<String> parameters = new ArrayList<>();
+        String processed = processInClauses(sql, mode, parameters);
+        processed = processComparisons(processed, mode, parameters);
+        processed = processFunctionArgs(processed, mode, parameters);
+        return new SqlNormalizeResult(processed, parameters);
+    }
+
+    private static String processInClauses(String sql, int mode, List<String> parameters) {
         StringBuffer result = new StringBuffer();
         Matcher matcher = IN_PATTERN.matcher(sql);
 
@@ -98,6 +120,8 @@ public final class HttpSqlStandardizer {
             String replacement;
 
             if (shouldReplaceValues(values, mode)) {
+                // Collapses to a single placeholder — one OTel parameter for that placeholder.
+                parameters.add(parameterValue(values.trim()));
                 replacement = "IN (?)";
             } else {
                 StringBuilder newValues = new StringBuilder();
@@ -107,7 +131,12 @@ public final class HttpSqlStandardizer {
                     if (newValues.length() > 0) {
                         newValues.append(',');
                     }
-                    newValues.append(shouldReplaceValue(item, mode) ? "?" : item);
+                    if (shouldReplaceValue(item, mode)) {
+                        parameters.add(parameterValue(item.trim()));
+                        newValues.append('?');
+                    } else {
+                        newValues.append(item);
+                    }
                 }
                 replacement = "IN (" + newValues + ")";
             }
@@ -118,22 +147,26 @@ public final class HttpSqlStandardizer {
         return result.toString();
     }
 
-    private static String processComparisons(String sql, int mode) {
+    private static String processComparisons(String sql, int mode, List<String> parameters) {
         StringBuffer result = new StringBuffer();
         Matcher matcher = COMPARISON_PATTERN.matcher(sql);
 
         while (matcher.find()) {
             String operator = matcher.group("operator");
             String value = matcher.group("value");
-            String replacement = shouldReplaceValue(value, mode) ? operator + " ?" : matcher.group();
-            matcher.appendReplacement(result, Matcher.quoteReplacement(replacement));
+            if (shouldReplaceValue(value, mode)) {
+                parameters.add(parameterValue(value));
+                matcher.appendReplacement(result, Matcher.quoteReplacement(operator + " ?"));
+            } else {
+                matcher.appendReplacement(result, Matcher.quoteReplacement(matcher.group()));
+            }
         }
         matcher.appendTail(result);
 
         return result.toString();
     }
 
-    private static String processFunctionArgs(String sql, int mode) {
+    private static String processFunctionArgs(String sql, int mode, List<String> parameters) {
         StringBuffer result = new StringBuffer();
         Matcher matcher = FUNCTION_PATTERN.matcher(sql);
 
@@ -148,7 +181,12 @@ public final class HttpSqlStandardizer {
                 if (newArgs.length() > 0) {
                     newArgs.append(',');
                 }
-                newArgs.append(shouldReplaceValue(part, mode) ? "?" : part);
+                if (shouldReplaceValue(part, mode)) {
+                    parameters.add(parameterValue(part.trim()));
+                    newArgs.append('?');
+                } else {
+                    newArgs.append(part);
+                }
             }
 
             String replacement = functionCall.replace(args, newArgs.toString());
@@ -173,11 +211,7 @@ public final class HttpSqlStandardizer {
     }
 
     private static boolean shouldReplaceValue(String value, int mode) {
-        String unquoted = value;
-        if ((value.startsWith("'") && value.endsWith("'"))
-                || (value.startsWith("\"") && value.endsWith("\""))) {
-            unquoted = value.substring(1, value.length() - 1);
-        }
+        String unquoted = stripQuotes(value);
 
         if (mode == 0) {
             return !unquoted.isEmpty() && Character.isDigit(unquoted.charAt(0));
@@ -186,6 +220,23 @@ public final class HttpSqlStandardizer {
             return containsDigit(unquoted);
         }
         return false;
+    }
+
+    /** Unquoted literal for {@code db.query.parameter.N} (matches OTel / UI display). */
+    private static String parameterValue(String raw) {
+        return stripQuotes(raw.trim());
+    }
+
+    private static String stripQuotes(String value) {
+        if (value == null) {
+            return "";
+        }
+        String trimmed = value.trim();
+        if ((trimmed.startsWith("'") && trimmed.endsWith("'") && trimmed.length() >= 2)
+                || (trimmed.startsWith("\"") && trimmed.endsWith("\"") && trimmed.length() >= 2)) {
+            return trimmed.substring(1, trimmed.length() - 1);
+        }
+        return trimmed;
     }
 
     private static boolean isPureDigit(String value) {

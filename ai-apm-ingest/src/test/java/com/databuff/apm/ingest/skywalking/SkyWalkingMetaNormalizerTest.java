@@ -118,6 +118,25 @@ class SkyWalkingMetaNormalizerTest {
                 .isEqualTo("SELECT id, amount FROM demo_order WHERE id = ? AND apiKey = ?");
         assertThat(span.resource)
                 .isEqualTo("SELECT id, amount FROM demo_order WHERE id = ? AND apiKey = ?");
+        assertThat(meta.get("db.query.parameter.0")).isEqualTo("10001");
+        assertThat(meta.get("db.query.parameter.1")).isEqualTo("HW274HYFH2492H");
+    }
+
+    @Test
+    void skipsSqlNormalizationWhenModeIsMinusOne() {
+        SkyWalkingMetaNormalizer.setSqlNormalizedType(-1);
+        try {
+            String rawSql = "SELECT id, amount FROM demo_order WHERE id = 10001 AND apiKey = HW274HYFH2492H";
+            DcSpan span = convertDbSpan(33, "sql", "mysql.test:3306", tag("db.statement", rawSql));
+            Map<String, String> meta = OtelAttributeMaps.parse(span);
+
+            assertThat(meta.get("db.statement")).isEqualTo(rawSql);
+            assertThat(meta.get("normalized.resource")).isNull();
+            assertThat(span.resource).isEqualTo(rawSql);
+            assertThat(meta.get("db.query.parameter.0")).isNull();
+        } finally {
+            SkyWalkingMetaNormalizer.setSqlNormalizedType(SkyWalkingMetaNormalizer.DEFAULT_SQL_NORMALIZED_TYPE);
+        }
     }
 
     @Test

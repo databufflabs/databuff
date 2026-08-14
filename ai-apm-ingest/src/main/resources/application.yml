@@ -47,6 +47,10 @@ ingest:
   skywalking:
     enabled: true
     grpc-port: 11800
+    # SQL normalize for SkyWalking only (OTLP/DataBuff agents already normalize on client).
+    # Default 1 matches pre-v0.1.7. -1 off; 0 digit-prefix → ?; 1 contains digit → ?.
+    # Env: INGEST_SQL_NORMALIZED_TYPE
+    sql-normalized-type: ${INGEST_SQL_NORMALIZED_TYPE:1}
   meta-service:
     sync-interval-ms: 60000
   remote:
