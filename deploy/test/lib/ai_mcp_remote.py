@@ -246,6 +246,13 @@ def _run_chat_case(
                 raise AssertionError(
                     f"no-auth 对话不应出现远端原文 {expected!r}: {blob[:500]!r}"
                 )
+            if int(after.get("unauthorized") or 0) <= int(before.get("unauthorized") or 0):
+                raise AssertionError(
+                    "missing Authorization 时应打到远端并被 401；"
+                    "unauthorized 未增加，说明客户端可能根本没连上"
+                    "（例如 fat-jar SPI / McpJsonMapper 失败）: "
+                    f"before={before} after={after} conversation={blob[:400]!r}"
+                )
             detail = "chat finished without remote MCP execution (auth missing)"
         return McpCaseResult(
             name=name,
