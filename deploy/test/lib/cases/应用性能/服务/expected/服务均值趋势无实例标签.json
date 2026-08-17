@@ -1,0 +1,11 @@
+{
+  "status": 200,
+  "message": "success",
+  "data": [
+    {
+      "values": {
+        "$minNonNullValues": 1
+      }
+    }
+  ]
+}

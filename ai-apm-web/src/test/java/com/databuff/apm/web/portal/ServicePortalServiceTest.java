@@ -4,6 +4,7 @@ import com.databuff.apm.common.query.ApmQueryModels;
 import com.databuff.apm.common.query.ApmQueryModels.DbDownstreamPoint;
 import com.databuff.apm.common.query.ApmQueryModels.DbServiceSummaryPoint;
 import com.databuff.apm.common.query.ApmQueryModels.MetaServicePoint;
+import com.databuff.apm.common.query.ApmQueryModels.ServiceInstanceSummaryPoint;
 import com.databuff.apm.common.query.ApmQueryModels.ServiceSummaryPoint;
 import com.databuff.apm.common.query.ApmQueryModels.ServiceTrendBucketPoint;
 import com.databuff.apm.common.query.TimeSeriesFillUtil;
@@ -15,6 +16,8 @@ import com.databuff.apm.web.monitor.AlarmStore;
 import org.junit.jupiter.api.Test;
 
 import java.time.Instant;
+import java.util.ArrayList;
+import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
 
@@ -448,6 +451,217 @@ class ServicePortalServiceTest {
     assertThat(values).hasSize(60);
     assertThat(values.get(0).get(0)).isEqualTo(TimeSeriesFillUtil.alignBucketEpochSec(from, 60) * 1000L);
     assertThat(values).anyMatch(row -> row.get(0).equals(1_780_545_360_000L) && row.get(1).equals(100.0));
+  }
+
+  @Test
+  void buildsServiceDetailTrendSeriesForTypeTopSingleInstance() throws Exception {
+    ApmReadRepository reader = mock(ApmReadRepository.class);
+    stubInstanceFilteredTrendBuckets(
+            reader,
+            instanceBuckets("svc-a-1", reqBucket(100)),
+            List.of("svc-a-1"));
+
+    ServicePortalService service = TestStorageSupport.servicePortalService(reader);
+    assertTypeTopSingleInstance(service.serviceDetailTrendChart(serviceDetailTrendBody("top")), "svc-a-1");
+    assertTypeTopSingleInstance(service.serviceDetailTrendChart(serviceDetailTrendBody("TOP")), "svc-a-1");
+  }
+
+  @Test
+  void buildsServiceDetailTrendSeriesForTypeServiceStillAggregated() throws Exception {
+    ApmReadRepository reader = mock(ApmReadRepository.class);
+    LinkedHashMap<String, List<ServiceTrendBucketPoint>> calling = new LinkedHashMap<>();
+    calling.put("inst-hi", List.of(reqBucket(80)));
+    calling.put("inst-lo", List.of(reqBucket(20)));
+    stubInstanceFilteredTrendBuckets(reader, calling, List.of("inst-hi"));
+
+    ServicePortalService service = TestStorageSupport.servicePortalService(reader);
+    List<Map<String, Object>> series = service.serviceDetailTrendChart(serviceDetailTrendBody("service"));
+
+    assertThat(series).hasSize(1);
+    Object tags = series.get(0).get("tags");
+    if (tags instanceof Map<?, ?> tagMap) {
+      assertThat(tagMap.containsKey("serviceInstance")).isFalse();
+    }
+  }
+
+  @Test
+  void buildsServiceDetailTrendSeriesForTypeTopSplitsInstances() throws Exception {
+    ApmReadRepository reader = mock(ApmReadRepository.class);
+    LinkedHashMap<String, List<ServiceTrendBucketPoint>> calling = new LinkedHashMap<>();
+    calling.put("inst-hi", List.of(reqBucket(80)));
+    calling.put("inst-lo", List.of(reqBucket(20)));
+    stubInstanceFilteredTrendBuckets(reader, calling, List.of("inst-hi", "idle-parked"));
+
+    ServicePortalService service = TestStorageSupport.servicePortalService(reader);
+    List<Map<String, Object>> series = service.serviceDetailTrendChart(serviceDetailTrendBody("top"));
+
+    assertThat(series).hasSize(2);
+    assertThat(instanceTags(series)).containsExactlyInAnyOrder("inst-hi", "inst-lo");
+    assertThat(instanceTags(series)).doesNotContain("idle-parked");
+  }
+
+  @Test
+  void buildsServiceDetailTrendSeriesForTypeTopIgnoresIdleEntity() throws Exception {
+    ApmReadRepository reader = mock(ApmReadRepository.class);
+    stubInstanceFilteredTrendBuckets(
+            reader,
+            instanceBuckets("caller-1", reqBucket(40)),
+            List.of("caller-1", "idle-no-call"));
+
+    ServicePortalService service = TestStorageSupport.servicePortalService(reader);
+    List<Map<String, Object>> series = service.serviceDetailTrendChart(serviceDetailTrendBody("top"));
+
+    assertThat(series).hasSize(1);
+    assertThat(instanceTag(series.get(0))).isEqualTo("caller-1");
+    assertThat(instanceTags(series)).doesNotContain("idle-no-call");
+  }
+
+  @Test
+  void buildsServiceDetailTrendSeriesForTypeTopIncludesCallerWithoutEntity() throws Exception {
+    ApmReadRepository reader = mock(ApmReadRepository.class);
+    stubInstanceFilteredTrendBuckets(
+            reader,
+            instanceBuckets("ghost-caller", reqBucket(30)),
+            List.of());
+
+    ServicePortalService service = TestStorageSupport.servicePortalService(reader);
+    List<Map<String, Object>> series = service.serviceDetailTrendChart(serviceDetailTrendBody("top"));
+
+    assertThat(series).hasSize(1);
+    assertThat(instanceTag(series.get(0))).isEqualTo("ghost-caller");
+  }
+
+  @Test
+  void buildsServiceDetailTrendSeriesForTypeTopDropsBlankInstance() throws Exception {
+    ApmReadRepository reader = mock(ApmReadRepository.class);
+    LinkedHashMap<String, List<ServiceTrendBucketPoint>> calling = new LinkedHashMap<>();
+    calling.put("svc-a-1", List.of(reqBucket(100)));
+    calling.put("", List.of(reqBucket(50)));
+    stubInstanceFilteredTrendBuckets(reader, calling, List.of("svc-a-1"));
+
+    ServicePortalService service = TestStorageSupport.servicePortalService(reader);
+    List<Map<String, Object>> series = service.serviceDetailTrendChart(serviceDetailTrendBody("top"));
+
+    assertThat(series).hasSize(1);
+    assertThat(instanceTag(series.get(0))).isEqualTo("svc-a-1");
+    assertThat(instanceTags(series)).doesNotContain("");
+  }
+
+  @Test
+  void buildsServiceDetailTrendSeriesForTypeTopTruncatesToTop5() throws Exception {
+    ApmReadRepository reader = mock(ApmReadRepository.class);
+    LinkedHashMap<String, List<ServiceTrendBucketPoint>> calling = new LinkedHashMap<>();
+    calling.put("keep-a", List.of(reqBucket(100)));
+    calling.put("keep-b", List.of(reqBucket(90)));
+    calling.put("keep-c", List.of(reqBucket(80)));
+    calling.put("keep-d", List.of(reqBucket(70)));
+    calling.put("keep-e", List.of(reqBucket(1_780_545_360L, 25), reqBucket(1_780_545_420L, 25)));
+    calling.put("drop-f", List.of(reqBucket(45)));
+    stubInstanceFilteredTrendBuckets(reader, calling, List.of("keep-a", "drop-f"));
+
+    ServicePortalService service = TestStorageSupport.servicePortalService(reader);
+    List<Map<String, Object>> series = service.serviceDetailTrendChart(serviceDetailTrendBody("top"));
+
+    assertThat(series).hasSize(5);
+    assertThat(instanceTags(series)).containsExactly("keep-a", "keep-b", "keep-c", "keep-d", "keep-e");
+    assertThat(instanceTags(series)).doesNotContain("drop-f");
+  }
+
+  private static Map<String, Object> serviceDetailTrendBody(String type) {
+    Map<String, Object> body = new LinkedHashMap<>();
+    body.put("serviceId", "demo-order");
+    body.put("startTime", "2026-06-04 11:00:00");
+    body.put("endTime", "2026-06-04 12:00:00");
+    body.put("interval", 60);
+    body.put("metric", "reqCount");
+    if (type != null) {
+      body.put("type", type);
+    }
+    return body;
+  }
+
+  private static ServiceTrendBucketPoint reqBucket(long requestCount) {
+    return reqBucket(1_780_545_360L, requestCount);
+  }
+
+  private static ServiceTrendBucketPoint reqBucket(long bucketEpochSec, long requestCount) {
+    return new ServiceTrendBucketPoint(bucketEpochSec, "demo-order", requestCount, 0, 1_000_000_000);
+  }
+
+  private static LinkedHashMap<String, List<ServiceTrendBucketPoint>> instanceBuckets(
+          String instance, ServiceTrendBucketPoint... buckets) {
+    LinkedHashMap<String, List<ServiceTrendBucketPoint>> byInstance = new LinkedHashMap<>();
+    byInstance.put(instance, List.of(buckets));
+    return byInstance;
+  }
+
+  private static void stubInstanceFilteredTrendBuckets(
+          ApmReadRepository reader,
+          LinkedHashMap<String, List<ServiceTrendBucketPoint>> bucketsByInstance,
+          List<String> entityInstanceNames) throws Exception {
+    when(reader.queryServiceTrendBuckets(anyString())).thenAnswer(invocation -> {
+      String sql = invocation.getArgument(0);
+      for (Map.Entry<String, List<ServiceTrendBucketPoint>> entry : bucketsByInstance.entrySet()) {
+        String instance = entry.getKey();
+        if (instance != null && !instance.isBlank()
+                && sql.contains("`service_instance` = '" + instance + "'")) {
+          return entry.getValue();
+        }
+      }
+      List<ServiceTrendBucketPoint> merged = new ArrayList<>();
+      for (List<ServiceTrendBucketPoint> buckets : bucketsByInstance.values()) {
+        merged.addAll(buckets);
+      }
+      return merged;
+    });
+    List<ServiceInstanceSummaryPoint> entities = new ArrayList<>();
+    for (String name : entityInstanceNames) {
+      entities.add(new ServiceInstanceSummaryPoint(
+              name, "host", "host", 0L, null, null, null, null, null));
+    }
+    when(reader.queryServiceInstanceSummaries(anyString())).thenReturn(entities);
+    List<String> callingNames = new ArrayList<>();
+    for (String name : bucketsByInstance.keySet()) {
+      if (name != null && !name.isBlank()) {
+        callingNames.add(name);
+      }
+    }
+    when(reader.queryDistinctStrings(anyString(), anyString())).thenAnswer(invocation -> {
+      String sql = invocation.getArgument(0);
+      if (sql != null && sql.contains("metric_service_instance")) {
+        return entityInstanceNames;
+      }
+      return callingNames;
+    });
+  }
+
+  private static void assertTypeTopSingleInstance(List<Map<String, Object>> series, String instance) {
+    assertThat(series).hasSize(1);
+    assertThat(instanceTag(series.get(0))).isEqualTo(instance);
+    @SuppressWarnings("unchecked")
+    List<List<Object>> values = (List<List<Object>>) series.get(0).get("values");
+    assertThat(values).hasSize(60);
+    assertThat(values).anyMatch(row ->
+            row.get(0).equals(1_780_545_360_000L) && ((Number) row.get(1)).doubleValue() == 100.0);
+  }
+
+  @SuppressWarnings("unchecked")
+  private static String instanceTag(Map<String, Object> item) {
+    Object tags = item.get("tags");
+    assertThat(tags).as("tags.serviceInstance").isInstanceOf(Map.class);
+    Map<String, Object> tagMap = (Map<String, Object>) tags;
+    Object name = tagMap.get("serviceInstance");
+    assertThat(name).as("tags.serviceInstance camelCase").isInstanceOf(String.class);
+    assertThat((String) name).isNotBlank();
+    return (String) name;
+  }
+
+  private static List<String> instanceTags(List<Map<String, Object>> series) {
+    List<String> names = new ArrayList<>();
+    for (Map<String, Object> item : series) {
+      names.add(instanceTag(item));
+    }
+    return names;
   }
 
   @Test

@@ -673,6 +673,27 @@ public final class MetricQueryBuilder {
                 Math.max(1, Math.min(limit, 200)));
     }
 
+    /** Calling instances from golden-metric rows. Do not use {@code metric_service_instance}. */
+    public static String serviceCallingInstanceDistinctSql(
+            String database, String service, long fromMillis, long toMillis, int limit) {
+        String filters = buildServiceIdFilter(service);
+        return """
+                SELECT DISTINCT `service_instance`
+                FROM %s.`%s`
+                WHERE %s
+                %s
+                  AND `service_instance` IS NOT NULL
+                  AND `service_instance` != ''
+                ORDER BY `service_instance` ASC
+                LIMIT %d
+                """.formatted(
+                database,
+                DorisTableNames.METRIC_SERVICE,
+                metricTsWhere(fromMillis, toMillis),
+                filters,
+                Math.max(1, Math.min(limit, 200)));
+    }
+
     public static String serviceInstanceSummarySql(
             String database,
             String service,

@@ -1,0 +1,15 @@
+{
+  "status": 200,
+  "message": "success",
+  "data": [
+    {
+      "tags": {
+        "serviceInstance": "service-a-1"
+      },
+      "values": {
+        "$minNonNullValues": 1,
+        "$eachNonNullRange": [1, 1000000000]
+      }
+    }
+  ]
+}

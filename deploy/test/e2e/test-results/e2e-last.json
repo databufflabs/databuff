@@ -4,10 +4,7 @@
       "/usr/local/bin/node",
       "/Users/ligang/important/databuff/databuff/deploy/test/e2e/node_modules/.bin/playwright",
       "test",
-      "--config=deploy/test/e2e/playwright.config.ts",
-      "endpoint-drill.spec.ts",
-      "-g",
-      "UI14 endpoint list click GET /demo/checkout"
+      "instance-top5.spec.ts"
     ],
     "configFile": "/Users/ligang/important/databuff/databuff/deploy/test/e2e/playwright.config.ts",
     "rootDir": "/Users/ligang/important/databuff/databuff/deploy/test/e2e",
@@ -69,62 +66,42 @@
   },
   "suites": [
     {
-      "title": "endpoint-drill.spec.ts",
-      "file": "endpoint-drill.spec.ts",
+      "title": "instance-top5.spec.ts",
+      "file": "instance-top5.spec.ts",
       "column": 0,
       "line": 0,
       "specs": [
         {
-          "title": "UI14 endpoint list click GET /demo/checkout",
+          "title": "UI-top5 service-a instance rank legend has service-a-1",
           "ok": true,
           "tags": [],
           "tests": [
             {
               "timeout": 60000,
-              "annotations": [
-                {
-                  "type": "skip",
-                  "description": "接口列表没有 GET /demo/checkout，本条诚实缺，禁止造数",
-                  "location": {
-                    "file": "/Users/ligang/important/databuff/databuff/deploy/test/e2e/helpers.ts",
-                    "line": 74,
-                    "column": 10
-                  }
-                }
-              ],
-              "expectedStatus": "skipped",
+              "annotations": [],
+              "expectedStatus": "passed",
               "projectId": "",
               "projectName": "",
               "results": [
                 {
                   "workerIndex": 0,
                   "parallelIndex": 0,
-                  "status": "skipped",
-                  "duration": 1312,
+                  "status": "passed",
+                  "duration": 5058,
                   "errors": [],
                   "stdout": [],
                   "stderr": [],
                   "retry": 0,
-                  "startTime": "2026-08-16T12:41:38.914Z",
-                  "annotations": [
-                    {
-                      "type": "skip",
-                      "description": "接口列表没有 GET /demo/checkout，本条诚实缺，禁止造数",
-                      "location": {
-                        "file": "/Users/ligang/important/databuff/databuff/deploy/test/e2e/helpers.ts",
-                        "line": 74,
-                        "column": 10
-                      }
-                    }
-                  ],
+                  "startTime": "2026-08-17T11:49:34.793Z",
+                  "annotations": [],
                   "attachments": []
                 }
               ],
-              "status": "skipped"
+              "status": "expected"
             }
           ],
-          "id": "91b3235f322ac7148dae-fa0808265cb6998aee25",
-          "file": "endpoint-drill.spec.ts",
+          "id": "415d450b31fa766796e1-8ca3aacc79dee11d99cf",
+          "file": "instance-top5.spec.ts",
           "line": 4,
           "column": 5
         }
@@ -133,10 +110,10 @@
   ],
   "errors": [],
   "stats": {
-    "startTime": "2026-08-16T12:41:38.686Z",
-    "duration": 1701.376,
-    "expected": 0,
-    "skipped": 1,
+    "startTime": "2026-08-17T11:49:34.481Z",
+    "duration": 5774.178000000001,
+    "expected": 1,
+    "skipped": 0,
     "unexpected": 0,
     "flaky": 0
   }

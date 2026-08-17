@@ -79,6 +79,7 @@ If readiness times out, `start.sh` suggests checking ingest / web logs.
 | Symptom | Action |
 |---------|--------|
 | Doris fails / BE OOM | Ensure enough host memory; FE `-Xmx` is patched to 1200m in compose |
+| FE log `CgroupInfo.getMountPoint()` / `anyController is null` | JDK cgroup v2 probe failure; see [FAQ](常见问题_en.md#doris-fe-fails-to-start-cgroupinfogetmountpoint-npe) |
 | Low `vm.max_map_count` | `start.sh` tries 2000000; persist via `sysctl` on Linux |
 | Port in use | Change `ports` in `docker-compose.yml` or free 27403 / 4317 / 4318 / 11800 |
 | Empty service list | Point Agent/SDK to `4317`/`4318`; see [OTLP Ingestion](../opentelemetry-otlp-ingestion_en.md) |
@@ -121,6 +122,7 @@ Post-upgrade smoke (`verify-upgrade.sh` in `deploy/docker/UPGRADE.md`) does **no
 
 ## See Also
 
+- [FAQ](常见问题_en.md)
 - [Upgrade and Uninstall](升级与卸载_en.md)
 - [Offline Installation](离线安装_en.md)
 - [Telemetry Pipeline](../架构设计/遥测数据流_en.md)

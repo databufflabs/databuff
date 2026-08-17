@@ -105,6 +105,7 @@ kubectl logs -n databuff deploy/ai-apm-web -f
 | Empty service list | Point Agent to `http://ai-apm-ingest:4318` (NodePort outside cluster); see [OTLP Ingestion](../opentelemetry-otlp-ingestion_en.md) |
 | No alerts after creating rules | Ensure services have metrics; evaluation runs every minute; verify rule scope |
 | Pod fails to start | `kubectl describe pod -n databuff <pod>` for Events; check node memory |
+| FE log `CgroupInfo.getMountPoint()` / `anyController is null` | JDK cgroup v2 probe failure; see [FAQ](常见问题_en.md#doris-fe-fails-to-start-cgroupinfogetmountpoint-npe) |
 
 ## Notes
 
@@ -113,5 +114,6 @@ kubectl logs -n databuff deploy/ai-apm-web -f
 
 ## See Also
 
+- [FAQ](常见问题_en.md)
 - [Upgrade and Uninstall](升级与卸载_en.md)
 - [Docker Operations Reference](Docker运维_en.md)

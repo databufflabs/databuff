@@ -76,6 +76,9 @@ public class ServicePortalService {
         if (serviceId == null) {
             return List.of();
         }
+        if (isInstanceTopType(body.get("type"))) {
+            return buildInstanceTopSeries(body, serviceId);
+        }
         String serviceInstance = stringValue(body.get("serviceInstance"), null);
         return buildServiceSeries(body, serviceId, serviceInstance, 1, false);
     }
@@ -2251,6 +2254,76 @@ public class ServicePortalService {
             series.add(item);
         }
         return series;
+    }
+
+    private static boolean isInstanceTopType(Object type) {
+        return type instanceof String text && "top".equalsIgnoreCase(text.trim());
+    }
+
+    private List<Map<String, Object>> buildInstanceTopSeries(Map<String, Object> body, String serviceId) {
+        long now = System.currentTimeMillis();
+        long from = PortalTimeParser.rangeFrom(body, now - 3_600_000L);
+        long to = PortalTimeParser.rangeTo(body, now);
+        int interval = intValue(body.get("interval"), 60);
+        String metric = stringValue(body.get("metric"), "reqCount");
+        boolean asc = "asc".equalsIgnoreCase(stringValue(body.get("sortOrder"), "desc"));
+
+        List<InstanceTrend> ranked = new ArrayList<>();
+        for (String instance : loadCallingServiceInstances(serviceId, from, to)) {
+            if (instance == null || instance.isBlank()) {
+                continue;
+            }
+            List<ServiceTrendBucketPoint> buckets = loadServiceBuckets(from, to, interval, serviceId, instance);
+            long requests = 0L;
+            double total = 0.0;
+            for (ServiceTrendBucketPoint bucket : buckets) {
+                requests += bucket.requestCount();
+                total += trendMetricValue(metric, bucket, interval);
+            }
+            if (requests <= 0) {
+                continue;
+            }
+            ranked.add(new InstanceTrend(instance, buckets, total));
+        }
+        ranked.sort(asc
+                ? Comparator.comparingDouble(InstanceTrend::total)
+                : Comparator.comparingDouble(InstanceTrend::total).reversed());
+        if (ranked.size() > 5) {
+            ranked = new ArrayList<>(ranked.subList(0, 5));
+        }
+
+        List<Map<String, Object>> series = new ArrayList<>();
+        for (InstanceTrend item : ranked) {
+            Map<Long, ServiceTrendBucketPoint> rowByBucket = item.buckets().stream()
+                    .collect(Collectors.toMap(
+                            ServiceTrendBucketPoint::bucketEpochSec,
+                            row -> row,
+                            ServicePortalService::mergeTrendBuckets));
+            List<List<Object>> values = TimeSeriesFillUtil.fillEpochMsValues(
+                    rowByBucket,
+                    from,
+                    to,
+                    interval,
+                    row -> trendMetricValue(metric, row, interval));
+            Map<String, Object> row = new LinkedHashMap<>();
+            row.put("tags", Map.of("serviceInstance", item.instance()));
+            row.put("values", values);
+            series.add(row);
+        }
+        return series;
+    }
+
+    private List<String> loadCallingServiceInstances(String serviceId, long from, long to) {
+        try {
+            String sql = MetricQueryBuilder.serviceCallingInstanceDistinctSql(
+                    metricDatabase, serviceId, from, to, 200);
+            return readRepository.queryDistinctStrings(sql, "service_instance");
+        } catch (Exception e) {
+            return List.of();
+        }
+    }
+
+    private record InstanceTrend(String instance, List<ServiceTrendBucketPoint> buckets, double total) {
     }
 
     private List<ServiceTrendBucketPoint> loadServiceBuckets(

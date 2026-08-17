@@ -83,6 +83,7 @@ docker compose logs ai-apm-doris-fe ai-apm-doris-be
 | 现象 | 处理 |
 |------|------|
 | Doris 启动失败 / BE OOM | 确认宿主机内存；FE 已在 compose 中将 `-Xmx` patch 为 1200m |
+| FE 日志 `CgroupInfo.getMountPoint()` / `anyController is null` | JDK 读 cgroup v2 失败；处理见 [常见问题](常见问题.md#doris-fe-启动失败cgroupinfogetmountpoint-npe) |
 | `vm.max_map_count` 过低 | `start.sh` 会尝试调至 2000000；Linux 可写入 `sysctl.conf` 持久化 |
 | 端口被占用 | 修改 `docker-compose.yml` 中 ports 映射或释放 27403 / 4317 / 4318 / 11800 |
 | 服务列表为空 | 确认 Agent/SDK 指向 `4317`/`4318`；见 [OTLP 接入](../opentelemetry-otlp-ingestion.md) |
@@ -127,6 +128,7 @@ docker compose logs ai-apm-doris-fe ai-apm-doris-be
 
 ## 相关文档
 
+- [常见问题](常见问题.md)
 - [升级与卸载](升级与卸载.md)
 - [离线安装](离线安装.md)
 - [遥测数据流](../架构设计/遥测数据流.md)

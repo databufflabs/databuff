@@ -1,0 +1,14 @@
+{
+  "status": 200,
+  "message": "success",
+  "data": [
+    {
+      "tags": {
+        "serviceInstance": "service-a-1"
+      },
+      "values": {
+        "$minNonNullValues": 1
+      }
+    }
+  ]
+}

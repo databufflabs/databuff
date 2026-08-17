@@ -2,12 +2,43 @@
 
 from __future__ import annotations
 
+from datetime import datetime
 from pathlib import Path
+from zoneinfo import ZoneInfo
 
-from ...common import ApiCase, DEMO_SERVICE_A, call_pair_body, metric_chart_body, service_body, service_filters, service_id_filters, time_window
+from ...common import (
+    ApiCase,
+    DEMO_SERVICE_A,
+    DEMO_SERVICE_A_ID,
+    call_pair_body,
+    metric_chart_body,
+    service_body,
+    service_filters,
+    service_id_filters,
+    time_window,
+)
 
 
 CASE_DIR = Path(__file__).resolve().parent
+SHANGHAI = ZoneInfo("Asia/Shanghai")
+HOUR_MS = 3_600_000
+
+
+def _fmt_portal_time(ms: int) -> str:
+    return datetime.fromtimestamp(ms / 1000, tz=SHANGHAI).strftime("%Y-%m-%d %H:%M:%S")
+
+
+def instance_top5_trend_body(to_ms: int, *, chart_type: str, metric: str) -> dict:
+    """页顶最近 1 小时：对齐已批缺陷方案 T1–T4，不要沿用无 type 的服务趋势图 body。"""
+    start_ms = to_ms - HOUR_MS
+    return {
+        "serviceId": DEMO_SERVICE_A_ID,
+        "startTime": _fmt_portal_time(start_ms),
+        "endTime": _fmt_portal_time(to_ms),
+        "interval": 60,
+        "type": chart_type,
+        "metric": metric,
+    }
 
 
 def build_cases(frm_ms: int, to_ms: int) -> list[ApiCase]:
@@ -33,6 +64,38 @@ def build_cases(frm_ms: int, to_ms: int) -> list[ApiCase]:
         ApiCase(page, "告警总量", "POST", "/webapi/cockpit/countServiceAlarmsTotal", tw, CASE_DIR),
         ApiCase(page, "服务详情", "POST", "/webapi/service/serviceInfo", sb, CASE_DIR),
         ApiCase(page, "服务趋势图", "POST", "/webapi/service/serviceDetailTrendChart", sb, CASE_DIR),
+        ApiCase(
+            page,
+            "按实例排行Top5平均耗时",
+            "POST",
+            "/webapi/service/serviceDetailTrendChart",
+            instance_top5_trend_body(to_ms, chart_type="top", metric="avgTime"),
+            CASE_DIR,
+        ),
+        ApiCase(
+            page,
+            "按实例排行Top5请求数",
+            "POST",
+            "/webapi/service/serviceDetailTrendChart",
+            instance_top5_trend_body(to_ms, chart_type="top", metric="reqCount"),
+            CASE_DIR,
+        ),
+        ApiCase(
+            page,
+            "按实例排行Top5错误率",
+            "POST",
+            "/webapi/service/serviceDetailTrendChart",
+            instance_top5_trend_body(to_ms, chart_type="top", metric="errRate"),
+            CASE_DIR,
+        ),
+        ApiCase(
+            page,
+            "服务均值趋势无实例标签",
+            "POST",
+            "/webapi/service/serviceDetailTrendChart",
+            instance_top5_trend_body(to_ms, chart_type="service", metric="avgTime"),
+            CASE_DIR,
+        ),
         ApiCase(page, "服务图表", "POST", "/webapi/service/graph_stats", sb, CASE_DIR),
         ApiCase(page, "响应时间分布", "POST", "/webapi/service/distribution_stats", sb, CASE_DIR),
         ApiCase(page, "请求 Top", "POST", "/webapi/service/reqTop", sb, CASE_DIR),
