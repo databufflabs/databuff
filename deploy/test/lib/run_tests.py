@@ -251,6 +251,49 @@ def inject_checkout_trace_ids(
         case.body = body
 
 
+def fetch_latest_alarm_id(base: str, token: str, frm_ms: int, to_ms: int, timeout: float) -> str:
+    code, _, payload = http_json(
+        "POST",
+        f"{base.rstrip('/')}/webapi/alarm/list",
+        body={"from": frm_ms, "to": to_ms, "start": frm_ms, "end": to_ms, "size": 1},
+        token=token,
+        timeout=timeout,
+    )
+    if code != 200:
+        raise RuntimeError(f"alarm list failed HTTP {code}: {payload}")
+    data = payload.get("data") if isinstance(payload, dict) else None
+    items = data.get("list") if isinstance(data, dict) else None
+    if not isinstance(items, list) or not items:
+        raise RuntimeError("alarm list empty in query window; C26 detail needs a real id")
+    first = items[0]
+    alarm_id = first.get("id") if isinstance(first, dict) else None
+    if not alarm_id:
+        raise RuntimeError(f"alarm list row missing id: {first}")
+    return str(alarm_id)
+
+
+def inject_alarm_ids(
+    base: str,
+    token: str,
+    cases: list[ApiCase],
+    frm_ms: int,
+    to_ms: int,
+    timeout: float,
+) -> None:
+    if not any(case.needs_alarm_id for case in cases):
+        return
+    try:
+        alarm_id = fetch_latest_alarm_id(base, token, frm_ms, to_ms, timeout)
+    except RuntimeError as error:
+        print(f"[test] alarm detail skipped inject: {error}")
+        return
+    print(f"[test] alarmId={alarm_id}")
+    for case in cases:
+        if not case.needs_alarm_id:
+            continue
+        case.path = f"/webapi/alarm/detail/{alarm_id}"
+
+
 def wait_for_demo_data_in_window(base: str, token: str, service: str, frm_ms: int, to_ms: int, timeout_sec: int) -> None:
     """Ensure demo traces exist in the last 2-minute query window."""
     deadline = time.time() + timeout_sec
@@ -293,7 +336,8 @@ def run_cases(base: str, token: str, cases: list[ApiCase], timeout: float) -> Te
 
     for case in cases:
         url = f"{base.rstrip('/')}{case.path}"
-        code, elapsed, payload = http_json(case.method, url, body=case.body, token=token, timeout=timeout)
+        case_token = token if case.use_token else None
+        code, elapsed, payload = http_json(case.method, url, body=case.body, token=case_token, timeout=timeout)
         expected = case.expected_json
         expected_text = json.dumps(expected, ensure_ascii=False, sort_keys=True)
         ok = code == case.expect_status
@@ -445,8 +489,8 @@ def main() -> int:
     parser.add_argument(
         "--skip-ai-chat",
         action="store_true",
-        default=os.environ.get("TEST_SKIP_AI_CHAT", "0") == "1",
-        help="skip AI chat tool parameter integration tests",
+        default=os.environ.get("TEST_SKIP_AI_CHAT", "1") == "1",
+        help="skip AI chat tool parameter integration tests (default: skip)",
     )
     parser.add_argument(
         "--ai-chat-rounds",
@@ -463,15 +507,14 @@ def main() -> int:
     parser.add_argument(
         "--skip-ai-memory",
         action="store_true",
-        default=os.environ.get("TEST_SKIP_AI_MEMORY", "0") == "1",
-        help="skip AI session memory integration tests (also skipped when DEEPSEEK_API_KEY unset)",
+        default=os.environ.get("TEST_SKIP_AI_MEMORY", "1") == "1",
+        help="skip AI session memory integration tests (default: skip)",
     )
     parser.add_argument(
         "--skip-ai-provider-formats",
         action="store_true",
-        default=os.environ.get("TEST_SKIP_AI_PROVIDER_FORMATS", "0") == "1",
-        help="skip OpenAI/Anthropic provider format tool-arg tests "
-        "(also skipped when DEEPSEEK_API_KEY and MINIMAX_API_KEY unset)",
+        default=os.environ.get("TEST_SKIP_AI_PROVIDER_FORMATS", "1") == "1",
+        help="skip OpenAI/Anthropic provider format tool-arg tests (default: skip)",
     )
     parser.add_argument(
         "--ai-provider-format-rounds",
@@ -494,8 +537,8 @@ def main() -> int:
     parser.add_argument(
         "--skip-ai-brain-async",
         action="store_true",
-        default=os.environ.get("TEST_SKIP_AI_BRAIN_ASYNC", "0") == "1",
-        help="skip AI brain async routing tests (also skipped when DEEPSEEK_API_KEY unset)",
+        default=os.environ.get("TEST_SKIP_AI_BRAIN_ASYNC", "1") == "1",
+        help="skip AI brain async routing tests (default: skip)",
     )
     parser.add_argument(
         "--ai-brain-async-poll-timeout",
@@ -524,6 +567,7 @@ def main() -> int:
 
     cases = build_cases(frm_ms, to_ms)
     inject_checkout_trace_ids(base, token, cases, frm_ms, to_ms, args.timeout)
+    inject_alarm_ids(base, token, cases, frm_ms, to_ms, args.timeout)
     print(f"[test] running {len(cases)} cases on last {QUERY_WINDOW_MS // 1000}s window ...")
     report = run_cases(base, token, cases, args.timeout)
     report.min_warmup_seconds = warmup

@@ -8,13 +8,13 @@
 # Ops docs: docs/运维参考/Docker运维.md 「发布验收 / Release gate」
 #
 # Usage:
-#   ./run-tests.sh                  # 应用性能 API 回归；AI 对话请用 ./ai-tests.sh（四分套件并行）
-#   TEST_SKIP_AI_ALL=1 ./run-tests.sh   # 发布门禁推荐：跳过全部 AI（chat/memory/formats/brain）
-#   TEST_SKIP_AI_CHAT=1 ./run-tests.sh
+#   ./run-tests.sh                  # 应用性能 API 回归；默认跳过 AI（请用 ./ai-tests.sh）
+#   TEST_SKIP_AI_ALL=0 ./run-tests.sh   # 开发态：把 AI 串进本进程（发版勿用）
+#   TEST_SKIP_AI_CHAT=1 ./run-tests.sh  # 仅在 TEST_SKIP_AI_ALL=0 时有意义
 #   TEST_SKIP_AI_MEMORY=1 ./run-tests.sh
 #   TEST_SKIP_AI_PROVIDER_FORMATS=1 ./run-tests.sh
 #   TEST_SKIP_AI_BRAIN_ASYNC=1 ./run-tests.sh
-#   DEEPSEEK_API_KEY=sk-... MINIMAX_API_KEY=... ./run-tests.sh   # 开发态可顺带跑 AI（串入本进程；发版勿用）
+#   TEST_SKIP_AI_ALL=0 DEEPSEEK_API_KEY=sk-... MINIMAX_API_KEY=... ./run-tests.sh
 set -euo pipefail
 
 TEST_DIR="$(cd "$(dirname "$0")" && pwd)"
@@ -23,12 +23,19 @@ export TEST_BASE_URL="${TEST_BASE_URL:-http://127.0.0.1:${WEB_HTTP_PORT:-27403}}
 export TEST_QUERY_WINDOW_MS="${TEST_QUERY_WINDOW_MS:-300000}"
 export TEST_DEMO_SERVICE="${TEST_DEMO_SERVICE:-service-a}"
 
-# Convenience: skip every AI suite embedded in run_tests.py
-if [[ "${TEST_SKIP_AI_ALL:-0}" == "1" ]]; then
+# Default: skip every AI suite embedded in run_tests.py (unset == skip).
+# Opt in with TEST_SKIP_AI_ALL=0; dedicated runner is ./ai-tests.sh.
+if [[ "${TEST_SKIP_AI_ALL:-1}" == "1" ]]; then
   export TEST_SKIP_AI_CHAT=1
   export TEST_SKIP_AI_MEMORY=1
   export TEST_SKIP_AI_PROVIDER_FORMATS=1
   export TEST_SKIP_AI_BRAIN_ASYNC=1
+  echo "[run-tests] skip AI (default; TEST_SKIP_AI_ALL=0 to embed, or ./ai-tests.sh)"
+else
+  export TEST_SKIP_AI_CHAT="${TEST_SKIP_AI_CHAT:-0}"
+  export TEST_SKIP_AI_MEMORY="${TEST_SKIP_AI_MEMORY:-0}"
+  export TEST_SKIP_AI_PROVIDER_FORMATS="${TEST_SKIP_AI_PROVIDER_FORMATS:-0}"
+  export TEST_SKIP_AI_BRAIN_ASYNC="${TEST_SKIP_AI_BRAIN_ASYNC:-0}"
 fi
 
 TEST_LIB_DIR="${TEST_DIR}/lib"

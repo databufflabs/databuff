@@ -126,4 +126,15 @@ class OpenSourceMenuCatalogTest {
         assertThat(menus.stream().noneMatch(m -> String.valueOf(m.get("path")).startsWith("/selfMonitor")))
                 .isTrue();
     }
+
+    @Test
+    void openSourceMenuExcludesInfrastructureNpmAndSysManage() {
+        List<String> paths = OpenSourceMenuCatalog.menus().stream()
+                .map(m -> String.valueOf(m.get("path")))
+                .toList();
+
+        assertThat(paths).noneMatch(path -> path.startsWith("/infrastructure"));
+        assertThat(paths).noneMatch(path -> path.startsWith("/npm"));
+        assertThat(paths).noneMatch(path -> path.startsWith("/sysManage"));
+    }
 }

@@ -1,4 +1,8 @@
-"""消息队列 /appMonitor/msgQueue"""
+"""消息队列 /appMonitor/msgQueue。
+
+列表 HTTP 是本文件「MQ 列表」。详情路由复用 serviceDetail，没有专名 case，
+验收单 C60 指这里，C61 诚实标半有。
+"""
 
 from __future__ import annotations
 

@@ -1,4 +1,8 @@
-"""外部服务 /appMonitor/external"""
+"""外部服务 /appMonitor/external。
+
+列表 HTTP 是本文件「外部调用列表」。详情路由复用 serviceDetail，没有专名 case，
+验收单 C64 指这里，C65 诚实标半有。
+"""
 
 from __future__ import annotations
 

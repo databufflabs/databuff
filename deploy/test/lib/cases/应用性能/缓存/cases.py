@@ -1,4 +1,8 @@
-"""缓存 /appMonitor/cache"""
+"""缓存 /appMonitor/cache。
+
+列表 HTTP 是本文件「缓存列表」。详情路由复用 serviceDetail，没有专名 case，
+验收单 C62 指这里，C63 诚实标半有。
+"""
 
 from __future__ import annotations
 

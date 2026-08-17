@@ -91,15 +91,13 @@ curl -fsSL https://databuff.ai/databuff/ai-apm-demo-k8s-install.sh | bash
 ## 集成测试
 
 ```bash
-# 跑接口 + AI chat 集成测试（默认）
+# 跑接口回归（默认跳过 AI；AI 请用 ./deploy/test/ai-tests.sh）
 ./deploy/test/run-tests.sh
 
-# 强制跳过 AI chat（即使已配置 API Key）
-TEST_SKIP_AI_CHAT=1 ./deploy/test/run-tests.sh
+# 开发态：把 AI 串进本进程（发版勿用）
+TEST_SKIP_AI_ALL=0 ./deploy/test/run-tests.sh
 ```
 
 `expected/*.json` 为手写基线（含 `$range` 等柔性断言），**禁止**用脚本批量覆盖；需改时手工编辑对应 JSON。
-
-未配置可用 API Key 时，AI chat 用例会自动跳过，不影响 APM 接口测试结果。
 
 初始化 SQL：`deploy/common/sql/databuff.sql`。

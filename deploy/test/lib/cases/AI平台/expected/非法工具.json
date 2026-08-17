@@ -1,0 +1,4 @@
+{
+  "error": "tool_not_found",
+  "message": "tool not found: not-a-real-tool-id"
+}

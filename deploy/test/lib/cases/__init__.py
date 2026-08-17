@@ -21,6 +21,11 @@ from .应用性能.接口分析.cases import build_cases as apm_service_analysis
 from .应用性能.错误分析.cases import build_cases as apm_errors_cases
 from .应用性能.链路追踪.cases import build_cases as apm_trace_cases
 from .应用性能.日志分析.cases import build_cases as apm_log_analysis_cases
+from .登录与壳.cases import build_cases as login_shell_cases
+from .AI平台.cases import build_cases as ai_platform_cases
+from .告警中心.cases import build_cases as alarm_center_cases
+from .安装部署.cases import build_cases as deploy_status_cases
+from .配置管理.cases import build_cases as config_manage_cases
 
 CaseBuilder = Callable[[int, int], list[ApiCase]]
 
@@ -55,7 +60,16 @@ APM_MENU_DIRS = [
     "日志分析",
 ]
 
-PAGE_BUILDERS: list[CaseBuilder] = APM_MENU_BUILDERS
+# 登录与壳放最后：登出不使 JWT 失效，但仍避免挡在应用性能前面
+EXTRA_BUILDERS: list[CaseBuilder] = [
+    ai_platform_cases,
+    alarm_center_cases,
+    deploy_status_cases,
+    config_manage_cases,
+    login_shell_cases,
+]
+
+PAGE_BUILDERS: list[CaseBuilder] = [*APM_MENU_BUILDERS, *EXTRA_BUILDERS]
 
 PAGE_DIRS = [f"{MODULE_APP_MONITOR}/{name}" for name in APM_MENU_DIRS]
 

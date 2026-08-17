@@ -32,22 +32,24 @@
             </h5>
             <div class="time-choose-picker-wrapper">
               <el-form ref='timeDateForm' :model='timeDateForm' :rules='timeDateRules' label-position='top'>
-                <el-form-item :label="$t('modules.views.configManage.alarm.s_592c5958')" prop='fromTime' class="time-form-item">
-                  <el-date-picker v-model='timeDateForm.fromTime' size='mini' type='datetime'
-                    @change='revalidHandle'
-                    :picker-options="pickerOptions"
-                    format="yyyy-MM-dd HH:mm"
-                    prefix-icon="el-icon-date"
-                    popper-class="time-choose-datepicker"></el-date-picker>
-                </el-form-item>
-                <el-form-item v-if="!timeRageStep" :label="$t('modules.components.charts.s_f782779e')" prop='toTime' class="time-form-item">
-                  <el-date-picker v-model='timeDateForm.toTime' size='mini' type='datetime'
-                    @change='revalidHandle'
-                    :picker-options="pickerOptions"
-                    format="yyyy-MM-dd HH:mm"
-                    prefix-icon="el-icon-date"
-                    popper-class="time-choose-datepicker"></el-date-picker>
-                </el-form-item>
+                <div class="time-choose-range-row">
+                  <el-form-item :label="$t('modules.views.configManage.alarm.s_592c5958')" prop='fromTime' class="time-form-item">
+                    <el-date-picker ref='fromTimePicker' v-model='timeDateForm.fromTime' size='mini' type='datetime'
+                      @change='revalidHandle'
+                      :picker-options="pickerOptions"
+                      format="yyyy-MM-dd HH:mm"
+                      prefix-icon="el-icon-date"
+                      popper-class="time-choose-datepicker"></el-date-picker>
+                  </el-form-item>
+                  <el-form-item v-if="!timeRageStep" :label="$t('modules.components.charts.s_f782779e')" prop='toTime' class="time-form-item">
+                    <el-date-picker ref='toTimePicker' v-model='timeDateForm.toTime' size='mini' type='datetime'
+                      @change='revalidHandle'
+                      :picker-options="pickerOptions"
+                      format="yyyy-MM-dd HH:mm"
+                      prefix-icon="el-icon-date"
+                      popper-class="time-choose-datepicker"></el-date-picker>
+                  </el-form-item>
+                </div>
                 <div class="mb-10">
                   <el-button @click="applyTimeRangeHandle" type="primary" size='mini' class="time-choose-picker-confirm">{{ $t('modules.views.infrastructure.hostDetail.s_5b0520a9') }}</el-button>
                 </div>
@@ -131,6 +133,8 @@ export default class DbFooterTime extends Vue {
   public $refs!: {
     timeDateForm: Form;
     hiddenSpan: HTMLSpanElement;
+    fromTimePicker: { placement?: string; currentPlacement?: string };
+    toTimePicker?: { placement?: string; currentPlacement?: string };
   }
 
   @Watch('$route', { immediate: true })
@@ -293,6 +297,22 @@ export default class DbFooterTime extends Vue {
         return time.getTime() > _initNowTime.getTime() || time.getTime() < _disabledFrom.getTime()
       }
     }
+  }
+
+  private mounted () {
+    this.placeTimePickersOutside()
+  }
+
+  // Element DatePicker 的 align 只能落到 bottom-*，面板会盖住竖排的结束时间。
+  // 钉到 left-start：日历开在输入框左侧/外侧，结束时间仍能直接点。
+  private placeTimePickersOutside () {
+    const pin = (picker?: { placement?: string; currentPlacement?: string }) => {
+      if (!picker) return
+      picker.placement = 'left-start'
+      picker.currentPlacement = 'left-start'
+    }
+    pin(this.$refs.fromTimePicker)
+    pin(this.$refs.toTimePicker)
   }
 
   private created () {
@@ -550,6 +570,7 @@ export default class DbFooterTime extends Vue {
   // 更新当前时间
   private updateNowTime () {
     this.initNowTime = setDateBySeconds(new Date(), 0)
+    this.placeTimePickersOutside()
   }
 }
 </script>
@@ -638,7 +659,7 @@ export default class DbFooterTime extends Vue {
   }
 
   .time-choose-picker-group {
-    width: 325px;
+    width: 468px;
     height: 100%;
     border-right: 1px solid var(--border-color-lighter);
 
@@ -660,7 +681,23 @@ export default class DbFooterTime extends Vue {
       }
     }
     .time-choose-picker-confirm {
-      width: 220px;
+      width: 100%;
+    }
+
+    .time-choose-range-row {
+      display: flex;
+      align-items: flex-start;
+      gap: 12px;
+
+      .time-form-item {
+        flex: 1;
+        min-width: 0;
+        margin-bottom: 16px;
+      }
+
+      :deep(.el-date-editor.el-input) {
+        width: 100%;
+      }
     }
 
     .flex-placeholder-empty {

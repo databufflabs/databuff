@@ -33,6 +33,8 @@ class ApiCase:
     module: str = "应用性能"
     expect_status: int = 200
     needs_checkout_trace_id: bool = False
+    needs_alarm_id: bool = False
+    use_token: bool = True
 
     @property
     def expected_path(self) -> Path:
