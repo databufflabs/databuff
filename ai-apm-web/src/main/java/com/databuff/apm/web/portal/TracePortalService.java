@@ -1660,6 +1660,7 @@ public class TracePortalService {
         if (span.metaHttpStatusCode() != null) {
             meta.put("http.status_code", String.valueOf(span.metaHttpStatusCode()));
         }
+        LlmTraceUnicode.decodeMetaIfLlmSpan(meta);
         String resource = displayTraceResource(span, meta);
         String serviceInstance = !nullToEmpty(span.serviceInstance()).isBlank()
                 ? span.serviceInstance()

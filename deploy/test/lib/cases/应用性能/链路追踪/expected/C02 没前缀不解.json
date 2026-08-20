@@ -1,0 +1,16 @@
+{
+  "status": 200,
+  "message": "success",
+  "data": {
+    "$minLength": 2,
+    "$containsSpanServiceTypes": {
+      "GET cart": {
+        "service": "[redis]redis:6379",
+        "meta": {
+          "http.body": "\\u4e2d\\u6587"
+        }
+      }
+    }
+  },
+  "total": 2
+}

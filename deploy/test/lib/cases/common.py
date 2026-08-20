@@ -35,6 +35,8 @@ class ApiCase:
     needs_checkout_trace_id: bool = False
     needs_alarm_id: bool = False
     use_token: bool = True
+    seed_key: Optional[str] = None
+    query_times: int = 1
 
     @property
     def expected_path(self) -> Path:

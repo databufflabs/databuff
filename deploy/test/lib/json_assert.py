@@ -215,7 +215,16 @@ def _match_partial_dict(actual: dict[Any, Any], expected: dict[Any, Any], path: 
     for key, exp_val in expected.items():
         if key not in actual:
             raise JsonAssertError(path, f"missing key {key!r}")
-        _match(actual[key], exp_val, f"{path}.{key}")
+        act_val = actual[key]
+        if (
+            isinstance(exp_val, dict)
+            and isinstance(act_val, dict)
+            and exp_val
+            and not all(str(item).startswith("$") for item in exp_val)
+        ):
+            _match_partial_dict(act_val, exp_val, f"{path}.{key}")
+            continue
+        _match(act_val, exp_val, f"{path}.{key}")
 
 
 def _match_special(actual: Any, expected: dict[str, Any], path: str) -> bool:

@@ -49,6 +49,7 @@ from ai_brain_async_routing import (  # noqa: E402
 from demo_window import MIN_WARMUP_SECONDS, QUERY_WINDOW_MS, aligned_query_window, trace_batch_bounds  # noqa: E402
 from ingest_warmup import wait_for_ingest_warmup  # noqa: E402
 from json_assert import assert_matches  # noqa: E402
+from otlp_checkout_unicode import default_otlp_url, seed_llm_unicode_traces  # noqa: E402
 
 SHANGHAI_TZ = ZoneInfo("Asia/Shanghai")
 DATETIME_FMT = "%Y-%m-%d %H:%M:%S"
@@ -251,6 +252,49 @@ def inject_checkout_trace_ids(
         case.body = body
 
 
+def wait_for_seeded_trace(base: str, token: str, trace_id: str, timeout: float, min_spans: int = 0) -> None:
+    deadline = time.time() + max(timeout, 15.0)
+    body = {"traceId": trace_id, "size": 100}
+    last_payload: Any = None
+    while time.time() < deadline:
+        code, _, payload = http_json(
+            "POST",
+            f"{base.rstrip('/')}/webapi/trace/spans",
+            body=body,
+            token=token,
+        )
+        last_payload = payload
+        data = payload.get("data") if isinstance(payload, dict) else None
+        if code == 200 and isinstance(data, list) and len(data) >= max(min_spans, 1):
+            return
+        time.sleep(1)
+    raise RuntimeError(f"seeded trace {trace_id} not queryable via /webapi/trace/spans: {last_payload}")
+
+
+def inject_seeded_otlp_trace_ids(
+    base: str,
+    token: str,
+    cases: list[ApiCase],
+    to_ms: int,
+    timeout: float,
+) -> None:
+    keys = {case.seed_key for case in cases if case.seed_key}
+    if not keys:
+        return
+    # After frozen window end so service-list callCnt expected stays exact.
+    start_ms = to_ms + 15_000
+    cache = seed_llm_unicode_traces(default_otlp_url(), keys, start_ms=start_ms)
+    for case in cases:
+        if not case.seed_key:
+            continue
+        body = dict(case.body or trace_spans_body())
+        body["traceId"] = cache[case.seed_key]
+        case.body = body
+    for key, trace_id in cache.items():
+        print(f"[test] wait llm-unicode {key} traceId={trace_id}")
+        wait_for_seeded_trace(base, token, trace_id, timeout, min_spans=2)
+
+
 def fetch_latest_alarm_id(base: str, token: str, frm_ms: int, to_ms: int, timeout: float) -> str:
     code, _, payload = http_json(
         "POST",
@@ -337,17 +381,35 @@ def run_cases(base: str, token: str, cases: list[ApiCase], timeout: float) -> Te
     for case in cases:
         url = f"{base.rstrip('/')}{case.path}"
         case_token = token if case.use_token else None
-        code, elapsed, payload = http_json(case.method, url, body=case.body, token=case_token, timeout=timeout)
         expected = case.expected_json
         expected_text = json.dumps(expected, ensure_ascii=False, sort_keys=True)
-        ok = code == case.expect_status
-        detail = f"HTTP {code}"
         expected_file = str(case.expected_path.relative_to(LIB_ROOT))
-
-        if ok:
+        ok = True
+        detail = ""
+        elapsed_total = 0.0
+        last_code = 0
+        query_times = max(1, int(case.query_times or 1))
+        for round_idx in range(query_times):
+            code, elapsed, payload = http_json(case.method, url, body=case.body, token=case_token, timeout=timeout)
+            elapsed_total += elapsed
+            last_code = code
+            if code != case.expect_status:
+                ok = False
+                detail = f"HTTP {code}"
+                if query_times > 1:
+                    detail = f"HTTP {code} (query {round_idx + 1}/{query_times})"
+                break
             v_ok, v_msg = assert_matches(payload, expected)
-            ok = v_ok
-            detail = f"HTTP {code}; {v_msg}" if v_ok else f"HTTP {code}; json mismatch: {v_msg}"
+            if not v_ok:
+                ok = False
+                detail = f"HTTP {code}; json mismatch: {v_msg}"
+                if query_times > 1:
+                    detail = f"HTTP {code}; query {round_idx + 1}/{query_times} json mismatch: {v_msg}"
+                break
+            detail = f"HTTP {code}; {v_msg}"
+            if query_times > 1:
+                detail = f"HTTP {code}; {query_times}x {v_msg}"
+        elapsed = elapsed_total
 
         result = CaseResult(
             module=case.module,
@@ -356,7 +418,7 @@ def run_cases(base: str, token: str, cases: list[ApiCase], timeout: float) -> Te
             path=case.path,
             method=case.method,
             ok=ok,
-            http_status=code,
+            http_status=last_code,
             elapsed_ms=round(elapsed, 1),
             detail=detail,
             expected_file=expected_file,
@@ -567,6 +629,7 @@ def main() -> int:
 
     cases = build_cases(frm_ms, to_ms)
     inject_checkout_trace_ids(base, token, cases, frm_ms, to_ms, args.timeout)
+    inject_seeded_otlp_trace_ids(base, token, cases, to_ms, args.timeout)
     inject_alarm_ids(base, token, cases, frm_ms, to_ms, args.timeout)
     print(f"[test] running {len(cases)} cases on last {QUERY_WINDOW_MS // 1000}s window ...")
     report = run_cases(base, token, cases, args.timeout)

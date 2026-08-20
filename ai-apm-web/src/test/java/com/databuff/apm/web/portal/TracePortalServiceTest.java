@@ -1,5 +1,6 @@
 package com.databuff.apm.web.portal;
 
+import com.databuff.apm.common.meta.OtelAttributeMaps;
 import com.databuff.apm.common.query.ApmQueryModels;
 import com.databuff.apm.common.query.ApmQueryModels.ExceptionListPoint;
 import com.databuff.apm.common.query.ApmQueryModels.ServiceFlowTreeRow;
@@ -12,6 +13,7 @@ import com.databuff.apm.web.flow.ServiceFlowService;
 import com.databuff.apm.web.trace.TraceQueryService;
 import org.junit.jupiter.api.Test;
 
+import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
 
@@ -800,6 +802,66 @@ class TracePortalServiceTest {
         assertThat(spans.get(0).get("parent_id")).isEqualTo("0");
         assertThat(spans.get(0).get("relativeTime")).isEqualTo(0L);
         assertThat(spans.get(1).get("relativeTime")).isEqualTo(50_000_000L);
+    }
+
+    @Test
+    void traceSpansDecodeUnicodeWhenLlmPrefixPresent() {
+        String escape = "\\" + "u4e2d" + "\\" + "u6587";
+        Map<String, String> attrs = new LinkedHashMap<>();
+        attrs.put("gen.ai.prompt", escape);
+        attrs.put("http.body", "{\"content\":\"" + escape + "\"}");
+        String metaJson = OtelAttributeMaps.encode(attrs);
+        Map<String, String> metricAttrs = new LinkedHashMap<>();
+        metricAttrs.put("tokens", "\\" + "u4e2d");
+        String metricsJson = OtelAttributeMaps.encode(metricAttrs);
+
+        TraceQueryService traceQuery = mock(TraceQueryService.class);
+        long rootStartNs = 1_000_000_000_000_000_000L;
+        when(traceQuery.traceDetail(any())).thenReturn(List.of(
+                new SpanDetail(
+                        "t1", "s1", "0", "service-a", null, "GET /demo/checkout", "2026-06-01 12:00:00",
+                        rootStartNs, 2_000_000L, 0, "host-1", "inst-1", "GET /demo/checkout", "SPAN_KIND_CLIENT",
+                        0, 1, metaJson, metricsJson, null, null, null, null)));
+
+        TracePortalService service = new TracePortalService(
+                traceQuery, mock(ServiceFlowService.class), mock(ApmReadRepository.class), TestStorageSupport.storage());
+        Map<String, Object> resp = service.traceSpans(Map.of("traceId", "t1", "size", 100));
+
+        @SuppressWarnings("unchecked")
+        List<Map<String, Object>> spans = (List<Map<String, Object>>) resp.get("data");
+        @SuppressWarnings("unchecked")
+        Map<String, String> meta = (Map<String, String>) spans.get(0).get("meta");
+        assertThat(meta.get("gen.ai.prompt")).isEqualTo("中文");
+        assertThat(meta.get("http.body")).isEqualTo("{\"content\":\"中文\"}");
+        @SuppressWarnings("unchecked")
+        Map<String, String> metrics = (Map<String, String>) spans.get(0).get("metrics");
+        assertThat(metrics.get("tokens")).isEqualTo("\\" + "u4e2d");
+    }
+
+    @Test
+    void traceSpansLeaveUnicodeWhenLlmPrefixMissing() {
+        String escape = "\\" + "u4e2d" + "\\" + "u6587";
+        Map<String, String> attrs = new LinkedHashMap<>();
+        attrs.put("http.body", escape);
+        String metaJson = OtelAttributeMaps.encode(attrs);
+
+        TraceQueryService traceQuery = mock(TraceQueryService.class);
+        long rootStartNs = 1_000_000_000_000_000_000L;
+        when(traceQuery.traceDetail(any())).thenReturn(List.of(
+                new SpanDetail(
+                        "t1", "s1", "0", "service-a", null, "GET /demo/checkout", "2026-06-01 12:00:00",
+                        rootStartNs, 2_000_000L, 0, "host-1", "inst-1", "GET /demo/checkout", "SPAN_KIND_CLIENT",
+                        0, 1, metaJson, null, null, null, null, null)));
+
+        TracePortalService service = new TracePortalService(
+                traceQuery, mock(ServiceFlowService.class), mock(ApmReadRepository.class), TestStorageSupport.storage());
+        Map<String, Object> resp = service.traceSpans(Map.of("traceId", "t1", "size", 100));
+
+        @SuppressWarnings("unchecked")
+        List<Map<String, Object>> spans = (List<Map<String, Object>>) resp.get("data");
+        @SuppressWarnings("unchecked")
+        Map<String, String> meta = (Map<String, String>) spans.get(0).get("meta");
+        assertThat(meta.get("http.body")).isEqualTo(escape);
     }
 
     @Test

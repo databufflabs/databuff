@@ -1,0 +1,16 @@
+{
+  "status": 200,
+  "message": "success",
+  "data": {
+    "$minLength": 2,
+    "$containsSpanServiceTypes": {
+      "GET /demo/checkout": {
+        "service": "service-a",
+        "meta": {
+          "gen.ai.prompt": "你好世界"
+        }
+      }
+    }
+  },
+  "total": 2
+}

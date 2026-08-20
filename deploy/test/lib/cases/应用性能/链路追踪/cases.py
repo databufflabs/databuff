@@ -5,6 +5,7 @@ from __future__ import annotations
 from pathlib import Path
 
 from ...common import ApiCase, service_body, trace_spans_body
+from otlp_checkout_unicode import SEED_C01C02, SEED_C03
 
 
 CASE_DIR = Path(__file__).resolve().parent
@@ -45,5 +46,33 @@ def build_cases(frm_ms: int, to_ms: int) -> list[ApiCase]:
                 "limit": 20,
             },
             CASE_DIR,
+        ),
+        ApiCase(
+            page,
+            "C01 有前缀就解",
+            "POST",
+            "/webapi/trace/spans",
+            trace_spans_body(),
+            CASE_DIR,
+            seed_key=SEED_C01C02,
+        ),
+        ApiCase(
+            page,
+            "C02 没前缀不解",
+            "POST",
+            "/webapi/trace/spans",
+            trace_spans_body(),
+            CASE_DIR,
+            seed_key=SEED_C01C02,
+        ),
+        ApiCase(
+            page,
+            "C03 明文和转义只解一次",
+            "POST",
+            "/webapi/trace/spans",
+            trace_spans_body(),
+            CASE_DIR,
+            seed_key=SEED_C03,
+            query_times=2,
         ),
     ]
