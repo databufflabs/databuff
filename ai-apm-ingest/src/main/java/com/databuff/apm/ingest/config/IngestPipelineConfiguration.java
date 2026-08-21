@@ -31,6 +31,7 @@ import com.databuff.apm.common.storage.DorisTableNames;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.beans.factory.annotation.Value;
+import org.springframework.boot.context.properties.EnableConfigurationProperties;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
 
@@ -38,6 +39,7 @@ import java.time.Duration;
 import java.util.List;
 
 @Configuration
+@EnableConfigurationProperties(TraceIgnoreProperties.class)
 public class IngestPipelineConfiguration {
 
     private static final Logger log = LoggerFactory.getLogger(IngestPipelineConfiguration.class);
@@ -265,10 +267,9 @@ public class IngestPipelineConfiguration {
     }
 
     @Bean
-    SpanResourceIgnoreFilter spanResourceIgnoreFilter(
-            @Value("${ingest.trace.ignore-resources:}") List<String> ignoreResources,
-            @Value("${ingest.trace.ignore-resource-regex:}") List<String> ignoreResourceRegex) {
-        SpanResourceIgnoreFilter filter = new SpanResourceIgnoreFilter(ignoreResources, ignoreResourceRegex);
+    SpanResourceIgnoreFilter spanResourceIgnoreFilter(TraceIgnoreProperties properties) {
+        SpanResourceIgnoreFilter filter = new SpanResourceIgnoreFilter(
+                properties.ignoreResources(), properties.ignoreResourceRegex());
         if (!filter.isEmpty()) {
             log.info("Span resource ignore filter enabled: {}", filter);
         }
