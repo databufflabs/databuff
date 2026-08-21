@@ -101,13 +101,14 @@ class LogQueryBuilderTest {
         assertThat(sql).contains("service_instance IN ('pod-1')");
         assertThat(sql).contains("severity IN ('ERROR')");
         assertThat(sql).contains("ORDER BY time_ns DESC");
+        assertThat(sql).contains("log_id");
         assertThat(sql).doesNotContain("attributes_json");
         assertThat(sql).doesNotContain("resource_json");
     }
 
     @Test
     void detailSqlSelectsFullRecordByTimeNs() {
-        String sql = LogQueryBuilder.detailSql("databuff", 1_720_000_000_000_000_000L, "svc-1");
+        String sql = LogQueryBuilder.detailSql("databuff", null, 1_720_000_000_000_000_000L, "svc-1");
 
         assertThat(sql).contains("attributes_json");
         assertThat(sql).contains("resource_json");
@@ -116,6 +117,26 @@ class LogQueryBuilderTest {
         assertThat(sql).contains("time_ns = 1720000000000000000");
         assertThat(sql).contains("service_id = 'svc-1'");
         assertThat(sql).contains("LIMIT 1");
+    }
+
+    @Test
+    void detailSqlPrefersLogIdWhenProvided() {
+        String sql = LogQueryBuilder.detailSql("databuff", "abc123", 1_720_000_000_000_000_000L, "svc-1");
+
+        assertThat(sql).contains("log_id = 'abc123'");
+        assertThat(sql).contains("log_time >=");
+        assertThat(sql).contains("service_id = 'svc-1'");
+        assertThat(sql).contains("LIMIT 1");
+        assertThat(sql).doesNotContain("time_ns =");
+    }
+
+    @Test
+    void detailSqlOmitsServiceIdWhenBlank() {
+        String sql = LogQueryBuilder.detailSql("databuff", "abc123", 1_720_000_000_000_000_000L, "");
+
+        assertThat(sql).contains("log_id = 'abc123'");
+        assertThat(sql).doesNotContain("service_id =");
+        assertThat(sql).doesNotContain("time_ns =");
     }
 
     @Test

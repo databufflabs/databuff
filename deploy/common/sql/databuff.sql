@@ -86,6 +86,7 @@ CREATE TABLE log_dc_record (
   `service`             VARCHAR(255)  NOT NULL,
   `trace_id`            VARCHAR(64)   NOT NULL DEFAULT '' COMMENT 'OTel trace_id hex',
   `span_id`             VARCHAR(64)   NOT NULL DEFAULT '' COMMENT 'OTel span_id hex',
+  `log_id`              VARCHAR(32)   NOT NULL DEFAULT '' COMMENT 'ingest-generated random id (UUID hex); unique per record',
   `hostname`            VARCHAR(255)  NOT NULL DEFAULT '' COMMENT 'OTel host.name',
   `service_instance`    VARCHAR(512)  NOT NULL DEFAULT '' COMMENT 'OTel service.instance.id',
   `severity`            VARCHAR(32)   NOT NULL DEFAULT 'UNSPECIFIED',

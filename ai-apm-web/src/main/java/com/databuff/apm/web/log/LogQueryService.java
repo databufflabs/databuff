@@ -52,11 +52,11 @@ public class LogQueryService {
     }
 
     /** Full record for a single log (attributes / resource JSON included). */
-    public Map<String, Object> detail(long timeNs, String serviceId) throws SQLException {
-        if (timeNs <= 0) {
+    public Map<String, Object> detail(String logId, long timeNs, String serviceId) throws SQLException {
+        if ((logId == null || logId.isBlank()) && timeNs <= 0) {
             return Map.of();
         }
-        String sql = LogQueryBuilder.detailSql(logDatabase, timeNs, serviceId);
+        String sql = LogQueryBuilder.detailSql(logDatabase, logId, timeNs, serviceId);
         List<Map<String, Object>> rows = readRepository.queryRows(sql, 1);
         if (rows.isEmpty()) {
             return Map.of();
@@ -224,6 +224,7 @@ public class LogQueryService {
 
     private static Map<String, Object> toPortalRow(Map<String, Object> row) {
         Map<String, Object> out = new LinkedHashMap<>();
+        out.put("logId", stringValue(row.get("log_id")));
         Object logTime = row.get("log_time");
         Object timeNs = row.get("time_ns");
         out.put("timestamp", formatTimestamp(logTime, timeNs));

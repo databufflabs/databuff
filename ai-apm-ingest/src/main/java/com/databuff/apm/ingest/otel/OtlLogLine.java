@@ -8,9 +8,11 @@ import com.fasterxml.jackson.databind.ObjectMapper;
 
 import java.util.LinkedHashMap;
 import java.util.Map;
+import java.util.concurrent.ThreadLocalRandom;
 
 /** Step 1 product: OTLP log record mapped to a Doris {@code log_dc_record} row. */
 public record OtlLogLine(
+        String logId,
         long timeNs,
         long observedTimeNs,
         String logTime,
@@ -27,6 +29,31 @@ public record OtlLogLine(
         String resourceJson) {
 
     private static final ObjectMapper JSON = new ObjectMapper();
+    private static final char[] HEX = "0123456789abcdef".toCharArray();
+
+    public OtlLogLine {
+        // OTel logs carry no per-record id; synthesize a 128-bit random id so the detail panel can
+        // pin the exact row (time_ns is not unique on the DUPLICATE KEY table — see GitHub #73).
+        // ThreadLocalRandom (not SecureRandom) — no contention, no crypto cost, 2^128 collision
+        // space is safe for any realistic ingest volume.
+        if (logId == null || logId.isBlank()) {
+            logId = randomHex32();
+        }
+    }
+
+    private static String randomHex32() {
+        ThreadLocalRandom r = ThreadLocalRandom.current();
+        char[] c = new char[32];
+        fillHex(c, 0, r.nextLong());
+        fillHex(c, 16, r.nextLong());
+        return new String(c);
+    }
+
+    private static void fillHex(char[] c, int off, long v) {
+        for (int i = 0; i < 16; i++) {
+            c[off + 15 - i] = HEX[(int) (v >>> (i * 4)) & 0xf];
+        }
+    }
 
     public byte[] toJsonBytes() throws JsonProcessingException {
         return toJsonBytes(DorisVarcharLimits.LOG_BODY);
@@ -35,6 +62,7 @@ public record OtlLogLine(
     /** @param bodyMaxLength max {@link String#length()} for {@code body} (configurable soft cap) */
     public byte[] toJsonBytes(int bodyMaxLength) throws JsonProcessingException {
         Map<String, Object> row = new LinkedHashMap<>();
+        row.put("log_id", logId);
         row.put("log_time", logTime);
         row.put("service_id", serviceId);
         row.put("service", service);

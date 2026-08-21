@@ -283,6 +283,7 @@ public final class OtelConverter {
             severityText = severityFromNumber(severityNumber);
         }
         return new OtlLogLine(
+                null,
                 timeNs,
                 logRecord.getObservedTimeUnixNano(),
                 DATETIME.format(Instant.ofEpochSecond(0, timeNs)),

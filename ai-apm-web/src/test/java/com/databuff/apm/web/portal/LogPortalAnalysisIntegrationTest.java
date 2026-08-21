@@ -74,6 +74,7 @@ class LogPortalAnalysisIntegrationTest {
         @SuppressWarnings("unchecked")
         List<Map<String, Object>> rows = (List<Map<String, Object>>) search.get("data");
         assertThat(rows).allMatch(row -> row.get("timeNs") != null && !String.valueOf(row.get("timeNs")).isBlank());
+        assertThat(rows).allMatch(row -> row.get("logId") != null && !String.valueOf(row.get("logId")).isBlank());
         assertThat(rows).allMatch(row -> !row.containsKey("attributes"));
         assertThat(rows).allMatch(row -> !row.containsKey("resources"));
     }
@@ -89,6 +90,7 @@ class LogPortalAnalysisIntegrationTest {
                 .orElseThrow();
 
         Map<String, Object> detailBody = new LinkedHashMap<>();
+        detailBody.put("logId", listRow.get("logId"));
         detailBody.put("timeNs", listRow.get("timeNs"));
         detailBody.put("serviceId", listRow.get("serviceId"));
 
@@ -96,6 +98,7 @@ class LogPortalAnalysisIntegrationTest {
         @SuppressWarnings("unchecked")
         Map<String, Object> data = (Map<String, Object>) detail.get("data");
 
+        assertThat(data.get("logId")).isEqualTo(listRow.get("logId"));
         assertThat(data.get("message")).isEqualTo("Available stock below threshold (2 units)");
         assertThat(data.get("status")).isEqualTo("WARN");
         assertThat(data.get("severityNumber")).isEqualTo(13);

@@ -271,13 +271,16 @@ export default class LogDetailDrawer extends Vue {
     const row = this.row;
     const timeNs = String(row?.timeNs || '').trim();
 
+    const logId = String(row?.logId || '').trim();
+    const detailKey = logId || timeNs;
+
     if (!timeNs) {
       this.setDetail(this.fallbackFromRow());
       this.error = !this.detail;
       this.loading = false;
       return;
     }
-    if (row?._detail && row._detailTimeNs === timeNs) {
+    if (row?._detail && row._detailKey === detailKey) {
       this.setDetail(row._detail);
       this.error = false;
       this.loading = false;
@@ -290,6 +293,7 @@ export default class LogDetailDrawer extends Vue {
     this.detail = null;
     this.messageBody = { text: '-', isJson: false };
     const { result, error } = await toAsyncWait(LogApi.getLogDetail({
+      logId: logId || undefined,
       timeNs,
       serviceId: row?.serviceId || undefined,
     }));
@@ -310,7 +314,7 @@ export default class LogDetailDrawer extends Vue {
     }
     this.setDetail(data);
     row._detail = data;
-    row._detailTimeNs = timeNs;
+    row._detailKey = detailKey;
   }
 
   private fallbackFromRow () {

@@ -82,6 +82,7 @@ public class LogPortalService {
 
     public Map<String, Object> detail(Map<String, Object> body) {
         Map<String, Object> request = body == null ? Map.of() : body;
+        String logId = ServicePortalService.stringValue(request.get("logId"), null);
         long timeNs = parseTimeNs(request.get("timeNs"));
         String serviceId = ServicePortalService.stringValue(request.get("serviceId"), null);
 
@@ -89,7 +90,7 @@ public class LogPortalService {
         response.put("status", 200);
         response.put("message", "success");
         try {
-            response.put("data", logQueryService.detail(timeNs, serviceId));
+            response.put("data", logQueryService.detail(logId, timeNs, serviceId));
         } catch (Exception ignored) {
             response.put("data", Map.of());
         }

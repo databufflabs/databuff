@@ -48,6 +48,7 @@ public final class SkyWalkingLogConverter {
         String attributesJson = encodeAttributes(attributes);
         String hostName = firstNonBlank(attributes.get("host.name"), serviceInstance, "unknown");
         OtlLogLine line = new OtlLogLine(
+                null,
                 timeNs,
                 timeNs,
                 DATETIME.format(Instant.ofEpochMilli(timeMs)),

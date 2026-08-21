@@ -25,7 +25,7 @@ public final class LogQueryBuilder {
             int offset,
             int limit) {
         StringBuilder sql = new StringBuilder(384);
-        sql.append("SELECT log_time, hostname, service_instance, service, service_id, trace_id, span_id, ");
+        sql.append("SELECT log_id, log_time, hostname, service_instance, service, service_id, trace_id, span_id, ");
         sql.append("severity AS status, body AS message, time_ns ");
         sql.append("FROM ").append(database).append('.').append(DorisTableNames.LOG_DC_RECORD);
         appendWhere(
@@ -50,22 +50,33 @@ public final class LogQueryBuilder {
     /**
      * Full log record for expand/detail panel. List search stays lightweight; only this path reads
      * {@code attributes_json} / {@code resource_json}.
+     * <p>Always prunes by a {@code log_time} window (partition pruning) derived from {@code timeNs}.
+     * Within that window, pins the exact row by {@code log_id} (ingest-generated, unique) when
+     * provided (GitHub #73: {@code time_ns} is not unique on the DUPLICATE KEY table); otherwise
+     * uses {@code time_ns} (+ {@code service_id} when present) for rows written before log_id
+     * existed. When {@code service_id} is present it is always applied so the sort-key prefix
+     * {@code (log_time, service_id)} can skip other services in the window. Empty {@code service_id}
+     * (common on some SkyWalking rows) is omitted so the log_id / time_ns filter still matches.
      */
-    public static String detailSql(String database, long timeNs, String serviceId) {
+    public static String detailSql(String database, String logId, long timeNs, String serviceId) {
         long millis = timeNs / 1_000_000L;
         long fromMillis = Math.max(0L, millis - 60_000L);
         long toMillis = millis + 60_000L;
-        StringBuilder sql = new StringBuilder(320);
-        sql.append("SELECT log_time, hostname, service_instance, service, service_id, trace_id, span_id, ");
+        StringBuilder sql = new StringBuilder(360);
+        sql.append("SELECT log_id, log_time, hostname, service_instance, service, service_id, trace_id, span_id, ");
         sql.append("severity AS status, severity_number, body AS message, attributes_json, resource_json, ");
         sql.append("time_ns, observed_time_ns ");
         sql.append("FROM ").append(database).append('.').append(DorisTableNames.LOG_DC_RECORD);
-        sql.append(" WHERE time_ns = ").append(timeNs);
+        sql.append(" WHERE log_time >= '").append(formatTime(fromMillis)).append("'");
+        sql.append(" AND log_time < '").append(formatTime(toMillis)).append("'");
+        if (logId != null && !logId.isBlank()) {
+            sql.append(" AND log_id = '").append(escape(logId)).append("'");
+        } else {
+            sql.append(" AND time_ns = ").append(timeNs);
+        }
         if (serviceId != null && !serviceId.isBlank()) {
             sql.append(" AND service_id = '").append(escape(serviceId)).append("'");
         }
-        sql.append(" AND log_time >= '").append(formatTime(fromMillis)).append("'");
-        sql.append(" AND log_time < '").append(formatTime(toMillis)).append("'");
         sql.append(" LIMIT 1");
         return sql.toString();
     }

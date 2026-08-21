@@ -40,6 +40,7 @@ public final class DemoLogFixture {
     private static final Pattern TRACE_ID = Pattern.compile("trace_id = '([^']+)'");
     private static final Pattern SPAN_ID = Pattern.compile("span_id = '([^']+)'");
     private static final Pattern SERVICE_ID = Pattern.compile("service_id = '([^']+)'");
+    private static final Pattern LOG_ID = Pattern.compile("log_id = '([^']+)'");
     private static final Pattern TIME_NS = Pattern.compile("time_ns = (\\d+)");
     private static final Pattern IN_CLAUSE = Pattern.compile("(\\w+) IN \\(([^)]+)\\)");
     private static final Pattern LIKE_BODY = Pattern.compile("body LIKE '%([^']*)%'");
@@ -92,6 +93,7 @@ public final class DemoLogFixture {
         String traceId = extract(TRACE_ID, sql);
         String spanId = extract(SPAN_ID, sql);
         String serviceId = extract(SERVICE_ID, sql);
+        String logId = extract(LOG_ID, sql);
         Set<String> serviceIds = inValues(sql, "service_id");
         Set<String> services = inValues(sql, "service");
         Set<String> instances = inValues(sql, "service_instance");
@@ -109,6 +111,9 @@ public final class DemoLogFixture {
                 continue;
             }
             if (timeNs != null && row.timeNs != timeNs) {
+                continue;
+            }
+            if (logId != null && !logId.equals(row.logId)) {
                 continue;
             }
             if (traceId != null && !traceId.equals(row.traceId)) {
@@ -216,6 +221,7 @@ public final class DemoLogFixture {
 
     private Map<String, Object> toSearchRow(Row row) {
         Map<String, Object> out = new LinkedHashMap<>();
+        out.put("log_id", row.logId);
         out.put("log_time", row.logTime);
         out.put("time_ns", Long.toString(row.timeNs));
         out.put("hostname", row.hostname);
@@ -283,36 +289,37 @@ public final class DemoLogFixture {
 
     private static List<Row> buildRows() {
         List<Row> out = new ArrayList<>();
+        int seq = 0;
         for (int minute = 0; minute < 2; minute++) {
             String logTime = String.format(Locale.ROOT, "2026-07-04 10:%02d:27", 50 + minute);
             long epochMs = ApmTimeZones.wallClockToEpochMilli(logTime);
             long timeNs = epochMs * 1_000_000L;
-            out.add(row(logTime, timeNs, HOST_A, INSTANCE_A, SERVICE_A, SERVICE_A_ID, TRACE_CHECKOUT,
+            out.add(row(logId(++seq), logTime, timeNs, HOST_A, INSTANCE_A, SERVICE_A, SERVICE_A_ID, TRACE_CHECKOUT,
                     "span-a-" + minute, "INFO", 9, "Received checkout request orderId=10001 channel=web",
                     "{\"order.id\":\"10001\",\"channel\":\"web\"}",
                     "{\"host.name\":\"" + HOST_A + "\",\"service.name\":\"" + SERVICE_A
                             + "\",\"service.instance.id\":\"" + INSTANCE_A + "\"}"));
-            out.add(row(logTime, timeNs + 1, HOST_A, INSTANCE_A, SERVICE_A, SERVICE_A_ID, TRACE_CHECKOUT,
+            out.add(row(logId(++seq), logTime, timeNs + 1, HOST_A, INSTANCE_A, SERVICE_A, SERVICE_A_ID, TRACE_CHECKOUT,
                     "span-a-" + minute, "INFO", 9, "Validating cart contents for user demo-user",
                     "{\"user.id\":\"demo-user\"}",
                     "{\"host.name\":\"" + HOST_A + "\",\"service.name\":\"" + SERVICE_A
                             + "\",\"service.instance.id\":\"" + INSTANCE_A + "\"}"));
-            out.add(row(logTime, timeNs + 2, HOST_A, INSTANCE_A, SERVICE_A, SERVICE_A_ID, TRACE_CHECKOUT,
+            out.add(row(logId(++seq), logTime, timeNs + 2, HOST_A, INSTANCE_A, SERVICE_A, SERVICE_A_ID, TRACE_CHECKOUT,
                     "span-a-" + minute, "INFO", 9, "Checkout started orderId=10001",
                     "{\"order.id\":\"10001\"}",
                     "{\"host.name\":\"" + HOST_A + "\",\"service.name\":\"" + SERVICE_A
                             + "\",\"service.instance.id\":\"" + INSTANCE_A + "\"}"));
-            out.add(row(logTime, timeNs + 3, HOST_B, INSTANCE_B, SERVICE_B, SERVICE_B_ID, TRACE_CHECKOUT,
+            out.add(row(logId(++seq), logTime, timeNs + 3, HOST_B, INSTANCE_B, SERVICE_B, SERVICE_B_ID, TRACE_CHECKOUT,
                     "span-b-" + minute, "INFO", 9, "Inventory lookup sku DEMO-10001",
                     "{\"sku\":\"DEMO-10001\"}",
                     "{\"host.name\":\"" + HOST_B + "\",\"service.name\":\"" + SERVICE_B
                             + "\",\"service.instance.id\":\"" + INSTANCE_B + "\",\"k8s.namespace.name\":\"demo\"}"));
-            out.add(row(logTime, timeNs + 4, HOST_B, INSTANCE_B, SERVICE_B, SERVICE_B_ID, TRACE_CHECKOUT,
+            out.add(row(logId(++seq), logTime, timeNs + 4, HOST_B, INSTANCE_B, SERVICE_B, SERVICE_B_ID, TRACE_CHECKOUT,
                     "span-b-" + minute, "WARN", 13, "Available stock below threshold (2 units)",
                     "{\"order.id\":\"10001\",\"stock\":\"2\"}",
                     "{\"host.name\":\"" + HOST_B + "\",\"service.name\":\"" + SERVICE_B
                             + "\",\"service.instance.id\":\"" + INSTANCE_B + "\",\"k8s.namespace.name\":\"demo\"}"));
-            out.add(row(logTime, timeNs + 5, HOST_B, INSTANCE_B, SERVICE_B, SERVICE_B_ID, TRACE_CHECKOUT,
+            out.add(row(logId(++seq), logTime, timeNs + 5, HOST_B, INSTANCE_B, SERVICE_B, SERVICE_B_ID, TRACE_CHECKOUT,
                     "span-b-" + minute, "ERROR", 17, "InsufficientStockException: inventory unavailable for sku DEMO-10001",
                     "{\"sku\":\"DEMO-10001\",\"exception.type\":\"InsufficientStockException\"}",
                     "{\"host.name\":\"" + HOST_B + "\",\"service.name\":\"" + SERVICE_B
@@ -321,7 +328,12 @@ public final class DemoLogFixture {
         return List.copyOf(out);
     }
 
+    private static String logId(int seq) {
+        return String.format(Locale.ROOT, "log-%04d", seq);
+    }
+
     private static Row row(
+            String logId,
             String logTime,
             long timeNs,
             String hostname,
@@ -336,6 +348,7 @@ public final class DemoLogFixture {
             String attributesJson,
             String resourceJson) {
         return new Row(
+                logId,
                 logTime,
                 timeNs,
                 hostname,
@@ -352,6 +365,7 @@ public final class DemoLogFixture {
     }
 
     private record Row(
+            String logId,
             String logTime,
             long timeNs,
             String hostname,

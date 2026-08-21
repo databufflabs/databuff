@@ -10,7 +10,7 @@ export default {
     })
   },
   /** Full log record (attributes / resources); call only on row expand. */
-  getLogDetail (data: { timeNs: string; serviceId?: string }) {
+  getLogDetail (data: { logId?: string; timeNs?: string; serviceId?: string }) {
     return http.request({
       url: '/log/detail',
       method: 'POST',
