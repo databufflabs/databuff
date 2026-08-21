@@ -5,6 +5,8 @@ import com.databuff.apm.common.trace.HttpSqlStandardizer;
 import org.apache.skywalking.apm.network.language.agent.v3.SpanLayer;
 import org.apache.skywalking.apm.network.language.agent.v3.SpanObject;
 import org.apache.skywalking.apm.network.language.agent.v3.SpanType;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 
 import java.util.List;
 import java.util.Locale;
@@ -26,6 +28,8 @@ import java.util.Set;
  * Override via {@code ingest.skywalking.sql-normalized-type} / env {@code INGEST_SQL_NORMALIZED_TYPE}.
  */
 public final class SkyWalkingMetaNormalizer {
+
+    private static final Logger log = LoggerFactory.getLogger(SkyWalkingMetaNormalizer.class);
 
     /** Same default as pre-v0.1.7 hardcode (values containing digits → ?). */
     public static final int DEFAULT_SQL_NORMALIZED_TYPE = 1;
@@ -176,8 +180,14 @@ public final class SkyWalkingMetaNormalizer {
             if (statement == null || statement.isBlank()) {
                 continue;
             }
-            HttpSqlStandardizer.SqlNormalizeResult result =
-                    HttpSqlStandardizer.standardizeSqlWithParameters(statement, mode);
+            HttpSqlStandardizer.SqlNormalizeResult result;
+            try {
+                result = HttpSqlStandardizer.standardizeSqlWithParameters(statement, mode);
+            } catch (RuntimeException exception) {
+                // SQL normalization is best-effort metadata enrichment and must never reject a trace segment.
+                log.warn("Failed to normalize SkyWalking SQL; keeping the original statement", exception);
+                return;
+            }
             meta.put(key, result.sql());
             meta.put("normalized.resource", result.sql());
             List<String> parameters = result.parameters();
