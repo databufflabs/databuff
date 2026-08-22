@@ -102,7 +102,7 @@ After joining the [OpenTelemetry official Vendors](https://opentelemetry.io/ecos
 - 🤖 **AI-native, not a bolt-on chat box** — LLM queries traces, metrics, topology, and alerts directly from real data
 - 🧠 **Multi-agent collaboration** — AI Brain orchestrates query, inspection, ops, and Q&A experts; complex tasks run in parallel
 - 🎯 **AI application observability** (Roadmap) — LLM call chains · token analytics · agent topology · skill/tool/model tracing
-- ⚡ **eBPF APM** (Roadmap) — kernel-level, non-intrusive collection without code changes
+- ⚡ **eBPF APM**  — kernel-level, non-intrusive collection without code changes
 - 📊 **Dual-protocol APM foundation** — OTLP native ingestion + **SkyWalking native gRPC compatibility**; existing SkyWalking users can switch by changing the exporter address
 - 🚨 **Alerting loop** — threshold and change detection, scheduled evaluation, alert event history
 - 🔧 **Skill + Tool extensibility** — override built-in skills, add custom digital experts without touching core code
