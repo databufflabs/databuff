@@ -1,332 +1,205 @@
 <div align="center">
 
-<p align="center">
-  <img src="ai-apm-frontend/public/img/logo_login.png" alt="" height="56" align="middle" />
-  &nbsp;&nbsp;
-  <img src="ai-apm-frontend/public/img/logo_wordmark.svg" alt="Databuff" height="32" align="middle" />
-</p>
+<img src="ai-apm-frontend/public/img/logo_login.png" alt="DataBuff" height="56" />
+&nbsp;&nbsp;
+<img src="ai-apm-frontend/public/img/logo_wordmark.svg" alt="Databuff" height="32" />
 
-<h3>Open Source · AI-Native OpenTelemetry APM</h3>
+<h3>DataBuff — AI-Native OpenTelemetry APM</h3>
 
-<p><strong>Ask one question in plain English — AI agents query metrics, traces, and topology together, then tell you what broke.</strong></p>
+<p><strong>Mission: build the strongest OpenTelemetry APM backend</strong></p>
+<p>AI-native · OTLP-native · multi-agent out of the box · self-hosted traces, metrics, topology</p>
 
 <p align="center">
   <a href="https://demo.databuff.ai">Live Demo</a>
-  &nbsp;|&nbsp;
-  <a href="https://databuff.ai/en/opensource-apm/">Open Source APM</a>
-  &nbsp;|&nbsp;
+  &nbsp;·&nbsp;
   <a href="docs/README_en.md">Documentation</a>
-  &nbsp;|&nbsp;
-  <a href="README.cn.md">中文</a>
-  &nbsp;|&nbsp;
+  &nbsp;·&nbsp;
+  <a href="https://databuff.ai/en/opensource-apm/">Open Source APM</a>
+  &nbsp;·&nbsp;
+  <a href="README.cn.md">简体中文</a>
+  &nbsp;·&nbsp;
   <a href="#community">Community</a>
 </p>
+
 <p align="center">
-  Username:Admin, Password:Databuff@123
+  <img src="https://img.shields.io/github/stars/databufflabs/databuff?style=social" />
+  <img src="https://img.shields.io/badge/License-Apache--2.0-blue.svg" />
+  <img src="https://img.shields.io/badge/AI--Native-APM-7C3AED?style=flat-square" />
+  <img src="https://img.shields.io/badge/OpenTelemetry-Native_OTLP-000000?style=flat-square&logo=opentelemetry&logoColor=white" />
+  <img src="https://img.shields.io/badge/Multi--Agent-Out_of_the_box-2563EB?style=flat-square" />
+  <img src="https://img.shields.io/badge/Docker-One_command-2496ED?style=flat-square&logo=docker&logoColor=white" />
 </p>
-<p align="center">
-  <img src="docs/images/community.png" alt="WeChat community QR code" width="128" />
-</p>
-<p align="center">
-chat on WeChat
-</p>
+
+<p align="center">Demo login: <code>admin</code> / <code>Databuff@123</code></p>
 
 </div>
-
-<br/>
 
 <p align="center">
   <img src="docs/images/databuff-demo-en.gif" alt="DataBuff demo: AI chat, services, topology" width="880" />
 </p>
-<p align="center"><sub>AI multi-agent troubleshooting · Service health · Call graph topology — English UI</sub></p>
+<p align="center"><sub>AI multi-agent troubleshooting · Service health · Call graph topology</sub></p>
 
-<br/>
-
-<p align="center">
-  <img src="docs/images/feature-pillars-en.png" alt="OpenTelemetry APM and AI Native capabilities" width="880" />
-</p>
+**Keywords**: `AI-Native APM` · `OpenTelemetry APM` · `OTLP Backend` · `Multi-Agent` · `Distributed Tracing` · `AIOps` · `Open Source APM` · `MCP` · `Self-Hosted Observability`
 
 ---
 
+## What is DataBuff
 
-<h2>Open Source APM</h2>
+**DataBuff is an AI-native OpenTelemetry APM backend** — ingest traces, metrics, and logs via OTLP, with full-stack monitoring, service topology, RED metrics, and **out-of-the-box multi-agent AI troubleshooting**.
 
-<p><strong>DataBuff</strong> is an <strong>open source APM</strong> (application performance monitoring) backend for teams that standardize on OpenTelemetry and want self-hosted traces, metrics, and topology with AI-assisted troubleshooting.</p>
+> The goal is not "yet another observability UI," but **to build the strongest OpenTelemetry APM backend** — letting LLMs query live telemetry directly, from natural-language query → multi-agent inspection → root-cause analysis → ops remediation.
 
-<ul>
-  <li><a href="https://databuff.ai/en/opensource-apm/">Open Source APM selection guide</a> — landscape, evaluation checklist, and install</li>
-  <li><a href="https://dev.to/logan_zhang_8ca3575087c5b/top-10-open-source-apm-tools-in-2026-1fh9">Top 10 Open Source APM Tools in 2026</a> (Dev.to)</li>
-  <li><a href="https://dev.to/logan_zhang_8ca3575087c5b/top-5-open-source-apm-tools-in-2026-1437">Top 5 Open Source APM Tools in 2026</a> (Dev.to)</li>
-  <li><a href="https://dev.to/logan_zhang_8ca3575087c5b/open-source-apm-tools-a-practical-guide-for-2026-2f7k">Open Source APM Tools: A Practical Guide for 2026</a> (Dev.to)</li>
-  <li><a href="https://dev.to/logan_zhang_8ca3575087c5b/how-to-pick-an-opentelemetry-apm-backend-in-2026-2ecg">How to Pick an OpenTelemetry APM Backend in 2026</a> (Dev.to)</li>
-  <li><a href="https://dev.to/logan_zhang_8ca3575087c5b/open-source-observability-stack-from-lgtm-to-unified-apm-49fi">Open Source Observability Stack: From LGTM to Unified APM</a> (Dev.to)</li>
-</ul>
+Listed on [OpenTelemetry official Vendors](https://opentelemetry.io/ecosystem/vendors/) (Native OTLP) and [CNCF Landscape](https://landscape.cncf.io/?item=observability-and-analysis--observability--databuff).
+
+[⭐ Star the project](https://github.com/databufflabs/databuff) · [Live Demo](https://demo.databuff.ai) · [Documentation](docs/README_en.md)
 
 ---
 
-## Ecosystem Recognition · OpenTelemetry Vendors × CNCF Landscape
+## Why DataBuff
 
-After joining the [OpenTelemetry official Vendors](https://opentelemetry.io/ecosystem/vendors/) list (**OSS · Native OTLP**), DataBuff is also listed on the [CNCF Landscape](https://landscape.cncf.io/?item=observability-and-analysis--observability--databuff) under **Observability and Analysis → Observability** (also tagged AI Native Infra / Observability). Bring your existing OTel instrumentation as-is, and find us alongside the global observability map.
+If you are evaluating an OpenTelemetry APM backend, or want AI that actually closes the troubleshooting loop, DataBuff is built for you:
 
-<table border="0" cellspacing="16" cellpadding="0" align="center">
-<tr>
-<td align="center" width="480" valign="top">
-  <p><strong>① OpenTelemetry Vendors</strong></p>
-  <p>Listed with Jaeger, SigNoz, Grafana, and others — marked Native OTLP on the official vendors page.</p>
-  <img src="docs/images/otel-vendors-databuff.png" alt="DataBuff on the OpenTelemetry Vendors list" width="460" />
-  <br/>
-  <sub>
-    <a href="https://opentelemetry.io/ecosystem/vendors/">Official list</a>
-    ·
-    <a href="https://mp.weixin.qq.com/s/RGzh1LnzBzOQTizsoPZMGg">Announcement</a>
-  </sub>
-</td>
-<td align="center" width="480" valign="top">
-  <p><strong>② CNCF Landscape</strong></p>
-  <p>Visible in the Observability sector of the cloud-native landscape.</p>
-  <img src="docs/images/cncf-landscape-databuff.png" alt="DataBuff on the CNCF Landscape" width="460" />
-  <br/>
-  <sub>
-    <a href="https://landscape.cncf.io/?item=observability-and-analysis--observability--databuff">Landscape entry</a>
-    ·
-    <a href="https://mp.weixin.qq.com/s/9PS2SW_ug6sNx9ZjAyxKNw">Announcement</a>
-  </sub>
-</td>
-</tr>
-</table>
+- **AI-native, not bolted on** — LLMs query traces, metrics, topology, and alerts directly; add an API key after install, no separate AI platform needed
+- **Multi-agent out of the box** — AI Brain orchestrates query, inspection, ops, and Q&A experts in parallel
+- **Fully embrace OpenTelemetry** — OTLP-native ingestion with existing instrumentation as-is; SkyWalking compatible for smooth migration
+- **Clear mission** — build the strongest OpenTelemetry APM backend: self-hosted, production-grade, extensible
+- **Minimal deployment** — Ingest + Doris + Web, one Docker command to run
 
 ---
 
-<h2>Features</h2>
+## Key Features
 
-- 🤖 **AI-native, not a bolt-on chat box** — LLM queries traces, metrics, topology, and alerts directly from real data
-- 🧠 **Multi-agent collaboration** — AI Brain orchestrates query, inspection, ops, and Q&A experts; complex tasks run in parallel
-- 🎯 **AI application observability** (Roadmap) — LLM call chains · token analytics · agent topology · skill/tool/model tracing
-- ⚡ **eBPF APM**  — kernel-level, non-intrusive collection without code changes
-- 📊 **Dual-protocol APM foundation** — OTLP native ingestion + **SkyWalking native gRPC compatibility**; existing SkyWalking users can switch by changing the exporter address
-- 🚨 **Alerting loop** — threshold and change detection, scheduled evaluation, alert event history
-- 🔧 **Skill + Tool extensibility** — override built-in skills, add custom digital experts without touching core code
-- 🔌 **MCP both ways** — expose platform capabilities to Cursor / Claude; ingest external MCPs (Prometheus, etc.)
-- 🐳 **Minimal 3-component stack** — Ingest + Doris + Web; one Docker / K8s command, no middleware sprawl
-- 🌐 **Bring your own model** — OpenAI-compatible + Anthropic Messages; Kimi, DeepSeek, GLM, Bailian, Qianfan, Ollama, and more
+### 🤖 AI-Native
+- **Not a bolt-on chat box** — LLM answers from real telemetry, not hallucination
+- **Multi-agent collaboration out of the box** — AI Brain orchestrates query, inspection, ops, and Q&A experts
+- **AI application observability** (Roadmap) — LLM call chains · token analytics · agent topology · skill/tool/model tracing
+- **MCP both ways** — expose capabilities to Cursor / Claude; ingest external MCPs like Prometheus
+- **Bring your own model** — Kimi, DeepSeek, GLM, Ollama, and other OpenAI-compatible APIs
 
----
+### 📊 OpenTelemetry-Native
+- **OTLP-native ingestion** — gRPC `4317` / HTTP `4318` for Traces + Metrics + Logs
+- **eBPF APM** — kernel-level, non-intrusive collection; call chains and performance data without code changes
+- **Dual-protocol support** — OTLP native + SkyWalking native gRPC (`11800`); switch by changing exporter address
+- **Alerting loop** — threshold detection, scheduled evaluation, alert event history
 
-<p align="center" id="aiops-roadmap" style="font-size:24px;font-weight:700;margin:8px 0;">AIOps Roadmap: Visible → Legion → Inspect → Diagnose → Repair → Predict → Answer</p>
-
-<p align="center"><img src="docs/images/screenshots/aiops-arc-en.svg" alt="AIOps 路线图" width="980" /></p>
-
----
-
-<h2 align="center" id="seven-capabilities">Seven Capabilities Expanded</h2>
-
-<p align="center"><strong>① Visible · Natural language query</strong></p>
-<p align="center">Ask "which service was slowest in the last hour" in plain English — AI queries 20 services itself, returns the top 3 with average latency. No query language to learn.</p>
-<p align="center">
-  <img src="docs/images/screenshots/nl-slowest.png" alt="Natural language query for slowest service" width="720" />
-</p>
-
-<p align="center"><strong>② Legion · Multi-agent parallel dispatch</strong></p>
-<p align="center">Don't pick a specific expert — hand the complex task to the AI Brain. It dispatches to the query + inspection experts in parallel, then synthesizes a forwardable incident report.</p>
-<p align="center">
-  <img src="docs/images/screenshots/multi-agent-process.png" alt="AI Brain dispatches dispatchExpertTask to query and inspection experts in parallel" width="720" />
-</p>
+### 🐳 Engineering Foundation
+- **3-component stack** — Ingest + Doris + Web, no middleware sprawl
+- **Skill extensibility** — custom digital experts without touching core code
 
 ---
 
-<p align="center"><strong>③ Inspect · Inspection + HTML report</strong></p>
-<p align="center">One sentence triggers a single-service inspection. 81 seconds later, a fully formatted HTML report appears: entry health 98, downstream MySQL 60, Redis 100, active alerts 0 — the entry looks perfectly healthy, yet the error log section surfaces 60 <code>InsufficientStockException</code> errors in 30 minutes, hidden behind HTTP 200. Preview and forward directly.</p>
-<p align="center">
-  <img src="docs/images/screenshots/inspect-report.png" alt="Inspection HTML report" width="720" />
-</p>
+## Feature Gallery
 
-<p align="center"><strong>④ Diagnose · Root cause analysis with evidence chain</strong></p>
-<p align="center">Ask "is the bottleneck in the app, the database, or downstream?" — AI pulls topology, ranks outbound call metrics, attributes by share. Bottleneck is downstream service-b at 73.2%; other components are cleared. The conclusion is ready to paste into an incident report.</p>
-<p align="center">
-  <img src="docs/images/screenshots/rca.png" alt="Root cause analysis" width="720" />
-</p>
+Out-of-the-box multi-agent AI on top of a full OpenTelemetry APM.
 
-<p align="center"><strong>⑤ Repair · Ops expert SSHes in and acts</strong></p>
-<p align="center">Beyond reading dashboards, it can log into the machine and fix things. Container stuck in a restart loop? The ops expert SSHes in, runs docker logs / inspect / free -m, identifies OOM 137 — the container memory limit was only 10MB while the JVM needed 64MB. It removes the old container, recreates it with 512MB, and docker ps is stable again. The watershed from "can see" to "can repair".</p>
-<p align="center">
-  <img src="docs/images/screenshots/ops-expert.png" alt="Ops expert SSH repair" width="720" />
-</p>
+<img src="docs/images/screenshots/aiops-arc-en.svg" alt="AIOps roadmap: Visible → Legion → Inspect → Diagnose → Repair → Predict → Answer" width="900" />
 
----
+#### Natural Language Query
 
-<p align="center"><strong>⑥ Predict · Capacity health analysis</strong></p>
-<p align="center">From "post-incident firefighting" to "pre-incident prediction". AI clarifies the real dependency graph, then judges the high-latency Redis — 98 QPS is far below single-node 10k capacity, so the bottleneck is not capacity but big keys / slow commands. Clear advice: don't blindly scale up.</p>
-<p align="center">
-  <img src="docs/images/screenshots/capacity.png" alt="Capacity health analysis" width="720" />
-</p>
+Ask "which service was slowest" in plain language — AI ranks results, no query language required.
 
-<p align="center"><strong>⑦ Answer · Open-source product with a built-in concierge</strong></p>
-<p align="center">"How do I integrate the OTel SDK? Where do I configure alert thresholds?" The Q&A expert actually reads the product docs and returns OTLP ports (gRPC 4317 / HTTP 4318), the Spring Boot Java Agent one-liner for zero-code instrumentation, and the alert config menu path — its own docs, more reliable than a search engine.</p>
-<p align="center">
-  <img src="docs/images/screenshots/qa-expert.png" alt="Q&A expert" width="720" />
-</p>
+<img src="docs/images/screenshots/nl-slowest.png" alt="Natural language query" width="720" />
 
----
+#### Multi-Agent Collaboration
 
-<h2 align="center" id="data-ingestion">Data Ingestion: Dual-Protocol Native Compatibility</h2>
+Complex tasks dispatched to multiple experts in parallel, synthesized into a forwardable incident report.
 
-<p align="center">DataBuff supports both OpenTelemetry and SkyWalking native ingestion — existing agents switch over without rework.</p>
+<img src="docs/images/screenshots/multi-agent-process.png" alt="Multi-agent collaboration" width="720" />
 
-<table align="center" cellpadding="0" cellspacing="0" style="border-collapse:collapse;max-width:760px;">
-<tr>
-<th align="left" style="background:#f1f5f9;border:1px solid #cbd5e1;padding:10px 14px;font-size:14px;width:160px;">Protocol</th>
-<th align="left" style="background:#f1f5f9;border:1px solid #cbd5e1;padding:10px 14px;font-size:14px;width:200px;">Port / Endpoint</th>
-<th align="left" style="background:#f1f5f9;border:1px solid #cbd5e1;padding:10px 14px;font-size:14px;">Supported signals</th>
-</tr>
-<tr>
-<td style="border:1px solid #cbd5e1;padding:10px 14px;font-size:13px;"><b>OTLP</b> (OpenTelemetry native)</td>
-<td style="border:1px solid #cbd5e1;padding:10px 14px;font-size:13px;">gRPC <code>4317</code> · HTTP <code>4318</code></td>
-<td style="border:1px solid #cbd5e1;padding:10px 14px;font-size:13px;">Traces + Metrics + Logs</td>
-</tr>
-<tr>
-<td style="border:1px solid #cbd5e1;padding:10px 14px;font-size:13px;"><b>SkyWalking</b> native gRPC</td>
-<td style="border:1px solid #cbd5e1;padding:10px 14px;font-size:13px;">gRPC <code>11800</code></td>
-<td style="border:1px solid #cbd5e1;padding:10px 14px;font-size:13px;">Trace Segment + JVM metrics + Logs (reuse existing SW Agent, just change exporter address)</td>
-</tr>
-</table>
+#### Root Cause Analysis
+
+Pull topology, rank metrics, attribute bottlenecks by share — conclusions ready for your incident report.
+
+<img src="docs/images/screenshots/rca.png" alt="Root cause analysis" width="720" />
+
+#### APM UI
+
+Global topology, service list, and trace drill-down — AI reads the data, the UI confirms it.
+
+<img src="docs/images/screenshots/global-topology.jpg" alt="Global topology" width="720" />
+
+More capabilities in [Documentation](docs/README_en.md)
 
 ---
 
-<h2 align="center" id="screenshots">Screenshots · The UI itself is a capable APM</h2>
+## Architecture & Ingestion
 
-<p align="center">AI reads the data for you; the UI confirms what the AI said. Two legs walking. Global topology, service list, service detail, service flow — every viewpoint is there, drill down from the topology to a single trace.</p>
+<img src="docs/images/screenshots/simple-architecture.jpg" alt="Minimal architecture: Ingest + Doris + Web" width="900" />
 
-<table border="0" cellspacing="12" cellpadding="0" align="center">
-<tr>
-<td align="center" width="450">
-  <img src="docs/images/screenshots/service-list.jpg" alt="Service list" width="450" />
-  <br/><sub>Service list · Traffic-light status for anomalies</sub>
-</td>
-<td align="center" width="450">
-  <img src="docs/images/screenshots/global-topology.jpg" alt="Global topology" width="450" />
-  <br/><sub>Global topology · Auto-generated call graph</sub>
-</td>
-</tr>
-<tr>
-<td align="center" width="450">
-  <img src="docs/images/screenshots/service-detail.jpg" alt="Service detail" width="450" />
-  <br/><sub>Service detail · Metric trends and instances</sub>
-</td>
-<td align="center" width="450">
-  <img src="docs/images/screenshots/service-flow.jpg" alt="Service flow" width="450" />
-  <br/><sub>Service flow · Upstream and downstream dependencies</sub>
-</td>
-</tr>
-</table>
+| Protocol | Port / Endpoint | Signals |
+| :-- | :-- | :-- |
+| **OTLP** (OpenTelemetry native) | gRPC `4317` · HTTP `4318` | Traces + Metrics + Logs |
+| **SkyWalking** native gRPC | gRPC `11800` | Trace + JVM metrics + Logs |
 
 ---
 
-<h2 align="center">Architecture</h2>
+## Quick Start in 5 Minutes
 
-<p align="center">
-  <img src="docs/images/screenshots/simple-architecture.jpg" alt="Architecture" width="920" />
-</p>
-
----
-
-<h2 align="center" id="installation">Quick Start</h2>
-
-> ⚡ From running the install command to demo apps reporting data and showing traces and topology, you can see results in about **5 minutes**.
-
-<p align="center">
-  <img src="https://img.shields.io/badge/Docker-docker_+_compose-2496ED?style=for-the-badge&logo=docker&logoColor=white" height="28" />
-</p>
-
-Requires **docker** and **docker-compose**. The install script auto-detects amd64/arm64 and downloads the matching image bundle.
-
-**1. Install Platform**
+1. **Install platform** — one command to launch Ingest + Doris + Web
 
 ```bash
 curl -fsSL https://databuff.ai/databuff/ai-apm-install.sh | bash
 ```
 
-**2. Install Demo App** (optional)
+2. **Install demo** (optional) — auto-report traces and see topology quickly
 
 ```bash
 curl -fsSL https://databuff.ai/databuff/ai-apm-demo-install.sh | bash
 ```
 
+3. **Connect a model → start troubleshooting** — open `http://YOUR_HOST:27403`, login `admin` / `Databuff@123`, add API key to enable AI
+
 <details>
-<summary><b>Offline Install</b></summary>
+<summary><b>Offline install / Kubernetes install</b></summary>
 
-When the registry is unreachable, download the bundle for your architecture and install on the target machine. Pick a version on the [install page](https://databuff.ai/#install) under **Docker → Offline Install**, or use:
+<br/>
 
-`https://datalens.databuff.com:5001/databuff/<version>/offline/databuff-ai-apm-offline-<version>-<arch>.tar.gz`
+**Offline install** — download the bundle from the [install page](https://databuff.ai/#install):
 
 ```bash
 tar -zxvf databuff-ai-apm-offline-<version>-<arch>.tar.gz
-cd databuff-ai-apm-offline-<version>-<arch>
-
-# Install platform
-sudo ./install.sh
+cd databuff-ai-apm-offline-<version>-<arch> && sudo ./install.sh
 ```
 
-</details>
-
-<details>
-<summary><b>Kubernetes</b></summary>
-
-Requires **kubectl** and a working Kubernetes cluster. The script installs the platform via K8s manifests.
-
-**1. Install Platform**
+**Kubernetes install**
 
 ```bash
 curl -fsSL https://databuff.ai/databuff/ai-apm-k8s-install.sh | bash
-```
-
-**2. Install Demo App** (optional)
-
-```bash
-curl -fsSL https://databuff.ai/databuff/ai-apm-demo-k8s-install.sh | bash
-```
-
-**Offline image download**
-
-If the install commands above cannot pull images due to network issues, run the following to download an offline image bundle and load it onto the node.
-
-```bash
-curl -fsSL https://databuff.ai/databuff/ai-apm-k8s-download-images.sh | bash
+curl -fsSL https://databuff.ai/databuff/ai-apm-demo-k8s-install.sh | bash  # demo optional
 ```
 
 </details>
 
-<p align="center">
-  Open <code>http://YOUR_HOST:27403</code> · Default login <code>admin</code> / <code>Databuff@123</code> · Add your API key in model settings to enable AI
+---
+
+## Documentation
+
+| Doc | Description |
+| :-- | :-- |
+| [Documentation](docs/README_en.md) | Product overview, user guides, ops reference |
+| [OTLP ingestion guide](docs/opentelemetry-otlp-ingestion_en.md) | OpenTelemetry SDK / Collector setup |
+| [Competitive comparison](docs/业界对比/总览_en.md) | vs Jaeger, SigNoz, SkyWalking, and more |
+| [Migration guide](docs/迁移指南/总览_en.md) | Migrate from other APM tools |
+
+---
+
+## Contributing
+
+If you are building **AI-native APM / OpenTelemetry observability**, help make the strongest OpenTelemetry APM backend a real, usable open-source foundation:
+
+- ⭐ [Star this repo](https://github.com/databufflabs/databuff/stargazers) and Watch for updates
+- 🐛 [Open an Issue](https://github.com/databufflabs/databuff/issues) to report bugs or request features
+- 🤝 Read [CONTRIBUTING.md](CONTRIBUTING.md) and submit a PR
+- 💬 Scan the QR code to join our WeChat community
+
+<p align="center" id="community">
+  <img src="docs/images/community.png" alt="Scan to join the DataBuff community on WeChat" width="128" />
   <br/>
+  <sub>Scan to join the DataBuff community</sub>
 </p>
 
 ---
 
-<h2 align="center" id="community">Community & Contributing</h2>
+## License
 
-<p align="center">
-  <a href="CONTRIBUTING.md">Contributing Guide</a>
-  &nbsp;·&nbsp;
-  <a href="https://github.com/databufflabs/databuff/issues">Open Issues</a>
-  &nbsp;·&nbsp;
-  <a href="https://github.com/databufflabs/databuff/discussions">Discussions</a>
-  &nbsp;·&nbsp;
-  <a href="https://github.com/databufflabs/databuff/labels/good%20first%20issue">Good First Issues</a>
-</p>
-
-<p align="center">
-  See <a href="CONTRIBUTING.md">CONTRIBUTING.md</a> to learn how to submit PRs, report bugs, or request features.
-  <br/>
-  Join our WeChat community for real-time help 👇
-</p>
-
-<p align="center">
-  <img src="docs/images/community.png" alt="WeChat community QR code" width="128" />
-</p>
-
-<br/>
-
-
-
-
-
+This repository is licensed under **Apache-2.0**.
