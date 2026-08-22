@@ -4,7 +4,7 @@
 &nbsp;&nbsp;
 <img src="ai-apm-frontend/public/img/logo_wordmark.svg" alt="Databuff" height="32" />
 
-<h3>DataBuff — AI-Native OpenTelemetry APM</h3>
+<h3>DataBuff — AI-Native APM Built On Opentelemetry</h3>
 
 <p><strong>Mission: build the strongest OpenTelemetry APM backend</strong></p>
 <p>AI-native · OTLP-native · multi-agent out of the box · self-hosted traces, metrics, topology</p>
@@ -45,7 +45,7 @@
 
 ## What is DataBuff
 
-**DataBuff is an AI-native OpenTelemetry APM backend** — ingest traces, metrics, and logs via OTLP, with full-stack monitoring, service topology, RED metrics, and **out-of-the-box multi-agent AI troubleshooting**.
+**DataBuff is an AI-native APM backend built on Opentelemetry** — ingest traces, metrics, and logs via OTLP, with full-stack monitoring, service topology, RED metrics, and **out-of-the-box multi-agent AI troubleshooting**.
 
 > The goal is not "yet another observability UI," but **to build the strongest OpenTelemetry APM backend** — letting LLMs query live telemetry directly, from natural-language query → multi-agent inspection → root-cause analysis → ops remediation.
 
