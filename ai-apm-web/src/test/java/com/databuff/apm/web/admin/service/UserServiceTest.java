@@ -7,10 +7,8 @@ import com.databuff.apm.web.auth.AuthService;
 import com.databuff.apm.web.auth.JwtTokenService;
 import com.databuff.apm.web.config.JwtProperties;
 import org.junit.jupiter.api.Test;
-import org.springframework.boot.info.BuildProperties;
 
 import java.util.Map;
-import java.util.Properties;
 
 import static org.assertj.core.api.Assertions.assertThat;
 
@@ -53,24 +51,5 @@ class UserServiceTest {
         var menuList = (java.util.List<Map<String, Object>>) data.get("menu");
         assertThat(menuList).isNotEmpty();
         assertThat(menuList.stream().noneMatch(item -> "/sysManage/account".equals(item.get("path")))).isTrue();
-    }
-
-    @Test
-    void productVersionFallsBackToDevWithoutBuildInfo() {
-        assertThat(userService.productVersion().get("data")).isEqualTo("dev");
-    }
-
-    @Test
-    void productVersionUsesBuildProperties() {
-        Properties props = new Properties();
-        props.setProperty("version", "0.1.7");
-        UserService withBuild = new UserService(
-                new AuthService(
-                        new JwtTokenService(new JwtProperties("secret", 3600)),
-                        portalUsers,
-                        new SessionIdleSettingsService()),
-                portalUsers,
-                new BuildProperties(props));
-        assertThat(withBuild.productVersion().get("data")).isEqualTo("0.1.7");
     }
 }

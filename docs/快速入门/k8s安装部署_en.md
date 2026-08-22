@@ -44,9 +44,9 @@ See [Kubernetes Operations](../运维参考/K8s运维_en.md) — Offline Images.
 Install a specific version:
 
 ```bash
-curl -fsSL https://databuff.ai/databuff/ai-apm-k8s-install.sh | bash -s -- --version 0.1.7
+curl -fsSL https://databuff.ai/databuff/ai-apm-k8s-install.sh | bash -s -- --version 0.1.8
 # or
-APM_VERSION=0.1.7 curl -fsSL https://databuff.ai/databuff/ai-apm-k8s-install.sh | bash
+APM_VERSION=0.1.8 curl -fsSL https://databuff.ai/databuff/ai-apm-k8s-install.sh | bash
 ```
 
 > **Operations**: [Kubernetes Operations Reference](../运维参考/K8s运维_en.md) — start/stop, NodePort access, offline images, scaling.

@@ -10,10 +10,6 @@
 #   INGEST_HOST      ingest 地址 (默认本机 IP)
 #   INGEST_PORT      ingest 端口 (默认 4318)
 #   SKIP_START       1=仅下载解压不启动
-#
-# 指定版本:
-#   curl -fsSL .../ai-apm-demo-install.sh | bash -s -- --version 0.1.7
-#   APM_VERSION=0.1.7 curl -fsSL .../ai-apm-demo-install.sh | bash
 
 set -e
 

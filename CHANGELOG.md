@@ -1,5 +1,44 @@
 # Changelog
 
+## [0.1.8] - 2026-08-22
+
+### Features
+
+- **GenAI / LLM traces**: decode `\uXXXX` escapes on spans whose attributes start with `gen_ai.` / `gen.ai.` / `llm.` so prompt and completion text display correctly
+- **Product version**: show Maven build-info version on the login page and sidebar user menu
+
+### Bug Fixes
+
+- Pin log-analysis detail to ingest-generated `log_id` (schema V008)
+- Fix `ResourceIgnoreFilter`
+- Normalize SkyWalking SQL at ingest
+- Fix Top 5 service instance grouping
+- Fix chart bar filter toggle and reset on Trace / Logs
+- Fix fat-jar MCP SPI lookup so remote SSE / Streamable HTTP tools actually run, and cover them through LLM chat
+- Require the no-auth MCP case to hit a remote 401 so a dead client is not treated as a pass
+
+### Deploy & Build
+
+- Docker / K8s / offline install scripts versioned to `0.1.8`
+- Schema migration V008: add `log_id` on `log_dc_record` for exact log-detail lookup
+
+### Full changelog
+
+Commits since `0.1.7`:
+
+- `590e55b` fix log id bug
+- `78c6b76` fix: pin log-analysis detail to ingest-generated log_id (#73)
+- `cc44950` fix ResourceIgnoreFilter
+- `f20b622` fix skywalking sql standard
+- `8fe53d5` 支持gen.ai
+- `ea785fd` fix group by top 5 service instance
+- `5ef5483` update test
+- `468bda3` Require the no-auth MCP case to hit a remote 401 so a dead client is not treated as a pass.
+- `1792c1a` Fix fat-jar MCP SPI lookup so remote SSE/Streamable HTTP tools actually run, and cover them through LLM chat
+- `7d671e9` Show product version from Maven build-info on login and sidebar user menu
+- `9aeeff3` update docs
+- `e883512` Fix chart bar filter toggle and reset on Trace/Logs
+
 ## [0.1.7] - 2026-08-04
 
 ### Features

@@ -3,7 +3,6 @@
 #
 # 在安装目录执行:
 #   cd /opt/databuff-ai-apm && ./update.sh
-#   ./update.sh --version 0.1.7
 #   ./update.sh --pull-images
 #   ./update.sh --backup
 #   ./update.sh --restore-backup

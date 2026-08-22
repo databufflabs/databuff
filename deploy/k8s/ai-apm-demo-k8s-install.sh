@@ -13,10 +13,6 @@
 #   SKIP_DOWNLOAD       已在安装目录中解压时设为 1
 #   SKIP_START          1=仅下载解压不部署
 #   KUBECONFIG          kubeconfig 路径（未设置时自动尝试常见路径）
-#
-# 指定版本:
-#   curl -fsSL .../ai-apm-demo-k8s-install.sh | bash -s -- --version 0.1.7
-#   APM_VERSION=0.1.7 curl -fsSL .../ai-apm-demo-k8s-install.sh | bash
 
 set -euo pipefail
 

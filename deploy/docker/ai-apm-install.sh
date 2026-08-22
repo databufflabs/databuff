@@ -16,10 +16,6 @@
 #   APM_VERSION        指定版本号 (默认从 ${APM_PKG_BASE}/VERSION 读取最新版)
 #   SKIP_START         1=仅下载解压不启动
 #   FORCE_PULL_IMAGES  1=强制重新下载镜像（同 --pull-images）
-#
-# 指定版本:
-#   curl -fsSL .../ai-apm-install.sh | bash -s -- --version 0.1.7
-#   APM_VERSION=0.1.7 curl -fsSL .../ai-apm-install.sh | bash
 
 set -e
 

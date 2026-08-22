@@ -38,9 +38,9 @@ curl -fsSL https://databuff.ai/databuff/ai-apm-install.sh | bash
 指定版本安装：
 
 ```bash
-curl -fsSL https://databuff.ai/databuff/ai-apm-install.sh | bash -s -- --version 0.1.7
+curl -fsSL https://databuff.ai/databuff/ai-apm-install.sh | bash -s -- --version 0.1.8
 # 或
-APM_VERSION=0.1.7 curl -fsSL https://databuff.ai/databuff/ai-apm-install.sh | bash
+APM_VERSION=0.1.8 curl -fsSL https://databuff.ai/databuff/ai-apm-install.sh | bash
 ```
 
 ### 离线安装

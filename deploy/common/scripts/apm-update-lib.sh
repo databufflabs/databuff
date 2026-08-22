@@ -336,7 +336,7 @@ apm_load_offline_bundle_images() {
   elif [[ -n "${APM_INSTALL_DIR:-}" && -f "${APM_INSTALL_DIR}/env.sh" ]]; then
     # 安装目录的 env.sh 是旧版本（APM_VERSION=旧），不能让它覆盖调用方已设好的
     # 目标版本 APM_VERSION，否则后续 apm_resolve_update_executable 会按旧版本
-    # 找部署包（如 0.1.3 找 databuff-ai-apm-0.1.3.tar.gz）而失败。只取镜像相关
+    # 找部署包而失败。只取镜像相关
     # 变量，保留 APM_VERSION。
     _apm_load_saved_ver="${APM_VERSION:-}"
     # shellcheck disable=SC1091
