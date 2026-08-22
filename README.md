@@ -35,9 +35,7 @@
 ---
 DataBuff 是一款面向 AI 智能体、微服务、云原生场景的 **AI 原生开源 APM 软件**，以 OpenTelemetry 标准接入，提供**全链路监控**、服务拓扑、RED 指标、智能体监控与 AI 工作台。
 
-## 生态认可 · OpenTelemetry Vendors × CNCF Landscape
 
-继入选 [OpenTelemetry 官方 Vendors](https://opentelemetry.io/ecosystem/vendors/)（标注 **OSS · Native OTLP**）之后，DataBuff 再被收录进 [CNCF Landscape](https://landscape.cncf.io/?item=observability-and-analysis--observability--databuff) 的 **Observability and Analysis → Observability**（另挂 AI Native Infra / Observability）——现有 OTel 埋点可零改造接入，也和全球可观测方案同屏对照。
 
 <table border="0" cellspacing="16" cellpadding="0" align="center">
 <tr>
