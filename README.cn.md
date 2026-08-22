@@ -19,20 +19,18 @@
 </p>
 
 <p align="center">
-  在线演示 Demo，需要加入下方交流群获取账号密码
+  在线演示环境，用户名:Admin, 密码:Databuff@123
+</p>
+<p align="center">
+  <img src="docs/images/community.png" alt="WeChat community QR code" width="128" />
+</p>
+<p align="center">
+在微信群技术沟通
 </p>
 
 </div>
 
-<br/>
 
-<p align="center">
-  <img src="docs/images/feature-pillars.png" alt="OpenTelemetry APM 与 AI Native 能力概览" width="880" />
-</p>
-
-<br/>
-
----
 DataBuff 是一款面向 AI 智能体、微服务、云原生场景的 **AI 原生开源 APM 软件**，以 OpenTelemetry 标准接入，提供**全链路监控**、服务拓扑、RED 指标、智能体监控与 AI 工作台。
 
 
