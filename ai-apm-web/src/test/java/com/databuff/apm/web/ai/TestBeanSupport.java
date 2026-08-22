@@ -3,6 +3,9 @@ package com.databuff.apm.web.ai;
 import com.databuff.apm.common.storage.ApmReadRepository;
 import com.databuff.apm.web.monitor.AlarmStore;
 import com.databuff.apm.web.monitor.NotifyChannelService;
+import com.databuff.apm.web.config.AlarmWebhookProperties;
+import com.databuff.apm.web.monitor.TestMonitorRecordIds;
+import com.databuff.apm.web.monitor.webhook.WebhookAlertAssembler;
 import com.databuff.apm.web.monitor.pipeline.EventAlarmOpener;
 import com.databuff.apm.web.monitor.service.AlarmService;
 import com.databuff.apm.web.persistence.AiPlatformPersistence;
@@ -263,10 +266,10 @@ public final class TestBeanSupport {
     }
 
     public static NotifyChannelService notifyChannelService() {
-        NotifyChannelService service =
-                new NotifyChannelService();
-        invokeInit(service, "initDefaults");
-        return service;
+        return new NotifyChannelService(
+                new AlarmWebhookProperties(),
+                TestMonitorRecordIds.create(),
+                new WebhookAlertAssembler());
     }
 
     public static EventAlarmOpener eventAlarmOpener(

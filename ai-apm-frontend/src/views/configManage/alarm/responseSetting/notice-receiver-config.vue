@@ -241,7 +241,7 @@ export default class NoticeReceiver extends Vue {
       sms: true,
       dingtalk: true,
       wechat: true,
-      webhook: true,
+      webhook: false,
       socket: true,
     };
     if (this.noticeTypes && this.noticeTypes.length) {
@@ -249,6 +249,8 @@ export default class NoticeReceiver extends Vue {
         mapping[key] = this.noticeTypes.includes(key)
       })
     }
+    // Alarm webhooks are configured only in application.yml, never per policy.
+    mapping.webhook = false
     return mapping
   }
 

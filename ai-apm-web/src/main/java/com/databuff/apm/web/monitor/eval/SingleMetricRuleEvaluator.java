@@ -36,6 +36,18 @@ public class SingleMetricRuleEvaluator {
     }
 
     public List<RuleEvaluationResult> evaluateAll(EventRule rule, long lookbackMillis) {
+        return evaluateAllInternal(rule, lookbackMillis, false);
+    }
+
+    /** Includes explicitly observed non-breaching groups so the pipeline can emit recovery. */
+    public List<RuleEvaluationResult> evaluateAllIncludingNormal(EventRule rule, long lookbackMillis) {
+        return evaluateAllInternal(rule, lookbackMillis, true);
+    }
+
+    private List<RuleEvaluationResult> evaluateAllInternal(
+            EventRule rule,
+            long lookbackMillis,
+            boolean includeNormal) {
         Map<String, Object> query = EventRulePayloadParser.parseQuery(rule.queryJson());
         Map<String, Object> primary = EventRulePayloadParser.primaryQueryItem(query);
         if (!primary.isEmpty()) {
@@ -48,12 +60,12 @@ public class SingleMetricRuleEvaluator {
         boolean catalogRule = rule.queryJson() != null && !rule.queryJson().isBlank();
         if (catalogRule) {
             if (EventRule.WAY_MUTATION.equals(way)) {
-                return evaluateCatalogMutationAll(rule, lookbackMillis);
+                return evaluateCatalogMutationAll(rule, lookbackMillis, includeNormal);
             }
-            return evaluateCatalogThresholdAll(rule, lookbackMillis);
+            return evaluateCatalogThresholdAll(rule, lookbackMillis, includeNormal);
         }
         RuleEvaluationResult single = evaluateLegacy(rule, lookbackMillis, way);
-        if (!single.triggered()) {
+        if (!single.triggered() && !includeNormal) {
             return List.of();
         }
         return List.of(single);
@@ -77,9 +89,27 @@ public class SingleMetricRuleEvaluator {
                     message,
                     EventRule.WAY_THRESHOLD,
                     rule.service(),
-                    rule.service());
+                    rule.service(),
+                    "service.error.pct",
+                    "错误率",
+                    "%",
+                    rate * 100,
+                    rule.threshold() * 100,
+                    EventRule.normalizeComparator(rule.comparator()));
         }
-        return RuleEvaluationResult.normal();
+        return new RuleEvaluationResult(
+                false,
+                "warning",
+                "",
+                EventRule.WAY_THRESHOLD,
+                rule.service(),
+                rule.service(),
+                "service.error.pct",
+                "错误率",
+                "%",
+                rate * 100,
+                rule.threshold() * 100,
+                EventRule.normalizeComparator(rule.comparator()));
     }
 
     private RuleEvaluationResult evaluateMutation(EventRule rule, long lookbackMillis) {
@@ -98,20 +128,57 @@ public class SingleMetricRuleEvaluator {
                     message,
                     EventRule.WAY_MUTATION,
                     rule.service(),
-                    rule.service());
+                    rule.service(),
+                    "service.error.pct",
+                    "错误率",
+                    "%",
+                    delta * 100,
+                    rule.threshold() * 100,
+                    EventRule.normalizeComparator(rule.comparator()));
         }
-        return RuleEvaluationResult.normal();
+        return new RuleEvaluationResult(
+                false,
+                "warning",
+                "",
+                EventRule.WAY_MUTATION,
+                rule.service(),
+                rule.service(),
+                "service.error.pct",
+                "错误率",
+                "%",
+                delta * 100,
+                rule.threshold() * 100,
+                EventRule.normalizeComparator(rule.comparator()));
     }
 
-    private List<RuleEvaluationResult> evaluateCatalogThresholdAll(EventRule rule, long lookbackMillis) {
+    private List<RuleEvaluationResult> evaluateCatalogThresholdAll(
+            EventRule rule,
+            long lookbackMillis,
+            boolean includeNormal) {
         List<GroupMetricValue> groups = ruleMetricEvaluationService.evaluateRuleGroups(rule, lookbackMillis);
         String comparator = resolveComparator(rule);
         EventRulePayloadParser.ThresholdLevels levels = resolveThresholdLevels(rule);
+        ThresholdAlarmMessageFormatter.MetricMeta metricMeta = messageFormatter.metricMeta(rule);
         List<RuleEvaluationResult> results = new ArrayList<>();
         for (GroupMetricValue group : groups) {
             String level = ThresholdAlarmCheck.resolveLevel(
                     group.value(), comparator, levels.critical(), levels.warning());
             if (level == null) {
+                if (includeNormal) {
+                    results.add(new RuleEvaluationResult(
+                            false,
+                            "warning",
+                            "",
+                            EventRule.WAY_THRESHOLD,
+                            group.service(),
+                            group.groupKey(),
+                            metricMeta.metricId(),
+                            metricMeta.label(),
+                            metricMeta.unit(),
+                            group.value(),
+                            levels.critical(),
+                            comparator));
+                }
                 continue;
             }
             double breachedThreshold = ThresholdAlarmCheck.resolveBreachedThreshold(
@@ -128,12 +195,21 @@ public class SingleMetricRuleEvaluator {
                     message,
                     EventRule.WAY_THRESHOLD,
                     group.service(),
-                    group.groupKey()));
+                    group.groupKey(),
+                    metricMeta.metricId(),
+                    metricMeta.label(),
+                    metricMeta.unit(),
+                    group.value(),
+                    breachedThreshold,
+                    comparator));
         }
         return results;
     }
 
-    private List<RuleEvaluationResult> evaluateCatalogMutationAll(EventRule rule, long lookbackMillis) {
+    private List<RuleEvaluationResult> evaluateCatalogMutationAll(
+            EventRule rule,
+            long lookbackMillis,
+            boolean includeNormal) {
         long to = PortalTimeParser.portalEndNow();
         long currentFrom = to - lookbackMillis;
         Map<String, Object> query = EventRulePayloadParser.parseQuery(rule.queryJson());
@@ -150,6 +226,7 @@ public class SingleMetricRuleEvaluator {
                 .collect(Collectors.toMap(GroupMetricValue::groupKey, Function.identity(), (left, right) -> left));
         String comparator = resolveComparator(rule);
         EventRulePayloadParser.ThresholdLevels levels = resolveThresholdLevels(rule);
+        ThresholdAlarmMessageFormatter.MetricMeta metricMeta = messageFormatter.metricMeta(rule);
         List<RuleEvaluationResult> results = new ArrayList<>();
         for (GroupMetricValue current : currentGroups) {
             GroupMetricValue previous = previousByGroup.get(current.groupKey());
@@ -158,14 +235,30 @@ public class SingleMetricRuleEvaluator {
             if (Double.isNaN(change) || Double.isInfinite(change)) {
                 continue;
             }
+            double displayDelta = yoy ? change * 100 : change;
+            double displayCritical = yoy ? levels.critical() * 100 : levels.critical();
             String level = ThresholdAlarmCheck.resolveLevel(
                     change, comparator, levels.critical(), levels.warning());
             if (level == null) {
+                if (includeNormal) {
+                    results.add(new RuleEvaluationResult(
+                            false,
+                            "warning",
+                            "",
+                            EventRule.WAY_MUTATION,
+                            current.service(),
+                            current.groupKey(),
+                            metricMeta.metricId(),
+                            metricMeta.label(),
+                            metricMeta.unit(),
+                            displayDelta,
+                            displayCritical,
+                            comparator));
+                }
                 continue;
             }
             double breachedThreshold = ThresholdAlarmCheck.resolveBreachedThreshold(
                     level, levels.critical(), levels.warning());
-            double displayDelta = yoy ? change * 100 : change;
             double displayThreshold = yoy ? breachedThreshold * 100 : breachedThreshold;
             String message = messageFormatter.mutationMessage(
                     rule, displayDelta, displayThreshold, current.groupKey(), current.service());
@@ -175,7 +268,13 @@ public class SingleMetricRuleEvaluator {
                     message,
                     EventRule.WAY_MUTATION,
                     current.service(),
-                    current.groupKey()));
+                    current.groupKey(),
+                    metricMeta.metricId(),
+                    metricMeta.label(),
+                    metricMeta.unit(),
+                    displayDelta,
+                    displayThreshold,
+                    comparator));
         }
         return results;
     }

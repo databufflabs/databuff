@@ -418,4 +418,86 @@ class SingleMetricRuleEvaluatorTest {
         assertThat(results).hasSize(1);
         assertThat(results.get(0).level()).isEqualTo(EventRule.LEVEL_WARNING);
     }
+
+    @Test
+    void catalogThresholdResultCarriesStructuredMetricNumbers() {
+        RuleMetricEvaluationService metricService = mock(RuleMetricEvaluationService.class);
+        when(metricService.evaluateRuleGroups(any(), anyLong()))
+                .thenReturn(List.of(new GroupMetricValue("order-service", "TimeoutException", 8.7)));
+
+        String queryJson = "{\"1\":{\"way\":\"threshold\",\"period\":300,\"comparison\":\">\","
+                + "\"thresholds\":{\"critical\":8},"
+                + "\"A\":{\"metric\":\"service.error.pct\",\"from\":[]}}}";
+        EventRule rule = new EventRule(
+                9L,
+                "error rate grouped",
+                EventRule.CLASSIFY_SINGLE,
+                EventRule.WAY_THRESHOLD,
+                "order-service",
+                EventRule.METRIC_ERROR_RATE,
+                8.0,
+                EventRule.COMPARATOR_GT,
+                true,
+                queryJson,
+                java.time.Instant.now());
+
+        List<RuleEvaluationResult> results = evaluator(metricService).evaluateAll(rule, 300_000L);
+
+        assertThat(results).hasSize(1);
+        RuleEvaluationResult result = results.get(0);
+        assertThat(result.metricId()).isEqualTo("service.error.pct");
+        assertThat(result.metricLabel()).isEqualTo("错误率");
+        assertThat(result.metricUnit()).isEqualTo("%");
+        assertThat(result.value()).isEqualTo(8.7);
+        assertThat(result.threshold()).isEqualTo(8.0);
+        assertThat(result.comparator()).isEqualTo("gt");
+    }
+
+    @Test
+    void legacyThresholdResultCarriesPercentScaledNumbers() {
+        RuleMetricEvaluationService metricService = mock(RuleMetricEvaluationService.class);
+        ThresholdEvaluationService thresholdService = mock(ThresholdEvaluationService.class);
+        when(thresholdService.currentErrorRate(any(), anyLong())).thenReturn(0.052);
+        ThresholdAlarmMessageFormatter formatter =
+                new ThresholdAlarmMessageFormatter(TestMetricCoreSupport.catalogWithServiceMetrics());
+        SingleMetricRuleEvaluator evaluator = new SingleMetricRuleEvaluator(
+                thresholdService, metricService, formatter);
+        EventRule rule = new EventRule(
+                11L, "legacy error rate", EventRule.CLASSIFY_SINGLE, EventRule.WAY_THRESHOLD,
+                "checkout", EventRule.METRIC_ERROR_RATE, 0.05, EventRule.COMPARATOR_GT, true,
+                null, java.time.Instant.now());
+
+        List<RuleEvaluationResult> results = evaluator.evaluateAll(rule, 300_000L);
+
+        assertThat(results).hasSize(1);
+        RuleEvaluationResult result = results.get(0);
+        // legacy error rate is a fraction; payload numbers match the message scale (percent)
+        assertThat(result.value()).isEqualTo(5.2);
+        assertThat(result.threshold()).isEqualTo(5.0);
+        assertThat(result.metricUnit()).isEqualTo("%");
+        assertThat(result.comparator()).isEqualTo("gt");
+    }
+
+    @Test
+    void includingNormalReturnsObservedCatalogGroupWithoutTriggering() {
+        RuleMetricEvaluationService metricService = mock(RuleMetricEvaluationService.class);
+        when(metricService.evaluateRuleGroups(any(), anyLong()))
+                .thenReturn(List.of(new GroupMetricValue("order-service", "TimeoutException", 4.0)));
+        String queryJson = "{\"1\":{\"way\":\"threshold\",\"period\":300,\"comparison\":\">\","
+                + "\"thresholds\":{\"critical\":8},"
+                + "\"A\":{\"metric\":\"service.error.pct\",\"from\":[]}}}";
+        EventRule rule = new EventRule(
+                12L, "error rate grouped", EventRule.CLASSIFY_SINGLE, EventRule.WAY_THRESHOLD,
+                "order-service", EventRule.METRIC_ERROR_RATE, 8.0, EventRule.COMPARATOR_GT,
+                true, queryJson, java.time.Instant.now());
+
+        assertThat(evaluator(metricService).evaluateAll(rule, 300_000L)).isEmpty();
+        List<RuleEvaluationResult> observed =
+                evaluator(metricService).evaluateAllIncludingNormal(rule, 300_000L);
+
+        assertThat(observed).hasSize(1);
+        assertThat(observed.get(0).triggered()).isFalse();
+        assertThat(observed.get(0).groupKey()).isEqualTo("TimeoutException");
+        assertThat(observed.get(0).value()).isEqualTo(4.0);
+    }
 }

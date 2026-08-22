@@ -19,17 +19,14 @@ public class EventRuleController {
 
     private final EventRuleService eventRuleService;
     private final AlarmStore alarmStore;
-    private final NotifyChannelService notifyChannelService;
     private final AlarmSilenceStore alarmSilenceStore;
 
     public EventRuleController(
             EventRuleService eventRuleService,
             AlarmStore alarmStore,
-            NotifyChannelService notifyChannelService,
             AlarmSilenceStore alarmSilenceStore) {
         this.eventRuleService = eventRuleService;
         this.alarmStore = alarmStore;
-        this.notifyChannelService = notifyChannelService;
         this.alarmSilenceStore = alarmSilenceStore;
     }
 
@@ -62,16 +59,6 @@ public class EventRuleController {
     @GetMapping("/incidents")
     public List<AlarmIncident> listOpenIncidents() {
         return alarmStore.groupOpenIncidents();
-    }
-
-    @GetMapping("/notify/config")
-    public Map<String, Object> getNotifyConfig() {
-        return notifyChannelService.getConfig();
-    }
-
-    @PostMapping("/notify/config")
-    public Map<String, Object> setNotifyConfig(@RequestBody Map<String, Object> body) {
-        return notifyChannelService.updateConfig(body);
     }
 
     @PostMapping("/silence")

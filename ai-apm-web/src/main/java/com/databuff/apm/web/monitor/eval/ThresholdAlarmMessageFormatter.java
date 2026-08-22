@@ -17,6 +17,17 @@ public class ThresholdAlarmMessageFormatter {
         this.catalogService = catalogService;
     }
 
+    /** Structured metric identity for webhook payloads: id + display label + unit. */
+    public record MetricMeta(String metricId, String label, String unit) {
+    }
+
+    /** Resolves the metric id/label/unit a rule's numbers should be reported under. */
+    public MetricMeta metricMeta(EventRule rule) {
+        MetricContext context = resolveContext(rule);
+        String unit = context.unitSuffix().isBlank() ? null : context.unitSuffix();
+        return new MetricMeta(context.metricId(), context.metricLabel(), unit);
+    }
+
     public String thresholdMessage(
             EventRule rule,
             double value,
@@ -83,7 +94,7 @@ public class ThresholdAlarmMessageFormatter {
         String metricLabel = resolveMetricLabel(metricId, definition);
         boolean percent = isPercentMetric(metricId, viewUnit, definition);
         String unitSuffix = resolveUnitSuffix(viewUnit, definition, percent);
-        return new MetricContext(metricLabel, percent, unitSuffix);
+        return new MetricContext(metricId, metricLabel, percent, unitSuffix);
     }
 
     private static String resolveMetricLabel(String metricId, MetricQueryDefinition definition) {
@@ -152,6 +163,6 @@ public class ThresholdAlarmMessageFormatter {
                 .replaceAll("\\.$", "");
     }
 
-    private record MetricContext(String metricLabel, boolean percent, String unitSuffix) {
+    private record MetricContext(String metricId, String metricLabel, boolean percent, String unitSuffix) {
     }
 }

@@ -34,6 +34,12 @@ public class EventRecordFactory {
                 result.message(),
                 result.groupKey(),
                 silenced,
-                triggeredAt);
+                triggeredAt,
+                result.metricId(),
+                result.metricLabel(),
+                result.metricUnit(),
+                result.value(),
+                result.threshold(),
+                result.comparator());
     }
 }

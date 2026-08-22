@@ -201,9 +201,8 @@ class EventRuleLocalIntegrationTest {
 
         @Bean
         AlarmResponseExecutor alarmResponseExecutor(
-                ResponsePolicyService responsePolicyService,
                 NotifyChannelService notifyChannelService) {
-            return new AlarmResponseExecutor(responsePolicyService, notifyChannelService);
+            return new AlarmResponseExecutor(notifyChannelService);
         }
 
         @Bean

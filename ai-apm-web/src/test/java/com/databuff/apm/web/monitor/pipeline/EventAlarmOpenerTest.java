@@ -72,6 +72,20 @@ class EventAlarmOpenerTest {
         assertThat(alarmStore.listOpen()).isEmpty();
     }
 
+    @Test
+    void recordsRecoveryEventAsResolvedAlarm() {
+        EventRecord event = new EventRecord(
+                "E2", 1L, "error rate rule", "checkout", EventRule.WAY_THRESHOLD,
+                "critical", EventRecord.STATUS_RECOVER, "recovered", "checkout", false,
+                Instant.now());
+
+        Optional<Alarm> recovered = opener.openRecoveryForEvent(event);
+
+        assertThat(recovered).isPresent();
+        assertThat(recovered.get().status()).isEqualTo(Alarm.STATUS_RESOLVED);
+        verify(eventPersistence).linkToAlarm("E2", recovered.get().id());
+    }
+
     private static EventRecord abnormalEvent(String id, String service, String message) {
         return new EventRecord(
                 id,

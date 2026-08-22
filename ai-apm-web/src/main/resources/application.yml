@@ -60,6 +60,13 @@ apm:
   alarm:
     lookback-minutes: 5
     evaluation-cron: "0 * * * * ?"
+    webhook:
+      url: ${APM_ALARM_WEBHOOK_URL:}
+      headers: {}
+      queue-capacity: ${APM_ALARM_WEBHOOK_QUEUE_CAPACITY:1000}
+      batch-size: ${APM_ALARM_WEBHOOK_BATCH_SIZE:50}
+      retry-times: ${APM_ALARM_WEBHOOK_RETRY_TIMES:2}
+      retry-backoff-millis: ${APM_ALARM_WEBHOOK_RETRY_BACKOFF_MILLIS:1000}
   monitor:
     pool:
       core-size: 4

@@ -13,8 +13,18 @@
 -- Deploy: apply this ALTER and wait for it to finish before rolling web/ingest
 -- (new web SELECTs log_id).
 -- ADD COLUMN IF NOT EXISTS keeps the migration re-runnable.
+-- This iteration also adds structured alert metric fields; no separate migration
+-- version is introduced.
 
 USE databuff;
 
 ALTER TABLE log_dc_record
   ADD COLUMN IF NOT EXISTS `log_id` VARCHAR(32) NOT NULL DEFAULT '' COMMENT 'ingest-generated random id (UUID hex); unique per record';
+
+ALTER TABLE config_event
+  ADD COLUMN IF NOT EXISTS `metric_id` VARCHAR(128) NULL COMMENT 'structured metric identifier behind the message',
+  ADD COLUMN IF NOT EXISTS `metric_label` VARCHAR(128) NULL COMMENT 'metric display label',
+  ADD COLUMN IF NOT EXISTS `metric_unit` VARCHAR(32) NULL COMMENT 'metric unit, e.g. %',
+  ADD COLUMN IF NOT EXISTS `metric_value` DOUBLE NULL COMMENT 'current metric value at trigger time',
+  ADD COLUMN IF NOT EXISTS `metric_threshold` DOUBLE NULL COMMENT 'breached threshold for the resolved level',
+  ADD COLUMN IF NOT EXISTS `comparator` VARCHAR(16) NULL COMMENT 'gt|gte|lt|lte';

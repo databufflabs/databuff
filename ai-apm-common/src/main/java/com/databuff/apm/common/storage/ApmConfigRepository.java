@@ -85,6 +85,25 @@ public class ApmConfigRepository {
         }
     }
 
+    /** True when {@code table} exists and already has {@code column} (feature detection). */
+    public boolean columnReady(String table, String column) {
+        try (Connection connection = reader.connection();
+             Statement statement = connection.createStatement()) {
+            statement.setQueryTimeout(5);
+            try (ResultSet ignored = statement.executeQuery(
+                    "SELECT " + column + " FROM " + qualified(table) + " LIMIT 0")) {
+                return true;
+            }
+        } catch (SQLException e) {
+            return false;
+        }
+    }
+
+    /** True when config_event carries the structured metric columns (V008+). */
+    public boolean eventMetricColumnsReady() {
+        return columnReady(DorisTableNames.CONFIG_EVENT, "metric_value");
+    }
+
     public List<LlmProviderRow> loadLlmProviders() throws SQLException {
         String sql = "SELECT provider_code, display_name, base_url, enabled, api_key_cipher, default_model, api_type "
                 + "FROM " + qualified(DorisTableNames.CONFIG_LLM_PROVIDER);
@@ -746,8 +765,54 @@ public class ApmConfigRepository {
         }
     }
 
+    /** V008+ insert: also persists the structured metric block (all columns nullable). */
+    public void upsertEventWithMetric(EventRow row) throws SQLException {
+        String sql = "INSERT INTO " + qualified(DorisTableNames.CONFIG_EVENT)
+                + " (id, rule_id, rule_name, service, detection_way, level, status, message, group_key,"
+                + " silenced, triggered_at, metric_id, metric_label, metric_unit, metric_value,"
+                + " metric_threshold, comparator)"
+                + " VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)";
+        try (Connection connection = reader.connection();
+             PreparedStatement ps = connection.prepareStatement(sql)) {
+            ps.setString(1, row.id());
+            ps.setLong(2, row.ruleId());
+            ps.setString(3, row.ruleName());
+            ps.setString(4, row.service());
+            ps.setString(5, row.detectionWay());
+            ps.setString(6, row.level());
+            ps.setString(7, row.status());
+            ps.setString(8, row.message());
+            ps.setString(9, row.groupKey());
+            ps.setInt(10, row.silenced() ? 1 : 0);
+            ps.setTimestamp(11, Timestamp.from(row.triggeredAt()));
+            ps.setString(12, row.metricId());
+            ps.setString(13, row.metricLabel());
+            ps.setString(14, row.metricUnit());
+            setNullableDouble(ps, 15, row.value());
+            setNullableDouble(ps, 16, row.threshold());
+            ps.setString(17, row.comparator());
+            ps.executeUpdate();
+        }
+    }
+
+    private static void setNullableDouble(PreparedStatement ps, int index, Double value) throws SQLException {
+        if (value == null) {
+            ps.setNull(index, Types.DOUBLE);
+        } else {
+            ps.setDouble(index, value);
+        }
+    }
+
     public List<EventRow> loadRecentEvents(int limit) throws SQLException {
-        String sql = "SELECT id, rule_id, rule_name, service, detection_way, level, status, message, group_key, silenced, triggered_at "
+        return loadRecentEvents(limit, false);
+    }
+
+    public List<EventRow> loadRecentEvents(int limit, boolean withMetricColumns) throws SQLException {
+        String columns = withMetricColumns
+                ? "id, rule_id, rule_name, service, detection_way, level, status, message, group_key, silenced,"
+                        + " triggered_at, metric_id, metric_label, metric_unit, metric_value, metric_threshold, comparator"
+                : "id, rule_id, rule_name, service, detection_way, level, status, message, group_key, silenced, triggered_at";
+        String sql = "SELECT " + columns + " "
                 + "FROM " + qualified(DorisTableNames.CONFIG_EVENT)
                 + " ORDER BY triggered_at DESC LIMIT " + limit;
         List<EventRow> rows = new ArrayList<>();
@@ -755,14 +820,22 @@ public class ApmConfigRepository {
              Statement statement = connection.createStatement();
              ResultSet rs = statement.executeQuery(sql)) {
             while (rs.next()) {
-                rows.add(readEventRow(rs));
+                rows.add(withMetricColumns ? readEventRowWithMetric(rs, 1) : readEventRow(rs));
             }
         }
         return rows;
     }
 
     public Optional<EventRow> loadEventById(String id) throws SQLException {
-        String sql = "SELECT id, rule_id, rule_name, service, detection_way, level, status, message, group_key, silenced, triggered_at "
+        return loadEventById(id, false);
+    }
+
+    public Optional<EventRow> loadEventById(String id, boolean withMetricColumns) throws SQLException {
+        String columns = withMetricColumns
+                ? "id, rule_id, rule_name, service, detection_way, level, status, message, group_key, silenced,"
+                        + " triggered_at, metric_id, metric_label, metric_unit, metric_value, metric_threshold, comparator"
+                : "id, rule_id, rule_name, service, detection_way, level, status, message, group_key, silenced, triggered_at";
+        String sql = "SELECT " + columns + " "
                 + "FROM " + qualified(DorisTableNames.CONFIG_EVENT)
                 + " WHERE id = ? LIMIT 1";
         try (Connection connection = reader.connection();
@@ -772,7 +845,7 @@ public class ApmConfigRepository {
                 if (!rs.next()) {
                     return Optional.empty();
                 }
-                return Optional.of(readEventRow(rs));
+                return Optional.of(withMetricColumns ? readEventRowWithMetric(rs, 1) : readEventRow(rs));
             }
         }
     }
@@ -906,6 +979,31 @@ public class ApmConfigRepository {
                 rs.getString(fromColumn + 8),
                 rs.getInt(fromColumn + 9) == 1,
                 rs.getTimestamp(fromColumn + 10).toInstant());
+    }
+
+    private static EventRow readEventRowWithMetric(ResultSet rs, int fromColumn) throws SQLException {
+        double value = rs.getDouble(fromColumn + 14);
+        boolean valueAbsent = rs.wasNull();
+        double threshold = rs.getDouble(fromColumn + 15);
+        boolean thresholdAbsent = rs.wasNull();
+        return new EventRow(
+                rs.getString(fromColumn),
+                rs.getLong(fromColumn + 1),
+                rs.getString(fromColumn + 2),
+                rs.getString(fromColumn + 3),
+                rs.getString(fromColumn + 4),
+                rs.getString(fromColumn + 5),
+                rs.getString(fromColumn + 6),
+                rs.getString(fromColumn + 7),
+                rs.getString(fromColumn + 8),
+                rs.getInt(fromColumn + 9) == 1,
+                rs.getTimestamp(fromColumn + 10).toInstant(),
+                rs.getString(fromColumn + 11),
+                rs.getString(fromColumn + 12),
+                rs.getString(fromColumn + 13),
+                valueAbsent ? null : value,
+                thresholdAbsent ? null : threshold,
+                rs.getString(fromColumn + 16));
     }
 
     public void upsertAlarmPolicy(AlarmPolicyRow row) throws SQLException {
@@ -1107,7 +1205,30 @@ public class ApmConfigRepository {
             String message,
             String groupKey,
             boolean silenced,
-            Instant triggeredAt) {
+            Instant triggeredAt,
+            String metricId,
+            String metricLabel,
+            String metricUnit,
+            Double value,
+            Double threshold,
+            String comparator) {
+
+        /** Legacy 11-field shape (tables without the V008 alert columns). */
+        public EventRow(
+                String id,
+                long ruleId,
+                String ruleName,
+                String service,
+                String detectionWay,
+                String level,
+                String status,
+                String message,
+                String groupKey,
+                boolean silenced,
+                Instant triggeredAt) {
+            this(id, ruleId, ruleName, service, detectionWay, level, status, message, groupKey,
+                    silenced, triggeredAt, null, null, null, null, null, null);
+        }
     }
 
     public record AlarmEventRow(

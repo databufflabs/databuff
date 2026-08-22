@@ -30,4 +30,20 @@ public class EventAlarmOpener {
         eventPersistence.linkToAlarm(event.id(), alarm.id());
         return Optional.of(alarm);
     }
+
+    /** Records a recovery event as a resolved one-shot alarm for the shared response path. */
+    public Optional<Alarm> openRecoveryForEvent(EventRecord event) {
+        if (event == null || !(EventRecord.STATUS_RECOVER.equals(event.status())
+                || EventRecord.STATUS_NORMAL.equals(event.status()))) {
+            return Optional.empty();
+        }
+        Alarm alarm = alarmStore.openResolved(
+                event.service(),
+                event.detectionWay(),
+                event.level(),
+                event.message(),
+                event.triggeredAt());
+        eventPersistence.linkToAlarm(event.id(), alarm.id());
+        return Optional.of(alarm);
+    }
 }

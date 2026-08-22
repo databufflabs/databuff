@@ -11,7 +11,6 @@ import com.databuff.apm.web.monitor.pipeline.EventRecord;
 import com.databuff.apm.web.monitor.pipeline.EventRecordFactory;
 import com.databuff.apm.web.monitor.pipeline.EventRulePipeline;
 import com.databuff.apm.web.portal.PortalTimeParser;
-import com.databuff.apm.web.monitor.policy.ResponsePolicyService;
 import com.databuff.apm.web.persistence.EventPersistence;
 
 import com.databuff.apm.common.query.ApmQueryModels.ErrorRateSnapshot;
@@ -64,7 +63,7 @@ class EventRuleMutationPipelineIntegrationTest {
         EventAlarmOpener eventAlarmOpener =
                 TestBeanSupport.eventAlarmOpener(alarmStore, eventPersistence);
         AlarmResponseExecutor responseExecutor = new AlarmResponseExecutor(
-                new ResponsePolicyService(), TestBeanSupport.notifyChannelService());
+                TestBeanSupport.notifyChannelService());
         monitorPipeline = new EventRulePipeline(
                 singleMetricRuleEvaluator,
                 alarmSilenceStore,

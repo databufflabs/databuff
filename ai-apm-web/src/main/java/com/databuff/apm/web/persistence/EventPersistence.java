@@ -32,6 +32,7 @@ public class EventPersistence {
     private final String configDatabase;
     private final ConcurrentLinkedDeque<EventRecord> recentEvents = new ConcurrentLinkedDeque<>();
     private volatile boolean persistenceEnabled;
+    private volatile boolean metricColumnsEnabled;
 
     public EventPersistence(
             ApmReadRepository readRepository,
@@ -49,12 +50,16 @@ public class EventPersistence {
             return;
         }
         try {
-            List<ApmConfigRepository.EventRow> rows = repository.loadRecentEvents(HYDRATE_LIMIT);
+            // Tables without the V008 metric columns keep the legacy read/write shape.
+            metricColumnsEnabled = repository.eventMetricColumnsReady();
+            List<ApmConfigRepository.EventRow> rows =
+                    repository.loadRecentEvents(HYDRATE_LIMIT, metricColumnsEnabled);
             for (ApmConfigRepository.EventRow row : rows) {
                 remember(toEventRecord(row));
             }
             persistenceEnabled = true;
-            log.info("Monitor raw event persistence enabled ({} rows from store)", rows.size());
+            log.info("Monitor raw event persistence enabled ({} rows from store, metric columns: {})",
+                    rows.size(), metricColumnsEnabled);
         } catch (Exception e) {
             log.warn("Failed to initialize monitor event persistence: {}", e.getMessage());
         }
@@ -66,7 +71,12 @@ public class EventPersistence {
             return;
         }
         try {
-            new ApmConfigRepository(readRepository, configDatabase).upsertEvent(toRow(event));
+            ApmConfigRepository repository = new ApmConfigRepository(readRepository, configDatabase);
+            if (metricColumnsEnabled) {
+                repository.upsertEventWithMetric(toRow(event));
+            } else {
+                repository.upsertEvent(toRow(event));
+            }
         } catch (Exception e) {
             log.warn("Failed to persist monitor event {}: {}", event.id(), e.getMessage());
         }
@@ -186,7 +196,13 @@ public class EventPersistence {
                 row.message(),
                 row.groupKey(),
                 row.silenced(),
-                row.triggeredAt());
+                row.triggeredAt(),
+                row.metricId(),
+                row.metricLabel(),
+                row.metricUnit(),
+                row.value(),
+                row.threshold(),
+                row.comparator());
     }
 
     private static ApmConfigRepository.EventRow toRow(EventRecord event) {
@@ -201,6 +217,12 @@ public class EventPersistence {
                 event.message(),
                 event.groupKey(),
                 event.silenced(),
-                event.triggeredAt());
+                event.triggeredAt(),
+                event.metricId(),
+                event.metricLabel(),
+                event.metricUnit(),
+                event.value(),
+                event.threshold(),
+                event.comparator());
     }
 }

@@ -31,6 +31,10 @@ public class MonitorRecordIdGenerator {
         return "E" + snowflake.nextId();
     }
 
+    public String nextBatchId() {
+        return "B" + snowflake.nextId();
+    }
+
     private static long resolveWorkerId(Long configuredWorkerId) {
         if (configuredWorkerId != null
                 && configuredWorkerId >= 0

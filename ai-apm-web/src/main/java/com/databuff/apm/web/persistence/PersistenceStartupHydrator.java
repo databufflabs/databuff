@@ -29,7 +29,6 @@ public class PersistenceStartupHydrator {
     private final AlarmPersistence alarmPersistence;
     private final AlarmSilencePersistence alarmSilencePersistence;
     private final AiSessionPersistence aiSessionPersistence;
-    private final NotifyChannelPersistence notifyChannelPersistence;
     private final TrafficLightConfigPersistence trafficLightConfigPersistence;
     private final AiPlatformPersistence aiPlatformPersistence;
     private final EventPersistence eventPersistence;
@@ -51,7 +50,6 @@ public class PersistenceStartupHydrator {
             AlarmPersistence alarmPersistence,
             AlarmSilencePersistence alarmSilencePersistence,
             AiSessionPersistence aiSessionPersistence,
-            NotifyChannelPersistence notifyChannelPersistence,
             TrafficLightConfigPersistence trafficLightConfigPersistence,
             AiPlatformPersistence aiPlatformPersistence,
             ExpertTaskPersistence expertTaskPersistence,
@@ -64,7 +62,6 @@ public class PersistenceStartupHydrator {
         this.alarmPersistence = alarmPersistence;
         this.alarmSilencePersistence = alarmSilencePersistence;
         this.aiSessionPersistence = aiSessionPersistence;
-        this.notifyChannelPersistence = notifyChannelPersistence;
         this.trafficLightConfigPersistence = trafficLightConfigPersistence;
         this.aiPlatformPersistence = aiPlatformPersistence;
         this.expertTaskPersistence = expertTaskPersistence;
@@ -152,7 +149,6 @@ public class PersistenceStartupHydrator {
         try {
             metricCorePersistence.reloadFromStore();
             trafficLightConfigPersistence.reloadFromStore();
-            notifyChannelPersistence.reloadFromStore();
             eventRuleStore.reloadFromStore();
             alarmPolicyHydrator.reloadFromStore();
             eventPersistence.reloadFromStore();

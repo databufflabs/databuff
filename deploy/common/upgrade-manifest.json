@@ -2,5 +2,5 @@
   "schema_version": 8,
   "upgrade_type": "A",
   "min_upgrade_from": "0.1.0",
-  "notes": "V008 adds log_id to log_dc_record so the log-analysis detail panel can locate the exact row (time_ns is not unique; GitHub #73). Apply this ALTER before rolling web/ingest. Ingest writes a 32-hex random id; existing rows (log_id='') use time_ns in the same detail SQL."
+  "notes": "V008 adds log_id to log_dc_record for exact log-detail lookup and structured alert metric columns. Apply the migration before rolling web/ingest."
 }
