@@ -24,6 +24,12 @@
 <p align="center">
   Username:Admin, Password:Databuff@123
 </p>
+<p align="center">
+  <img src="docs/images/community.png" alt="WeChat community QR code" width="128" />
+</p>
+<p align="center">
+chat on WeChat
+</p>
 
 </div>
 
