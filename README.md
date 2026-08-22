@@ -37,33 +37,6 @@ DataBuff 是一款面向 AI 智能体、微服务、云原生场景的 **AI 原�
 
 
 
-<table border="0" cellspacing="16" cellpadding="0" align="center">
-<tr>
-<td align="center" width="480" valign="top">
-  <p><strong>① 入选 OpenTelemetry Vendors</strong></p>
-  <p>与 Jaeger、SigNoz、Grafana 等并列，官网 Vendors 列表标注原生 OTLP。</p>
-  <img src="docs/images/otel-vendors-databuff.png" alt="OpenTelemetry Vendors 列表中的 DataBuff" width="460" />
-  <br/>
-  <sub>
-    <a href="https://opentelemetry.io/ecosystem/vendors/">官网列表</a>
-    ·
-    <a href="https://mp.weixin.qq.com/s/RGzh1LnzBzOQTizsoPZMGg">宣布文章</a>
-  </sub>
-</td>
-<td align="center" width="480" valign="top">
-  <p><strong>② 收录 CNCF Landscape</strong></p>
-  <p>云原生全景图 Observability 区可见 DataBuff。</p>
-  <img src="docs/images/cncf-landscape-databuff.png" alt="CNCF Landscape 中的 DataBuff" width="460" />
-  <br/>
-  <sub>
-    <a href="https://landscape.cncf.io/?item=observability-and-analysis--observability--databuff">Landscape 条目</a>
-    ·
-    <a href="https://mp.weixin.qq.com/s/9PS2SW_ug6sNx9ZjAyxKNw">宣布文章</a>
-  </sub>
-</td>
-</tr>
-</table>
-
 ---
 
 ## 功能特性
