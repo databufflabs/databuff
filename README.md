@@ -17,7 +17,7 @@
   &nbsp;|&nbsp;
   <a href="docs/README_en.md">Documentation</a>
   &nbsp;|&nbsp;
-  <a href="README.md">中文</a>
+  <a href="README.cn.md">中文</a>
   &nbsp;|&nbsp;
   <a href="#community">Community</a>
 </p>
