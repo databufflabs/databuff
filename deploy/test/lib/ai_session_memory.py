@@ -330,7 +330,9 @@ def run_ai_session_memory_cases(
     except (urllib.error.URLError, TimeoutError, RuntimeError) as error:
         results.append(_case("巡检多轮记忆", False, sid, started, str(error)))
 
-    # 2) cross-expert isolation (reuse inspection session if available)
+    # 2) same-session cross-expert shared memory (no brain dispatch → shared)
+    #    产品改造后：直接指定 expertId（无大脑派发）时，同会话记忆共享，
+    #    data 专家应能记住 inspection 专家在同一会话里记下的暗号。
     started = time.time()
     try:
         if not sid:
@@ -349,10 +351,10 @@ def run_ai_session_memory_cases(
             session_id=sid,
             **turn_kw,
         )
-        ok = ("不知道" in r3) or ("蓝莓派" not in r3)
-        results.append(_case("同会话跨专家隔离", ok, sid, started, r3[:240]))
+        ok = "蓝莓派" in r3
+        results.append(_case("同会话跨专家共享记忆", ok, sid, started, r3[:240]))
     except (urllib.error.URLError, TimeoutError, RuntimeError) as error:
-        results.append(_case("同会话跨专家隔离", False, sid, started, str(error)))
+        results.append(_case("同会话跨专家共享记忆", False, sid, started, str(error)))
 
     # 3) data multi-turn
     started = time.time()
