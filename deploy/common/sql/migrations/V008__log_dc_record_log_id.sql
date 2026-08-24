@@ -12,19 +12,22 @@
 -- databuff.sql; this upgrades existing DBs.
 -- Deploy: apply this ALTER and wait for it to finish before rolling web/ingest
 -- (new web SELECTs log_id).
--- ADD COLUMN IF NOT EXISTS keeps the migration re-runnable.
+-- NOTE: plain `ADD COLUMN` (no `IF NOT EXISTS`) — Doris 4.1.x parser rejects
+-- `ADD COLUMN IF NOT EXISTS` ("no viable alternative at input 'ADD COLUMN IF'").
+-- Idempotency is provided by the schema_version gate (this migration only runs
+-- when going 7 -> 8), not by SQL-level IF NOT EXISTS.
 -- This iteration also adds structured alert metric fields; no separate migration
 -- version is introduced.
 
 USE databuff;
 
 ALTER TABLE log_dc_record
-  ADD COLUMN IF NOT EXISTS `log_id` VARCHAR(32) NOT NULL DEFAULT '' COMMENT 'ingest-generated random id (UUID hex); unique per record';
+  ADD COLUMN `log_id` VARCHAR(32) NOT NULL DEFAULT '' COMMENT 'ingest-generated random id (UUID hex); unique per record';
 
 ALTER TABLE config_event
-  ADD COLUMN IF NOT EXISTS `metric_id` VARCHAR(128) NULL COMMENT 'structured metric identifier behind the message',
-  ADD COLUMN IF NOT EXISTS `metric_label` VARCHAR(128) NULL COMMENT 'metric display label',
-  ADD COLUMN IF NOT EXISTS `metric_unit` VARCHAR(32) NULL COMMENT 'metric unit, e.g. %',
-  ADD COLUMN IF NOT EXISTS `metric_value` DOUBLE NULL COMMENT 'current metric value at trigger time',
-  ADD COLUMN IF NOT EXISTS `metric_threshold` DOUBLE NULL COMMENT 'breached threshold for the resolved level',
-  ADD COLUMN IF NOT EXISTS `comparator` VARCHAR(16) NULL COMMENT 'gt|gte|lt|lte';
+  ADD COLUMN `metric_id` VARCHAR(128) NULL COMMENT 'structured metric identifier behind the message',
+  ADD COLUMN `metric_label` VARCHAR(128) NULL COMMENT 'metric display label',
+  ADD COLUMN `metric_unit` VARCHAR(32) NULL COMMENT 'metric unit, e.g. %',
+  ADD COLUMN `metric_value` DOUBLE NULL COMMENT 'current metric value at trigger time',
+  ADD COLUMN `metric_threshold` DOUBLE NULL COMMENT 'breached threshold for the resolved level',
+  ADD COLUMN `comparator` VARCHAR(16) NULL COMMENT 'gt|gte|lt|lte';
