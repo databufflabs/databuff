@@ -64,11 +64,11 @@ if [[ -n "${TEST_BASE_URL:-}" ]]; then
 fi
 export TEST_BASE_URL="${LOCAL_BASE_URL}"
 export AI_TESTS_PARALLEL="${AI_TESTS_PARALLEL:-1}"
-# 核心套件进程并发上限（默认 1，避免 MiniMax/DeepSeek 429）
-export AI_TESTS_SUITE_CONCURRENCY="${AI_TESTS_SUITE_CONCURRENCY:-1}"
-# 套件内 LLM 并发默认压低
-export TEST_AI_CHAT_MAX_WORKERS="${TEST_AI_CHAT_MAX_WORKERS:-1}"
-export TEST_AI_BRAIN_MAX_WORKERS="${TEST_AI_BRAIN_MAX_WORKERS:-1}"
+# 核心套件进程并发上限（默认 3，chat/formats/memory/brain/mcp 最多 3 个套件同时跑）
+export AI_TESTS_SUITE_CONCURRENCY="${AI_TESTS_SUITE_CONCURRENCY:-3}"
+# 套件内 LLM 并发：chat 默认 3；brain 默认 5（10 个 case 并行跑，缩短真 LLM 下的耗时）
+export TEST_AI_CHAT_MAX_WORKERS="${TEST_AI_CHAT_MAX_WORKERS:-3}"
+export TEST_AI_BRAIN_MAX_WORKERS="${TEST_AI_BRAIN_MAX_WORKERS:-5}"
 export AI_TEST_PROVIDER="${AI_TEST_PROVIDER:-deepseek}"
 case "${AI_TEST_PROVIDER}" in
   deepseek|minimax|opencode) ;;
