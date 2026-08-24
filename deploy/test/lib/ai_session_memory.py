@@ -332,7 +332,9 @@ def run_ai_session_memory_cases(
 
     # 2) same-session cross-expert shared memory (no brain dispatch → shared)
     #    产品改造后：直接指定 expertId（无大脑派发）时，同会话记忆共享，
-    #    data 专家应能记住 inspection 专家在同一会话里记下的暗号。
+    #    data 专家应能从共享历史里召回 inspection 专家在同一会话记下的暗号。
+    #    注意：共享历史不标注专家归属，所以只测「从共享历史召回」，
+    #    不问「巡检专家的暗号」（那会触发 data 专家按自身身份推理「我不是巡检专家」→ 不知道）。
     started = time.time()
     try:
         if not sid:
@@ -346,7 +348,7 @@ def run_ai_session_memory_cases(
         _, r3 = _turn(
             base,
             token,
-            "不要调用任何工具。刚才巡检专家的暗号是什么？如果不知道就回答「不知道」。",
+            "不要调用任何工具。刚才的暗号是什么？只回答暗号本身。",
             expert_id="data",
             session_id=sid,
             **turn_kw,
