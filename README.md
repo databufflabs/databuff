@@ -204,4 +204,4 @@ If you are building **AI-native APM / OpenTelemetry observability**, help make t
 
 ## License
 
-This repository is licensed under **Apache-2.0**.
+This repository is licensed under **AGPL-3.0**.
