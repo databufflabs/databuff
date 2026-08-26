@@ -208,4 +208,4 @@ curl -fsSL https://databuff.ai/databuff/ai-apm-demo-k8s-install.sh | bash  # Dem
 
 ## 版权与许可
 
-本仓库遵循 **Apache-2.0** 开源协议。
+本仓库遵循 **AGPL-3.0** 开源协议。
