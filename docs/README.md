@@ -41,6 +41,8 @@ curl -fsSL https://databuff.ai/databuff/ai-apm-install.sh | bash
 - [AI 平台](使用手册/AI平台.md)
 - [Agent 集成](使用手册/Agent集成.md)
 - [SkyWalking 接入](使用手册/SkyWalking接入.md)
+- [eBPF 接入](使用手册/eBPF接入.md)
+- [Nginx 接入](使用手册/Nginx接入.md)
 - [自定义数字专家](使用手册/自定义数字专家.md)
 - [外部 MCP 集成](使用手册/外部MCP集成.md)
 

@@ -170,5 +170,7 @@ telnet <ingest-host> 11800
 ## Related Documents
 
 - [OpenTelemetry OTLP Ingestion](../opentelemetry-otlp-ingestion_en.md)
+- [eBPF Ingestion](eBPF接入_en.md)
+- [Nginx Ingestion](Nginx接入_en.md)
 - [Application Performance](应用性能_en.md)
 - [Telemetry Pipeline and Storage](../架构设计/遥测数据流_en.md)

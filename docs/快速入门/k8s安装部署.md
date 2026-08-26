@@ -29,7 +29,7 @@ curl -fsSL https://databuff.ai/databuff/ai-apm-k8s-install.sh | bash
 | OTLP gRPC | `<节点IP>:30417` |
 | OTLP HTTP | `http://<节点IP>:30418` |
 
-集群内 Agent 上报：`http://ai-apm-ingest:4318`（gRPC `ai-apm-ingest:4317`）。NodePort 供集群外使用。自有应用接入见 [OpenTelemetry OTLP 接入](../opentelemetry-otlp-ingestion.md)。
+集群内 Agent 上报：`http://ai-apm-ingest:4318`（gRPC `ai-apm-ingest:4317`）。NodePort 供集群外使用。自有应用接入见 [OpenTelemetry OTLP 接入](../opentelemetry-otlp-ingestion.md)；无侵入采集见 [eBPF 接入](../使用手册/eBPF接入.md)，入口 Nginx 见 [Nginx 接入](../使用手册/Nginx接入.md)。
 
 ### 离线镜像（可选）
 

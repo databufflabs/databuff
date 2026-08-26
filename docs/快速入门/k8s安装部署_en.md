@@ -29,7 +29,7 @@ After installation, the terminal prints the Web UI URL, namespace, and access de
 | OTLP gRPC | `<node-ip>:30417` |
 | OTLP HTTP | `http://<node-ip>:30418` |
 
-In-cluster agents: `http://ai-apm-ingest:4318` (gRPC `ai-apm-ingest:4317`). NodePorts are for external access. To connect your own apps, see [OpenTelemetry OTLP Ingestion](../opentelemetry-otlp-ingestion_en.md).
+In-cluster agents: `http://ai-apm-ingest:4318` (gRPC `ai-apm-ingest:4317`). NodePorts are for external access. To connect your own apps, see [OpenTelemetry OTLP Ingestion](../opentelemetry-otlp-ingestion_en.md); for zero-instrumentation collection see [eBPF Ingestion](../使用手册/eBPF接入_en.md), for entry Nginx see [Nginx Ingestion](../使用手册/Nginx接入_en.md).
 
 ### Offline Images (Optional)
 

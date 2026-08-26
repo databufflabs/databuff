@@ -131,4 +131,6 @@ export OTEL_METRIC_EXPORT_INTERVAL=60000    # export metrics every 60s
 
 - [Docker Installation](docker安装部署_en.md)
 - [OpenTelemetry OTLP Ingestion](../opentelemetry-otlp-ingestion_en.md)
+- [eBPF Ingestion](../使用手册/eBPF接入_en.md)
+- [Nginx Ingestion](../使用手册/Nginx接入_en.md)
 - [Application Performance](../使用手册/应用性能_en.md)

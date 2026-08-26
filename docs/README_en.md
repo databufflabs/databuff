@@ -41,6 +41,8 @@ Online docs: [databuff.ai/docs](https://databuff.ai/docs/en/)
 - [AI Platform](使用手册/AI平台_en.md)
 - [Agent Integration](使用手册/Agent集成_en.md)
 - [SkyWalking Ingestion](使用手册/SkyWalking接入_en.md)
+- [eBPF Ingestion](使用手册/eBPF接入_en.md)
+- [Nginx Ingestion](使用手册/Nginx接入_en.md)
 - [Custom Digital Experts](使用手册/自定义数字专家_en.md)
 - [External MCP Integration](使用手册/外部MCP集成_en.md)
 

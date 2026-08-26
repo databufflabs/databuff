@@ -33,7 +33,7 @@ curl -fsSL https://databuff.ai/databuff/ai-apm-install.sh | bash
 | OTLP gRPC | `<本机IP>:4317` |
 | OTLP HTTP | `http://<本机IP>:4318` |
 
-自有应用接入见 [OpenTelemetry OTLP 接入](../opentelemetry-otlp-ingestion.md)。
+自有应用接入见 [OpenTelemetry OTLP 接入](../opentelemetry-otlp-ingestion.md)；无侵入采集见 [eBPF 接入](../使用手册/eBPF接入.md)，入口 Nginx 见 [Nginx 接入](../使用手册/Nginx接入.md)。
 
 指定版本安装：
 

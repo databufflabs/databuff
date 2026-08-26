@@ -33,7 +33,7 @@ After installation, the terminal prints the Web UI URL, credentials, and OTLP en
 | OTLP gRPC | `<host-ip>:4317` |
 | OTLP HTTP | `http://<host-ip>:4318` |
 
-To connect your own apps, see [OpenTelemetry OTLP Ingestion](../opentelemetry-otlp-ingestion_en.md).
+To connect your own apps, see [OpenTelemetry OTLP Ingestion](../opentelemetry-otlp-ingestion_en.md); for zero-instrumentation collection see [eBPF Ingestion](../使用手册/eBPF接入_en.md), for entry Nginx see [Nginx Ingestion](../使用手册/Nginx接入_en.md).
 
 Install a specific version:
 

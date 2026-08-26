@@ -124,6 +124,13 @@ For TLS-terminated or remote deployments, point exporters at the reachable OTLP 
 
 For how data is stored and queried, see [Telemetry Pipeline and Storage](架构设计/遥测数据流_en.md).
 
+## Related docs
+
+- [eBPF Ingestion](使用手册/eBPF接入_en.md) — OBI DaemonSet, zero-instrumentation HTTP / gRPC
+- [Nginx Ingestion](使用手册/Nginx接入_en.md) — `ngx_otel_module` entry traces
+- [Spring Boot OTLP Integration](快速入门/spring-boot-otlp-integration_en.md)
+- [SkyWalking Ingestion](使用手册/SkyWalking接入_en.md)
+
 ## Open source
 
 - Repository: [github.com/databufflabs/databuff](https://github.com/databufflabs/databuff)

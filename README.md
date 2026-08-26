@@ -178,6 +178,8 @@ curl -fsSL https://databuff.ai/databuff/ai-apm-demo-k8s-install.sh | bash  # dem
 | :-- | :-- |
 | [Documentation](docs/README_en.md) | Product overview, user guides, ops reference |
 | [OTLP ingestion guide](docs/opentelemetry-otlp-ingestion_en.md) | OpenTelemetry SDK / Collector setup |
+| [eBPF ingestion](docs/使用手册/eBPF接入_en.md) | OBI DaemonSet, zero-instrumentation HTTP / gRPC |
+| [Nginx ingestion](docs/使用手册/Nginx接入_en.md) | ngx_otel_module entry traces |
 | [Competitive comparison](docs/业界对比/总览_en.md) | vs Jaeger, SigNoz, SkyWalking, and more |
 | [Migration guide](docs/迁移指南/总览_en.md) | Migrate from other APM tools |
 

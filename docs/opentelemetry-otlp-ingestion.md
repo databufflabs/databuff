@@ -112,6 +112,13 @@ export OTEL_LOGS_EXPORTER=otlp
 
 深入了解数据如何写入与查询，见 [遥测数据流与存储](架构设计/遥测数据流.md)。
 
+## 相关文档
+
+- [eBPF 接入](使用手册/eBPF接入.md) — OBI DaemonSet，无侵入采集 HTTP / gRPC
+- [Nginx 接入](使用手册/Nginx接入.md) — `ngx_otel_module` 上报入口 Trace
+- [Spring Boot OTLP 接入](快速入门/spring-boot-otlp-integration.md)
+- [SkyWalking 接入](使用手册/SkyWalking接入.md)
+
 ## 开源信息
 
 - 仓库：[github.com/databufflabs/databuff](https://github.com/databufflabs/databuff)
