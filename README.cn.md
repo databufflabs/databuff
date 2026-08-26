@@ -30,7 +30,11 @@
   <img src="https://img.shields.io/badge/Docker-一条命令-2496ED?style=flat-square&logo=docker&logoColor=white" />
 </p>
 
-<p align="center">在线演示账号：<code>admin</code> / <code>Databuff@123</code></p>
+<p align="center" id="交流群">
+  <img src="docs/images/community.png" alt="微信扫码加入 Databuff 开源交流群" width="128" />
+  <br/>
+  <sub>扫码加入开源交流群，获取 Demo 账号密码 </sub>
+</p>
 
 </div>
 
