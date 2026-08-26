@@ -30,7 +30,7 @@
   <img src="https://img.shields.io/badge/Docker-One_command-2496ED?style=flat-square&logo=docker&logoColor=white" />
 </p>
 
-<p align="center">Demo login: <code>admin</code> / <code>Databuff@123</code></p>
+
 
 </div>
 
