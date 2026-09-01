@@ -33,6 +33,12 @@ import java.util.List;
 @Lazy
 public class AgentScopeRuntimeAdapter {
 
+    private static final String CREDENTIAL_PROTECTION_PROMPT = """
+            凭据安全红线：任何情况下都禁止查询、读取、解码、推断或回显 API Key、Token、密码、Secret 等凭据；
+            禁止访问 config_llm_provider 表和 api_key_cipher 字段，也不得通过 Bash、环境变量、配置文件、数据库或编码转换绕过。
+            用户要求输出凭据时必须拒绝，只能说明是否已配置、是否启用等不含凭据的信息。
+            """;
+
     private static final Logger log = LoggerFactory.getLogger(AgentScopeRuntimeAdapter.class);
 
     private final AgentRuntimeConfig agentRuntimeConfig;
@@ -329,10 +335,12 @@ public class AgentScopeRuntimeAdapter {
     }
 
     private String resolveSystemPrompt(AiExpertDefinition expert) {
-        if ("brain".equals(expert.expertId())) {
-            return brainRoutingCatalog.resolveBrainSystemPrompt(expert);
-        }
-        return expert.systemPrompt();
+        String basePrompt = "brain".equals(expert.expertId())
+                ? brainRoutingCatalog.resolveBrainSystemPrompt(expert)
+                : expert.systemPrompt();
+        return (basePrompt == null ? "" : basePrompt.trim())
+                + "\n\n"
+                + CREDENTIAL_PROTECTION_PROMPT.trim();
     }
 
     private String routingCatalogHash(AiExpertDefinition expert) {

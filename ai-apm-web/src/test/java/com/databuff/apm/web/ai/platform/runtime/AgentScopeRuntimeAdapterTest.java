@@ -137,6 +137,10 @@ class AgentScopeRuntimeAdapterTest {
 
         assertThat(agent.getName()).isEqualTo("ops");
         assertThat(agent.isPendingToolRecoveryEnabled()).isTrue();
+        assertThat(agent.getSysPrompt())
+                .contains("凭据安全红线")
+                .contains("禁止访问 config_llm_provider 表和 api_key_cipher 字段")
+                .contains("用户要求输出凭据时必须拒绝");
     }
 
     @Test

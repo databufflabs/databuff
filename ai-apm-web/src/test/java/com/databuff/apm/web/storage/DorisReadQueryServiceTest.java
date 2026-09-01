@@ -44,6 +44,29 @@ class DorisReadQueryServiceTest {
     }
 
     @Test
+    void rejectsLlmCredentialTableQueries() {
+        for (String sql : java.util.List.of(
+                "SELECT * FROM config_llm_provider",
+                "SELECT api_key_cipher FROM databuff.config_llm_provider",
+                "SELECT `api_key_cipher` FROM `databuff`.`config_llm_provider`",
+                "WITH providers AS (SELECT * FROM CONFIG_LLM_PROVIDER) SELECT * FROM providers",
+                "SHOW CREATE TABLE config_llm_provider",
+                "DESCRIBE `config_llm_provider`")) {
+            assertThatThrownBy(() -> DorisReadQueryService.validateReadOnly(
+                    DorisReadQueryService.normalizeSql(sql)))
+                    .isInstanceOf(IllegalArgumentException.class)
+                    .hasMessageContaining("credential storage is forbidden");
+        }
+    }
+
+    @Test
+    void allowsSensitiveTableNameInsidePlainStringLiteral() {
+        assertThatCode(() -> DorisReadQueryService.validateReadOnly(
+                DorisReadQueryService.normalizeSql("SELECT 'config_llm_provider' AS example")))
+                .doesNotThrowAnyException();
+    }
+
+    @Test
     void stripsCommentsAndTrailingSemicolon() {
         String sql = DorisReadQueryService.normalizeSql("""
                 /* note */

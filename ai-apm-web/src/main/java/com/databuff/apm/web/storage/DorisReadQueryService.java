@@ -31,6 +31,8 @@ public class DorisReadQueryService {
     private static final Pattern LINE_COMMENT = Pattern.compile("(?m)--.*?$");
     private static final Pattern MULTI_STATEMENT = Pattern.compile(";\\s*\\S");
     private static final Pattern STRING_LITERAL = Pattern.compile("'([^']|'')*'|\"([^\"]|\"\")*\"");
+    private static final Pattern SENSITIVE_LLM_CREDENTIAL_IDENTIFIER = Pattern.compile(
+            "(?i)(?<![A-Za-z0-9_$])`?(config_llm_provider|api_key_cipher)`?(?![A-Za-z0-9_$])");
     /** Applied only to SELECT/WITH after stripping string literals. */
     private static final Pattern FORBIDDEN_IN_SELECT = Pattern.compile(
             "(?i)\\b(INSERT|UPDATE|DELETE|DROP|ALTER|CREATE|TRUNCATE|REPLACE|GRANT|REVOKE|"
@@ -110,10 +112,13 @@ public class DorisReadQueryService {
             throw new IllegalArgumentException(
                     "only read-only SQL is allowed (SELECT/SHOW/DESCRIBE/DESC/EXPLAIN/WITH), got: " + leading);
         }
+        String withoutLiterals = STRING_LITERAL.matcher(sql).replaceAll("''");
+        if (SENSITIVE_LLM_CREDENTIAL_IDENTIFIER.matcher(withoutLiterals).find()) {
+            throw new IllegalArgumentException("access to LLM provider credential storage is forbidden");
+        }
         if (METADATA_LEADING.contains(leading)) {
             return;
         }
-        String withoutLiterals = STRING_LITERAL.matcher(sql).replaceAll("''");
         if (FORBIDDEN_IN_SELECT.matcher(withoutLiterals).find()) {
             throw new IllegalArgumentException("SQL contains forbidden write/admin keywords");
         }

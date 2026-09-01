@@ -80,6 +80,9 @@ public class ShellCommandPolicy {
             rule("credential", "读影子密码库", "cat\\s+.*(/etc/shadow|/etc/gshadow)", "cat /etc/shadow"),
             rule("credential", "读用户列表", "cat\\s+/etc/passwd\\b", "cat /etc/passwd"),
             rule("credential", "通过 nss 读影子库", "\\bgetent\\s+shadow\\b", "getent shadow root"),
+            rule("credential", "查询 LLM API Key 存储",
+                    "\\b(config_llm_provider|api_key_cipher)\\b",
+                    "mysql -e 'select api_key_cipher from config_llm_provider'"),
 
             // ── SSH 私钥 / 密钥操作 ────────────────────────────────────────
             rule("ssh-key", "读 SSH 私钥 (cat)", "cat\\s+.*\\.ssh/(id_rsa|id_ed25519|id_ecdsa|id_dsa)", "cat ~/.ssh/id_rsa"),
