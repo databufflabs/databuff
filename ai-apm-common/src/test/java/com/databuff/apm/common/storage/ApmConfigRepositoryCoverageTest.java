@@ -105,6 +105,25 @@ class ApmConfigRepositoryCoverageTest {
     }
 
     @Test
+    void deleteLlmProviderDeletesModelsBeforeProvider() throws Exception {
+        ApmReadRepository reader = Mockito.mock(ApmReadRepository.class);
+        Connection connection = mock(Connection.class);
+        PreparedStatement modelsPs = mock(PreparedStatement.class);
+        PreparedStatement providerPs = mock(PreparedStatement.class);
+        when(reader.connection()).thenReturn(connection);
+        when(connection.prepareStatement(contains("config_llm_model"))).thenReturn(modelsPs);
+        when(connection.prepareStatement(contains("config_llm_provider"))).thenReturn(providerPs);
+
+        ApmConfigRepository repository = new ApmConfigRepository(reader, "databuff");
+        repository.deleteLlmProvider("my-llm");
+
+        verify(modelsPs).setString(1, "my-llm");
+        verify(modelsPs).executeUpdate();
+        verify(providerPs).setString(1, "my-llm");
+        verify(providerPs).executeUpdate();
+    }
+
+    @Test
     void countAndLoadAiSessions() throws Exception {
         ApmReadRepository reader = Mockito.mock(ApmReadRepository.class);
         Connection connection = mock(Connection.class);

@@ -817,6 +817,7 @@ function hasModuleMessage(mod, shortKey) {
 }
 
 const FIXED_MESSAGES = [
+  ['views.configManage.llm', '确认删除模型提供商 {value0}？删除后无法恢复。', 'Delete model provider {value0}? This action cannot be undone.'],
   ['views.aiPlatform.chat', '已完成思考，用时 {duration}', 'Finished thinking in {duration}'],
   ['views.aiPlatform.chat', '趋势图', 'Trend chart'],
   ['views.aiPlatform.chat', '步', 'steps'],

@@ -207,6 +207,65 @@ class InMemoryLlmProviderStoreTest {
     }
 
     @Test
+    void supportsKeylessCustomProvider() {
+        InMemoryLlmProviderStore store = TestBeanSupport.llmProviderStore();
+        LlmProviderView created = store.createProvider(new CreateLlmProviderRequest(
+                "local-llm", "Local LLM", "http://127.0.0.1:11434/v1", "llama3", null, true));
+
+        assertThat(created.configured()).isTrue();
+        assertThat(store.hasEnabledProvider()).isTrue();
+        assertThat(store.resolveProvider("local-llm")).get()
+                .extracting(OpenAiCompatibleChatClient.ResolvedLlmProvider::apiKey)
+                .isNull();
+    }
+
+    @Test
+    void rejectsDuplicateModelIdsAndInvalidTokenLimits() {
+        InMemoryLlmProviderStore store = TestBeanSupport.llmProviderStore();
+
+        assertThatThrownBy(() -> store.saveProviderDetail(new SaveLlmProviderRequest(
+                "openai", null, null, null, null, null, null, "same", List.of(
+                new LlmModelView("same", "One", null, null, List.of(), true),
+                new LlmModelView("same", "Two", null, null, List.of(), false)))))
+                .isInstanceOf(IllegalArgumentException.class)
+                .hasMessageContaining("不能重复");
+
+        assertThatThrownBy(() -> store.saveProviderDetail(new SaveLlmProviderRequest(
+                "openai", null, null, null, null, null, null, "bad", List.of(
+                new LlmModelView("bad", "Bad", -1, 0, List.of(), true)))))
+                .isInstanceOf(IllegalArgumentException.class)
+                .hasMessageContaining("正整数");
+    }
+
+    @Test
+    void deletesCustomProviderAndFallsBackFromDefault() {
+        InMemoryLlmProviderStore store = TestBeanSupport.llmProviderStore();
+        store.updateProvider("openai", new UpdateLlmProviderRequest(
+                null, "sk-openai", null, true));
+        LlmProviderView created = store.createProvider(new CreateLlmProviderRequest(
+                "my-llm", "My LLM", "https://api.example.com/v1", "default", "sk-test", true));
+        assertThat(created.builtIn()).isFalse();
+        store.setDefaultProvider("my-llm");
+
+        store.deleteProvider("my-llm");
+
+        assertThat(store.listProviders()).noneMatch(provider -> "my-llm".equals(provider.providerCode()));
+        assertThat(store.resolveApiKey("my-llm", null)).isNull();
+        assertThat(store.firstEnabledProvider()).get().extracting(
+                OpenAiCompatibleChatClient.ResolvedLlmProvider::providerCode).isEqualTo("openai");
+    }
+
+    @Test
+    void rejectsDeletingBuiltInProvider() {
+        InMemoryLlmProviderStore store = TestBeanSupport.llmProviderStore();
+        assertThat(store.getProviderDetail("openai").builtIn()).isTrue();
+
+        assertThatThrownBy(() -> store.deleteProvider("openai"))
+                .isInstanceOf(IllegalArgumentException.class)
+                .hasMessageContaining("内置");
+    }
+
+    @Test
     void rejectsDuplicateProvider() {
         InMemoryLlmProviderStore store = TestBeanSupport.llmProviderStore();
         assertThatThrownBy(() -> store.createProvider(new CreateLlmProviderRequest(

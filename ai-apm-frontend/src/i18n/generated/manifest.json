@@ -1919,6 +1919,7 @@
   "确定要清空所有筛选条件吗？": "views.configManage.alarm.s_f8aae98f",
   "确认 Pod 已注入 initContainer 及 OTEL 相关环境变量：": "views.deployInstall.apm.s_d1e55537",
   "确认": "views.deployInstall.apm.s_e83a256e",
+  "确认删除模型提供商 {value0}？删除后无法恢复。": "views.configManage.llm.s_a6fb41c8",
   "确认删除 Skill {value0}？": "views.aiPlatform.skills.s_ab6d9907",
   "确认删除{value0}工具 {value1}？": "views.aiPlatform.tools.s_9f7f4544",
   "确认删除专家 {value0}？": "views.aiPlatform.experts.s_72960082",

@@ -20,6 +20,7 @@ import static org.mockito.ArgumentMatchers.anyString;
 import static org.mockito.ArgumentMatchers.contains;
 import static org.mockito.Mockito.doThrow;
 import static org.mockito.Mockito.mock;
+import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
 class LlmProviderPersistenceTest {
@@ -110,5 +111,42 @@ class LlmProviderPersistenceTest {
         LlmProviderPersistence sync = new LlmProviderPersistence(reader, store, TestStorageSupport.storage());
         assertThat(sync.reloadFromStore()).isFalse();
         assertThat(sync.persistenceEnabled()).isFalse();
+    }
+
+    @Test
+    void deletesProviderFromPersistentStore() throws Exception {
+        ApmReadRepository reader = mock(ApmReadRepository.class);
+        Connection connection = mock(Connection.class);
+        Statement statement = mock(Statement.class);
+        ResultSet schemaRs = mock(ResultSet.class);
+        ResultSet providersRs = mock(ResultSet.class);
+        ResultSet modelsRs = mock(ResultSet.class);
+        PreparedStatement providerPs = mock(PreparedStatement.class);
+        PreparedStatement modelPs = mock(PreparedStatement.class);
+        when(reader.connection()).thenReturn(connection);
+        when(connection.createStatement()).thenReturn(statement);
+        when(connection.prepareStatement(contains("config_llm_provider"))).thenReturn(providerPs);
+        when(connection.prepareStatement(contains("config_llm_model"))).thenReturn(modelPs);
+        when(statement.executeQuery(anyString())).thenAnswer(invocation -> {
+            String sql = invocation.getArgument(0, String.class);
+            if (sql.contains("LIMIT 1")) {
+                return schemaRs;
+            }
+            return sql.contains("config_llm_model") ? modelsRs : providersRs;
+        });
+        when(schemaRs.next()).thenReturn(true);
+        when(providersRs.next()).thenReturn(false);
+        when(modelsRs.next()).thenReturn(false);
+
+        LlmProviderPersistence persistence = new LlmProviderPersistence(
+                reader, TestBeanSupport.llmProviderStore(), TestStorageSupport.storage());
+        assertThat(persistence.reloadFromStore()).isTrue();
+
+        persistence.deleteProvider("my-llm");
+
+        verify(modelPs).setString(1, "my-llm");
+        verify(modelPs).executeUpdate();
+        verify(providerPs).setString(1, "my-llm");
+        verify(providerPs).executeUpdate();
     }
 }

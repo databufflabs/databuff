@@ -24,6 +24,7 @@ export interface LlmProviderView {
   enabled: boolean;
   configured: boolean;
   defaultProvider: boolean;
+  builtIn: boolean;
 }
 
 export interface LlmProviderDetailView {
@@ -99,6 +100,13 @@ export function createLlmProvider (data: CreateLlmProviderRequest) {
     url: '/api/v1/config/ai/providers',
     method: 'post',
     data,
+  });
+}
+
+export function deleteLlmProvider (providerCode: string) {
+  return http.request<void>({
+    url: `/api/v1/config/ai/providers/${encodeURIComponent(providerCode)}`,
+    method: 'delete',
   });
 }
 

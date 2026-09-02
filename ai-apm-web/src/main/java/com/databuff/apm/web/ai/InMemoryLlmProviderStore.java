@@ -11,9 +11,11 @@ import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Component;
 
 import java.util.ArrayList;
+import java.util.HashSet;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
+import java.util.Set;
 import java.util.concurrent.ConcurrentHashMap;
 
 @Component
@@ -82,6 +84,7 @@ public class InMemoryLlmProviderStore {
         if (request.enabled() != null) {
             state.enabled = request.enabled();
         }
+        state.configured = true;
         if (request.models() != null) {
             replaceModels(code, request.models(), request.defaultModelId());
         }
@@ -124,7 +127,9 @@ public class InMemoryLlmProviderStore {
                 request.baseUrl().trim(),
                 defaultModel,
                 DEFAULT_API_TYPE,
-                enabled);
+                enabled,
+                true,
+                false);
         providers.put(code, state);
         modelsByProvider.put(code, List.of(new ModelState(
                 defaultModel,
@@ -139,6 +144,40 @@ public class InMemoryLlmProviderStore {
         bumpProviderVersion(code);
         maybeSetDefaultProvider(code, state);
         return toView(state);
+    }
+
+    public void validateProviderDeletion(String providerCode) {
+        ProviderState state = requireProvider(providerCode);
+        if (state.builtIn) {
+            throw new IllegalArgumentException("内置模型提供商不支持删除");
+        }
+    }
+
+    public void deleteProvider(String providerCode) {
+        validateProviderDeletion(providerCode);
+        removeProvider(providerCode);
+    }
+
+    public void rollbackCreatedProvider(String providerCode) {
+        ProviderState state = providers.get(providerCode);
+        if (state != null && !state.builtIn) {
+            removeProvider(providerCode);
+        }
+    }
+
+    private void removeProvider(String providerCode) {
+        providers.remove(providerCode);
+        modelsByProvider.remove(providerCode);
+        apiKeys.remove(providerCode);
+        providerVersions.remove(providerCode);
+        if (providerCode.equals(defaultProviderCode)) {
+            defaultProviderCode = providers.values().stream()
+                    .filter(state -> isProviderUsable(state.code))
+                    .map(state -> state.code)
+                    .findFirst()
+                    .orElse(null);
+        }
+        invalidateByProvider(providerCode);
     }
 
     public LlmProviderView setDefaultProvider(String providerCode) {
@@ -179,6 +218,7 @@ public class InMemoryLlmProviderStore {
         if (request.enabled() != null) {
             state.enabled = request.enabled();
         }
+        state.configured = true;
         bumpProviderVersion(providerCode);
         invalidateByProvider(providerCode);
         maybeSetDefaultProvider(providerCode, state);
@@ -190,7 +230,7 @@ public class InMemoryLlmProviderStore {
             return firstEnabledProvider();
         }
         ProviderState state = providers.get(providerCode);
-        if (state == null || !state.enabled || !apiKeys.containsKey(providerCode)) {
+        if (state == null || !state.enabled || !state.configured) {
             return java.util.Optional.empty();
         }
         return java.util.Optional.of(new OpenAiCompatibleChatClient.ResolvedLlmProvider(
@@ -321,7 +361,7 @@ public class InMemoryLlmProviderStore {
     }
 
     public boolean hasEnabledProvider() {
-        return providers.values().stream().anyMatch(state -> state.enabled && apiKeys.containsKey(state.code));
+        return providers.values().stream().anyMatch(state -> state.enabled && state.configured);
     }
 
     public java.util.Optional<OpenAiCompatibleChatClient.ResolvedLlmProvider> firstEnabledProvider() {
@@ -333,7 +373,7 @@ public class InMemoryLlmProviderStore {
             }
         }
         return providers.values().stream()
-                .filter(state -> state.enabled && apiKeys.containsKey(state.code))
+                .filter(state -> state.enabled && state.configured)
                 .findFirst()
                 .map(state -> new OpenAiCompatibleChatClient.ResolvedLlmProvider(
                         state.code,
@@ -360,7 +400,9 @@ public class InMemoryLlmProviderStore {
                         row.baseUrl(),
                         row.defaultModel(),
                         apiType,
-                        row.enabled());
+                        row.enabled(),
+                        true,
+                        false);
                 providers.put(row.providerCode(), state);
                 changed = true;
             } else {
@@ -369,12 +411,14 @@ public class InMemoryLlmProviderStore {
                         || !java.util.Objects.equals(state.defaultModel, row.defaultModel())
                         || !java.util.Objects.equals(state.apiType, apiType)
                         || state.enabled != row.enabled()
+                        || !state.configured
                         || (plain != null && !plain.isBlank() && !java.util.Objects.equals(existingKey, plain));
                 state.displayName = row.displayName();
                 state.baseUrl = row.baseUrl();
                 state.defaultModel = row.defaultModel();
                 state.apiType = apiType;
                 state.enabled = row.enabled();
+                state.configured = true;
             }
             if (plain != null && !plain.isBlank()) {
                 apiKeys.put(row.providerCode(), plain);
@@ -384,7 +428,7 @@ public class InMemoryLlmProviderStore {
             if (changed) {
                 bumpProviderVersion(row.providerCode());
             }
-            if (defaultProviderCode == null && row.enabled() && plain != null && !plain.isBlank()) {
+            if (defaultProviderCode == null && row.enabled()) {
                 defaultProviderCode = row.providerCode();
             }
         }
@@ -435,6 +479,35 @@ public class InMemoryLlmProviderStore {
         return state == null ? DEFAULT_API_TYPE : state.apiType;
     }
 
+    public ProviderSnapshot snapshotProvider(String providerCode) {
+        ProviderState state = requireProvider(providerCode);
+        return new ProviderSnapshot(
+                copyProviderState(state),
+                copyModelStates(modelsByProvider.getOrDefault(providerCode, List.of())),
+                apiKeys.get(providerCode),
+                apiKeys.containsKey(providerCode),
+                providerVersions.get(providerCode),
+                defaultProviderCode);
+    }
+
+    public void restoreProvider(ProviderSnapshot snapshot) {
+        String providerCode = snapshot.state.code;
+        providers.put(providerCode, copyProviderState(snapshot.state));
+        modelsByProvider.put(providerCode, copyModelStates(snapshot.models));
+        if (snapshot.hadApiKey) {
+            apiKeys.put(providerCode, snapshot.apiKey);
+        } else {
+            apiKeys.remove(providerCode);
+        }
+        if (snapshot.version == null) {
+            providerVersions.remove(providerCode);
+        } else {
+            providerVersions.put(providerCode, snapshot.version);
+        }
+        defaultProviderCode = snapshot.defaultProviderCode;
+        invalidateByProvider(providerCode);
+    }
+
     private ProviderState requireProvider(String providerCode) {
         ProviderState state = providers.get(providerCode);
         if (state == null) {
@@ -448,6 +521,7 @@ public class InMemoryLlmProviderStore {
             throw new IllegalArgumentException("至少配置一个模型");
         }
         List<ModelState> next = new ArrayList<>();
+        Set<String> modelIds = new HashSet<>();
         String resolvedDefault = defaultModelId;
         if (resolvedDefault == null || resolvedDefault.isBlank()) {
             resolvedDefault = models.stream().filter(LlmModelView::defaultModel).map(LlmModelView::modelId)
@@ -458,6 +532,15 @@ public class InMemoryLlmProviderStore {
                 continue;
             }
             String modelId = model.modelId().trim();
+            if (!modelIds.add(modelId)) {
+                throw new IllegalArgumentException("模型 ID 不能重复: " + modelId);
+            }
+            if (model.contextWindow() != null && model.contextWindow() <= 0) {
+                throw new IllegalArgumentException("上下文窗口必须为正整数: " + modelId);
+            }
+            if (model.maxOutputTokens() != null && model.maxOutputTokens() <= 0) {
+                throw new IllegalArgumentException("最大输出 Token 必须为正整数: " + modelId);
+            }
             String displayName = model.displayName() == null || model.displayName().isBlank()
                     ? modelId
                     : model.displayName().trim();
@@ -555,8 +638,8 @@ public class InMemoryLlmProviderStore {
                 .toList();
         String storedKey = apiKeys.get(state.code);
         boolean maskApiKey = providerProperties == null || providerProperties.maskApiKey();
-        boolean configured = storedKey != null;
-        boolean apiKeyMasked = maskApiKey && configured;
+        boolean configured = state.configured;
+        boolean apiKeyMasked = maskApiKey && storedKey != null;
         String apiKey = apiKeyMasked ? null : storedKey;
         return new LlmProviderDetailView(
                 state.code,
@@ -568,6 +651,7 @@ public class InMemoryLlmProviderStore {
                 apiKeyMasked,
                 state.enabled,
                 state.code.equals(defaultProviderCode),
+                state.builtIn,
                 models);
     }
 
@@ -582,7 +666,7 @@ public class InMemoryLlmProviderStore {
     }
 
     private void maybeSetDefaultProvider(String providerCode, ProviderState state) {
-        if (!state.enabled || !apiKeys.containsKey(state.code)) {
+        if (!state.enabled || !state.configured) {
             return;
         }
         if (defaultProviderCode == null || !isProviderUsable(defaultProviderCode)) {
@@ -592,11 +676,11 @@ public class InMemoryLlmProviderStore {
 
     private boolean isProviderUsable(String providerCode) {
         ProviderState state = providers.get(providerCode);
-        return state != null && state.enabled && apiKeys.containsKey(providerCode);
+        return state != null && state.enabled && state.configured;
     }
 
     private void seed(String code, String name, String baseUrl, String defaultModel, String apiType) {
-        providers.put(code, new ProviderState(code, name, baseUrl, defaultModel, apiType, false));
+        providers.put(code, new ProviderState(code, name, baseUrl, defaultModel, apiType, false, false, true));
         modelsByProvider.put(code, defaultModelsFor(providers.get(code)));
         providerVersions.put(code, 1L);
     }
@@ -623,8 +707,37 @@ public class InMemoryLlmProviderStore {
                 state.apiType,
                 modelsByProvider.getOrDefault(state.code, List.of()).size(),
                 state.enabled,
-                apiKeys.containsKey(state.code),
-                state.code.equals(defaultProviderCode));
+                state.configured,
+                state.code.equals(defaultProviderCode),
+                state.builtIn);
+    }
+
+    private ProviderState copyProviderState(ProviderState state) {
+        return new ProviderState(
+                state.code,
+                state.displayName,
+                state.baseUrl,
+                state.defaultModel,
+                state.apiType,
+                state.enabled,
+                state.configured,
+                state.builtIn);
+    }
+
+    private List<ModelState> copyModelStates(List<ModelState> models) {
+        List<ModelState> copied = new ArrayList<>();
+        for (ModelState model : models) {
+            copied.add(new ModelState(
+                    model.modelId,
+                    model.displayName,
+                    model.contextWindow,
+                    model.maxOutputTokens,
+                    model.envVars.stream()
+                            .map(env -> new EnvVarState(env.key, env.value))
+                            .toList(),
+                    model.isDefault));
+        }
+        return copied;
     }
 
     private String encodeEnvVars(List<EnvVarState> envVars) {
@@ -671,6 +784,8 @@ public class InMemoryLlmProviderStore {
         private String defaultModel;
         private String apiType;
         private boolean enabled;
+        private boolean configured;
+        private final boolean builtIn;
 
         private ProviderState(
                 String code,
@@ -678,13 +793,41 @@ public class InMemoryLlmProviderStore {
                 String baseUrl,
                 String defaultModel,
                 String apiType,
-                boolean enabled) {
+                boolean enabled,
+                boolean configured,
+                boolean builtIn) {
             this.code = code;
             this.displayName = displayName;
             this.baseUrl = baseUrl;
             this.defaultModel = defaultModel;
             this.apiType = apiType == null || apiType.isBlank() ? DEFAULT_API_TYPE : apiType;
             this.enabled = enabled;
+            this.configured = configured;
+            this.builtIn = builtIn;
+        }
+    }
+
+    public static final class ProviderSnapshot {
+        private final ProviderState state;
+        private final List<ModelState> models;
+        private final String apiKey;
+        private final boolean hadApiKey;
+        private final Long version;
+        private final String defaultProviderCode;
+
+        private ProviderSnapshot(
+                ProviderState state,
+                List<ModelState> models,
+                String apiKey,
+                boolean hadApiKey,
+                Long version,
+                String defaultProviderCode) {
+            this.state = state;
+            this.models = models;
+            this.apiKey = apiKey;
+            this.hadApiKey = hadApiKey;
+            this.version = version;
+            this.defaultProviderCode = defaultProviderCode;
         }
     }
 

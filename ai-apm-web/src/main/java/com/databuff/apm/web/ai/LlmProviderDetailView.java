@@ -12,5 +12,6 @@ public record LlmProviderDetailView(
         boolean apiKeyMasked,
         boolean enabled,
         boolean defaultProvider,
+        boolean builtIn,
         List<LlmModelView> models) {
 }

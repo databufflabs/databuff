@@ -199,6 +199,23 @@ public class ApmConfigRepository {
         }
     }
 
+    public void deleteLlmProvider(String providerCode) throws SQLException {
+        String deleteModelsSql = "DELETE FROM " + qualified(DorisTableNames.CONFIG_LLM_MODEL)
+                + " WHERE provider_code = ?";
+        String deleteProviderSql = "DELETE FROM " + qualified(DorisTableNames.CONFIG_LLM_PROVIDER)
+                + " WHERE provider_code = ?";
+        try (Connection connection = reader.connection()) {
+            try (PreparedStatement modelsPs = connection.prepareStatement(deleteModelsSql)) {
+                modelsPs.setString(1, providerCode);
+                modelsPs.executeUpdate();
+            }
+            try (PreparedStatement providerPs = connection.prepareStatement(deleteProviderSql)) {
+                providerPs.setString(1, providerCode);
+                providerPs.executeUpdate();
+            }
+        }
+    }
+
     private static Integer readNullableInt(ResultSet rs, String column) throws SQLException {
         int value = rs.getInt(column);
         return rs.wasNull() ? null : value;

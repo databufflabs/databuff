@@ -2157,7 +2157,8 @@ export default {
         "s_5b2cc4b8": "AddFailed, canalreadycontains",
         "s_a5bfd70d": "AddSuccess",
         "s_df3bbd52": "Fire",
-        "s_5cd4cd39": "Please add a model first"
+        "s_5cd4cd39": "Please add a model first",
+        "s_a6fb41c8": "Delete model provider {value0}? This action cannot be undone."
       },
       "login": {
         "s_4c06782f": "Display language",

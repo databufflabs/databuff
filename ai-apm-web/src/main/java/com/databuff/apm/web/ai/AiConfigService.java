@@ -34,21 +34,44 @@ public class AiConfigService {
     }
 
     public LlmProviderView saveProviderDetail(SaveLlmProviderRequest request) {
-        LlmProviderView view = store.saveProviderDetail(request);
-        llmProviderPersistence.persistDetail(request, view);
-        return view;
+        InMemoryLlmProviderStore.ProviderSnapshot snapshot = store.snapshotProvider(request.providerCode());
+        try {
+            LlmProviderView view = store.saveProviderDetail(request);
+            llmProviderPersistence.persistDetail(request, view);
+            return view;
+        } catch (RuntimeException e) {
+            store.restoreProvider(snapshot);
+            throw e;
+        }
     }
 
     public LlmProviderView updateProvider(String providerCode, UpdateLlmProviderRequest request) {
-        LlmProviderView view = store.updateProvider(providerCode, request);
-        llmProviderPersistence.persistUpdate(providerCode, request, view);
-        return view;
+        InMemoryLlmProviderStore.ProviderSnapshot snapshot = store.snapshotProvider(providerCode);
+        try {
+            LlmProviderView view = store.updateProvider(providerCode, request);
+            llmProviderPersistence.persistUpdate(providerCode, request, view);
+            return view;
+        } catch (RuntimeException e) {
+            store.restoreProvider(snapshot);
+            throw e;
+        }
     }
 
     public LlmProviderView createProvider(CreateLlmProviderRequest request) {
         LlmProviderView view = store.createProvider(request);
-        llmProviderPersistence.persistCreate(request, view);
-        return view;
+        try {
+            llmProviderPersistence.persistCreate(request, view);
+            return view;
+        } catch (RuntimeException e) {
+            store.rollbackCreatedProvider(view.providerCode());
+            throw e;
+        }
+    }
+
+    public void deleteProvider(String providerCode) {
+        store.validateProviderDeletion(providerCode);
+        llmProviderPersistence.deleteProvider(providerCode);
+        store.deleteProvider(providerCode);
     }
 
     public LlmProviderView setDefaultProvider(String providerCode) {

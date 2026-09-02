@@ -21,7 +21,7 @@
           'is-default': item.defaultProvider,
         }"
         @click="openEditDialog(item)">
-        <div v-if="item.defaultProvider || item.enabled" class="provider-status">
+        <div v-if="item.defaultProvider || item.enabled || !item.builtIn" class="provider-status">
           <span
             v-if="item.defaultProvider"
             class="provider-default-badge"
@@ -35,6 +35,15 @@
             :title="$t('modules.views.help.startGuide.s_53ace430')">
             <i class="el-icon-check"></i>
           </span>
+          <el-button
+            v-if="!item.builtIn"
+            type="text"
+            class="provider-delete"
+            icon="el-icon-delete"
+            :loading="deletingProviderCode === item.providerCode"
+            :title="$t('modules.views.hide.advancedConfig.s_2f4aaddd')"
+            :aria-label="$t('modules.views.hide.advancedConfig.s_2f4aaddd')"
+            @click.stop="confirmDeleteProvider(item)" />
         </div>
         <div class="provider-icon" :style="{ background: iconStyle(item).bg }">
           <span>{{ iconStyle(item).label }}</span>
@@ -232,6 +241,7 @@ import {
   getLlmProviderDetail,
   saveLlmProviderDetail,
   createLlmProvider,
+  deleteLlmProvider,
   testLlmProvider,
   LlmProviderView,
   LlmModelView,
@@ -299,6 +309,7 @@ export default class LlmConfigPage extends Vue {
   private saving = false;
   private testing = false;
   private creating = false;
+  private deletingProviderCode = '';
   private providers: LlmProviderView[] = [];
   private editVisible = false;
   private createVisible = false;
@@ -332,16 +343,6 @@ export default class LlmConfigPage extends Vue {
     providerName: [{ required: true, message: i18n.t('modules.views.configManage.llm.s_97b6dccd') as string, messageKey: 'modules.views.configManage.llm.s_97b6dccd', trigger: 'blur' }],
     baseUrl: [{ required: true, message: i18n.t('modules.views.configManage.llm.s_37d1bf0f') as string, messageKey: 'modules.views.configManage.llm.s_37d1bf0f', trigger: 'blur' }],
     apiType: [{ required: true, message: i18n.t('modules.views.configManage.llm.s_411e43dd') as string, messageKey: 'modules.views.configManage.llm.s_411e43dd', trigger: 'change' }],
-    apiKey: [{
-      validator: (_rule: unknown, value: string, callback: (err?: Error) => void) => {
-        if (this.editConfigured || (value && value.trim())) {
-          callback();
-          return;
-        }
-        callback(new Error(i18n.t('modules.views.configManage.llm.s_b807ddf3') as string));
-      },
-      trigger: 'blur',
-    }],
   };
 
   private createRules = {
@@ -362,7 +363,7 @@ export default class LlmConfigPage extends Vue {
   }
 
   get apiKeyPlaceholder () {
-    if (this.editConfigured) {
+    if (this.editApiKeyMasked) {
       return i18n.t('modules.views.configManage.llm.s_08f020e8') as string;
     }
     return i18n.t('modules.views.configManage.llm.s_58aacc17') as string;
@@ -639,6 +640,30 @@ export default class LlmConfigPage extends Vue {
     this.createVisible = false;
     await this.loadProviders();
   }
+
+  private confirmDeleteProvider (item: LlmProviderView) {
+    this.$confirm(
+      i18n.t('modules.views.configManage.llm.s_a6fb41c8', { value0: item.displayName }) as string,
+      i18n.t('common.hint') as string,
+      { type: 'warning' },
+    )
+      .then(() => this.removeProvider(item))
+      .catch(() => undefined);
+  }
+
+  private async removeProvider (item: LlmProviderView) {
+    this.deletingProviderCode = item.providerCode;
+    const { error } = await toAsyncWait(deleteLlmProvider(item.providerCode), false);
+    this.deletingProviderCode = '';
+    if (error) {
+      if ((error as Error).message !== 'interrupt') {
+        this.$message.error((error as Error).message);
+      }
+      return;
+    }
+    this.$message.success(i18n.t('modules.views.aiPlatform.experts.s_0007d170') as string);
+    await this.loadProviders();
+  }
 }
 </script>
 
@@ -753,6 +778,21 @@ export default class LlmConfigPage extends Vue {
 
   i {
     font-weight: 700;
+  }
+}
+
+.provider-delete {
+  width: 22px;
+  height: 22px;
+  padding: 0;
+  color: #f56c6c;
+  font-size: 14px;
+
+  &:hover,
+  &:focus {
+    color: #f87171;
+    background: #fef2f2;
+    border-radius: 50%;
   }
 }
 

@@ -139,6 +139,19 @@ public class LlmProviderPersistence {
         }
     }
 
+    public void deleteProvider(String providerCode) {
+        ensurePersistenceOrThrow();
+        try {
+            ApmConfigRepository repository = new ApmConfigRepository(readRepository, configDatabase);
+            repository.deleteLlmProvider(providerCode);
+        } catch (IllegalStateException e) {
+            throw e;
+        } catch (Exception e) {
+            log.error("Failed to delete LLM provider {}: {}", providerCode, e.getMessage(), e);
+            throw new IllegalStateException("删除模型配置失败: " + e.getMessage(), e);
+        }
+    }
+
     private synchronized void ensurePersistenceOrThrow() {
         if (!persistenceEnabled) {
             reloadFromStore();

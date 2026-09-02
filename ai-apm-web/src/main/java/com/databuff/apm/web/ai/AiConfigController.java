@@ -1,5 +1,6 @@
 package com.databuff.apm.web.ai;
 
+import org.springframework.web.bind.annotation.DeleteMapping;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PathVariable;
 import org.springframework.web.bind.annotation.PostMapping;
@@ -70,6 +71,11 @@ public class AiConfigController {
     @PostMapping("/providers")
     public LlmProviderView createProvider(@RequestBody CreateLlmProviderRequest request) {
         return aiConfigService.createProvider(request);
+    }
+
+    @DeleteMapping("/providers/{providerCode}")
+    public void deleteProvider(@PathVariable String providerCode) {
+        aiConfigService.deleteProvider(providerCode);
     }
 
     @PutMapping("/providers/{providerCode}/default")

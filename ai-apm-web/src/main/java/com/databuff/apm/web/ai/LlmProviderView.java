@@ -9,5 +9,6 @@ public record LlmProviderView(
         int modelCount,
         boolean enabled,
         boolean configured,
-        boolean defaultProvider) {
+        boolean defaultProvider,
+        boolean builtIn) {
 }
