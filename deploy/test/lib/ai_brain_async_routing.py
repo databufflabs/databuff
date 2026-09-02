@@ -37,6 +37,23 @@ MODULE_AI_PLATFORM = "AI平台"
 GROUP_BRAIN_ASYNC = "大脑异步路由"
 
 WAITING_MARKERS = ("请稍候", "尚未返回", "继续等待", "正在等待其完成")
+DUPLICATE_CALLBACK_MARKERS = (
+    "重复回调",
+    "重复回传",
+    "重复返回",
+    "重复传递",
+    "重复提交",
+    "重复通知",
+    "重复内容",
+    "不再重复",
+    "无需重复",
+    "已经处理过",
+    "已处理过",
+    "duplicate callback",
+    "duplicate delivery",
+    "duplicate result",
+    "already delivered",
+)
 
 
 @dataclass
@@ -139,6 +156,67 @@ def _expert_ids_with_deliverable(payload: dict[str, Any]) -> set[str]:
             if expert:
                 found.add(expert)
     return found
+
+
+def _message_position(message: dict[str, Any], fallback: int) -> int:
+    raw = message.get("messageIndex")
+    try:
+        return int(raw)
+    except (TypeError, ValueError):
+        return fallback
+
+
+def _terminal_pre_tool_reasoning(payload: dict[str, Any]) -> str | None:
+    """Return orphan brain pre-tool text between the last deliverable and final TEXT.
+
+    Text followed by a tool call is legitimate process narration. Text emitted at normal stream
+    completion with no later tool call is the reply candidate and must not be persisted as
+    ``REASONING/source=pre_tool_text``.
+    """
+    ordered = [
+        (_message_position(message, index), message)
+        for index, message in enumerate(_messages(payload), start=1)
+    ]
+    final_positions = [
+        pos
+        for pos, message in ordered
+        if str(message.get("expertId") or "") == "brain"
+        and str(message.get("messageType") or "").upper() == "TEXT"
+        and (message.get("metadata") or {}).get("isRoundFinal") is True
+    ]
+    deliverable_positions = [
+        pos
+        for pos, message in ordered
+        if (message.get("metadata") or {}).get("isExpertDeliverable") is True
+    ]
+    if not final_positions or not deliverable_positions:
+        return None
+
+    final_pos = max(final_positions)
+    prior_deliverable_positions = [pos for pos in deliverable_positions if pos < final_pos]
+    if not prior_deliverable_positions:
+        return None
+    last_deliverable_pos = max(prior_deliverable_positions)
+    for pos, message in ordered:
+        if pos <= last_deliverable_pos or pos >= final_pos:
+            continue
+        if str(message.get("expertId") or "") != "brain":
+            continue
+        if str(message.get("messageType") or "").upper() != "REASONING":
+            continue
+        meta = message.get("metadata") or {}
+        if str(meta.get("source") or message.get("source") or "") != "pre_tool_text":
+            continue
+        has_later_tool = any(
+            pos < later_pos < final_pos
+            and str(later.get("expertId") or "") == "brain"
+            and str(later.get("messageType") or "").upper() == "TOOL_CALL"
+            for later_pos, later in ordered
+        )
+        if not has_later_tool:
+            content = message.get("content")
+            return content.strip() if isinstance(content, str) else "<empty>"
+    return None
 
 
 def _task_inputs_for(tasks: list[dict[str, Any]], target_expert_id: str) -> list[str]:
@@ -488,8 +566,21 @@ def _run_single_expert_dispatch_case(
             "data" in str(t.get("targetExpertId") or "") for t in tasks
         )
         waiting_only = any(m in final_text for m in WAITING_MARKERS) and len(final_text) < 120
-        ok = has_data and bool(final_text.strip()) and not waiting_only
-        detail = f"tasks={len(tasks)} targets={sorted(targets)} final={final_text[:220]}"
+        duplicate_callback = _text_has_any(final_text, DUPLICATE_CALLBACK_MARKERS)
+        terminal_pre_tool = _terminal_pre_tool_reasoning(payload)
+        ok = (
+            has_data
+            and bool(final_text.strip())
+            and not waiting_only
+            and not duplicate_callback
+            and terminal_pre_tool is None
+        )
+        detail = (
+            f"tasks={len(tasks)} targets={sorted(targets)} "
+            f"duplicate_callback={duplicate_callback} "
+            f"terminal_pre_tool={terminal_pre_tool[:160] if terminal_pre_tool else None!r} "
+            f"final={final_text[:220]}"
+        )
         return _case("单专家派发fan-in", ok, sid, started, detail)
     except (urllib.error.URLError, TimeoutError, RuntimeError) as error:
         return _case("单专家派发fan-in", False, sid, started, str(error))

@@ -169,8 +169,25 @@ public class AgentScopeSessionHook {
             }
             String storeSessionId = storeSessionId();
             sessionStore.endReasoningSegment(storeSessionId, ctx.expertId());
-            flushPendingTextBeforeTool();
+            finishTerminalBuffers();
             sessionStore.finalizeRoundStreaming(storeSessionId, ctx.expertId());
+        }
+
+        private void finishTerminalBuffers() {
+            String terminalText = pendingTextBeforeTool.toString().trim();
+            String terminalThinking = pendingThinkingBeforeTool.toString().trim();
+            pendingTextBeforeTool.setLength(0);
+            pendingThinkingBeforeTool.setLength(0);
+
+            // Terminal TEXT is the reply candidate. The orchestrator owns its final
+            // REASONING/TEXT classification because only it knows whether subtasks remain.
+            // Preserve a distinct native thinking block as trace information.
+            if (!isBlank(terminalThinking) && !terminalThinking.equals(terminalText)) {
+                persistCompletedTrace(
+                        AiMessageType.REASONING,
+                        terminalThinking,
+                        Map.of("source", "thinking"));
+            }
         }
 
         private Flux<ExpertRuntimeEvent> recordToolCallStart(ToolCallStartEvent event) {

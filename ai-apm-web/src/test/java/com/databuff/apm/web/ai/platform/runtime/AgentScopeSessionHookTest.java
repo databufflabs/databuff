@@ -271,6 +271,25 @@ class AgentScopeSessionHookTest {
     }
 
     @Test
+    void terminalTextWithoutFollowingToolIsLeftForOrchestratorClassification() {
+        AiSessionStore store = new AiSessionStore();
+        String sessionId = store.ensureSession(null, "brain", "rk", "web-1", "admin");
+        store.appendUserMessage(sessionId, "汇总专家结论", "brain", "admin", Map.of());
+        AgentScopeSessionHook hook = new AgentScopeSessionHook(store);
+        AgentScopeSessionHook.TraceRecorder recorder = hook.newTraceRecorder(new ExpertChatContext.State(
+                sessionId, "admin", "brain", "assistant-1", true, null));
+
+        recorder.record(new TextBlockDeltaEvent(
+                "reply-1", "text-1", "这是本次 stream 的最终答复。")).blockLast();
+        recorder.finish();
+
+        assertThat(store.activeRoundMessages(sessionId))
+                .filteredOn(message -> "REASONING".equals(message.messageType()))
+                .as("terminal text is a reply candidate, not pre-tool reasoning")
+                .isEmpty();
+    }
+
+    @Test
     void recordsPreToolReasoningOnceWhenThinkingAndTextBlocksMatch() {
         AiSessionStore store = new AiSessionStore();
         String sessionId = store.ensureSession(null, "brain", "rk", "web-1", "admin");

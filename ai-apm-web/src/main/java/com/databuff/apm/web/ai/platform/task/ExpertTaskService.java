@@ -10,6 +10,7 @@ import com.databuff.apm.web.ai.platform.runtime.ExpertChatContext;
 import com.databuff.apm.web.ai.platform.runtime.ExpertChatScopeRegistry;
 import com.databuff.apm.web.ai.platform.runtime.ExpertRuntime;
 import com.databuff.apm.web.ai.platform.runtime.ExpertRuntimeEvent;
+import com.databuff.apm.web.ai.platform.runtime.ExpertRuntimeEventAccumulator;
 import com.databuff.apm.web.ai.platform.runtime.ExpertRuntimeRegistry;
 import com.databuff.apm.web.ai.platform.runtime.SessionExpertRuntimeRegistry;
 import com.databuff.apm.web.ai.platform.runtime.SessionWorkspaceService;
@@ -314,12 +315,12 @@ public class ExpertTaskService {
                     null,
                     current.taskId());
             ExpertTask runningTask = current;
-            StringBuilder content = new StringBuilder();
+            ExpertRuntimeEventAccumulator outcome = new ExpertRuntimeEventAccumulator();
             ExpertTaskContext.enterScope(runtimeSessionId, runningTask.sourceExpertId(), event -> {});
             ExpertChatScopeRegistry.register(chatContext);
             Flux<ExpertRuntimeEvent> events = runtime.stream(input);
             Disposable disposable = events
-                    .doOnNext(event -> appendStreamContent(content, event))
+                    .doOnNext(outcome::accept)
                     .doFinally(signal -> {
                         ExpertChatScopeRegistry.unregister(runtimeSessionId);
                         ExpertTaskContext.leaveScope(runtimeSessionId);
@@ -328,7 +329,7 @@ public class ExpertTaskService {
                     .subscribe(
                             null,
                             error -> handleTaskStreamFailure(runningTask, roundIndex, userName, error),
-                            () -> handleTaskStreamSuccess(runningTask, roundIndex, userName, content));
+                            () -> handleTaskStreamSuccess(runningTask, roundIndex, userName, outcome));
             pendingRegistry.registerTaskDisposable(runningTask.sessionId(), runningTask.taskId(), disposable);
         } catch (Exception e) {
             log.warn("Expert task {} failed to start: {}", taskId, e.getMessage());
@@ -346,14 +347,14 @@ public class ExpertTaskService {
             ExpertTask current,
             int roundIndex,
             String userName,
-            StringBuilder content) {
+            ExpertRuntimeEventAccumulator outcome) {
         sessionStore.finalizeRoundStreaming(current.sessionId(), current.targetExpertId());
         if (sessionStore.isAbortRequested(current.sessionId())) {
             failTask(current, ExpertTaskStatus.CANCELLED, "task cancelled");
             notifyFailure(current, "task cancelled");
             return;
         }
-        String reply = content.toString().trim();
+        String reply = outcome.replyCandidate();
         if (reply.isBlank()) {
             reply = extractExpertReplyFromSession(
                     current.sessionId(), current.targetExpertId(), roundIndex);
@@ -389,26 +390,6 @@ public class ExpertTaskService {
                 : ExpertTaskStatus.FAILED;
         ExpertTask failed = failTask(current, status, message);
         notifyFailure(failed, failed.error());
-    }
-
-    private static void appendStreamContent(StringBuilder content, ExpertRuntimeEvent event) {
-        if (event == null) {
-            return;
-        }
-        String type = event.type();
-        if ("error".equals(type)) {
-            String message = event.content() == null || event.content().isBlank()
-                    ? "expert stream failed"
-                    : event.content().trim();
-            throw new IllegalStateException(message);
-        }
-        if ("text".equals(type) && event.content() != null) {
-            content.append(event.content());
-            return;
-        }
-        if ("reasoning".equals(type) && event.content() != null && content.isEmpty()) {
-            content.append(event.content());
-        }
     }
 
     private void commitExpertDeliverable(ExpertTask task, int roundIndex, String reply) {

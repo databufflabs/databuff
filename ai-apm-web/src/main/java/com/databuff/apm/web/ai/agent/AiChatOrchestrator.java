@@ -12,6 +12,7 @@ import com.databuff.apm.web.ai.platform.runtime.ExpertChatInput;
 import com.databuff.apm.web.ai.platform.runtime.ExpertChatResult;
 import com.databuff.apm.web.ai.platform.runtime.ExpertRuntime;
 import com.databuff.apm.web.ai.platform.runtime.ExpertRuntimeEvent;
+import com.databuff.apm.web.ai.platform.runtime.ExpertRuntimeEventAccumulator;
 import com.databuff.apm.web.ai.platform.runtime.AgentScopeRuntimeAdapter;
 import com.databuff.apm.web.ai.platform.runtime.ExpertRuntimeRegistry;
 import com.databuff.apm.web.ai.platform.runtime.SessionExpertRuntimeRegistry;
@@ -459,78 +460,31 @@ public class AiChatOrchestrator implements BrainRoundContinuer {
             AiExpertDefinition expert,
             boolean transientRuntime) {
         try {
-            StringBuilder content = new StringBuilder();
-            StringBuilder textBeforeFirstTool = new StringBuilder();
-            boolean[] toolActivitySeen = new boolean[] { false };
+            ExpertRuntimeEventAccumulator outcome = new ExpertRuntimeEventAccumulator();
             ExpertRuntime runtime = expertRuntime(sessionId, expert, transientRuntime);
             ExpertChatInput input = toExpertChatInput(sessionId, userName, assistantMessageId, chatContext);
             try {
                 Flux<ExpertRuntimeEvent> events = runtime.stream(input);
                 events.doOnNext(event -> {
-                        String type = event.type();
-                        if ("error".equals(type)) {
-                            String message = event.content() == null || event.content().isBlank()
-                                    ? "AgentScope stream failed"
-                                    : event.content().trim();
-                            throw new IllegalStateException(message);
-                        }
-                        if ("tool_call".equals(type) || "tool_result".equals(type)) {
-                            toolActivitySeen[0] = true;
-                            textBeforeFirstTool.setLength(0);
-                            return;
-                        }
-                        if (!"text".equals(type) || event.content() == null) {
-                            return;
-                        }
-                        if (content.isEmpty() && textBeforeFirstTool.isEmpty()) {
+                        outcome.accept(event);
+                        if ("text".equals(event.type()) && event.content() != null) {
                             sessionStore.endReasoningSegment(sessionId, expertId);
-                        }
-                        if (toolActivitySeen[0]) {
-                            content.append(event.content());
-                        } else {
-                            textBeforeFirstTool.append(event.content());
                         }
                         })
                         .blockLast(agentRuntimeConfig.expertRoundTimeout());
-                if (!content.isEmpty()) {
-                    return content.toString();
-                }
-                if ("brain".equals(expertId)
-                        && !toolActivitySeen[0]
-                        && !textBeforeFirstTool.isEmpty()
-                        && !brainRoundStillInProgress(sessionId)) {
-                    ExpertChatResult recovery = runtime.chat(input).block(agentRuntimeConfig.expertRoundTimeout());
-                    if (recovery != null && recovery.ok() && recovery.content() != null && !recovery.content().isBlank()) {
-                        content.append(recovery.content());
-                    }
-                    if (!content.isEmpty()) {
-                        return content.toString();
-                    }
-                    if (brainRoundStillInProgress(sessionId)) {
-                        return textBeforeFirstTool.toString();
-                    }
+                String replyCandidate = outcome.replyCandidate();
+                if (!replyCandidate.isEmpty()) {
+                    return replyCandidate;
                 }
                 if ("brain".equals(expertId) && brainRoundStillInProgress(sessionId)) {
-                    if (!toolActivitySeen[0] && !textBeforeFirstTool.isEmpty()) {
-                        return textBeforeFirstTool.toString();
-                    }
                     return "";
-                }
-                if (!toolActivitySeen[0] && !textBeforeFirstTool.isEmpty()) {
-                    return textBeforeFirstTool.toString();
-                }
-                if ("brain".equals(expertId) && expertTaskService.awaitingBrainTaskCompletionNotifications(
-                        sessionId, sessionStore.peekCurrentRoundIndex(sessionId))) {
-                    return "";
-                }
-                ExpertChatResult result = runtime.chat(input).block(agentRuntimeConfig.expertRoundTimeout());
-                if (result != null && result.ok()) {
-                    return result.content();
                 }
                 return runtimeFailureReply(
                         expertId,
                         chatContext.message(),
-                        result == null ? "empty runtime response" : result.error());
+                        outcome.toolActivitySeen()
+                                ? "stream completed after tool activity without a reply"
+                                : "empty runtime response");
             } finally {
                 if (shouldCloseTransientRuntime(expertId, sessionId, transientRuntime)) {
                     runtime.close();
@@ -610,24 +564,16 @@ public class AiChatOrchestrator implements BrainRoundContinuer {
             }
         }, () -> {
             String userName = requireUserName(request);
-            StringBuilder content = new StringBuilder();
+            ExpertRuntimeEventAccumulator outcome = new ExpertRuntimeEventAccumulator();
             try {
                 AiExpertDefinition expert = withRequestModel(resolveExpert(expertId), request);
                 boolean transientRuntime = request.hasModelOverride();
                 ExpertRuntime runtime = expertRuntime(sessionId, expert, transientRuntime);
                 Flux<ExpertRuntimeEvent> events = runtime.stream(input);
                 events.doOnNext(event -> {
-                            if ("error".equals(event.type())) {
-                                String message = event.content() == null || event.content().isBlank()
-                                        ? "AgentScope stream failed"
-                                        : event.content().trim();
-                                throw new IllegalStateException(message);
-                            }
+                            outcome.accept(event);
                             if ("text".equals(event.type()) && event.content() != null) {
-                                if (content.isEmpty()) {
-                                    sessionStore.endReasoningSegment(sessionId, expertId);
-                                }
-                                content.append(event.content());
+                                sessionStore.endReasoningSegment(sessionId, expertId);
                             }
                             try {
                                 emitter.send(SseEmitter.event()
@@ -665,7 +611,14 @@ public class AiChatOrchestrator implements BrainRoundContinuer {
                             if (shouldCloseTransientRuntime(expertId, sessionId, transientRuntime)) {
                                 runtime.close();
                             }
-                            completeStream(sessionId, expertId, assistantMessageId, userName, content, outputsBefore, emitter);
+                            completeStream(
+                                    sessionId,
+                                    expertId,
+                                    assistantMessageId,
+                                    userName,
+                                    outcome.replyCandidate(),
+                                    outputsBefore,
+                                    emitter);
                             activeChatTasks.remove(sessionId);
                             if (!sessionStore.isAbortRequested(sessionId) && !shouldKeepSessionRunning(sessionId)) {
                                 sessionStore.setRunning(sessionId, false);
@@ -692,14 +645,13 @@ public class AiChatOrchestrator implements BrainRoundContinuer {
             String expertId,
             String assistantMessageId,
             String userName,
-            StringBuilder content,
+            String reply,
             Set<String> outputsBefore,
             SseEmitter emitter) {
         if (sessionStore.isAbortRequested(sessionId)) {
             return;
         }
         try {
-            String reply = content.toString();
             Map<String, Object> metadata = new LinkedHashMap<>(buildAssistantMetadata(
                     sessionId, expertId, outputsBefore));
             metadata.put("stream", true);

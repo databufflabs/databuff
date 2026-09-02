@@ -55,6 +55,7 @@ class BrainAsyncRoutingIntegrationTest {
     private ExpertTaskService taskService;
     private AiChatOrchestrator orchestrator;
     private final AtomicInteger brainStreamCalls = new AtomicInteger();
+    private final AtomicInteger brainChatCalls = new AtomicInteger();
     private final List<String> brainPrompts = new ArrayList<>();
 
     @BeforeEach
@@ -100,8 +101,10 @@ class BrainAsyncRoutingIntegrationTest {
             }
             return Flux.empty();
         });
-        when(brainRuntime.chat(any(ExpertChatInput.class)))
-                .thenReturn(Mono.just(ExpertChatResult.ok("整合后的终稿：共 3 个服务")));
+        when(brainRuntime.chat(any(ExpertChatInput.class))).thenAnswer(invocation -> {
+            brainChatCalls.incrementAndGet();
+            return Mono.just(ExpertChatResult.ok("SECOND_CALL_MUST_NOT_BECOME_FINAL"));
+        });
         when(registry.getOrCreate("data")).thenReturn(dataRuntime);
         when(registry.getOrCreate("ops")).thenReturn(opsRuntime);
         when(registry.getOrCreate("inspection")).thenReturn(inspectionRuntime);
@@ -185,12 +188,16 @@ class BrainAsyncRoutingIntegrationTest {
                 .anySatisfy(message -> {
                     assertThat(message.messageType()).isEqualTo("TEXT");
                     assertThat(message.expertId()).isEqualTo("brain");
-                    assertThat(message.content()).containsAnyOf("整合后的终稿", "终稿");
+                    assertThat(message.content()).isEqualTo("整合后的终稿：共 3 个服务");
                     assertThat(message.metadata().get(ExpertMessageConstants.META_IS_ROUND_FINAL))
                             .isEqualTo(Boolean.TRUE);
                     assertThat(message.metadata().get(ExpertMessageConstants.META_TRIGGER_SOURCE))
                             .isEqualTo(ExpertMessageConstants.TRIGGER_EXPERT_RESULT);
                 });
+        assertThat(brainStreamCalls.get()).isEqualTo(1);
+        assertThat(brainChatCalls.get())
+                .as("one expert completion must invoke the brain exactly once")
+                .isZero();
         assertThat(pendingRegistry.hasPending(sessionId)).isFalse();
     }
 
@@ -235,7 +242,10 @@ class BrainAsyncRoutingIntegrationTest {
                     assertThat(message.content()).doesNotContain("继续等待");
                 });
 
-        assertThat(brainStreamCalls.get()).isGreaterThanOrEqualTo(2);
+        assertThat(brainStreamCalls.get()).isEqualTo(2);
+        assertThat(brainChatCalls.get())
+                .as("two expert completions must produce two brain invocations, not a third recovery call")
+                .isZero();
         synchronized (brainPrompts) {
             assertThat(brainPrompts.stream().anyMatch(p -> p.contains("数字专家") && p.contains("已完成")))
                     .isTrue();
