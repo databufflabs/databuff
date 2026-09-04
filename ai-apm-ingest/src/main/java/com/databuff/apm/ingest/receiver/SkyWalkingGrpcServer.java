@@ -2,6 +2,7 @@ package com.databuff.apm.ingest.receiver;
 
 import com.databuff.apm.ingest.skywalking.ManagementServiceNoop;
 import com.databuff.apm.ingest.skywalking.SkyWalkingIngestService;
+import io.grpc.BindableService;
 import io.grpc.Server;
 import io.grpc.ServerBuilder;
 import io.grpc.stub.StreamObserver;
@@ -44,46 +45,52 @@ public class SkyWalkingGrpcServer implements ApplicationListener<ApplicationRead
     }
 
     public void start() throws IOException {
+        BindableService traceService = new TraceSegmentReportServiceGrpc.TraceSegmentReportServiceImplBase() {
+            @Override
+            public StreamObserver<SegmentObject> collect(StreamObserver<Commands> responseObserver) {
+                return new StreamObserver<>() {
+                    @Override
+                    public void onNext(SegmentObject segment) {
+                        ingestService.ingestSegment(segment);
+                    }
+
+                    @Override
+                    public void onError(Throwable throwable) {
+                        log.warn("SkyWalking trace stream error", throwable);
+                    }
+
+                    @Override
+                    public void onCompleted() {
+                        responseObserver.onNext(EMPTY);
+                        responseObserver.onCompleted();
+                    }
+                };
+            }
+
+            @Override
+            public void collectInSync(SegmentCollection request, StreamObserver<Commands> responseObserver) {
+                for (SegmentObject segment : request.getSegmentsList()) {
+                    ingestService.ingestSegment(segment);
+                }
+                responseObserver.onNext(EMPTY);
+                responseObserver.onCompleted();
+            }
+        };
+        BindableService jvmService = new JVMMetricReportServiceGrpc.JVMMetricReportServiceImplBase() {
+            @Override
+            public void collect(JVMMetricCollection request, StreamObserver<Commands> responseObserver) {
+                ingestService.ingestJvmMetrics(request);
+                responseObserver.onNext(EMPTY);
+                responseObserver.onCompleted();
+            }
+        };
+        BindableService managementService = new ManagementServiceNoop();
+
         server = ServerBuilder.forPort(grpcPort)
-                .addService(new TraceSegmentReportServiceGrpc.TraceSegmentReportServiceImplBase() {
-                    @Override
-                    public StreamObserver<SegmentObject> collect(StreamObserver<Commands> responseObserver) {
-                        return new StreamObserver<>() {
-                            @Override
-                            public void onNext(SegmentObject segment) {
-                                ingestService.ingestSegment(segment);
-                            }
-
-                            @Override
-                            public void onError(Throwable throwable) {
-                                log.warn("SkyWalking trace stream error", throwable);
-                            }
-
-                            @Override
-                            public void onCompleted() {
-                                responseObserver.onNext(EMPTY);
-                                responseObserver.onCompleted();
-                            }
-                        };
-                    }
-
-                    @Override
-                    public void collectInSync(SegmentCollection request, StreamObserver<Commands> responseObserver) {
-                        for (SegmentObject segment : request.getSegmentsList()) {
-                            ingestService.ingestSegment(segment);
-                        }
-                        responseObserver.onNext(EMPTY);
-                        responseObserver.onCompleted();
-                    }
-                })
-                .addService(new JVMMetricReportServiceGrpc.JVMMetricReportServiceImplBase() {
-                    @Override
-                    public void collect(JVMMetricCollection request, StreamObserver<Commands> responseObserver) {
-                        ingestService.ingestJvmMetrics(request);
-                        responseObserver.onNext(EMPTY);
-                        responseObserver.onCompleted();
-                    }
-                })
+                .addService(traceService)
+                .addService(GrpcServiceAlias.withServiceName(traceService, "TraceSegmentReportService"))
+                .addService(jvmService)
+                .addService(GrpcServiceAlias.withServiceName(jvmService, "JVMMetricReportService"))
                 .addService(new LogReportServiceGrpc.LogReportServiceImplBase() {
                     @Override
                     public StreamObserver<LogData> collect(StreamObserver<Commands> responseObserver) {
@@ -106,10 +113,15 @@ public class SkyWalkingGrpcServer implements ApplicationListener<ApplicationRead
                         };
                     }
                 })
-                .addService(new ManagementServiceNoop())
+                .addService(managementService)
+                .addService(GrpcServiceAlias.withServiceName(managementService, "ManagementService"))
                 .build()
                 .start();
-        log.info("SkyWalking gRPC listening on port {}", grpcPort);
+        log.info("SkyWalking gRPC listening on port {}", server.getPort());
+    }
+
+    int boundPort() {
+        return server == null ? grpcPort : server.getPort();
     }
 
     @Override

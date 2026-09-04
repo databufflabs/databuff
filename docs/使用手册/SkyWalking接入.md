@@ -6,7 +6,7 @@
 
 # 使用手册 · SkyWalking 接入
 
-DataBuff **Ingest** 服务支持直接接收 **SkyWalking 原生 gRPC 协议**（v3），Java Agent 或自研 SDK 可将 Trace、JVM 指标、Log 上报至 DataBuff，无需经过 SkyWalking OAP 或 OpenTelemetry Collector。
+DataBuff **Ingest** 服务支持直接接收 **SkyWalking 原生 gRPC 协议**（v3），Java Agent 或自研 SDK 可将 Trace、JVM 指标、Log 上报至 DataBuff，无需经过 SkyWalking OAP 或 OpenTelemetry Collector。Trace、JVM 指标和 Management 同时兼容 SkyWalking 8.0–8.3 Agent 使用的无 package 服务名。
 
 ## 支持的信号
 
@@ -89,6 +89,8 @@ DataBuff Ingest 实现了 SkyWalking v3 gRPC 协议的三个核心服务，与�
 - **`JVMMetricReportService`** — 接收 `JVMMetricCollection`
 - **`LogReportService`** — 接收 `LogData`
 - **`ManagementService`** — 已注册（NOOP），Agent 心跳不做额外处理
+
+同一个 `11800` 端口同时接受 8.0–8.3 的 `/TraceSegmentReportService/...`、`/JVMMetricReportService/...`、`/ManagementService/...`，以及 8.4+ 的 `/skywalking.v3.<Service>/...` 方法路径，无需配置 Agent 版本。
 
 源码位置：`ai-apm-ingest/src/main/java/com/databuff/apm/ingest/receiver/SkyWalkingGrpcServer.java:46`
 

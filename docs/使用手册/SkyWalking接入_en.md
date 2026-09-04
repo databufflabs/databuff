@@ -6,7 +6,7 @@
 
 # User Guide · SkyWalking Ingestion
 
-DataBuff **Ingest** supports the **SkyWalking native gRPC protocol (v3)** directly. Java Agents or custom SDKs can submit traces, JVM metrics, and logs to DataBuff without going through a SkyWalking OAP or OpenTelemetry Collector.
+DataBuff **Ingest** supports the **SkyWalking native gRPC protocol (v3)** directly. Java Agents or custom SDKs can submit traces, JVM metrics, and logs to DataBuff without going through a SkyWalking OAP or OpenTelemetry Collector. Trace, JVM metric, and Management endpoints also accept the unqualified service names used by SkyWalking 8.0–8.3 agents.
 
 ## Supported Signals
 
@@ -89,6 +89,8 @@ DataBuff Ingest implements three core SkyWalking v3 gRPC services, compatible wi
 - **`JVMMetricReportService`** — accepts `JVMMetricCollection`
 - **`LogReportService`** — accepts `LogData`
 - **`ManagementService`** — registered (NOOP), agent heartbeat is ignored
+
+The same `11800` port accepts both the SkyWalking 8.0–8.3 paths (`/TraceSegmentReportService/...`, `/JVMMetricReportService/...`, and `/ManagementService/...`) and the `/skywalking.v3.<Service>/...` paths used by 8.4+ agents. No agent-version setting is required.
 
 Source: `ai-apm-ingest/src/main/java/com/databuff/apm/ingest/receiver/SkyWalkingGrpcServer.java:46`
 

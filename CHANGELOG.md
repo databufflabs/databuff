@@ -1,5 +1,11 @@
 # Changelog
 
+## [Unreleased]
+
+### Bug Fixes
+
+- Accept the unqualified SkyWalking 8.0–8.3 gRPC service names for Trace, JVM metrics, and Management on the existing ingest port
+
 ## [0.1.8] - 2026-08-22
 
 ### Features
