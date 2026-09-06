@@ -22,8 +22,6 @@ import java.util.concurrent.ConcurrentHashMap;
 public class InMemoryLlmProviderStore {
 
     private static final String DEFAULT_API_TYPE = LlmApiTypes.OPENAI_COMPLETIONS;
-    private static final String ANTHROPIC_API_TYPE = LlmApiTypes.ANTHROPIC_MESSAGES;
-
     private final Map<String, ProviderState> providers = new LinkedHashMap<>();
     private final Map<String, List<ModelState>> modelsByProvider = new LinkedHashMap<>();
     private final Map<String, String> apiKeys = new ConcurrentHashMap<>();
@@ -39,7 +37,6 @@ public class InMemoryLlmProviderStore {
     void initDefaults() {
         seed("kimi", "Kimi", "https://api.moonshot.cn/v1", "kimi-k2.6", DEFAULT_API_TYPE);
         seed("volcengine", "火山引擎", "https://ark.cn-beijing.volces.com/api/coding/v3", "kimi-k2.6", DEFAULT_API_TYPE);
-        seed("minimax", "MiniMax", "https://api.minimaxi.com/anthropic", "MiniMax-M3", ANTHROPIC_API_TYPE);
         seed("bailian", "百炼", "https://dashscope.aliyuncs.com/compatible-mode/v1", "qwen-plus", DEFAULT_API_TYPE);
         seed("deepseek", "DeepSeek", "https://api.deepseek.com", "deepseek-v4-flash", DEFAULT_API_TYPE);
         seed("zhipu", "智谱", "https://open.bigmodel.cn/api/paas/v4", "glm-4-flash", DEFAULT_API_TYPE);

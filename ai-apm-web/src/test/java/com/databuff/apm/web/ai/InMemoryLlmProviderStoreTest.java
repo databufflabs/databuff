@@ -15,6 +15,8 @@ class InMemoryLlmProviderStoreTest {
     void seedsProvidersAndTracksApiKey() {
         InMemoryLlmProviderStore store = TestBeanSupport.llmProviderStore();
         assertThat(store.listProviders()).hasSizeGreaterThanOrEqualTo(8);
+        assertThat(store.listProviders())
+                .noneMatch(provider -> "minimax".equals(provider.providerCode()));
         LlmProviderView updated = store.updateProvider("openai", new UpdateLlmProviderRequest(
                 null, "sk-test", null, true));
         assertThat(updated.configured()).isTrue();

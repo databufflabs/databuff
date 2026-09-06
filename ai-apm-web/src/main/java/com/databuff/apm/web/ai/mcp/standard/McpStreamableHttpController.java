@@ -1,5 +1,6 @@
 package com.databuff.apm.web.ai.mcp.standard;
 
+import org.springframework.http.HttpMethod;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.MediaType;
 import org.springframework.http.ResponseEntity;
@@ -23,13 +24,17 @@ public class McpStreamableHttpController {
             value = "/mcp",
             consumes = MediaType.APPLICATION_JSON_VALUE,
             produces = MediaType.APPLICATION_JSON_VALUE)
-    public Map<String, Object> post(@RequestBody Map<String, Object> body) {
-        return jsonRpcService.handle(body);
+    public ResponseEntity<?> post(@RequestBody Map<String, Object> body) {
+        if (!body.containsKey("id") && body.get("method") instanceof String) {
+            return ResponseEntity.accepted().build();
+        }
+        return ResponseEntity.ok(jsonRpcService.handle(body));
     }
 
     @GetMapping("/mcp")
-    public ResponseEntity<Map<String, String>> get() {
+    public ResponseEntity<Void> get() {
         return ResponseEntity.status(HttpStatus.METHOD_NOT_ALLOWED)
-                .body(Map.of("error", "Use POST with application/json for JSON-RPC requests"));
+                .allow(HttpMethod.POST)
+                .build();
     }
 }

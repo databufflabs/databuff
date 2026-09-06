@@ -282,7 +282,6 @@ interface EditFormState {
 const ICON_MAP: Record<string, IconStyle> = {
   kimi: { bg: 'linear-gradient(135deg, #111827, #374151)', label: 'K' },
   volcengine: { bg: 'linear-gradient(135deg, #006EFF, #00E5E5)', label: i18n.t('modules.views.configManage.llm.s_df3bbd52') as string, labelKey: 'modules.views.configManage.llm.s_df3bbd52' },
-  minimax: { bg: 'linear-gradient(135deg, #2563eb, #7c3aed)', label: 'M' },
   bailian: { bg: 'linear-gradient(135deg, #f97316, #ea580c)', label: i18n.t('modules.views.configManage.llm.s_81ec89a2') as string, labelKey: 'modules.views.configManage.llm.s_81ec89a2' },
   deepseek: { bg: 'linear-gradient(135deg, #0ea5e9, #0369a1)', label: 'D' },
   zhipu: { bg: 'linear-gradient(135deg, #7c3aed, #4f46e5)', label: i18n.t('modules.views.configManage.llm.s_c49daac4') as string, labelKey: 'modules.views.configManage.llm.s_c49daac4' },
