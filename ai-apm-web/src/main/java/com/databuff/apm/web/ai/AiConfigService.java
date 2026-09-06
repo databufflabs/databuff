@@ -34,38 +34,21 @@ public class AiConfigService {
     }
 
     public LlmProviderView saveProviderDetail(SaveLlmProviderRequest request) {
-        InMemoryLlmProviderStore.ProviderSnapshot snapshot = store.snapshotProvider(request.providerCode());
-        try {
-            LlmProviderView view = store.saveProviderDetail(request);
-            llmProviderPersistence.persistDetail(request, view);
-            return view;
-        } catch (RuntimeException e) {
-            store.restoreProvider(snapshot);
-            throw e;
-        }
+        LlmProviderView view = store.saveProviderDetail(request);
+        llmProviderPersistence.persistDetail(request, view);
+        return view;
     }
 
     public LlmProviderView updateProvider(String providerCode, UpdateLlmProviderRequest request) {
-        InMemoryLlmProviderStore.ProviderSnapshot snapshot = store.snapshotProvider(providerCode);
-        try {
-            LlmProviderView view = store.updateProvider(providerCode, request);
-            llmProviderPersistence.persistUpdate(providerCode, request, view);
-            return view;
-        } catch (RuntimeException e) {
-            store.restoreProvider(snapshot);
-            throw e;
-        }
+        LlmProviderView view = store.updateProvider(providerCode, request);
+        llmProviderPersistence.persistUpdate(providerCode, request, view);
+        return view;
     }
 
     public LlmProviderView createProvider(CreateLlmProviderRequest request) {
         LlmProviderView view = store.createProvider(request);
-        try {
-            llmProviderPersistence.persistCreate(request, view);
-            return view;
-        } catch (RuntimeException e) {
-            store.rollbackCreatedProvider(view.providerCode());
-            throw e;
-        }
+        llmProviderPersistence.persistCreate(request, view);
+        return view;
     }
 
     public void deleteProvider(String providerCode) {

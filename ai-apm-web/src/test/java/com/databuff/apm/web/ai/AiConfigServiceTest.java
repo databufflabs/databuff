@@ -65,7 +65,7 @@ class AiConfigServiceTest {
     }
 
     @Test
-    void restoresProviderWhenSavingToDatabaseFails() {
+    void keepsProviderInMemoryWhenSavingToDatabaseFails() {
         InMemoryLlmProviderStore store = TestBeanSupport.llmProviderStore();
         LlmProviderPersistence persistence = mock(LlmProviderPersistence.class);
         AiConfigService service = new AiConfigService(
@@ -73,8 +73,6 @@ class AiConfigServiceTest {
                 new LlmCatalogService(),
                 persistence,
                 TestBeanSupport.defaultProviderProperties());
-        LlmProviderDetailView before = store.getProviderDetail("openai");
-        long versionBefore = store.providerVersion("openai");
         doThrow(new IllegalStateException("database unavailable"))
                 .when(persistence).persistDetail(any(), any());
 
@@ -91,12 +89,15 @@ class AiConfigServiceTest {
                         "changed-model", "Changed", null, null, List.of(), true)))))
                 .isInstanceOf(IllegalStateException.class);
 
-        assertThat(store.getProviderDetail("openai")).isEqualTo(before);
-        assertThat(store.providerVersion("openai")).isEqualTo(versionBefore);
+        assertThat(service.aiReady()).isTrue();
+        assertThat(store.getProviderDetail("openai").providerName()).isEqualTo("Changed name");
+        assertThat(service.getProviderDetail("openai").models())
+                .extracting(LlmModelView::modelId)
+                .containsExactly("changed-model");
     }
 
     @Test
-    void removesNewProviderFromMemoryWhenDatabaseCreateFails() {
+    void keepsNewProviderInMemoryWhenDatabaseCreateFails() {
         InMemoryLlmProviderStore store = TestBeanSupport.llmProviderStore();
         LlmProviderPersistence persistence = mock(LlmProviderPersistence.class);
         AiConfigService service = new AiConfigService(
@@ -112,6 +113,7 @@ class AiConfigServiceTest {
                 .isInstanceOf(IllegalStateException.class);
 
         assertThat(store.listProviders())
-                .noneMatch(provider -> "failed-create".equals(provider.providerCode()));
+                .anyMatch(provider -> "failed-create".equals(provider.providerCode()));
+        assertThat(service.aiReady()).isTrue();
     }
 }
