@@ -1,10 +1,32 @@
 # Changelog
 
-## [Unreleased]
+## [0.1.9] - 2026-09-06
+
+### Features
+
+- **LLM provider management**: full CRUD for LLM providers with detail views and i18n updates in config management
 
 ### Bug Fixes
 
 - Accept the unqualified SkyWalking 8.0–8.3 gRPC service names for Trace, JVM metrics, and Management on the existing ingest port
+- Fix duplicated / repeated messages in AI brain streaming responses
+
+### Security
+
+- Block AI agent shell commands and read-only Doris queries from accessing LLM provider credential storage (`config_llm_provider` / `api_key_cipher`)
+
+### Deploy & Build
+
+- Docker / K8s / offline install scripts and docs versioned to `0.1.9`
+
+### Full changelog
+
+Commits since `0.1.8`:
+
+- `c56d243` fix: accept SkyWalking 8.1 agent services
+- `93c89d5` update llm provider crud
+- `7341661` fix ai brain repeat message
+- `fc29f85` disable show key
 
 ## [0.1.8] - 2026-08-22
 
