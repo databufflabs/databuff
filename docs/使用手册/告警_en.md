@@ -67,6 +67,58 @@ Filter by service, severity, status. Click an alert for details:
 - Handling log
 
 Alerts auto-resolve when metrics recover.
+---
+
+## Configuration Example
+
+Example: fire when `order-service` error rate stays above 5% for 5 minutes.
+Create it under **Configuration → Alert Config → New Rule**:
+
+| Field | Value | Meaning |
+|-------|-------|---------|
+| Rule name | `order-service error rate too high` | How the row is labeled in the alert list |
+| Scope | `order-service` | Service (or an instance) to evaluate |
+| Metric | Error rate (`error_rate` / `service.error.pct`) | Percent, not a 0–1 fraction |
+| Condition | Threshold, greater than (`gt`) | Or less-than / change detection |
+| Threshold | `5` | 5% |
+| Lookback | `300` seconds | Each run uses the last 5 minutes; the job itself runs every minute |
+| Severity | Critical (`critical`) | Info / Warning also exist |
+| Enabled | yes | Disabled rules are not evaluated |
+
+Equivalent YAML:
+
+```yaml
+ruleName: order-service error rate too high
+enabled: true
+service: order-service
+metric: error_rate
+detectionWay: threshold
+comparator: gt
+threshold: 5
+period: 300          # seconds, last 5 minutes
+level: critical
+```
+
+Matching evaluation JSON (the block stored in `queryJson`):
+
+```json
+{
+  "1": {
+    "way": "threshold",
+    "period": 300,
+    "view_unit": "%",
+    "thresholds": { "critical": 5 },
+    "A": { "metric": "service.error.pct", "from": [] }
+  }
+}
+```
+
+After you save and enable it, evaluation checks the last 5 minutes every minute.
+When the rate is above 5%, a row shows up under **Alert Center → Alert List**,
+with a description like "error rate 12% exceeded threshold 5%", status open.
+Open it for metric trend, related traces and logs. When the metric recovers the
+row is marked resolved. Trigger records for that alert sit in the event list on
+the detail page.
 
 ---
 
