@@ -812,8 +812,11 @@ class MetricQueryBuilderTest {
         String sql = MetricQueryBuilder.serviceMetricHasDataSql(
                 "databuff", "metric_jvm", "service-a", 0L, 3_600_000L);
         assertThat(sql).contains("metric_jvm");
-        assertThat(sql).contains("COUNT(*)");
+        assertThat(sql).contains("SELECT 1 AS total_cnt");
         assertThat(sql).contains("`service_id` = '" + serviceId + "'");
+        assertThat(sql).contains("LIMIT 1");
+        assertThat(sql).doesNotContain("`cnt` > 0");
+        assertThat(sql).doesNotContain("COUNT(*)");
         assertThat(sql).doesNotContain("SUM(`cnt`)");
     }
 
@@ -826,7 +829,10 @@ class MetricQueryBuilderTest {
         assertThat(sql).contains("`srcServiceId` = '" + PortalServiceIdResolver.normalize("demo-order") + "'");
         assertThat(sql).doesNotContain("`service` = ");
         assertThat(sql).doesNotContain("`srcService` = ");
-        assertThat(sql).contains("total_cnt");
+        assertThat(sql).contains("SELECT 1 AS total_cnt");
+        assertThat(sql).contains("`cnt` > 0");
+        assertThat(sql).contains("LIMIT 1");
+        assertThat(sql).doesNotContain("SUM(`cnt`)");
     }
 
     @Test

@@ -1599,22 +1599,26 @@ public final class MetricQueryBuilder {
             String database, String tableName, String service, long fromMillis, long toMillis) {
         String serviceFilter = componentMetricServiceFilter(tableName, service);
         String inboundFilter = isInboundComponentTable(tableName) ? " AND `isIn` = '1' " : "";
-        String aggregate = DorisTableNames.METRIC_JVM.equals(tableName)
-                ? "COUNT(*)"
-                : "SUM(`cnt`)";
+        // This is an existence probe on the inspectService hot path. Keep it short-circuitable;
+        // SUM/COUNT forced Doris to aggregate the complete one-hour range for every component.
+        String positiveCountFilter = DorisTableNames.METRIC_JVM.equals(tableName)
+                ? ""
+                : " AND `cnt` > 0 ";
         return """
-                SELECT %s AS total_cnt
+                SELECT 1 AS total_cnt
                 FROM %s.`%s`
                 WHERE %s
                 %s
                 %s
+                %s
+                LIMIT 1
                 """.formatted(
-                aggregate,
                 database,
                 tableName,
                 metricTsWhere(fromMillis, toMillis),
                 serviceFilter,
-                inboundFilter);
+                inboundFilter,
+                positiveCountFilter);
     }
 
     private static boolean isInboundComponentTable(String tableName) {

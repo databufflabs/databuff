@@ -2139,6 +2139,9 @@ public class ServicePortalService {
         String resolvedId = meta != null && !isBlank(meta.id())
                 ? PortalServiceIdResolver.normalize(meta.id())
                 : PortalServiceIdResolver.normalize(serviceId);
+        // Reuse the HTTP presence probe below when resolving technology; querying it twice made
+        // every inspectService call pay for another Doris scan before its parallel work started.
+        List<String> componentTypes = loadServiceComponentTypes(serviceId, from, to);
         Map<String, Object> service = new LinkedHashMap<>();
         service.put("serviceId", resolvedId);
         service.put("name", displayName);
@@ -2146,7 +2149,7 @@ public class ServicePortalService {
         service.put("service_type", serviceType);
         service.put("type", typeIcon);
         service.put("technology", resolveServiceTechnology(
-                meta != null ? meta.technology() : null, serviceId, serviceType, from, to));
+                meta != null ? meta.technology() : null, serviceId, serviceType, from, to, componentTypes));
         service.put("language", meta != null ? nullToEmpty(meta.language()) : "");
         service.put("processRuntimeName", meta != null ? nullToEmpty(meta.processRuntimeName()) : "");
         service.put("processRuntimeVersion", meta != null ? nullToEmpty(meta.processRuntimeVersion()) : "");
@@ -2161,7 +2164,7 @@ public class ServicePortalService {
         service.put("alarmCount", serviceAlarmCounter.countFor(
                 resolvedId, firstNonBlank(displayName, collectedService), from, to));
         service.put("tags", Map.of("custom", List.of()));
-        service.put("componentTypes", loadServiceComponentTypes(serviceId, from, to));
+        service.put("componentTypes", componentTypes);
         service.put("bizEvents", List.of());
         service.put("domainManager", Map.of());
         service.put("businessLineName", "");
@@ -2620,7 +2623,12 @@ public class ServicePortalService {
     }
 
     private String resolveServiceTechnology(
-            String metaTechnology, String serviceId, String serviceType, long from, long to) {
+            String metaTechnology,
+            String serviceId,
+            String serviceType,
+            long from,
+            long to,
+            List<String> componentTypes) {
         if (!"web".equals(serviceType)) {
             return !isBlank(metaTechnology) ? metaTechnology : inferServiceTypeIcon(serviceId, serviceType);
         }
@@ -2635,27 +2643,10 @@ public class ServicePortalService {
         if (hasServiceMetricData(serviceId, DorisTableNames.METRIC_JVM, from, to)) {
             technologies.add("jvm");
         }
-        if (hasServiceMetricData(serviceId, DorisTableNames.METRIC_SERVICE_HTTP, from, to)) {
+        if (componentTypes.contains("service.http")) {
             technologies.add("http");
-        }
-        if (technologies.isEmpty()) {
-            return inferServiceTechnology(serviceId, serviceType, from, to);
         }
         return String.join(",", technologies);
-    }
-
-    private String inferServiceTechnology(String serviceId, String serviceType, long from, long to) {
-        if (!"web".equals(serviceType)) {
-            return inferServiceTypeIcon(serviceId, serviceType);
-        }
-        List<String> technologies = new ArrayList<>();
-        if (hasServiceMetricData(serviceId, DorisTableNames.METRIC_JVM, from, to)) {
-            technologies.add("jvm");
-        }
-        if (hasServiceMetricData(serviceId, DorisTableNames.METRIC_SERVICE_HTTP, from, to)) {
-            technologies.add("http");
-        }
-        return technologies.isEmpty() ? "" : String.join(",", technologies);
     }
 
     private List<String> loadServiceComponentTypes(String serviceId, long from, long to) {

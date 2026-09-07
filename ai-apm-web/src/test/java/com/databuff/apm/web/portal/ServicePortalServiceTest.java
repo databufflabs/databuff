@@ -24,6 +24,7 @@ import java.util.Map;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.anyString;
+import static org.mockito.ArgumentMatchers.argThat;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.times;
@@ -342,6 +343,8 @@ class ServicePortalServiceTest {
         @SuppressWarnings("unchecked")
         Map<String, Object> tags = (Map<String, Object>) info.get("tags");
         assertThat(tags.get("custom")).isEqualTo(List.of());
+        verify(reader, times(8)).queryDistinctCount(anyString());
+        verify(reader, times(1)).queryDistinctCount(argThat(sql -> sql.contains("metric_service_http")));
     }
 
     @Test
@@ -379,7 +382,7 @@ class ServicePortalServiceTest {
         when(reader.queryServiceSummaries(anyString())).thenReturn(List.of());
         when(reader.queryDistinctCount(anyString())).thenAnswer(invocation -> {
             String sql = invocation.getArgument(0);
-            if (sql.contains("metric_jvm") && sql.contains("COUNT(*)")) {
+            if (sql.contains("metric_jvm")) {
                 return 3L;
             }
             return 0L;
