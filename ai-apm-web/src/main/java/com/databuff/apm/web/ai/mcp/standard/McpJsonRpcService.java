@@ -1,6 +1,8 @@
 package com.databuff.apm.web.ai.mcp.standard;
 
 import com.databuff.apm.web.ai.platform.AiPlatformApiException;
+import com.fasterxml.jackson.databind.JsonNode;
+import com.fasterxml.jackson.databind.ObjectMapper;
 import org.springframework.stereotype.Service;
 
 import java.util.LinkedHashMap;
@@ -12,6 +14,8 @@ public class McpJsonRpcService {
 
     static final String JSONRPC_VERSION = "2.0";
     static final String PROTOCOL_VERSION = "2024-11-05";
+
+    private static final ObjectMapper OUTPUT_MAPPER = new ObjectMapper();
 
     private final McpToolCatalog catalog;
     private final JavaBeanToolExecutor executor;
@@ -89,11 +93,37 @@ public class McpJsonRpcService {
         Map<String, Object> arguments = params.get("arguments") instanceof Map<?, ?> rawArguments
                 ? (Map<String, Object>) rawArguments
                 : Map.of();
-        JavaBeanToolExecutor.TestToolRequest request = executor.fromArguments(arguments);
-        String output = executor.invoke(tool.implementation(), request);
-        return Map.of(
-                "content", List.of(Map.of("type", "text", "text", output)),
-                "isError", false);
+        try {
+            JavaBeanToolExecutor.TestToolRequest request = executor.fromArguments(arguments);
+            String output = executor.invoke(tool.implementation(), request);
+            return toolResult(output, isBusinessError(output));
+        } catch (RuntimeException ex) {
+            return toolResult(ex.getMessage() == null ? "Tool execution failed" : ex.getMessage(), true);
+        }
+    }
+
+    private static Map<String, Object> toolResult(String output, boolean error) {
+        return Map.of("content", List.of(Map.of("type", "text", "text", output == null ? "" : output)),
+                "isError", error);
+    }
+
+    private static boolean isBusinessError(String output) {
+        if (output == null || output.isBlank()) return true;
+        try {
+            JsonNode body = OUTPUT_MAPPER.readTree(output);
+            // Only inspect response envelopes, never metric rows or arbitrary nested user data.
+            for (int depth = 0; depth < 3 && body != null && body.isObject(); depth++) {
+                if (body.path("ok").isBoolean() && !body.path("ok").booleanValue()
+                        || body.path("success").isBoolean() && !body.path("success").booleanValue()
+                        || body.path("status").isIntegralNumber() && body.path("status").asInt() >= 400) {
+                    return true;
+                }
+                body = body.get("data");
+            }
+        } catch (Exception ignored) {
+            // Text output is valid MCP content; do not infer failure from words in evidence.
+        }
+        return false;
     }
 
     static Map<String, Object> successResponse(Object id, Object result) {

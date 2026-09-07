@@ -162,4 +162,21 @@ class AgentScopeRuntimeAdapterTest {
                 .contains("`data`")
                 .contains("`inspection`");
     }
+    @Test
+    void shippedQueryRulesReachBothExpertPromptsAndExportedCopies() throws Exception {
+        Path root = Path.of("../deploy/common/skills");
+        for (String id : java.util.List.of("skill.data.metrics", "skill.inspection.health")) {
+            String body = Files.readString(root.resolve(id + "/SKILL.md"));
+            assertThat(Files.readString(Path.of("../integrations/agent/skills", id, "SKILL.md"))).isEqualTo(body);
+            assertThat(body).contains("metric_service", "sumDuration", "同类失败没有新证据时停止")
+                    .doesNotContain("query-contracts.md");
+            Files.writeString(tempDir.resolve("skills").resolve(id + "/SKILL.md"), body);
+        }
+        for (String expertId : java.util.List.of("data", "inspection")) {
+            var runtime = (AgentScopeExpertRuntime) adapter.buildRuntime(expertManagementService.find(expertId).orElseThrow());
+            String skillId = expertId.equals("data") ? "skill.data.metrics" : "skill.inspection.health";
+            assertThat(runtime.agent().getSysPrompt()).contains(Files.readString(root.resolve(skillId + "/SKILL.md")).trim());
+        }
+    }
+
 }

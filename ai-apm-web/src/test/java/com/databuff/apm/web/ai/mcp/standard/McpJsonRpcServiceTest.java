@@ -110,4 +110,42 @@ class McpJsonRpcServiceTest {
         assertThat(error).containsEntry("code", -32602);
         assertThat(error.get("message")).asString().contains("Unknown tool");
     }
+    @Test
+    void businessFailureRemainsReadableAndSetsMcpError() {
+        String body = "{\"ok\":false,\"message\":\"fromTime and toTime are required\"}";
+        when(executor.invoke(eq("dataTools.queryServiceTopology"), any())).thenReturn(body);
+        Map<?, ?> result = call("queryServiceTopology");
+        assertThat(result.get("isError")).isEqualTo(true);
+        assertThat(result.get("content")).isEqualTo(List.of(Map.of("type", "text", "text", body)));
+    }
+
+    @Test
+    void nestedApiFailureIsNotSuccessfulAlarmQuery() {
+        when(executor.invoke(eq("dataTools.queryServiceAlarms"), any()))
+                .thenReturn("{\"data\":{\"status\":500,\"message\":\"query failed\"}}");
+        assertThat(call("queryServiceAlarms").get("isError")).isEqualTo(true);
+    }
+
+    @Test
+    void emptyResultsAndErrorWordsInEvidenceRemainSuccessful() {
+        when(executor.invoke(eq("dataTools.queryMetricData"), any()))
+                .thenReturn("[[]]", "[[{\"error\":42,\"status\":500,\"message\":\"timeout\"}]]");
+        assertThat(call("queryMetricData").get("isError")).isEqualTo(false);
+        assertThat(call("queryMetricData").get("isError")).isEqualTo(false);
+    }
+
+    @Test
+    void executionExceptionIsToolFailureRatherThanProtocolFailure() {
+        when(executor.invoke(eq("dataTools.queryMetricData"), any()))
+                .thenThrow(new IllegalArgumentException("start is required"));
+        assertThat(call("queryMetricData").get("isError")).isEqualTo(true);
+    }
+
+    private Map<?, ?> call(String name) {
+        Map<String, Object> response = service.handle(Map.of("jsonrpc", "2.0", "id", 5,
+                "method", "tools/call", "params", Map.of("name", name, "arguments", Map.of())));
+        assertThat(response).doesNotContainKey("error");
+        return (Map<?, ?>) response.get("result");
+    }
+
 }

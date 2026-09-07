@@ -24,27 +24,27 @@ public class McpToolCatalog {
                         "Draw multiple trend charts from queried metric data",
                         schema(Map.of("charts", arrayProp("Trend chart specifications")))),
                 tool("queryServicesAll",
-                        "Query service list from service catalog; optional fromTime/toTime for time-windowed list",
+                        "Query service list from service catalog, at most 20 results. Omitted times default to the last hour; not an unlimited directory. Pass both fromTime/toTime for a custom window",
                         schema(Map.of(
                                 "keyword", stringProp("Optional service name keyword filter"),
-                                "fromTime", stringProp("Query start time"),
-                                "toTime", stringProp("Query end time")))),
+                                "fromTime", stringProp("Query start time in Asia/Shanghai yyyy-MM-dd HH:mm:ss; pass both fromTime and toTime"),
+                                "toTime", stringProp("Query end time in Asia/Shanghai yyyy-MM-dd HH:mm:ss; pass both fromTime and toTime")))),
                 tool("queryServicesByServiceType",
-                        "Query service list by serviceType from service catalog; optional fromTime/toTime",
+                        "Query service list by serviceType (service/web, db, mq, cache, remote). Omitted times default to the last hour; pass both fromTime/toTime for a custom window",
                         schema(Map.of(
-                                "serviceType", stringProp("Service type filter"),
+                                "serviceType", Map.of("type", "string", "enum", List.of("service", "web", "db", "mq", "cache", "remote"), "description", "Required service type"),
                                 "keyword", stringProp("Optional service name keyword filter"),
                                 "size", integerProp("Maximum number of results"),
-                                "fromTime", stringProp("Query start time"),
-                                "toTime", stringProp("Query end time")))),
+                                "fromTime", stringProp("Query start time in Asia/Shanghai yyyy-MM-dd HH:mm:ss; pass both fromTime and toTime"),
+                                "toTime", stringProp("Query end time in Asia/Shanghai yyyy-MM-dd HH:mm:ss; pass both fromTime and toTime")), List.of("serviceType"))),
                 tool("queryServiceTopology",
                         "Query upstream and downstream topology for one service by service name",
                         schema(Map.of(
                                 "serviceName", stringProp("Service name"),
                                 "serviceInstance", stringProp("Optional service instance"),
-                                "fromTime", stringProp("Query start time"),
-                                "toTime", stringProp("Query end time")),
-                        List.of("serviceName"))),
+                                "fromTime", stringProp("Query start time in Asia/Shanghai yyyy-MM-dd HH:mm:ss; pass both fromTime and toTime"),
+                                "toTime", stringProp("Query end time in Asia/Shanghai yyyy-MM-dd HH:mm:ss; pass both fromTime and toTime")),
+                        List.of("serviceName", "fromTime", "toTime"))),
                 tool("queryTraceListByCondition",
                         "Query trace list by service call condition",
                         schema(Map.of(
@@ -53,9 +53,9 @@ public class McpToolCatalog {
                                 "componentType", stringProp("Component type filter"),
                                 "resource", stringProp("Resource filter"),
                                 "direction", stringProp("Call direction"),
-                                "fromTime", stringProp("Query start time"),
-                                "toTime", stringProp("Query end time"),
-                                "size", integerProp("Maximum number of results")))),
+                                "fromTime", stringProp("Query start time in Asia/Shanghai yyyy-MM-dd HH:mm:ss; pass both fromTime and toTime"),
+                                "toTime", stringProp("Query end time in Asia/Shanghai yyyy-MM-dd HH:mm:ss; pass both fromTime and toTime"),
+                                "size", integerProp("Maximum number of results")), List.of("fromTime", "toTime"))),
                 tool("queryTraceDetail",
                         "Query trace detail by traceId",
                         schema(Map.of("traceId", stringProp("Trace ID")),
@@ -64,14 +64,14 @@ public class McpToolCatalog {
                         "Query alarm data for one service entity",
                         schema(Map.of(
                                 "serviceId", stringProp("Service ID"),
-                                "status", integerProp("Alarm status filter"),
-                                "fromTime", stringProp("Query start time"),
-                                "toTime", stringProp("Query end time")))),
+                                "status", integerProp("Optional alarm status: 0 open/pending, 1 closed"),
+                                "fromTime", stringProp("Query start time in Asia/Shanghai yyyy-MM-dd HH:mm:ss; pass both fromTime and toTime"),
+                                "toTime", stringProp("Query end time in Asia/Shanghai yyyy-MM-dd HH:mm:ss; pass both fromTime and toTime")), List.of("serviceId", "fromTime", "toTime"))),
                 tool("queryMetricData",
-                        "Query Doris metric tables by metric_core measurement, field, and tags",
+                        "Query real Doris metric tables (e.g. metric_service). measurement is a table name, never reqCount or a metric alias. Use documented fields; do not guess table names after a missing-table error. Requests use start/end, not fromTime/toTime. size belongs at the tool top level",
                         schema(Map.of(
-                                "queryRequests", arrayProp("Metric query request list"),
-                                "size", integerProp("Maximum number of results per query")))),
+                                "queryRequests", metricRequestsSchema(),
+                                "size", integerProp("Maximum rows per query, default 200, capped at 1000")), List.of("queryRequests"))),
                 tool("queryLogTrend",
                         "Query log volume trend by service, service instance, severity, or keyword",
                         schema(logTrendSchema(), List.of("fromTime", "toTime"))),
@@ -102,7 +102,7 @@ public class McpToolCatalog {
                                 "size", integerProp("Page size, max 200")),
                         List.of("spanId"))),
                 tool("inspectService",
-                        "Inspect one service: entry metrics, ERROR/WARN/keyword logs, alarms, dependencies, error traces, instances; web also checks exception/JVM/CPU/memory",
+                        "Inspect one service over a fixed last-hour window; no custom time input. For a user-selected window use explicit metric queries. Returns entry metrics, ERROR/WARN/keyword logs, alarms, dependencies, error traces, instances; web also checks exception/JVM/CPU/memory",
                         schema(Map.of("serviceName", stringProp("Service name to inspect")),
                         List.of("serviceName"))));
     }
@@ -142,6 +142,33 @@ public class McpToolCatalog {
         props.put("severities", stringArrayProp("Optional severity filters such as ERROR, WARN, INFO"));
         props.put("query", stringProp("Optional body keyword"));
         return props;
+    }
+
+    private static Map<String, Object> metricRequestsSchema() {
+        Map<String, Object> aggregation = schema(Map.of(
+                "function", Map.of("type", "string", "description", "Supported aggregate function; omit for a raw field", "enum", List.of("SUM", "AVG", "MAX", "MIN", "COUNT")),
+                "field", stringProp("Documented table field: cnt, error or sumDuration for metric_service"),
+                "alias", stringProp("Result column alias, e.g. total_cnt")), List.of("field"));
+        Map<String, Object> where = schema(Map.of(
+                "field", stringProp("Documented tag column, e.g. service or service_id; do not guess"),
+                "operator", stringProp("Default =; supports =, !=, >, >=, <, <=, LIKE, NOT LIKE, IN/INLIST, NOT IN, IS NULL, IS NOT NULL"),
+                "value", Map.of("description", "Filter value; IN/INLIST requires a JSON array, never a JSON-encoded string")), List.of("field"));
+        Map<String, Object> item = schema(Map.of(
+                "measurement", stringProp("Real Doris table name: metric_service for service metrics, metric_service_http/rpc/db/redis/mq for call metrics. Never an alias such as reqCount"),
+                "aggregations", Map.of("type", "array", "items", aggregation),
+                "wheres", Map.of("type", "array", "items", where),
+                "groupBy", stringArrayProp("Documented tag columns, e.g. service or service_id"),
+                "interval", Map.of("type", "integer", "minimum", 0, "description", "0 or omitted: aggregate; for a trend use 1 with intervalUnit=m"),
+                "intervalUnit", Map.of("type", "string", "enum", List.of("s", "m", "h", "ms"), "description", "Default s"),
+                "start", stringProp("Required start in Asia/Shanghai yyyy-MM-dd HH:mm:ss"),
+                "end", stringProp("Required end in Asia/Shanghai yyyy-MM-dd HH:mm:ss")), List.of("measurement", "start", "end"));
+        item.put("additionalProperties", false);
+        return Map.of("type", "array", "minItems", 1, "description", "Non-empty QueryRequest object array; not a JSON string. For request/error/duration use SUM(cnt), SUM(error), SUM(sumDuration); average duration is summed duration divided by count", "items", item,
+                "examples", List.of(List.of(Map.of(
+                        "measurement", "metric_service",
+                        "aggregations", List.of(Map.of("function", "SUM", "field", "cnt", "alias", "total_cnt")),
+                        "wheres", List.of(Map.of("field", "service", "operator", "=", "value", "service-a")),
+                        "start", "2026-09-07 16:00:00", "end", "2026-09-07 17:00:00"))));
     }
 
     private static String implementationFor(String name) {

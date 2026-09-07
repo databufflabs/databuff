@@ -10,7 +10,7 @@ description: APM 指标、Trace、日志与告警查询规则
 
 - 用户问服务列表/有哪些服务/全部服务时，用 `queryServicesAll` 或 `queryServicesByServiceType`，**禁止**用 `queryMetricData` 查服务列表。
 - 带时间窗口（如「最近1小时的服务列表」）：先确定 `fromTime`/`toTime`，再传给服务列表工具。
-- 不带时间限制的全量目录：不传 `fromTime`/`toTime`。
+- 未指定时间时，不传 `fromTime`/`toTime` 会使用最近 1 小时；不是无限时间的全量目录。`queryServicesAll` 最多返回 20 项，不能把这批结果宣称为全部服务。
 
 ## 时间范围
 
@@ -25,7 +25,7 @@ description: APM 指标、Trace、日志与告警查询规则
 
 | 场景 | 工具 |
 |------|------|
-| 全部服务 | `queryServicesAll(keyword, size, fromTime, toTime)` |
+| 全部服务 | `queryServicesAll(keyword, fromTime, toTime)` |
 | 按类型查服务 | `queryServicesByServiceType(serviceType, keyword, size, fromTime, toTime)`，类型：`service`/`web`、`db`、`mq`、`cache`、`remote` |
 | 服务上下游拓扑 | `queryServiceTopology(serviceName, serviceInstance, fromTime, toTime)`，参数是服务名 |
 | 条件查 Trace 列表 | `queryTraceListByCondition(...)` |
@@ -44,7 +44,7 @@ description: APM 指标、Trace、日志与告警查询规则
 - Doris 库名由服务端配置固定（当前为 `databuff`），**不要传** `databaseName` / `database`；`config_metric_core.app`（如 `apm`）不是库名。
 - `measurement`：Doris 表名，如 `metric_service`、`metric_service_http`，不要用 `service.db` 这类抽象名。
 - `aggregations`：`{ "function": "SUM|AVG|MAX|MIN|COUNT", "field": "<字段>", "alias": "<别名>" }`。
-- **禁止**使用 `QUANTILE`、`PERCENTILE`、`P99`、`TP99` 等分位数函数——Doris 不支持，会直接报错 `No matching function with signature: quantile(DOUBLE)`。
+- **禁止**使用 `QUANTILE`、`PERCENTILE`、`P99`、`TP99` 等分位数函数——本工具的受支持查询契约不包含这些函数，可能报错 `No matching function with signature: quantile(DOUBLE)`。
 - 只允许上述 5 种聚合函数；不要编造其它 function 名。
 - `wheres`：`{ "field": "<tag列>", "operator": "=", "value": "..." }`，field 必须来自该表的 tags 列表。
 - `INLIST` / `IN` 的 `value` 必须是 **JSON 数组** `["id1","id2"]`，**禁止**写成字符串 `"[\"id1\",\"id2\"]"`（会被当成一个整体匹配，导致查不到数据）。
@@ -120,7 +120,7 @@ description: APM 指标、Trace、日志与告警查询规则
 
 **注意**：`db`/`cache`/`mq`/`remote` 类型服务的指标在各自表（如 `metric_service_db`），不在 `metric_service`。不要把 7 种不同类型服务的 id 全塞进 `metric_service` 一次查——按类型分组，分别用对应 measurement。
 
-完整 tags/fields 以运行时 `config_metric_core` 或 Doris 元数据为准。
+完整 tags/fields 以运行时 `config_metric_core` 或 Doris 元数据为准。只有当前绑定工具提供只读元数据查询能力时才能读取；没有这类能力时使用本 Skill 明确列出的表字段，其他指标报告契约缺失，不猜表名或字段名。
 
 ## 指标视角
 
@@ -130,7 +130,7 @@ description: APM 指标、Trace、日志与告警查询规则
 
 ## 示例
 
-- 「查询最近1小时的服务列表」：`getCurrentTimeRange(60)` → `queryServicesAll(null, size, fromTime, toTime)`
+- 「查询最近1小时的服务列表」：`getCurrentTimeRange(60)` → `queryServicesAll(null, fromTime, toTime)`
 - 「服务 A 访问 DB」：`metric_service_db`，filter service=A，groupBy resource/sqlContent
 - 「哪些服务在访问服务 A」：`metric_service_http`，service=A + isIn=1，groupBy srcService
 - 「对比 A/B/C 请求量」：一次查询，`INLIST` + groupBy service，不要分别查三次
@@ -138,6 +138,42 @@ description: APM 指标、Trace、日志与告警查询规则
 - 「各实例请求量趋势」：`metric_service`，groupBy service_instance，设 interval
 - 「order-api 最近 ERROR 日志」：`getCurrentTimeRange` → `queryLogDetail(services=["order-api"], severities=["ERROR"])`
 - 「trace abc 的日志」：`queryLogsByTraceId(traceId="abc")`，可选再 `queryTraceDetail`
+
+## 调用证据与失败处理
+
+- 工具是否可用及当前输入结构以本次 `tools/list` / 工具定义为准。定义与本 Skill 冲突时，保留冲突信息，不自行猜参数；有明确错误提示时按提示修正。
+- `measurement` 不是指标别名：`reqCount`、`avgTime`、`service_cpm` 不能作为表名。表不存在时停止该查询，不能换一批相似名字穷举。
+- 调用前核对必填项：拓扑需要 `serviceName/fromTime/toTime`，告警需要 `serviceId/fromTime/toTime`；指标每项需要 `measurement/start/end`。时间使用 Asia/Shanghai 的 `yyyy-MM-dd HH:mm:ss`，不是 Unix 毫秒或 ISO 字符串。
+- MCP `isError:true`、正文 `ok:false` / `success:false` 或接口错误状态均是失败。外层 SUCCESS、HTTP 200 不代表业务成功。空数组与失败分别报告，不能把失败解释成没有请求或没有告警。
+- 参数修正必须有 schema、本文契约或错误信息作为依据。同类失败没有新证据时停止；不能通过不断换参数或工具名试探。已有满足需求的有效查询结果就回报，不扩大成穷举接口调查。
+- `inspectService(serviceName)` 若在当前工具清单中可用，提供固定最近 1 小时的入口指标与巡检证据，不接收自定义时间。用户选择其他窗口时用带时间参数的查询，不能把固定窗口结果说成所选窗口。
+- 拓扑边的请求数是调用链口径，不将所有上下游边相加冒充服务自身请求量。
+
+## 指标查询完整示例
+
+以下查询参数形状可直接参考；服务名与起止时间必须来自本次真实对象和时间范围，不能固定沿用示例值：
+
+```json
+{
+  "queryRequests": [{
+    "measurement": "metric_service",
+    "aggregations": [
+      {"function": "SUM", "field": "cnt", "alias": "total_cnt"},
+      {"function": "SUM", "field": "error", "alias": "error_cnt"},
+      {"function": "SUM", "field": "sumDuration", "alias": "sum_duration"}
+    ],
+    "wheres": [{"field": "service", "operator": "=", "value": "service-a"}],
+    "groupBy": ["service"],
+    "interval": 1,
+    "intervalUnit": "m",
+    "start": "2026-09-07 16:00:00",
+    "end": "2026-09-07 17:00:00"
+  }],
+  "size": 200
+}
+```
+
+`size` 是工具顶层参数，不放在 queryRequests 的单项中。当前返回按请求排列的结果数组；按真实返回的时间列和聚合别名取值，不猜 `data/values` 层次。
 
 ## 回答要求
 

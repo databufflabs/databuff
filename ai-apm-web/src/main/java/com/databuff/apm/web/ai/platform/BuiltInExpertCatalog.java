@@ -41,7 +41,7 @@ public final class BuiltInExpertCatalog {
                         "dataTools.queryTraceDetail", now),
                 tool("data.queryServiceAlarms", "服务告警查询", "Query alarm data for one service entity",
                         "dataTools.queryServiceAlarms", now),
-                tool("data.queryMetricData", "指标明细查询", "Query Doris metric tables by metric_core measurement, field, and tags",
+                tool("data.queryMetricData", "指标明细查询", "Query real Doris metric tables such as metric_service using queryRequests: measurement, aggregations, wheres, groupBy, interval, intervalUnit, start, end; never use metric aliases as table names",
                         "dataTools.queryMetricData", now),
                 tool("log.queryLogTrend", "日志量趋势", "Query log volume trend by service, service instance, severity, or keyword",
                         "logTools.queryLogTrend", now),
