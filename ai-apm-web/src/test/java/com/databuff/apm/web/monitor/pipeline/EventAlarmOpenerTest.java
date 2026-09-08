@@ -39,6 +39,7 @@ class EventAlarmOpenerTest {
 
         assertThat(opened).isPresent();
         assertThat(opened.get().message()).isEqualTo("service checkout error rate 10.00%");
+        assertThat(opened.get().policyId()).isEqualTo(1L);
         assertThat(opened.get().status()).isEqualTo(Alarm.STATUS_RESOLVED);
         assertThat(opened.get().resolvedAt()).isEqualTo(opened.get().triggeredAt());
         verify(eventPersistence).linkToAlarm("E1", opened.get().id());
@@ -82,6 +83,7 @@ class EventAlarmOpenerTest {
         Optional<Alarm> recovered = opener.openRecoveryForEvent(event);
 
         assertThat(recovered).isPresent();
+        assertThat(recovered.get().policyId()).isEqualTo(1L);
         assertThat(recovered.get().status()).isEqualTo(Alarm.STATUS_RESOLVED);
         verify(eventPersistence).linkToAlarm("E2", recovered.get().id());
     }

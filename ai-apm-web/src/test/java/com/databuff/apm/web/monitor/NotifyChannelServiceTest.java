@@ -123,6 +123,46 @@ class NotifyChannelServiceTest {
         }
     }
 
+    @Test
+    void firingAndResolvedLifecycleProducesTwoRecordsWithSameFingerprint() throws Exception {
+        com.sun.net.httpserver.HttpServer server = server(exchange -> {
+            exchange.sendResponseHeaders(204, -1);
+        });
+        NotifyChannelService service = service(new AlarmWebhookProperties(
+                url(server), Map.of(), 100, 1, 2, 0));
+        try {
+            EventRecord trigger = event("E-FIRING", 42L, "checkout", "TimeoutException");
+            EventRecord recovery = new EventRecord(
+                    "E-RESOLVED", 42L, "checkout error rate", "checkout", EventRule.WAY_THRESHOLD,
+                    "critical", EventRecord.STATUS_RECOVER, "已恢复：checkout error rate",
+                    "TimeoutException", false, Instant.now());
+
+            service.notifyAlert(alarm("A-FIRING"), trigger);
+            service.notifyAlert(
+                    new Alarm("A-RESOLVED", 42L, "checkout", EventRule.WAY_THRESHOLD, "critical",
+                            "已恢复：checkout error rate", Alarm.STATUS_RESOLVED, Instant.now(), Instant.now()),
+                    recovery);
+            assertThat(service.awaitBatchIdle()).isTrue();
+
+            List<WebhookSendRecord> records = service.recentSendRecords(2);
+            assertThat(records).hasSize(2);
+            assertThat(records).extracting(WebhookSendRecord::primaryStatus)
+                    .containsExactly("resolved", "firing");
+            assertThat(records).extracting(WebhookSendRecord::primaryFingerprint)
+                    .containsOnly("rule:42:service:TimeoutException");
+            assertThat(records).allMatch(WebhookSendRecord::success);
+        } finally {
+            service.close();
+            server.stop(0);
+        }
+    }
+
+    private static EventRecord event(String id, long ruleId, String ruleName, String groupKey) {
+        return new EventRecord(id, ruleId, ruleName, "checkout", EventRule.WAY_THRESHOLD,
+                "warning", EventRecord.STATUS_TRIGGER, "checkout error rate 10.00%",
+                groupKey, false, Instant.now(), "service.error.pct", "错误率", "%", 10.0, 5.0, "gt");
+    }
+
     private static NotifyChannelService service(AlarmWebhookProperties properties) {
         return new NotifyChannelService(
                 properties, TestMonitorRecordIds.create(), new WebhookAlertAssembler());

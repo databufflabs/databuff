@@ -36,7 +36,7 @@ public class AlarmStore {
             String level,
             String message,
             Instant triggeredAt) {
-        return open(service, detectionWay, level, message, triggeredAt, Alarm.STATUS_OPEN, null);
+        return open(0L, service, detectionWay, level, message, triggeredAt, Alarm.STATUS_OPEN, null);
     }
 
     /** One-shot alert for a single event: triggered and resolved at the same instant. */
@@ -46,11 +46,23 @@ public class AlarmStore {
             String level,
             String message,
             Instant triggeredAt) {
+        return openResolved(0L, service, detectionWay, level, message, triggeredAt);
+    }
+
+    /** One-shot alert tied to the originating rule ({@code policyId = ruleId}). */
+    public Alarm openResolved(
+            long policyId,
+            String service,
+            String detectionWay,
+            String level,
+            String message,
+            Instant triggeredAt) {
         Instant at = triggeredAt == null ? Instant.now() : triggeredAt;
-        return open(service, detectionWay, level, message, at, Alarm.STATUS_RESOLVED, at);
+        return open(policyId, service, detectionWay, level, message, at, Alarm.STATUS_RESOLVED, at);
     }
 
     private Alarm open(
+            long policyId,
             String service,
             String detectionWay,
             String level,
@@ -64,7 +76,7 @@ public class AlarmStore {
         Instant effectiveTriggeredAt = triggeredAt == null ? Instant.now() : triggeredAt;
         Alarm event = new Alarm(
                 id,
-                0L,
+                policyId,
                 service,
                 way,
                 resolvedLevel,

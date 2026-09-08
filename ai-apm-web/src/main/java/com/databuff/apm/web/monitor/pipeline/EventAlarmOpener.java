@@ -22,6 +22,7 @@ public class EventAlarmOpener {
             return Optional.empty();
         }
         Alarm alarm = alarmStore.openResolved(
+                event.ruleId(),
                 event.service(),
                 event.detectionWay(),
                 event.level(),
@@ -38,6 +39,7 @@ public class EventAlarmOpener {
             return Optional.empty();
         }
         Alarm alarm = alarmStore.openResolved(
+                event.ruleId(),
                 event.service(),
                 event.detectionWay(),
                 event.level(),

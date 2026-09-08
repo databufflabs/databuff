@@ -104,7 +104,7 @@ public class NotifyChannelService {
         } catch (Exception e) {
             log.warn("Alarm webhook payload serialization failed: {}", e.toString());
             sendRecords.append(WebhookSendRecord.of(batchId, properties.url(), template.id(),
-                    alerts.size(), false, 0, -1, "payload serialization failed: " + e, 0));
+                    alerts.size(), false, 0, -1, "payload serialization failed: " + e, 0, alerts));
             return;
         }
 
@@ -130,7 +130,7 @@ public class NotifyChannelService {
         }
         sendRecords.append(WebhookSendRecord.of(batchId, properties.url(), template.id(),
                 alerts.size(), result.success(), attempts, result.statusCode(), result.error(),
-                System.currentTimeMillis() - startedAt));
+                System.currentTimeMillis() - startedAt, alerts));
         if (!result.success()) {
             log.warn("Alarm webhook delivery failed after {} attempt(s): {}", attempts,
                     result.error() == null ? "HTTP " + result.statusCode() : result.error());
