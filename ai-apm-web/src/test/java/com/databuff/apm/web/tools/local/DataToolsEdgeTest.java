@@ -153,6 +153,37 @@ class DataToolsEdgeTest {
     }
 
     @Test
+    void queryMetricDataSupportsPhysicalColumnsContainingDots() throws Exception {
+        when(readRepository.queryRows(anyString(), org.mockito.ArgumentMatchers.anyInt()))
+                .thenReturn(List.of());
+
+        MetricQueryRequest configRequest = request(
+                "metric_service_config", List.of(where("config.type", "=", "dynamic")));
+        configRequest.setGroupBy(List.of("config.type"));
+        MetricQueryAggregation count = new MetricQueryAggregation();
+        count.setFunction("SUM");
+        count.setField("cnt");
+        count.setAlias("total_cnt");
+        configRequest.setAggregations(List.of(count));
+
+        MetricQueryRequest ioRequest = request("metric_service_io");
+        MetricQueryAggregation aggregation = new MetricQueryAggregation();
+        aggregation.setFunction("AVG");
+        aggregation.setField("read.rate");
+        aggregation.setAlias("avg_read_rate");
+        ioRequest.setAggregations(List.of(aggregation));
+
+        dataTools.queryMetricData(List.of(configRequest, ioRequest), 10);
+
+        ArgumentCaptor<String> sql = ArgumentCaptor.forClass(String.class);
+        verify(readRepository, times(2)).queryRows(sql.capture(), org.mockito.ArgumentMatchers.anyInt());
+        assertThat(sql.getAllValues().get(0))
+                .contains("`config.type` = 'dynamic'")
+                .contains("GROUP BY `config.type`");
+        assertThat(sql.getAllValues().get(1)).contains("AVG(`read.rate`) AS `avg_read_rate`");
+    }
+
+    @Test
     void queryMetricDataBuildsIsNullClause() throws Exception {
         when(readRepository.queryRows(anyString(), org.mockito.ArgumentMatchers.anyInt()))
                 .thenReturn(List.of(Map.of("epoch_sec", 1L, "cnt", 1)));

@@ -68,7 +68,7 @@ public class McpToolCatalog {
                                 "fromTime", stringProp("Query start time in Asia/Shanghai yyyy-MM-dd HH:mm:ss; pass both fromTime and toTime"),
                                 "toTime", stringProp("Query end time in Asia/Shanghai yyyy-MM-dd HH:mm:ss; pass both fromTime and toTime")), List.of("serviceId", "fromTime", "toTime"))),
                 tool("queryMetricData",
-                        "Query real Doris metric tables (e.g. metric_service). measurement is a table name, never reqCount or a metric alias. Use documented fields; do not guess table names after a missing-table error. Requests use start/end, not fromTime/toTime. size belongs at the tool top level",
+                        "Query real Doris metric tables (e.g. metric_service). measurement, tag, and field names must come from the bound Skill's physical-table contract; dotted physical columns are supported. measurement is never reqCount or another metric alias. sumDuration is nanoseconds. Requests use start/end, not fromTime/toTime. size belongs at the tool top level",
                         schema(Map.of(
                                 "queryRequests", metricRequestsSchema(),
                                 "size", integerProp("Maximum rows per query, default 200, capped at 1000")), List.of("queryRequests"))),
@@ -147,23 +147,23 @@ public class McpToolCatalog {
     private static Map<String, Object> metricRequestsSchema() {
         Map<String, Object> aggregation = schema(Map.of(
                 "function", Map.of("type", "string", "description", "Supported aggregate function; omit for a raw field", "enum", List.of("SUM", "AVG", "MAX", "MIN", "COUNT")),
-                "field", stringProp("Documented table field: cnt, error or sumDuration for metric_service"),
+                "field", stringProp("Field from the physical-table contract in the bound Skill, for example cnt, sumDuration or read.rate; dotted physical column names are supported"),
                 "alias", stringProp("Result column alias, e.g. total_cnt")), List.of("field"));
         Map<String, Object> where = schema(Map.of(
-                "field", stringProp("Documented tag column, e.g. service or service_id; do not guess"),
+                "field", stringProp("Tag from the physical-table contract in the bound Skill, e.g. service, service_id or config.type; do not guess"),
                 "operator", stringProp("Default =; supports =, !=, >, >=, <, <=, LIKE, NOT LIKE, IN/INLIST, NOT IN, IS NULL, IS NOT NULL"),
                 "value", Map.of("description", "Filter value; IN/INLIST requires a JSON array, never a JSON-encoded string")), List.of("field"));
         Map<String, Object> item = schema(Map.of(
                 "measurement", stringProp("Real Doris table name: metric_service for service metrics, metric_service_http/rpc/db/redis/mq for call metrics. Never an alias such as reqCount"),
                 "aggregations", Map.of("type", "array", "items", aggregation),
                 "wheres", Map.of("type", "array", "items", where),
-                "groupBy", stringArrayProp("Documented tag columns, e.g. service or service_id"),
+                "groupBy", stringArrayProp("Tags from the physical-table contract in the bound Skill, e.g. service, service_id or config.type"),
                 "interval", Map.of("type", "integer", "minimum", 0, "description", "0 or omitted: aggregate; for a trend use 1 with intervalUnit=m"),
                 "intervalUnit", Map.of("type", "string", "enum", List.of("s", "m", "h", "ms"), "description", "Default s"),
                 "start", stringProp("Required start in Asia/Shanghai yyyy-MM-dd HH:mm:ss"),
                 "end", stringProp("Required end in Asia/Shanghai yyyy-MM-dd HH:mm:ss")), List.of("measurement", "start", "end"));
         item.put("additionalProperties", false);
-        return Map.of("type", "array", "minItems", 1, "description", "Non-empty QueryRequest object array; not a JSON string. For request/error/duration use SUM(cnt), SUM(error), SUM(sumDuration); average duration is summed duration divided by count", "items", item,
+        return Map.of("type", "array", "minItems", 1, "description", "Non-empty QueryRequest object array; not a JSON string. Use only measurements/tags/fields listed in the bound Skill's physical Doris table contract. For request/error/duration use SUM(cnt), SUM(error), SUM(sumDuration); sumDuration is nanoseconds and average milliseconds is SUM(sumDuration)/SUM(cnt)/1000000", "items", item,
                 "examples", List.of(List.of(Map.of(
                         "measurement", "metric_service",
                         "aggregations", List.of(Map.of("function", "SUM", "field", "cnt", "alias", "total_cnt")),

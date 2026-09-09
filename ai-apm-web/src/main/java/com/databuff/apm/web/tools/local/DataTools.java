@@ -243,9 +243,9 @@ public class DataTools {
         return json(response);
     }
 
-    @Tool(converter = PlainTextToolResultConverter.class, description = "Execute metric queries with QueryRequest objects, similar to TSDBResultSet executeQuery. Each request has measurement, aggregations, wheres, groupBy, interval, intervalUnit, start, and end. For time-series/trend queries use 1-minute buckets by default (interval=1, intervalUnit=m). Doris database is fixed by server config.")
+    @Tool(converter = PlainTextToolResultConverter.class, description = "Execute metric queries against physical Doris tables using QueryRequest objects. Use only measurement, tag, and field names from the bound Skill's physical-table contract; dotted physical columns are supported. Each request has measurement, aggregations, wheres, groupBy, interval, intervalUnit, start, and end. sumDuration is nanoseconds. For time-series/trend queries use 1-minute buckets by default (interval=1, intervalUnit=m). Doris database is fixed by server config.")
     public String queryMetricData(
-            @ToolParam(name = "queryRequests", description = "Required list of QueryRequest objects. Use the Doris metric table name directly in measurement, for example metric_service or metric_service_db. Each item has measurement, aggregations (function/field/alias), wheres (field/operator/value), groupBy, interval, intervalUnit, start, and end. For trends set interval=1 and intervalUnit=m (1-minute buckets); use interval=0 for single aggregate only.")
+            @ToolParam(name = "queryRequests", description = "Required list of QueryRequest objects. Use a Doris table name from the bound Skill's physical-table contract directly in measurement, for example metric_service or metric_service_db. Each item has measurement, aggregations (function/field/alias), wheres (field/operator/value), groupBy, interval, intervalUnit, start, and end. For trends set interval=1 and intervalUnit=m (1-minute buckets); use interval=0 for single aggregate only.")
             List<MetricQueryRequest> queryRequests,
             @ToolParam(name = "size", required = false, description = "Optional max rows per query, default 200")
             Integer size) {
@@ -349,7 +349,7 @@ public class DataTools {
         List<MetricQueryAggregation> aggregations = aggregationsOf(request);
         List<MetricQueryWhere> wheres = wheresOf(request);
         List<String> groupBy = groupByOf(request).stream()
-                .map(DataTools::safeIdentifier)
+                .map(DataTools::safeColumnIdentifier)
                 .toList();
 
         List<String> selectParts = new java.util.ArrayList<>();
@@ -441,7 +441,7 @@ public class DataTools {
     }
 
     private static String aggregationExpression(MetricQueryAggregation aggregation) {
-        String field = safeIdentifier(aggregation.getField());
+        String field = safeColumnIdentifier(aggregation.getField());
         String function = aggregation.getFunction();
         String alias = aggregation.getAlias();
         String expression = isBlank(function)
@@ -454,7 +454,7 @@ public class DataTools {
     }
 
     private String whereClause(MetricQueryWhere where) {
-        String field = safeIdentifier(where.getField());
+        String field = safeColumnIdentifier(where.getField());
         String operator = normalizeWhereOperator(where.getOperator());
         Object value = where.getValue();
         if ("IS NULL".equals(operator) || "IS NOT NULL".equals(operator)) {
@@ -590,6 +590,13 @@ public class DataTools {
 
     private static boolean isSafeIdentifier(String value) {
         return value != null && value.matches("[A-Za-z0-9_]+");
+    }
+
+    private static String safeColumnIdentifier(String value) {
+        if (value == null || !value.matches("[A-Za-z0-9_]+(?:\\.[A-Za-z0-9_]+)*")) {
+            throw new IllegalArgumentException("unsafe identifier: " + value);
+        }
+        return value;
     }
 
     private static String escapeLiteral(String value) {

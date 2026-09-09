@@ -1,6 +1,7 @@
 ---
 name: skill.inspection.health
 description: 服务健康巡检与异常诊断流程
+category: 智能巡检
 ---
 # 智能巡检流程
 
@@ -19,8 +20,7 @@ description: 服务健康巡检与异常诊断流程
    - 实例数变化 / 消失实例
    - Web / service 类型补充：服务异常分布、JVM/GC、CPU/内存使用率
 3. 发现可疑问题后，不要直接定论根因；按异常方向补充证据：`queryMetricData`、`queryServiceTopology`、`queryTraceListByCondition`、`queryTraceDetail`、`queryServiceAlarms`、`queryLogTrend`、`queryLogDetail`、`queryLogsByTraceId`。
-4. 巡检结论较完整时，**必须**按 `skill.summary.html` 的 `inspection-report.html` 写出 HTML 报告到 `outputs/`（一次 `readWorkspaceFile` 读完整模版，见该 Skill「选模版与读取」），**不要**先征求用户同意；写完后一句话告知文件名便于预览。
-5. 未发现明显异常时，也要说明这是工具结果，并结合用户问题决定是否继续查明细。
+4. 未发现明显异常时，也要说明这是工具结果，并结合用户问题决定是否继续查明细。
 
 ## 时间范围
 
@@ -32,9 +32,7 @@ description: 服务健康巡检与异常诊断流程
 
 ## 趋势图
 
-- 需要展示趋势时，先调用 `drawTrendCharts` 传入所有图表数据，再输出文字结论。
-- 不要在 Markdown 中插入 `![...](chart)` 图片；前端会根据 `drawTrendCharts` 结果自动渲染。
-- 若写出 HTML 巡检/趋势报告，须在 HTML 内嵌 ECharts，见 `skill.summary.html` 与 `trend-chart-snippet.html`。
+- 需要展示趋势时，返回实际时间序列和查询口径，由 BuffOps 当前页面或报告流程决定展示方式。
 
 ## 补充查询规则（本文件完整提供）
 
@@ -118,26 +116,108 @@ description: 服务健康巡检与异常诊断流程
 |------|----------|-------|------|
 | `total_cnt` | SUM | cnt | 请求量 |
 | `error_cnt` | SUM | error | 错误数 |
-| `sum_duration` | SUM | sumDuration | 总耗时（毫秒） |
+| `sum_duration_ns` | SUM | sumDuration | 总耗时（纳秒） |
 
 查询后在回答里计算：
 
-- 平均耗时 = `sum_duration / total_cnt`（`total_cnt` 为 0 时写「无请求」）
+- 平均耗时（毫秒）= `sum_duration_ns / total_cnt / 1_000_000`（`total_cnt` 为 0 时写「无请求」）
 - 错误率 = `error_cnt / total_cnt`（百分比，保留 2 位小数）
 
 同一 measurement、时间、过滤条件下，把上述 3 个 aggregation 合并进**一个** QueryRequest。
 
-## 常用 measurement
+## Doris 物理指标表契约
 
-**自身指标**
+下面是 `queryMetricData` 可直接查询的业务指标物理表及完整列清单。`tags` 只能用于 `wheres.field`/`groupBy`；`fields` 用于 `aggregations.field`。列名大小写和点号必须原样保留：
 
-- `metric_service`：tags: service, service_id, service_instance；fields: cnt, error, sumDuration 等
-- `metric_service_exception`：异常；fields: cnt, error
-- `metric_service_http` / `metric_service_rpc`：HTTP/RPC 调用链
-- `metric_service_db` / `metric_service_redis` / `metric_service_mq`：DB/Redis/MQ 调用（Elasticsearch 归入 `metric_service_db`）
-- `metric_jvm*`、`metric_service_cpu/mem/io/net`：JVM 与系统指标
+- `metric_time`、`ts` 是内部时间列，不作为 tag/field 传入；时间过滤和分桶使用 `start`、`end`、`interval`、`intervalUnit`。
+- 物理列名是 `service_id`、`service_instance`；不要传配置层名称 `serviceId`、`serviceInstance`。
+- `config.type`、`read.rate`、`write.rate` 是包含点号的完整物理列名，不要拆分或改成下划线。
+- JVM 表名只有 `metric_jvm`；不要在表名后添加星号或其他通配符。
+- 本清单来自 Doris 物理表结构，不以 `config_metric_core` 的逻辑元数据替代。只能使用下列 measurement、tag 和 field；清单外的名称按契约缺失处理，不猜测。
 
-**按服务类型选表（批量对比多个服务时）**
+- `metric_jvm`
+  - tags: `instance`, `service`, `service_id`, `service_instance`, `tag_host`
+  - fields: `thread_count`, `cpu_load_process`, `cpu_load_system`, `gc_eden_size`, `gc_major_collection_count`, `gc_major_collection_time`, `gc_metaspace_size`, `gc_minor_collection_count`, `gc_minor_collection_time`, `gc_old_gen_size`, `gc_survivor_size`, `buffer_pool_direct_capacity`, `buffer_pool_direct_count`, `buffer_pool_direct_used`, `buffer_pool_mapped_capacity`, `buffer_pool_mapped_count`, `buffer_pool_mapped_used`, `loaded_classes_count`, `memory_heap_committed`, `memory_heap_init`, `memory_heap_max`, `memory_heap_used`, `memory_heap_free`, `memory_heap_pct`, `memory_noheap_committed`, `memory_noheap_init`, `memory_noheap_max`, `memory_noheap_used`
+- `metric_service`
+  - tags: `errorType`, `service`, `service_id`, `service_instance`
+  - fields: `apdex`, `cnt`, `error`, `healthStatus`, `histogramCount`, `histogramMax`, `maxDuration`, `minDuration`, `reqBodyLength`, `respBodyLength`, `slowCnt`, `sumCpuTime`, `sumDuration`, `verySlowCnt`
+- `metric_service_config`
+  - tags: `config.type`, `durationRange`, `isIn`, `isOut`, `operation`, `resource`, `rootComponentType`, `rootResource`, `service`, `service_id`, `service_instance`, `srcService`, `srcServiceId`, `srcServiceInstance`
+  - fields: `cnt`, `error`, `histogramCount`, `histogramMax`, `maxDuration`, `minDuration`, `slow`, `sumDuration`
+- `metric_service_cpu`
+  - tags: `service`, `serviceCode`, `service_id`, `service_instance`
+  - fields: `usage_pct`
+- `metric_service_db`
+  - tags: `dbType`, `durationRange`, `isIn`, `isOut`, `isSlow`, `resource`, `rootComponentType`, `rootResource`, `service`, `service_id`, `service_instance`, `sqlContent`, `sqlDatabase`, `sqlOperation`, `srcService`, `srcServiceId`, `srcServiceInstance`
+  - fields: `cnt`, `error`, `histogramCount`, `histogramMax`, `maxDuration`, `minDuration`, `readRows`, `readRowsCnt`, `slow`, `slowCnt`, `sumDuration`, `updateRows`, `updateRowsCnt`
+- `metric_service_db_connection_pool`
+  - tags: `connectionPoolDbType`, `connectionPoolName`, `connectionPoolType`, `connectionPoolUrl`, `connectionPoolUsername`, `driverClassName`, `service`, `service_id`, `service_instance`
+  - fields: `activeSize`, `idleSize`, `maxSize`, `waiterNum`
+- `metric_service_db_connection_pool_get`
+  - tags: `connectionPoolName`, `service`, `service_id`, `service_instance`
+  - fields: `waitTime`, `count`
+- `metric_service_exception`
+  - tags: `componentService`, `componentServiceId`, `componentServiceInstance`, `exceptionCode`, `exceptionName`, `isIn`, `isOut`, `resource`, `rootComponentType`, `rootResource`, `service`, `service_id`, `service_instance`
+  - fields: `cnt`, `error`
+- `metric_service_flow`
+  - tags: `entryInterfacePathId`, `entryPathId`, `interfacePathId`, `isIn`, `parentInterfacePathId`, `parentPathId`, `parentResource`, `parentService`, `parentServiceId`, `pathId`, `resource`, `service`, `service_id`
+  - fields: `cnt`, `error`, `slow`, `srcCall`, `sumDuration`
+- `metric_service_health_status`
+  - tags: `convergenceType`, `gid`, `host`, `level`, `policyId`, `policyName`, `problemId`, `service`, `service_id`, `service_instance`
+  - fields: `metricsVal`
+- `metric_service_http`
+  - tags: `durationRange`, `httpCode`, `httpMethod`, `isIn`, `isOut`, `resource`, `rootComponentType`, `rootResource`, `service`, `service_id`, `service_instance`, `srcService`, `srcServiceId`, `srcServiceInstance`, `url`
+  - fields: `cnt`, `cpuTime`, `error`, `histogramCount`, `histogramMax`, `maxDuration`, `minDuration`, `reqBodyLength`, `respBodyLength`, `slow`, `slowCnt`, `sumDuration`, `verySlowCnt`
+- `metric_service_http_connection_pool`
+  - tags: `httpConnectionPoolName`, `service`, `service_id`, `service_instance`
+  - fields: `activeSize`, `idleSize`, `maxSize`, `waiterNum`
+- `metric_service_http_connection_pool_get`
+  - tags: `httpConnectionPoolName`, `service`, `service_id`, `service_instance`
+  - fields: `waitTime`, `count`
+- `metric_service_instance`
+  - tags: `biz_pid_id`, `containerId`, `containerName`, `hostIp`, `hostname`, `javaVendor`, `javaVersion`, `k8sClusterId`, `k8sContainerId`, `k8sNamespace`, `k8sPodName`, `pid`, `pname`, `ports`, `service`, `service_id`, `service_instance`, `service_type`, `virtualService`
+  - fields: `metricsVal`
+- `metric_service_io`
+  - tags: `service`, `serviceCode`, `service_id`, `service_instance`
+  - fields: `read.rate`, `write.rate`
+- `metric_service_mem`
+  - tags: `service`, `serviceCode`, `service_id`, `service_instance`
+  - fields: `size`, `usage_pct`, `used`
+- `metric_service_mq`
+  - tags: `broker`, `durationRange`, `group`, `isConsume`, `isIn`, `isOut`, `partition`, `resource`, `rootComponentType`, `rootResource`, `service`, `service_id`, `service_instance`, `srcService`, `srcServiceId`, `srcServiceInstance`, `topic`, `type`
+  - fields: `cnt`, `cpuTime`, `delay`, `error`, `histogramCount`, `histogramMax`, `maxDuration`, `minDuration`, `mqBodyLength`, `slow`, `sumDuration`
+- `metric_service_net`
+  - tags: `service`, `serviceCode`, `service_id`, `service_instance`
+  - fields: `bytes_rcvd`, `bytes_sent`
+- `metric_service_object_pool`
+  - tags: `objectPoolFairness`, `objectPoolName`, `objectPoolObjectClass`, `service`, `service_id`, `service_instance`
+  - fields: `activeSize`, `idleSize`, `maxSize`
+- `metric_service_object_pool_get`
+  - tags: `objectPoolName`, `service`, `service_id`, `service_instance`
+  - fields: `waitTime`, `count`
+- `metric_service_redis`
+  - tags: `command`, `durationRange`, `isIn`, `isOut`, `resource`, `rootComponentType`, `rootResource`, `service`, `service_id`, `service_instance`, `srcService`, `srcServiceId`, `srcServiceInstance`
+  - fields: `cnt`, `error`, `histogramCount`, `histogramMax`, `maxDuration`, `minDuration`, `reqBodyLength`, `respBodyLength`, `slow`, `sumDuration`
+- `metric_service_remote`
+  - tags: `durationRange`, `isIn`, `isOut`, `resource`, `rootComponentType`, `rootResource`, `service`, `service_id`, `service_instance`, `srcService`, `srcServiceId`, `srcServiceInstance`, `remoteType`
+  - fields: `cnt`, `cpuTime`, `error`, `histogramCount`, `histogramMax`, `maxDuration`, `minDuration`, `reqBodyLength`, `respBodyLength`, `slow`, `slowCnt`, `sumDuration`, `verySlowCnt`
+- `metric_service_rpc`
+  - tags: `durationRange`, `isIn`, `isOut`, `resource`, `rootComponentType`, `rootResource`, `service`, `service_id`, `service_instance`, `srcService`, `srcServiceId`, `srcServiceInstance`, `statusCode`, `type`
+  - fields: `cnt`, `cpuTime`, `error`, `histogramCount`, `histogramMax`, `maxDuration`, `minDuration`, `reqBodyLength`, `respBodyLength`, `slow`, `slowCnt`, `sumDuration`, `verySlowCnt`
+- `metric_service_tcp`
+  - tags: `service`, `serviceCode`, `service_id`, `service_instance`
+  - fields: `conns_established`, `retransmit`
+- `metric_service_thread_pool`
+  - tags: `service`, `service_id`, `service_instance`, `threadPoolName`
+  - fields: `activeCount`, `completedTaskCount`, `corePoolSize`, `largestPoolSize`, `maximumPoolSize`, `poolSize`, `queueRemainingCapacity`, `queueSize`, `taskCount`
+- `metric_service_thread_pool_cost`
+  - tags: `rootResource`, `service`, `service_id`, `service_instance`, `threadPoolName`, `type`
+  - fields: `cnt`, `maxDuration`, `minDuration`, `sumDuration`
+- `metric_service_trace`
+  - tags: `errorType`, `hostName`, `httpMethod`, `httpStatusCode`, `resource`, `service`, `service_id`, `service_instance`
+  - fields: `cnt`, `error`, `histogramCount`, `histogramMax`, `maxDuration`, `minDuration`, `sumDuration`
+
+## 按服务类型选表（批量对比多个服务时）
 
 | 服务类型 | measurement |
 |----------|-------------|
@@ -151,8 +231,6 @@ description: 服务健康巡检与异常诊断流程
 
 **注意**：`db`/`cache`/`mq`/`remote` 类型服务的指标在各自表（如 `metric_service_db`），不在 `metric_service`。不要把 7 种不同类型服务的 id 全塞进 `metric_service` 一次查——按类型分组，分别用对应 measurement。
 
-完整 tags/fields 以运行时 `config_metric_core` 或 Doris 元数据为准。只有当前绑定工具提供只读元数据查询能力时才能读取；没有这类能力时使用本 Skill 明确列出的表字段，其他指标报告契约缺失，不猜表名或字段名。
-
 ## 指标视角
 
 - **入口**：谁调用了该服务、入口流量、URL/状态码/耗时 → 被调服务 + `isIn=1`
@@ -165,7 +243,7 @@ description: 服务健康巡检与异常诊断流程
 - 「服务 A 访问 DB」：`metric_service_db`，filter service=A，groupBy resource/sqlContent
 - 「哪些服务在访问服务 A」：`metric_service_http`，service=A + isIn=1，groupBy srcService
 - 「对比 A/B/C 请求量」：一次查询，`INLIST` + groupBy service，不要分别查三次
-- 「7 个服务的关键指标概览」：按上表选 measurement，每条 QueryRequest 仅含 `total_cnt`/`error_cnt`/`sum_duration` 三个 SUM 聚合，一次 `queryMetricData` 提交多条 queryRequests
+- 「7 个服务的关键指标概览」：按上表选 measurement，每条 QueryRequest 仅含 `total_cnt`/`error_cnt`/`sum_duration_ns` 三个 SUM 聚合，一次 `queryMetricData` 提交多条 queryRequests
 - 「各实例请求量趋势」：`metric_service`，groupBy service_instance，设 interval
 - 「order-api 最近 ERROR 日志」：`getCurrentTimeRange` → `queryLogDetail(services=["order-api"], severities=["ERROR"])`
 - 「trace abc 的日志」：`queryLogsByTraceId(traceId="abc")`，可选再 `queryTraceDetail`
@@ -191,7 +269,7 @@ description: 服务健康巡检与异常诊断流程
     "aggregations": [
       {"function": "SUM", "field": "cnt", "alias": "total_cnt"},
       {"function": "SUM", "field": "error", "alias": "error_cnt"},
-      {"function": "SUM", "field": "sumDuration", "alias": "sum_duration"}
+      {"function": "SUM", "field": "sumDuration", "alias": "sum_duration_ns"}
     ],
     "wheres": [{"field": "service", "operator": "=", "value": "service-a"}],
     "groupBy": ["service"],
@@ -213,5 +291,11 @@ description: 服务健康巡检与异常诊断流程
 - 先给巡检结论，再列关键证据和后续建议。
 - 明确区分「工具检测结果」与「基于证据的分析判断」。
 - 不要编造未查询到的数据。
-- 输出依赖拓扑、调用关系、诊断流程等图形结构时，使用 Markdown 的 `mermaid` 代码块（如 `flowchart` / `graph`），前端会渲染为图。
-- mermaid 语法要点：节点 label 含特殊字符时用双引号包裹，如 `id["a/b:c"]`、`id[("db")]`（圆柱体表示 DB/缓存/MQ）；圆柱体 `)]` 必须紧贴，不要写成 `) ]`。
+
+## BuffOps 接入与交付
+
+只使用当前系统实例绑定的 MCP 实际暴露的工具；本文列出的工具未出现在当前清单时，报告能力缺失。本文查询规则已完整写入本文件，无需读取其他 Skill。
+
+场景接口调查应返回准确 systemId/toolId/toolName、必填参数、时间格式、输出结构及一次真实试查；拿到满足需求的结果即回报，不修改场景。页面生成和发布由场景流程负责。普通问数与巡检按用户要求交付，不强制生成 DataBuff 专用 HTML 或调用未绑定的绘图工具。
+
+场景 `timeRange` 使用 Unix 毫秒，但 `local-datetime` 绑定的 `probeParams.from/to` 使用 Asia/Shanghai 时间字符串；不要把宿主时间戳原样当成上游字符串参数。自定义窗口指标优先使用明确时间的 queryMetricData，不能用 inspectService 固定一小时替代。

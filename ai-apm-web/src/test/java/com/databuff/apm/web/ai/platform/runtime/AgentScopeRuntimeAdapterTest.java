@@ -168,8 +168,20 @@ class AgentScopeRuntimeAdapterTest {
         for (String id : java.util.List.of("skill.data.metrics", "skill.inspection.health")) {
             String body = Files.readString(root.resolve(id + "/SKILL.md"));
             assertThat(Files.readString(Path.of("../integrations/agent/skills", id, "SKILL.md"))).isEqualTo(body);
-            assertThat(body).contains("metric_service", "sumDuration", "同类失败没有新证据时停止")
-                    .doesNotContain("query-contracts.md");
+            assertThat(body.lines()
+                            .filter(line -> line.matches("- `metric_(?:jvm|service[^`]*)`"))
+                            .count())
+                    .isEqualTo(27);
+            assertThat(body).contains(
+                            "`metric_service_trace`",
+                            "`exceptionName`",
+                            "`config.type`",
+                            "`read.rate`",
+                            "`write.rate`",
+                            "sum_duration_ns / total_cnt / 1_000_000",
+                            "JVM 表名只有 `metric_jvm`",
+                            "同类失败没有新证据时停止")
+                    .doesNotContain("query-contracts.md", "metric_jvm*", "exceptionType");
             Files.writeString(tempDir.resolve("skills").resolve(id + "/SKILL.md"), body);
         }
         for (String expertId : java.util.List.of("data", "inspection")) {
