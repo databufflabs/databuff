@@ -363,7 +363,7 @@ export default class ServiceTable extends Vue {
         graphStats: [_field],
         serviceId: row.serviceId
       }
-      if (this.$route.query.dbTarget || ['service.db', 'service.redis', 'service.mq'].includes(this.componentType)) {
+      if (this.$route.query.dbTarget || ['service.db', 'service.redis', 'service.mq', 'service.remote'].includes(this.componentType)) {
         params.dbTarget = 1
       }
       const { result, error } = await toAsyncWait(ApmApi.getServiceGraph(params, this.tooltipChart.cancelTokenSource.token))

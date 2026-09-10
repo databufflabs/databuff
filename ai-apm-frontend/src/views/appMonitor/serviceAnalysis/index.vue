@@ -124,7 +124,10 @@ export default class ServiceAnalysis extends Vue {
       ...this.queryParams,
       isIn: 1,
     }
-    if (params.dbTarget) {
+    const selectedService = this.serviceList.find((item) => item.value === params.sid)
+    // Remote virtual services are downstream targets; keep sid on the metric's serviceId dimension.
+    const isRemoteTarget = this.requestType === 'service.remote' && selectedService?.info?.virtualService
+    if (params.dbTarget || isRemoteTarget) {
       params.dbTarget = 1
     } else {
       delete params.dbTarget
@@ -318,7 +321,11 @@ export default class ServiceAnalysis extends Vue {
       const { data = [] } = result || {};
       const serviceNameIdMap: any = {}
       data.forEach((t: any) => {
-        serviceNameIdMap[t.name] = { id: t.id, type: t.service_type }
+        serviceNameIdMap[t.name] = {
+          id: t.id,
+          type: t.service_type,
+          virtualService: t.virtual_service,
+        }
       });
       this.serviceList = orderBy(Object.keys(serviceNameIdMap), [t => t.toLocaleLowerCase()], ['asc'])
           .map(t => ({
@@ -326,6 +333,7 @@ export default class ServiceAnalysis extends Vue {
             value: serviceNameIdMap[t].id,
             info: {
               type: serviceNameIdMap[t].type,
+              virtualService: serviceNameIdMap[t].virtualService,
               texts: ['服务类型：' + ServiceTypeFilter(serviceNameIdMap[t].type)],
             },
           }))
