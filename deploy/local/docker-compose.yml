@@ -16,6 +16,8 @@ services:
       - |
         sed -i 's/-Xmx8192m/-Xmx512m/g' /opt/apache-doris/fe/conf/fe.conf
         sed -i 's/-Xms8192m/-Xms512m/g' /opt/apache-doris/fe/conf/fe.conf
+        grep -q -- '-XX:-UseContainerSupport' /opt/apache-doris/fe/conf/fe.conf \
+          || sed -i 's/^JAVA_OPTS_FOR_JDK_17="/JAVA_OPTS_FOR_JDK_17="-XX:-UseContainerSupport /' /opt/apache-doris/fe/conf/fe.conf
         exec bash init_fe.sh
     volumes:
       - ./data/fe-meta:/opt/apache-doris/fe/doris-meta
@@ -146,11 +148,16 @@ services:
       SKYWALKING_GRPC_TARGET: ${SKYWALKING_GRPC_TARGET:-ai-apm-ingest:11800}
       SEED_INTERVAL_SECONDS: ${SEED_INTERVAL_SECONDS:-30}
       JVM_METRIC_INTERVAL_SECONDS: ${JVM_METRIC_INTERVAL_SECONDS:-60}
+      DEMO_FAULT_API_PORT: ${DEMO_FAULT_API_PORT:-18080}
+      DEMO_CHANGE_KAFKA_BOOTSTRAP_SERVERS: ${DEMO_CHANGE_KAFKA_BOOTSTRAP_SERVERS:-}
+      DEMO_CHANGE_KAFKA_TOPIC: ${DEMO_CHANGE_KAFKA_TOPIC:-buffops.demo.alerts}
     volumes:
       - ./run/demo:/app
     depends_on:
       ai-apm-ingest:
         condition: service_healthy
+    ports:
+      - "${DEMO_FAULT_API_HOST_PORT:-18081}:${DEMO_FAULT_API_PORT:-18080}"
     networks:
       apm:
         ipv4_address: 172.20.80.6

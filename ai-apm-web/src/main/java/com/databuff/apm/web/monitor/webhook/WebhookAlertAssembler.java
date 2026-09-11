@@ -48,7 +48,8 @@ public class WebhookAlertAssembler {
         put(payload, "description", alarm.message());
         put(payload, "severity", severity(alarm.level()));
         put(payload, "status", deliveryStatus);
-        put(payload, "source", source == null || source.isBlank() ? "databuff-apm" : source);
+        String normalizedSource = source == null || source.isBlank() ? "databuff-apm" : source;
+        put(payload, "source", normalizedSource);
         put(payload, "service", alarm.service());
         put(payload, "groupKey", event == null ? null : event.groupKey());
         put(payload, "detectionWay", alarm.detectionWay());
@@ -62,7 +63,7 @@ public class WebhookAlertAssembler {
                         : event == null ? null : event.triggeredAt())
                 : null);
         payload.put("silenced", event != null && event.silenced());
-        put(payload, "tags", tags(alarm, event));
+        put(payload, "tags", tags(alarm, event, normalizedSource));
         return payload;
     }
 
@@ -132,8 +133,9 @@ public class WebhookAlertAssembler {
         return metric;
     }
 
-    private static Map<String, Object> tags(Alarm alarm, EventRecord event) {
+    private static Map<String, Object> tags(Alarm alarm, EventRecord event, String source) {
         Map<String, Object> tags = new LinkedHashMap<>();
+        tags.put("source", source);
         if (alarm.service() != null) {
             tags.put("service", alarm.service());
         }

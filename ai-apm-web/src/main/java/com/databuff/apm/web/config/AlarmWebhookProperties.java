@@ -1,13 +1,20 @@
 package com.databuff.apm.web.config;
 
 import org.springframework.boot.context.properties.ConfigurationProperties;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 
+import java.nio.charset.StandardCharsets;
+import java.nio.file.Files;
+import java.nio.file.Path;
 import java.util.LinkedHashMap;
 import java.util.Map;
 
 /** Application-file-only configuration for outbound alarm webhooks. */
 @ConfigurationProperties(prefix = "apm.alarm.webhook")
 public class AlarmWebhookProperties {
+
+    private static final Logger log = LoggerFactory.getLogger(AlarmWebhookProperties.class);
 
     private static final int DEFAULT_QUEUE_CAPACITY = 1000;
     private static final int DEFAULT_BATCH_SIZE = 50;
@@ -22,6 +29,9 @@ public class AlarmWebhookProperties {
     private int retryTimes = DEFAULT_RETRY_TIMES;
     private long retryBackoffMillis = DEFAULT_RETRY_BACKOFF_MILLIS;
     private Map<String, String> headers = new LinkedHashMap<>();
+    private String tokenFile = "";
+    private String tokenHeader = "X-BuffOps-Token";
+    private volatile boolean tokenFileWarningLogged;
 
     public AlarmWebhookProperties() {
     }
@@ -57,6 +67,25 @@ public class AlarmWebhookProperties {
                     normalized.put(key.trim(), value.trim());
                 }
             });
+        }
+        String file = tokenFile == null ? "" : tokenFile.trim();
+        String header = tokenHeader == null ? "" : tokenHeader.trim();
+        if (!file.isEmpty() && !header.isEmpty()) {
+            try {
+                String token = Files.readString(Path.of(file), StandardCharsets.UTF_8).trim();
+                if (!token.isEmpty()) {
+                    normalized.put(header, token);
+                    tokenFileWarningLogged = false;
+                } else if (!tokenFileWarningLogged) {
+                    tokenFileWarningLogged = true;
+                    log.warn("Alarm webhook token file is empty: {}", file);
+                }
+            } catch (Exception e) {
+                if (!tokenFileWarningLogged) {
+                    tokenFileWarningLogged = true;
+                    log.warn("Alarm webhook token file cannot be read: {} ({})", file, e.getMessage());
+                }
+            }
         }
         return Map.copyOf(normalized);
     }
@@ -96,6 +125,22 @@ public class AlarmWebhookProperties {
 
     public void setHeaders(Map<String, String> headers) {
         this.headers = headers == null ? new LinkedHashMap<>() : new LinkedHashMap<>(headers);
+    }
+
+    public String getTokenFile() {
+        return tokenFile;
+    }
+
+    public void setTokenFile(String tokenFile) {
+        this.tokenFile = tokenFile;
+    }
+
+    public String getTokenHeader() {
+        return tokenHeader;
+    }
+
+    public void setTokenHeader(String tokenHeader) {
+        this.tokenHeader = tokenHeader;
     }
 
     public int getQueueCapacity() {

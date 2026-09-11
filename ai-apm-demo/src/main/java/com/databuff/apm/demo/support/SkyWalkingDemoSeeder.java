@@ -1,5 +1,7 @@
 package com.databuff.apm.demo.support;
 
+import com.databuff.apm.demo.fault.DemoConfigurationChange;
+import com.databuff.apm.demo.fault.DemoFaultSnapshot;
 import org.apache.skywalking.apm.network.language.agent.v3.JVMMetricCollection;
 import org.apache.skywalking.apm.network.logging.v3.LogData;
 
@@ -14,12 +16,26 @@ public final class SkyWalkingDemoSeeder {
     }
 
     public static void seedOnce(String target) throws Exception {
+        seedOnce(target, DemoFaultSnapshot.normal(), null, true);
+    }
+
+    public static void seedOnce(
+            String target,
+            DemoFaultSnapshot fault,
+            DemoConfigurationChange configurationChange,
+            boolean emitMetrics) throws Exception {
         ensureManagementRegistered(target);
-        DemoSkyWalkingBatch batch = SkyWalkingTraceFixture.nextBatch();
+        DemoSkyWalkingBatch batch = SkyWalkingTraceFixture.nextBatch(fault);
         SkyWalkingGrpcExporter.postSegments(target, batch.segments());
-        SkyWalkingGrpcExporter.postLogs(target, SkyWalkingLogFixture.logsForBatch(batch));
-        for (JVMMetricCollection collection : SkyWalkingJvmFixture.nextCollections()) {
-            SkyWalkingGrpcExporter.postJvmMetrics(target, collection);
+        List<LogData> logs = new java.util.ArrayList<>(SkyWalkingLogFixture.logsForBatch(batch));
+        if (configurationChange != null) {
+            logs.add(SkyWalkingLogFixture.configurationLog(configurationChange));
+        }
+        SkyWalkingGrpcExporter.postLogs(target, logs);
+        if (emitMetrics) {
+            for (JVMMetricCollection collection : SkyWalkingJvmFixture.nextCollections()) {
+                SkyWalkingGrpcExporter.postJvmMetrics(target, collection);
+            }
         }
     }
 
@@ -58,7 +74,7 @@ public final class SkyWalkingDemoSeeder {
         long jvmMetricIntervalMillis = jvmMetricIntervalSeconds * 1000L;
         while (true) {
             try {
-                DemoSkyWalkingBatch batch = SkyWalkingTraceFixture.nextBatch();
+                DemoSkyWalkingBatch batch = SkyWalkingTraceFixture.nextBatch(DemoFaultSnapshot.normal());
                 SkyWalkingGrpcExporter.postSegments(target, batch.segments());
                 sentTraces++;
                 if (sentTraces == 1 || sentTraces % 20 == 0) {

@@ -48,7 +48,8 @@ class WebhookAlertAssemblerTest {
         assertThat(payload.get("fingerprint")).isEqualTo("rule:12:service:TimeoutException");
         assertThat(payload.get("rule")).isEqualTo(Map.of("id", 12L, "name", "订单服务错误率"));
         assertThat(payload.get("tags")).isEqualTo(Map.of(
-                "service", "order-service", "ruleName", "订单服务错误率"));
+                "source", "databuff-apm", "service", "order-service",
+                "ruleName", "订单服务错误率"));
         assertThat(payload.get("triggeredAt")).isEqualTo("2026-08-22T10:38:00Z");
         assertThat(payload).doesNotContainKey("resolvedAt");
         assertThat(payload.get("silenced")).isEqualTo(false);

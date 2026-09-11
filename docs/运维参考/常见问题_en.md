@@ -36,7 +36,7 @@ Prepend `-XX:-UseContainerSupport` to `JAVA_OPTS_FOR_JDK_17`. After that, the JV
       - |
         sed -i 's/-Xmx8192m/-Xmx1200m/g' /opt/apache-doris/fe/conf/fe.conf
         sed -i 's/-Xms8192m/-Xms1200m/g' /opt/apache-doris/fe/conf/fe.conf
-        grep -q 'UseContainerSupport' /opt/apache-doris/fe/conf/fe.conf \
+        grep -q -- '-XX:-UseContainerSupport' /opt/apache-doris/fe/conf/fe.conf \
           || sed -i 's/^JAVA_OPTS_FOR_JDK_17="/JAVA_OPTS_FOR_JDK_17="-XX:-UseContainerSupport /' /opt/apache-doris/fe/conf/fe.conf
         exec bash init_fe.sh
 ```
@@ -46,13 +46,15 @@ The same two `grep` / `sed` lines apply to `deploy/local/docker-compose.yml`; le
 **Already running: edit the container config and restart:**
 
 ```bash
-docker exec ai-apm-doris-fe sed -i \
-  's/^JAVA_OPTS_FOR_JDK_17="/JAVA_OPTS_FOR_JDK_17="-XX:-UseContainerSupport /' \
-  /opt/apache-doris/fe/conf/fe.conf
+docker exec ai-apm-doris-fe grep -q -- '-XX:-UseContainerSupport' \
+  /opt/apache-doris/fe/conf/fe.conf \
+  || docker exec ai-apm-doris-fe sed -i \
+    's/^JAVA_OPTS_FOR_JDK_17="/JAVA_OPTS_FOR_JDK_17="-XX:-UseContainerSupport /' \
+    /opt/apache-doris/fe/conf/fe.conf
 docker restart ai-apm-doris-fe
 ```
 
-Do not append the flag again if `fe.conf` already contains `UseContainerSupport`.
+The command is safe to repeat; it does not append the option when `fe.conf` already contains it.
 
 **Kubernetes:** in the FE container command in `deploy/k8s/manifests/doris.yaml`, add the same two `grep` / `sed` lines after the `-Xmx` patch and before `exec bash init_fe.sh`.
 

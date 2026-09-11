@@ -1,0 +1,25 @@
+name: doris-fe-startup-check
+on:
+  pull_request:
+    paths:
+      - 'deploy/docker/docker-compose.yml'
+      - 'deploy/docker/docker-compose.legacy.yml'
+      - 'deploy/local/docker-compose.yml'
+      - 'deploy/k8s/manifests/doris.yaml'
+      - 'deploy/test/check-doris-fe-jvm-workaround.sh'
+      - '.github/workflows/doris-fe-startup-check.yml'
+  push:
+    branches: [master, main]
+    paths:
+      - 'deploy/docker/docker-compose.yml'
+      - 'deploy/docker/docker-compose.legacy.yml'
+      - 'deploy/local/docker-compose.yml'
+      - 'deploy/k8s/manifests/doris.yaml'
+      - 'deploy/test/check-doris-fe-jvm-workaround.sh'
+      - '.github/workflows/doris-fe-startup-check.yml'
+jobs:
+  check:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - run: bash deploy/test/check-doris-fe-jvm-workaround.sh

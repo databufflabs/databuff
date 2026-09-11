@@ -61,6 +61,8 @@ spec:
               export FE_ID=1
               sed -i 's/-Xmx8192m/-Xmx1200m/g' /opt/apache-doris/fe/conf/fe.conf
               sed -i 's/-Xms8192m/-Xms1200m/g' /opt/apache-doris/fe/conf/fe.conf
+              grep -q -- '-XX:-UseContainerSupport' /opt/apache-doris/fe/conf/fe.conf \
+                || sed -i 's/^JAVA_OPTS_FOR_JDK_17="/JAVA_OPTS_FOR_JDK_17="-XX:-UseContainerSupport /' /opt/apache-doris/fe/conf/fe.conf
               exec bash init_fe.sh
           ports:
             - name: fe-query

@@ -63,6 +63,8 @@ apm:
     webhook:
       url: ${APM_ALARM_WEBHOOK_URL:}
       headers: {}
+      token-file: ${APM_ALARM_WEBHOOK_TOKEN_FILE:}
+      token-header: ${APM_ALARM_WEBHOOK_TOKEN_HEADER:X-BuffOps-Token}
       queue-capacity: ${APM_ALARM_WEBHOOK_QUEUE_CAPACITY:1000}
       batch-size: ${APM_ALARM_WEBHOOK_BATCH_SIZE:50}
       retry-times: ${APM_ALARM_WEBHOOK_RETRY_TIMES:2}

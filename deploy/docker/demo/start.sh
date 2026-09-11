@@ -61,6 +61,11 @@ export OTEL_EXPORTER_OTLP_ENDPOINT="${OTEL_EXPORTER_OTLP_ENDPOINT:-http://${INGE
 export SKYWALKING_GRPC_TARGET="${SKYWALKING_GRPC_TARGET:-${INGEST_HOST}:${SKYWALKING_PORT}}"
 export SEED_PROTOCOL="${SEED_PROTOCOL:-otlp}"
 export SEED_INTERVAL_SECONDS="${SEED_INTERVAL_SECONDS:-30}"
+export JVM_METRIC_INTERVAL_SECONDS="${JVM_METRIC_INTERVAL_SECONDS:-60}"
+export DEMO_FAULT_API_PORT="${DEMO_FAULT_API_PORT:-18080}"
+export DEMO_FAULT_API_HOST_PORT="${DEMO_FAULT_API_HOST_PORT:-18081}"
+export DEMO_CHANGE_KAFKA_BOOTSTRAP_SERVERS="${DEMO_CHANGE_KAFKA_BOOTSTRAP_SERVERS:-}"
+export DEMO_CHANGE_KAFKA_TOPIC="${DEMO_CHANGE_KAFKA_TOPIC:-buffops.demo.alerts}"
 
 if declare -F apm_refresh_image_refs >/dev/null 2>&1; then
   apm_refresh_image_refs
@@ -81,12 +86,19 @@ fi
 
 echo "[start] OTLP endpoint: ${OTEL_EXPORTER_OTLP_ENDPOINT} (interval ${SEED_INTERVAL_SECONDS}s)"
 echo "[start] SkyWalking gRPC: ${SKYWALKING_GRPC_TARGET} (protocol ${SEED_PROTOCOL})"
+echo "[start] Fault API: http://127.0.0.1:${DEMO_FAULT_API_HOST_PORT}/api/v1/demo/fault-runs/service-b-order-cache-ttl-zero"
+if [ -n "${DEMO_CHANGE_KAFKA_BOOTSTRAP_SERVERS}" ]; then
+  echo "[start] Change events: ${DEMO_CHANGE_KAFKA_BOOTSTRAP_SERVERS}/${DEMO_CHANGE_KAFKA_TOPIC}"
+else
+  echo "[start] Fault trigger disabled: DEMO_CHANGE_KAFKA_BOOTSTRAP_SERVERS is empty"
+fi
 compose_cmd up -d
 
 if [ "${START_SKIP_READY:-0}" != "1" ]; then
   echo ""
   echo "[start] demo seeder running"
   echo "  Target : ${OTEL_EXPORTER_OTLP_ENDPOINT}/v1/traces"
+  echo "  Fault  : http://127.0.0.1:${DEMO_FAULT_API_HOST_PORT}/api/v1/demo/fault-runs/service-b-order-cache-ttl-zero"
   echo "  Logs   : docker logs -f ai-apm-demo"
   echo "  Stop   : ./stop.sh"
   echo ""
