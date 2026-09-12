@@ -39,6 +39,12 @@ compose_f_args() {
   for f in $(echo "$COMPOSE_FILE" | tr ":" " "); do
     printf -- "-f\0%s\0" "$f"
   done
+  if [ -f "${root}/docker-compose.buffops.yml" ]; then
+    case ":${COMPOSE_FILE}:" in
+      *":${root}/docker-compose.buffops.yml:"*) ;;
+      *) printf -- "-f\0%s\0" "${root}/docker-compose.buffops.yml" ;;
+    esac
+  fi
   override="${root}/docker-compose.override.yml"
   case ":${COMPOSE_FILE}:" in
     *":${override}:"*) ;;

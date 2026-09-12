@@ -42,6 +42,11 @@ public class WebhookAlertAssembler {
     public Map<String, Object> assemble(Alarm alarm, EventRecord event, String source) {
         Map<String, Object> payload = new LinkedHashMap<>();
         String deliveryStatus = deliveryStatus(alarm, event);
+        put(payload, "id", event == null ? alarm.id() : event.id());
+        // Standard-event receivers order lifecycle changes by the source event time.
+        put(payload, "occurredAt", iso(event != null ? event.triggeredAt()
+                : "resolved".equals(deliveryStatus) && alarm.resolvedAt() != null
+                        ? alarm.resolvedAt() : alarm.triggeredAt()));
         put(payload, "alarmId", alarm.id());
         put(payload, "eventId", event == null ? null : event.id());
         put(payload, "title", title(alarm.message()));

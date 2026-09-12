@@ -1,0 +1,11 @@
+{
+  "services": {
+    "ai-apm-web": {
+      "environment": {
+        "APM_ALARM_WEBHOOK_URL": "http://host.docker.internal:19100/api/open/v1/ingest/conn-15d74c66-ed28-4000-aa12-c84e643db5d1",
+        "APM_ALARM_WEBHOOK_TOKEN_FILE": "/app/buffops-webhook.token",
+        "APM_ALARM_WEBHOOK_TOKEN_HEADER": "X-BuffOps-Token"
+      }
+    }
+  }
+}

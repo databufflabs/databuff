@@ -39,6 +39,8 @@ class WebhookAlertAssemblerTest {
         assertThat(payload).doesNotContainKey("message");
         assertThat(payload.get("alarmId")).isEqualTo("A1");
         assertThat(payload.get("eventId")).isEqualTo("E1");
+        assertThat(payload.get("id")).isEqualTo("E1");
+        assertThat(payload.get("occurredAt")).isEqualTo("2026-08-22T10:38:00Z");
         assertThat(payload.get("severity")).isEqualTo("critical");
         assertThat(payload.get("status")).isEqualTo("firing");
         assertThat(payload.get("source")).isEqualTo("databuff-apm");
@@ -69,7 +71,9 @@ class WebhookAlertAssemblerTest {
                 "databuff-apm");
 
         assertThat(payload).containsEntry("status", "resolved")
-                .containsEntry("resolvedAt", "2026-08-22T10:40:00Z");
+                .containsEntry("resolvedAt", "2026-08-22T10:40:00Z")
+                .containsEntry("id", "E2")
+                .containsEntry("occurredAt", "2026-08-22T10:40:00Z");
     }
 
     @Test
