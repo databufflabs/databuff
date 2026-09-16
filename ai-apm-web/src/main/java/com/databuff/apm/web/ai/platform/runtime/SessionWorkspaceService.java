@@ -6,10 +6,12 @@ import org.slf4j.LoggerFactory;
 import org.springframework.stereotype.Service;
 
 import java.io.IOException;
+import java.nio.charset.StandardCharsets;
 import java.nio.file.FileVisitResult;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.nio.file.SimpleFileVisitor;
+import java.nio.file.StandardOpenOption;
 import java.nio.file.attribute.BasicFileAttributes;
 import java.util.ArrayList;
 import java.util.Base64;
@@ -56,6 +58,33 @@ public class SessionWorkspaceService {
 
     public void ensureOutputsDir(String sessionId) throws IOException {
         Files.createDirectories(outputsDir(sessionId));
+    }
+
+    /** Saves a complete oversized tool result and returns its session-relative path. */
+    public String saveToolResult(
+            String sessionId,
+            String toolName,
+            String toolCallId,
+            String content) throws IOException {
+        if (content == null) {
+            throw new IllegalArgumentException("content is required");
+        }
+        Path toolResultsDir = sessionDir(sessionId).resolve("tool-results").normalize();
+        Files.createDirectories(toolResultsDir);
+        String safeToolName = shortenFilename(sanitizeFilename(toolName, "tool"), 80);
+        String safeCallId = shortenFilename(sanitizeFilename(toolCallId, "call"), 80);
+        String filename = safeToolName + "-" + safeCallId + ".txt";
+        Path target = toolResultsDir.resolve(filename).normalize();
+        if (!target.startsWith(toolResultsDir)) {
+            throw new IllegalArgumentException("invalid tool result target");
+        }
+        Files.writeString(
+                target,
+                content,
+                StandardCharsets.UTF_8,
+                StandardOpenOption.CREATE,
+                StandardOpenOption.TRUNCATE_EXISTING);
+        return sessionDir(sessionId).relativize(target).toString().replace('\\', '/');
     }
 
     public String resolveOutputWritePath(String fileName) {
@@ -389,6 +418,10 @@ public class SessionWorkspaceService {
             }
         }
         return base + "-" + System.currentTimeMillis() + ext;
+    }
+
+    private static String shortenFilename(String filename, int maxLength) {
+        return filename.length() <= maxLength ? filename : filename.substring(0, maxLength);
     }
 
     private static String normalizeRelativePath(String relativePath) {

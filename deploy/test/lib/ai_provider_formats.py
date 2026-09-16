@@ -75,7 +75,7 @@ PROVIDER_FORMATS: tuple[ProviderFormatProfile, ...] = (
         api_type="openai-completions",
         provider_code="opencode",
         base_url="https://opencode.ai/zen/go/v1",
-        model="deepseek-v4-flash",
+        model="deepseek-v4.1-flash",
         env_key=ENV_OPENCODE,
     ),
 )

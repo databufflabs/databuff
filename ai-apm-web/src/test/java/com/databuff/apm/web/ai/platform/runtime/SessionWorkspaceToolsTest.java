@@ -74,6 +74,45 @@ class SessionWorkspaceToolsTest {
     }
 
     @Test
+    void readWorkspaceFileChunkReturnsBoundedUtf8ContentAndContinuationOffset() throws Exception {
+        String content = "ab中cd文efgh";
+        Path file = workspaceService.sessionDir(sessionId).resolve("tool-results/result.txt");
+        Files.createDirectories(file.getParent());
+        Files.writeString(file, content);
+
+        RuntimeContext runtimeContext = RuntimeContext.builder().sessionId(sessionId).build();
+        String first = tools.readWorkspaceFileChunk(
+                "tool-results/result.txt", 0L, 6, runtimeContext);
+        String second = tools.readWorkspaceFileChunk(
+                "tool-results/result.txt", 6L, 6, runtimeContext);
+
+        assertThat(first)
+                .contains("nextOffsetBytes=6")
+                .contains("hasMore=true")
+                .endsWith("ab中c");
+        assertThat(second)
+                .contains("offsetBytes=6")
+                .contains("nextOffsetBytes=12")
+                .endsWith("d文ef");
+    }
+
+    @Test
+    void ordinaryReadAlsoBoundsInternalToolResultFiles() throws Exception {
+        Path file = workspaceService.sessionDir(sessionId).resolve("tool-results/large.txt");
+        Files.createDirectories(file.getParent());
+        Files.writeString(file, "x".repeat(140_000));
+
+        ToolResultBlock result = tools.readWorkspaceFile(
+                "tool-results/large.txt", null, RuntimeContext.builder().sessionId(sessionId).build());
+
+        String text = ((TextBlock) result.getOutput().get(0)).getText();
+        assertThat(text)
+                .contains("hasMore=true")
+                .contains("nextOffsetBytes=131072");
+        assertThat(text.length()).isLessThan(132_000);
+    }
+
+    @Test
     void readWorkspaceFileResolvesSessionIdFromRuntimeContextWhenScopesAreAmbiguous() throws Exception {
         // Simulate a second concurrent chat: register another parent brain scope so the global
         // registry's soleSessionId() becomes ambiguous. Without RuntimeContext this used to throw

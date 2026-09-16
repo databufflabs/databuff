@@ -44,6 +44,8 @@ public class AgentRuntimeConfig {
     /** Imported / synced custom skill packages (writable). */
     private String customSkillsDir = "./data/skills";
     private String workspaceDir = "./data/ai-workspaces";
+    /** Maximum UTF-8 bytes returned directly to the model by one MCP tool call. */
+    private int mcpToolResultMaxBytes = 128 * 1024;
     private String workspaceShellCommands = "cat,head,tail,grep,wc,ls,file,python3";
     private int workspaceShellTimeoutSeconds = 60;
     /**
@@ -182,6 +184,18 @@ public class AgentRuntimeConfig {
 
     public void setWorkspaceDir(String workspaceDir) {
         this.workspaceDir = workspaceDir;
+    }
+
+    public int getMcpToolResultMaxBytes() {
+        return mcpToolResultMaxBytes;
+    }
+
+    public void setMcpToolResultMaxBytes(int mcpToolResultMaxBytes) {
+        this.mcpToolResultMaxBytes = mcpToolResultMaxBytes;
+    }
+
+    public int resolvedMcpToolResultMaxBytes() {
+        return Math.max(1024, mcpToolResultMaxBytes);
     }
 
     public String getWorkspaceShellCommands() {

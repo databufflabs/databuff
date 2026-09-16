@@ -83,6 +83,8 @@ apm:
     builtin-skills-dir: ${APM_BUILTIN_SKILLS_DIR:../deploy/common/skills}
     custom-skills-dir: ${APM_CUSTOM_SKILLS_DIR:./data/skills}
     workspace-dir: ${APM_DATA_DIR:./data}/ai-workspaces
+    # 超长 MCP 文本结果完整保存到会话工作区，仅把预览和文件路径交给模型。
+    mcp-tool-result-max-bytes: ${APM_AGENT_MCP_TOOL_RESULT_MAX_BYTES:131072}
     workspace-shell-commands: cat,head,tail,grep,wc,ls,file,python3
     workspace-shell-timeout-seconds: 60
     # 在内置危险命令 denylist 之外追加拦截。逗号分隔，两种写法：

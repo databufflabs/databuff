@@ -16,7 +16,11 @@ import org.springframework.stereotype.Component;
 
 import java.io.BufferedReader;
 import java.io.IOException;
+import java.io.InputStream;
 import java.io.InputStreamReader;
+import java.nio.ByteBuffer;
+import java.nio.charset.CharacterCodingException;
+import java.nio.charset.CodingErrorAction;
 import java.nio.charset.StandardCharsets;
 import java.nio.file.Files;
 import java.nio.file.Path;
@@ -36,6 +40,7 @@ public class SessionWorkspaceTools {
     private final SessionWorkspaceService workspaceService;
     private final Set<String> allowedShellCommands;
     private final int shellTimeoutSeconds;
+    private final int maxReadChunkBytes;
     private final ShellCommandPolicy shellPolicy;
     private final TaskGeneratedFileRegistry generatedFileRegistry;
 
@@ -47,6 +52,7 @@ public class SessionWorkspaceTools {
         this.workspaceService = workspaceService;
         this.allowedShellCommands = agentRuntimeConfig.workspaceShellCommands();
         this.shellTimeoutSeconds = agentRuntimeConfig.getWorkspaceShellTimeoutSeconds();
+        this.maxReadChunkBytes = agentRuntimeConfig.resolvedMcpToolResultMaxBytes();
         this.shellPolicy = agentRuntimeConfig.shellCommandPolicy();
         this.generatedFileRegistry = generatedFileRegistry;
     }
@@ -99,6 +105,9 @@ public class SessionWorkspaceTools {
             @ToolParam(name = "lineRange", required = false, description = "Optional line range, e.g. 10000-19998; default 1-9999")
             String lineRange,
             RuntimeContext runtimeContext) {
+        if (isToolResultPath(filePath)) {
+            return ToolResultBlock.text(readWorkspaceFileChunk(filePath, 0L, null, runtimeContext));
+        }
         String sessionId = requireSessionId(runtimeContext);
         try {
             Path file = workspaceService.resolveRelativePath(sessionId, filePath);
@@ -117,6 +126,53 @@ public class SessionWorkspaceTools {
             return ToolResultBlock.text(builder.toString().trim());
         } catch (Exception e) {
             return ToolResultBlock.text("readWorkspaceFile failed: " + e.getMessage());
+        }
+    }
+
+    @Tool(description = "Read a bounded UTF-8 byte chunk from a text file in the current chat session workspace. "
+            + "Use the returned nextOffsetBytes to continue only when more content is needed.")
+    public String readWorkspaceFileChunk(
+            @ToolParam(name = "filePath", description = "Session-relative file path, usually tool-results/...")
+            String filePath,
+            @ToolParam(name = "offsetBytes", required = false, description = "Byte offset, default 0; use nextOffsetBytes from the previous chunk")
+            Long offsetBytes,
+            @ToolParam(name = "maxBytes", required = false, description = "Requested chunk size; capped by server configuration")
+            Integer maxBytes,
+            RuntimeContext runtimeContext) {
+        String sessionId = requireSessionId(runtimeContext);
+        long offset = offsetBytes == null ? 0L : offsetBytes;
+        int requested = maxBytes == null || maxBytes <= 0 ? maxReadChunkBytes : maxBytes;
+        int limit = Math.min(Math.max(4, requested), maxReadChunkBytes);
+        try {
+            Path file = workspaceService.resolveRelativePath(sessionId, filePath);
+            if (!Files.isRegularFile(file)) {
+                return "not a file: " + filePath;
+            }
+            long totalBytes = Files.size(file);
+            if (offset < 0 || offset > totalBytes) {
+                return "readWorkspaceFileChunk failed: offsetBytes must be between 0 and " + totalBytes;
+            }
+            if (offset == totalBytes) {
+                return chunkHeader(filePath, offset, offset, totalBytes, false);
+            }
+            byte[] bytes;
+            try (InputStream input = Files.newInputStream(file)) {
+                input.skipNBytes(offset);
+                bytes = input.readNBytes(limit);
+            }
+            int decodedLength = utf8Boundary(bytes);
+            if (decodedLength < 0) {
+                return "readWorkspaceFileChunk failed: offsetBytes is not on a UTF-8 boundary; "
+                        + "use 0 or nextOffsetBytes from the previous chunk";
+            }
+            String content = StandardCharsets.UTF_8.decode(
+                    ByteBuffer.wrap(bytes, 0, decodedLength)).toString();
+            long nextOffset = offset + decodedLength;
+            return chunkHeader(filePath, offset, nextOffset, totalBytes, nextOffset < totalBytes)
+                    + "\n\n"
+                    + content;
+        } catch (Exception e) {
+            return "readWorkspaceFileChunk failed: " + e.getMessage();
         }
     }
 
@@ -252,6 +308,17 @@ public class SessionWorkspaceTools {
         return relativePath.trim();
     }
 
+    private static boolean isToolResultPath(String filePath) {
+        if (filePath == null) {
+            return false;
+        }
+        String normalized = filePath.trim().replace('\\', '/');
+        while (normalized.startsWith("./")) {
+            normalized = normalized.substring(2);
+        }
+        return normalized.startsWith("tool-results/");
+    }
+
     private static int[] parseLineRange(String lineRange, int totalLines) {
         if (totalLines <= 0) {
             return new int[]{0, -1};
@@ -286,5 +353,33 @@ public class SessionWorkspaceTools {
             }
         }
         return String.join("\n", lines).trim();
+    }
+
+    private static String chunkHeader(
+            String filePath,
+            long offset,
+            long nextOffset,
+            long totalBytes,
+            boolean hasMore) {
+        return "workspace_file=" + filePath
+                + "\noffsetBytes=" + offset
+                + "\nnextOffsetBytes=" + nextOffset
+                + "\ntotalBytes=" + totalBytes
+                + "\nhasMore=" + hasMore;
+    }
+
+    private static int utf8Boundary(byte[] bytes) {
+        for (int length = bytes.length; length >= Math.max(0, bytes.length - 3); length--) {
+            try {
+                StandardCharsets.UTF_8.newDecoder()
+                        .onMalformedInput(CodingErrorAction.REPORT)
+                        .onUnmappableCharacter(CodingErrorAction.REPORT)
+                        .decode(ByteBuffer.wrap(bytes, 0, length));
+                return length;
+            } catch (CharacterCodingException ignored) {
+                // The byte limit can split one multibyte character; trim only that partial suffix.
+            }
+        }
+        return -1;
     }
 }

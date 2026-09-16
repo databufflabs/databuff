@@ -18,9 +18,13 @@ import java.util.function.Supplier;
 public class AgentScopeToolResultTracer implements Tracer {
 
     private final AgentScopeSessionHook sessionHook;
+    private final McpToolResultOverflowService overflowService;
 
-    public AgentScopeToolResultTracer(AgentScopeSessionHook sessionHook) {
+    public AgentScopeToolResultTracer(
+            AgentScopeSessionHook sessionHook,
+            McpToolResultOverflowService overflowService) {
         this.sessionHook = sessionHook;
+        this.overflowService = overflowService;
     }
 
     @PostConstruct
@@ -34,7 +38,11 @@ public class AgentScopeToolResultTracer implements Tracer {
             ToolCallParam param,
             Supplier<Mono<ToolResultBlock>> next) {
         long startedAtMs = System.currentTimeMillis();
-        return next.get().doOnNext(result -> capture(param, result, startedAtMs));
+        return next.get().map(result -> {
+            ToolResultBlock modelSafeResult = overflowService.limit(toolkit, param, result);
+            capture(param, modelSafeResult, startedAtMs);
+            return modelSafeResult;
+        });
     }
 
     private void capture(ToolCallParam param, ToolResultBlock result, long startedAtMs) {

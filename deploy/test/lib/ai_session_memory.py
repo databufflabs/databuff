@@ -39,7 +39,7 @@ _PROVIDER_PROFILES: dict[str, dict[str, str]] = {
         "env_key": "MINIMAX_API_KEY",
     },
     "opencode": {
-        "model": "deepseek-v4-flash",
+        "model": "deepseek-v4.1-flash",
         "base_url": "https://opencode.ai/zen/go/v1",
         "api_type": "openai-completions",
         "env_key": "OPENCODE_API_KEY",
