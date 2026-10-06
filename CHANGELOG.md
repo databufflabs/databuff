@@ -1,5 +1,47 @@
 # Changelog
 
+## [0.1.10] - 2026-10-06
+
+### Features
+
+- **Webhook delivery records**: the notification portal `/notify/records` now returns real recent webhook send records (batch, attempts, status code, duration, plus the primary alert status / fingerprint / description) instead of an empty placeholder
+- **Demo fault injection**: the demo app gains a fault HTTP server and controller with Kafka change-event publishers, and refreshed OTLP / SkyWalking trace and log fixtures for more realistic demo telemetry
+
+### Bug Fixes
+
+- Fix Doris FE startup failure on cgroup-aware JDK 17: docker / K8s deploy scripts add `-XX:-UseContainerSupport` to the FE JVM options (idempotent), documented in the FAQ
+- Bound oversized MCP tool results: text output above 128 KB is stored in the session workspace and the model only receives a preview plus a file path (`APM_AGENT_MCP_TOOL_RESULT_MAX_BYTES`)
+- MCP JSON-RPC tool calls now report `isError` for business-error envelopes and runtime exceptions instead of always returning success
+- MCP tool catalog: tightened tool descriptions with explicit Asia/Shanghai time formats, default one-hour window, result caps, serviceType enum and required arguments
+- Webhook payloads now include `id` and `occurredAt` (source event time) so standard-event receivers order lifecycle changes correctly
+- Fix the service-analysis filter for remote virtual services: keep `sid` on the serviceId dimension and treat `service.remote` targets like db/redis/mq in the request list
+
+### Security
+
+- Pin security-baseline dependency versions above the Spring Boot 3.5.14 BOM defaults: log4j2 2.25.5, Tomcat 10.1.59, Jackson 2.22.2, Logback 1.5.34, mysql-connector-j 26.7.0, Spring Framework 6.2.19, ZooKeeper 3.9.5
+
+### Deploy & Build
+
+- Docker / K8s / offline install scripts and docs versioned to `0.1.10`
+- `build-images.sh` runs with `set -euo pipefail` and web source packaging filters stale git-index entries before tar
+- Alert rule configuration example added to the alarm manual (PR #78)
+
+### Full changelog
+
+Commits since `0.1.9`:
+
+- `01aa701` update demo fixtures and third-party notices
+- `2e4f5ce` fix: bound oversized MCP tool results
+- `04fc924` fix doris fe start failed
+- `3abf8b0` update doris fe jvm conf
+- `2444e06` update remote service filter bug
+- `4e67ed3` update skill
+- `b9f54c0` update skill
+- `3f63d73` update notify
+- `14f9546` Merge pull request #78 from AzazelSensei/docs-11-alert-config-example
+- `d82077f` update skill and mcp
+- `e864b09` docs: add alert rule configuration example
+
 ## [0.1.9] - 2026-09-06
 
 ### Features
