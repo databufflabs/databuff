@@ -170,6 +170,7 @@ public final class OtlpTraceFixture {
                 kv("demo.cache_fallback", Boolean.toString(fault.active())));
         addFaultAttributes(orderDbSpan, fault);
 
+        // Keep the baseline inventory exception and its logs alongside the cache-TTL scenario.
         ResourceSpans serviceB = ResourceSpans.newBuilder()
                 .setResource(serviceResource(SERVICE_B, "service-b-1", "demo-host-b"))
                 .addScopeSpans(ScopeSpans.newBuilder()
@@ -190,7 +191,11 @@ public final class OtlpTraceFixture {
                                 kv("db.name", "demo_apm"),
                                 kv("db.statement", "SELECT sku, available FROM demo_inventory WHERE sku = ?"),
                                 kv("server.address", "mysql"),
-                                kv("server.port", "3306"))))
+                                kv("server.port", "3306"))
+                                .addAttributes(kv("error.type", "InsufficientStockException"))
+                                .setStatus(Status.newBuilder()
+                                        .setCode(Status.StatusCode.STATUS_CODE_ERROR)
+                                        .setMessage("inventory unavailable for sku DEMO-10001"))))
                 .build();
 
         byte[] traceBytes = ExportTraceServiceRequest.newBuilder()
@@ -209,7 +214,9 @@ public final class OtlpTraceFixture {
                 spanRef(SERVICE_B, "service-b-1", "demo-host-b", httpServer, at(traceStart, 55)),
                 spanRef(SERVICE_B, "service-b-1", "demo-host-b", orderCache, at(traceStart, 36)),
                 spanRef(SERVICE_B, "service-b-1", "demo-host-b", orderMysql,
-                        at(traceStart, orderDbStartMs + 5)));
+                        at(traceStart, orderDbStartMs + 5)),
+                spanRef(SERVICE_B, "service-b-1", "demo-host-b", inventoryMysql,
+                        at(traceStart, lateStartMs + 15)));
     }
 
     private static void addFaultAttributes(Span.Builder span, DemoFaultSnapshot fault) {

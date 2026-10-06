@@ -16,7 +16,8 @@ public record DemoSkyWalkingBatch(
         SpanRef serviceAHttpClient,
         SpanRef serviceBHttpServer,
         SpanRef serviceBOrderCache,
-        SpanRef serviceBOrderDatabase) {
+        SpanRef serviceBOrderDatabase,
+        SpanRef serviceBInventoryDatabase) {
 
     public record SpanRef(
             String segmentId,

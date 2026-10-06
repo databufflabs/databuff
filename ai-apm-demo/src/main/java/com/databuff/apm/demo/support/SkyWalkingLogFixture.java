@@ -61,6 +61,13 @@ public final class SkyWalkingLogFixture {
                 fault.active()
                         ? "Slow demo_order query durationMs=2950 rows=1"
                         : "demo_order query completed durationMs=45 rows=1"));
+        DemoSkyWalkingBatch.SpanRef inventoryDb = batch.serviceBInventoryDatabase();
+        logs.add(log(inventoryDb, batch, inventoryDb.timeMs(), "INFO",
+                "Querying inventory for sku DEMO-10001"));
+        logs.add(log(inventoryDb, batch, inventoryDb.timeMs() + 6, "WARN",
+                "Available stock below threshold (2 units)"));
+        logs.add(log(inventoryDb, batch, inventoryDb.timeMs() + 12, "ERROR",
+                "InsufficientStockException: inventory unavailable for sku DEMO-10001"));
         return logs;
     }
 

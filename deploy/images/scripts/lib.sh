@@ -788,7 +788,11 @@ prepare_web_databuff_tree() {
   mkdir -p "$dest"
   (
     cd "${APM_REPO_ROOT}" || exit 1
+    # 索引里可能残留已删除未提交的路径，tar 会因 Cannot stat 整体报错，先过滤掉
     git ls-files -c -o --exclude-standard -z \
+      | while IFS= read -r -d '' f; do
+          if [ -e "$f" ] || [ -L "$f" ]; then printf '%s\0' "$f"; fi
+        done \
       | tar --null -T - -cf - \
       | tar -C "$dest" -xf -
   )

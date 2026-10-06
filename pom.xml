@@ -56,6 +56,14 @@
         <druid.version>1.2.27</druid.version>
         <!-- 内置 Doris 服务端版本（deploy/docker、deploy/k8s 镜像 tag）；JDBC 走 mysql-connector-j -->
         <doris.version>4.1.1</doris.version>
+        <!-- 安全版本基线覆盖（2026-09 上线安全自查清单，均高于 Spring Boot 3.5.14 BOM 默认值；升级前核对下方各属性） -->
+        <log4j2.version>2.25.5</log4j2.version>
+        <tomcat.version>10.1.59</tomcat.version>
+        <jackson-bom.version>2.22.2</jackson-bom.version>
+        <logback.version>1.5.34</logback.version>
+        <mysql.version>26.7.0</mysql.version>
+        <spring-framework.version>6.2.19</spring-framework.version>
+        <zookeeper.version>3.9.5</zookeeper.version>
     </properties>
 
     <dependencyManagement>
@@ -139,6 +147,17 @@
                 <groupId>org.apache.curator</groupId>
                 <artifactId>curator-test</artifactId>
                 <version>${curator.version}</version>
+            </dependency>
+            <!-- ZooKeeper 客户端安全基线：curator 5.7.1 传递 3.9.2，低于清单要求的 ≥3.9.5，此处显式收敛 -->
+            <dependency>
+                <groupId>org.apache.zookeeper</groupId>
+                <artifactId>zookeeper</artifactId>
+                <version>${zookeeper.version}</version>
+            </dependency>
+            <dependency>
+                <groupId>org.apache.zookeeper</groupId>
+                <artifactId>zookeeper-jute</artifactId>
+                <version>${zookeeper.version}</version>
             </dependency>
             <dependency>
                 <groupId>com.alibaba</groupId>

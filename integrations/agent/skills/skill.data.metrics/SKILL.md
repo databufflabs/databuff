@@ -43,6 +43,7 @@ category: 数据查询
 ## queryMetricData 参数
 
 - `queryRequests`：QueryRequest 对象列表（不是 JSON 字符串）。
+- `size`：工具顶层参数，统一限制每项查询的返回行数；不放在 `queryRequests` 单项中，不支持为单项独立设置。
 - Doris 库名由服务端配置固定（当前为 `databuff`），**不要传** `databaseName` / `database`；`config_metric_core.app`（如 `apm`）不是库名。
 - `measurement`：Doris 表名，如 `metric_service`、`metric_service_http`，不要用 `service.db` 这类抽象名。
 - `aggregations`：`{ "function": "SUM|AVG|MAX|MIN|COUNT", "field": "<字段>", "alias": "<别名>" }`。
@@ -50,7 +51,7 @@ category: 数据查询
 - 只允许上述 5 种聚合函数；不要编造其它 function 名。
 - `wheres`：`{ "field": "<tag列>", "operator": "=", "value": "..." }`，field 必须来自该表的 tags 列表。
 - `INLIST` / `IN` 的 `value` 必须是 **JSON 数组** `["id1","id2"]`，**禁止**写成字符串 `"[\"id1\",\"id2\"]"`（会被当成一个整体匹配，导致查不到数据）。
-- `groupBy`：分组字段，必须来自该表的 tags 列表。
+- `groupBy`：分组字段，必须来自该表的 tags 列表；非空时 `aggregations` 也必须非空。
 - `interval`：时间桶，0 或不传表示单次聚合；正数表示时序。
 - `intervalUnit`：`s`、`m`、`h`、`ms`，默认秒。
 - `start`、`end`：查询时间范围。
@@ -64,9 +65,10 @@ category: 数据查询
 
 ## 维度规则
 
-- 先确定 `measurement`，再选 `wheres.field`、`groupBy`、`aggregations.field`。
+- 每次调用先确定 `measurement`，再按该表清单逐项核对全部 `wheres.field`、`groupBy`、`aggregations.field`；不能借用其他表的列。委派任务给出的候选字段也须独立核对，与当前表冲突的字段不执行，并说明纠正依据。
 - 只有 `serviceId`→`service_id`、`serviceInstance`→`service_instance` 两种列名映射；其余 tag 用目录原名（camelCase）。
-- 调用链表（http/rpc/db/redis/mq 等）支持 `isIn`、`isOut`、`srcService*`。
+- HTTP/RPC/DB/Redis/MQ 表的调用方向和 `srcService*` 以各表 tags 清单为准，不能推及其他调用链表。
+- `metric_service_flow` 的父节点是 `parentService` / `parentServiceId`，当前节点是 `service` / `service_id`；本表不支持 `srcService*`、`isOut`、`service_instance`。查询节点关系时按这四列分组并聚合 `cnt`；空父节点不能填造成调用关系。
 - 自身/JVM/系统表没有 `srcService*`、`isIn`/`isOut`。
 - 不要编造 tag 或 field 名。
 
@@ -271,6 +273,26 @@ category: 数据查询
 | 查询成功后再省略时间或扩大跨度“验证一下” | 已有契约与有效样例就回报；除非新的业务问题需要另一窗口，不追加测试 |
 
 ## 指标查询完整示例
+
+### flow 父节点到当前节点的请求量
+
+使用本轮真实时间窗替换示例时间。`srcService*` 是其他表的查询维度，不是可忽略的 JSON 属性；传入本表会造成未知列错误。已有满足需求的合法结果时，不再用清单外字段试探。
+
+```json
+{
+  "queryRequests": [{
+    "measurement": "metric_service_flow",
+    "aggregations": [{"function": "SUM", "field": "cnt", "alias": "total_cnt"}],
+    "groupBy": ["parentService", "parentServiceId", "service", "service_id"],
+    "interval": 0,
+    "start": "2026-09-22 10:00:00",
+    "end": "2026-09-22 10:15:00"
+  }],
+  "size": 50
+}
+```
+
+### 服务请求量、错误数与平均耗时
 
 以下查询参数形状可直接参考；服务名与起止时间必须来自本次真实对象和时间范围，不能固定沿用示例值：
 

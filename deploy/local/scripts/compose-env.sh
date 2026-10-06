@@ -45,6 +45,17 @@ compose_f_args() {
       *) printf -- "-f\0%s\0" "${root}/docker-compose.buffops.yml" ;;
     esac
   fi
+  # OpenOcta event-sender wiring (written by wire-databuff-events.py) must win
+  # over the legacy buffops overlay but keep local overrides as the last word.
+  openocta="${root}/docker-compose.openocta.yml"
+  case ":${COMPOSE_FILE}:" in
+    *":${openocta}:"*) ;;
+    *)
+      if [ -f "$openocta" ]; then
+        printf -- "-f\0%s\0" "$openocta"
+      fi
+      ;;
+  esac
   override="${root}/docker-compose.override.yml"
   case ":${COMPOSE_FILE}:" in
     *":${override}:"*) ;;

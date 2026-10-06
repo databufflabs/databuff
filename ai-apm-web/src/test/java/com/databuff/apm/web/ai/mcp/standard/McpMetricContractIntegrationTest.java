@@ -32,8 +32,15 @@ class McpMetricContractIntegrationTest {
         for (String id : List.of("skill.data.metrics", "skill.inspection.health")) {
             String skill = Files.readString(Path.of("../deploy/common/skills", id, "SKILL.md"));
             var example = Pattern.compile("```json\\s*(.*?)```", Pattern.DOTALL).matcher(skill);
-            assertThat(example.find()).isTrue();
-            Map<String, Object> arguments = mapper.readValue(example.group(1), new TypeReference<>() {});
+            Map<String, Object> arguments = null;
+            while (example.find()) {
+                Map<String, Object> candidate = mapper.readValue(example.group(1), new TypeReference<>() {});
+                if (candidate.containsKey("queryRequests")) {
+                    arguments = candidate;
+                    break;
+                }
+            }
+            assertThat(arguments).as("%s 应包含 queryMetricData 示例", id).isNotNull();
             Map<?, ?> result = call(arguments);
             assertThat(result.get("isError")).isEqualTo(false);
         }

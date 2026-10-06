@@ -66,6 +66,15 @@ public final class OtlpLogFixture {
                                 "Slow demo_order query durationMs=2950 rows=1")
                         : info(batch, orderDb, orderDb.timeNanos() + ms(10),
                                 "demo_order query completed durationMs=45 rows=1")));
+        DemoTraceBatch.SpanRef inventoryDb = batch.serviceBInventoryDatabase();
+        request.addResourceLogs(resourceLogs(inventoryDb,
+                info(batch, inventoryDb, inventoryDb.timeNanos(),
+                        "Querying inventory for sku DEMO-10001"),
+                warn(batch, inventoryDb, inventoryDb.timeNanos() + ms(6),
+                        "Available stock below threshold (2 units)"),
+                logRecord(batch, inventoryDb, inventoryDb.timeNanos() + ms(12),
+                        SeverityNumber.SEVERITY_NUMBER_ERROR, "ERROR",
+                        "InsufficientStockException: inventory unavailable for sku DEMO-10001")));
         return request.build().toByteArray();
     }
 

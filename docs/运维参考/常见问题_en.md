@@ -6,7 +6,7 @@
 
 # FAQ
 
-Known issues seen during install or startup. Day-to-day Docker / Kubernetes operations: [Docker Operations](Docker运维_en.md), [Kubernetes Operations](K8s运维_en.md).
+Known issues seen during install, startup, or operation. Day-to-day Docker / Kubernetes operations: [Docker Operations](Docker运维_en.md), [Kubernetes Operations](K8s运维_en.md).
 
 ## Doris FE fails to start: `CgroupInfo.getMountPoint()` NPE
 
@@ -69,6 +69,59 @@ docker exec ai-apm-doris-fe grep JAVA_OPTS_FOR_JDK_17 /opt/apache-doris/fe/conf/
 ```
 
 Ingest and web stay down until FE answers on `8030` / `9030`.
+
+## Model connectivity: curl works, but the connectivity test fails with `Model request timeout after PT30S`
+
+### Symptom
+
+In the AI platform's model provider settings, with the same Base URL and API key: curl from the host returns 200 from `<Base-URL>/chat/completions` in under a second, while DataBuff's connectivity test reports `Model request timeout after PT30S` after about 30 seconds (real chats time out the same way). Mostly seen in intranet deployments (vLLM, or model services behind a gateway / WAF).
+
+### Cause
+
+The connectivity test is issued by the AgentScope SDK **inside the `ai-apm-web` container**, which differs from host-side curl in two ways:
+
+- **Runtime environment**: the test runs in a container (custom bridge network). If the intranet domain is resolved via the host's `/etc/hosts` or an intranet DNS, the container cannot read the host's `/etc/hosts`; and if the host uses systemd-resolved (`/etc/resolv.conf` pointing to `127.0.0.53`), the container cannot resolve it either.
+- **HTTP version**: the AgentScope transport defaults to HTTP/2 (negotiated via TLS ALPN); older curl builds do not support h2 and actually speak HTTP/1.1. When a gateway / WAF accepts the JDK's h2 connection but never sends a response, the request hangs silently.
+
+`PT30S` is the probe's overall timeout covering connect + TLS + response. DNS failures, untrusted certificates, and refused ports all fail within seconds; **a full 30-second hang means the request stalled silently**, which points to one of the two causes above.
+
+### Fix
+
+**Step 1: force HTTP/1.1 (cheapest, try first).** Add one line to the `environment` block of the `ai-apm-web` service in the compose file (Docker install: `deploy/docker/docker-compose.yml`; local dev: `deploy/local/docker-compose.yml`):
+
+```yaml
+      APM_AGENT_LLM_FORCE_HTTP11: "true"
+```
+
+This maps to the `apm.agent.llm-force-http11` config key (every shipped application.yml already carries the placeholder — no code change needed). After startup, both the connectivity test and real LLM calls go over HTTP/1.1. Then **recreate the container** — `docker restart` does not pick up environment changes:
+
+```bash
+docker compose up -d --force-recreate ai-apm-web
+docker logs ai-apm-web 2>&1 | grep -i "HTTP/1.1"
+# should show: AgentScope LLM HTTP transport forced to HTTP/1.1 (apm.agent.llm-force-http11=true)
+```
+
+**Step 2: if it still times out, check the container-to-gateway network path** (substitute the real domain / key / model ID):
+
+```bash
+docker exec ai-apm-web getent hosts llm.example.internal   # compare the resolved IP with the host's
+docker exec ai-apm-web timeout 5 bash -c 'exec 3<>/dev/tcp/llm.example.internal/443' && echo TCP-OK
+docker exec ai-apm-web curl -sS -m 10 \
+  -H "Authorization: Bearer <API-Key>" -H 'Content-Type: application/json' \
+  -d '{"model":"<model-id>","messages":[{"role":"user","content":"ping"}]}' \
+  https://llm.example.internal/v1/chat/completions
+```
+
+If curl inside the container also times out → network problem: add an `extra_hosts` entry (intranet domain → IP) to `ai-apm-web` in the compose file, or point the container at a working intranet DNS. If curl inside the container is fast while the platform still times out → go back to step 1 and confirm the HTTP/1.1 switch is active.
+
+### Verify
+
+The connectivity test reports success. Other error messages map directly to causes:
+
+- `UnknownHostException`: container DNS problem — follow step 2;
+- `PKIX path building failed`: the gateway certificate is not in the JDK truststore (curl uses the OS certificate store, Java uses its own cacerts) — import the gateway certificate chain into the container JDK's cacerts;
+- `404 ... model not found`: model ID mismatch. vLLM is case-sensitive — if the server serves `deepseek-v4`, entering `DeepSeek-V4` fails; use what `/v1/models` returns;
+- `401`: wrong API key.
 
 ## See also
 

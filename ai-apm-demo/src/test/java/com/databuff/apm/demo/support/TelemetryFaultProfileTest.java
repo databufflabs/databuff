@@ -13,6 +13,8 @@ import org.apache.skywalking.apm.network.language.agent.v3.SegmentObject;
 import org.apache.skywalking.apm.network.language.agent.v3.SpanObject;
 import org.apache.skywalking.apm.network.logging.v3.LogData;
 import org.junit.jupiter.api.Test;
+import org.junit.jupiter.params.ParameterizedTest;
+import org.junit.jupiter.params.provider.ValueSource;
 
 import java.time.Instant;
 import java.util.LinkedHashMap;
@@ -52,9 +54,10 @@ class TelemetryFaultProfileTest {
         assertThat(trace.getResourceSpansList().stream()
                 .flatMap(resource -> resource.getScopeSpansList().stream())
                 .flatMap(scope -> scope.getSpansList().stream())
-                .anyMatch(span -> span.getStatus().getCode()
-                        == io.opentelemetry.proto.trace.v1.Status.StatusCode.STATUS_CODE_ERROR))
-                .isFalse();
+                .filter(span -> span.getStatus().getCode()
+                        == io.opentelemetry.proto.trace.v1.Status.StatusCode.STATUS_CODE_ERROR)
+                .map(Span::getName).toList())
+                .containsExactly("SELECT demo_inventory");
     }
 
     @Test
@@ -75,7 +78,7 @@ class TelemetryFaultProfileTest {
         String logs = otlpBodies(OtlpLogFixture.logExport(batch));
         assertThat(logs)
                 .contains("cache hit orderId=10001 ttlSeconds=300")
-                .doesNotContain("InsufficientStockException")
+                .contains("InsufficientStockException")
                 .doesNotContain("Slow request");
     }
 
@@ -149,7 +152,9 @@ class TelemetryFaultProfileTest {
                 .containsEntry("fault.run_id", "fault-test-001");
         assertThat(batch.segments().getSegmentsList())
                 .flatExtracting(SegmentObject::getSpansList)
-                .allSatisfy(span -> assertThat(span.getIsError()).isFalse());
+                .filteredOn(SpanObject::getIsError)
+                .extracting(SpanObject::getOperationName)
+                .containsExactly("SELECT demo_inventory");
 
         List<LogData> logs = SkyWalkingLogFixture.logsForBatch(batch);
         assertThat(logs).allSatisfy(log -> {
@@ -160,6 +165,61 @@ class TelemetryFaultProfileTest {
                 .anyMatch(body -> body.contains("cache bypassed"))
                 .anyMatch(body -> body.contains("durationMs=3100"))
                 .anyMatch(body -> body.contains("durationMs=3200"));
+    }
+
+    @ParameterizedTest
+    @ValueSource(booleans = {false, true})
+    void otlpInventoryErrorAndItsLogsRemainPresentWithOrWithoutCacheFault(boolean cacheFault) throws Exception {
+        DemoTraceBatch batch = cacheFault
+                ? OtlpTraceFixture.nextTraceBatch(FAULT) : OtlpTraceFixture.nextTraceBatch();
+        ExportTraceServiceRequest trace = ExportTraceServiceRequest.parseFrom(batch.traceBytes());
+        Span inventory = otlpSpan(trace, "service-b", "SELECT demo_inventory");
+        assertThat(inventory.getStatus().getCode())
+                .isEqualTo(io.opentelemetry.proto.trace.v1.Status.StatusCode.STATUS_CODE_ERROR);
+        assertThat(inventory.getStatus().getMessage())
+                .isEqualTo("inventory unavailable for sku DEMO-10001");
+        assertThat(attributes(inventory)).containsEntry("error.type", "InsufficientStockException");
+
+        var logs = ExportLogsServiceRequest.parseFrom(OtlpLogFixture.logExport(batch))
+                .getResourceLogsList().stream()
+                .flatMap(resource -> resource.getScopeLogsList().stream())
+                .flatMap(scope -> scope.getLogRecordsList().stream())
+                .filter(log -> log.getSpanId().equals(inventory.getSpanId())).toList();
+        assertThat(logs).extracting(LogRecord::getSeverityText).containsExactly("INFO", "WARN", "ERROR");
+        assertThat(logs.get(2).getSeverityNumber())
+                .isEqualTo(io.opentelemetry.proto.logs.v1.SeverityNumber.SEVERITY_NUMBER_ERROR);
+        assertThat(logs).extracting(log -> log.getBody().getStringValue()).containsExactly(
+                "Querying inventory for sku DEMO-10001",
+                "Available stock below threshold (2 units)",
+                "InsufficientStockException: inventory unavailable for sku DEMO-10001");
+        assertThat(logs).allSatisfy(log -> {
+            assertThat(log.getTraceId()).isEqualTo(inventory.getTraceId());
+            assertThat(log.getTimeUnixNano())
+                    .isBetween(inventory.getStartTimeUnixNano(), inventory.getEndTimeUnixNano());
+        });
+    }
+
+    @ParameterizedTest
+    @ValueSource(booleans = {false, true})
+    void skyWalkingInventoryErrorAndItsLogsMatchOtlpWithOrWithoutCacheFault(boolean cacheFault) {
+        DemoSkyWalkingBatch batch = cacheFault
+                ? SkyWalkingTraceFixture.nextBatch(FAULT) : SkyWalkingTraceFixture.nextBatch();
+        SpanObject inventory = skyWalkingSpan(batch, "service-b", "SELECT demo_inventory");
+        assertThat(inventory.getIsError()).isTrue();
+        assertThat(tags(inventory)).containsEntry("error.type", "InsufficientStockException");
+        var logs = SkyWalkingLogFixture.logsForBatch(batch).stream()
+                .filter(log -> log.getTraceContext().getTraceSegmentId().equals(batch.segmentBId())
+                        && log.getTraceContext().getSpanId() == inventory.getSpanId()).toList();
+        assertThat(logs).extracting(log -> tags(log).get("level")).containsExactly("INFO", "WARN", "ERROR");
+        assertThat(logs).extracting(log -> log.getBody().getText().getText()).containsExactly(
+                "Querying inventory for sku DEMO-10001",
+                "Available stock below threshold (2 units)",
+                "InsufficientStockException: inventory unavailable for sku DEMO-10001");
+        assertThat(logs).allSatisfy(log -> {
+            assertThat(log.getService()).isEqualTo("service-b");
+            assertThat(log.getTraceContext().getTraceId()).isEqualTo(batch.traceId());
+            assertThat(log.getTimestamp()).isBetween(inventory.getStartTime(), inventory.getEndTime());
+        });
     }
 
     private static Span otlpSpan(

@@ -22,6 +22,8 @@ category: 数据查询
 - 用户未明确时间：调用 `getCurrentTimeRange`。
 - 不要调用或编造 `formatTime` 工具。
 
+填写参数时可直接参考下文 [易错调用对照](#易错调用对照) 和 [指标查询完整示例](#指标查询完整示例)。
+
 ## 工具选择
 
 | 场景 | 工具 |
@@ -41,6 +43,7 @@ category: 数据查询
 ## queryMetricData 参数
 
 - `queryRequests`：QueryRequest 对象列表（不是 JSON 字符串）。
+- `size`：工具顶层参数，统一限制每项查询的返回行数；不放在 `queryRequests` 单项中，不支持为单项独立设置。
 - Doris 库名由服务端配置固定（当前为 `databuff`），**不要传** `databaseName` / `database`；`config_metric_core.app`（如 `apm`）不是库名。
 - `measurement`：Doris 表名，如 `metric_service`、`metric_service_http`，不要用 `service.db` 这类抽象名。
 - `aggregations`：`{ "function": "SUM|AVG|MAX|MIN|COUNT", "field": "<字段>", "alias": "<别名>" }`。
@@ -48,7 +51,7 @@ category: 数据查询
 - 只允许上述 5 种聚合函数；不要编造其它 function 名。
 - `wheres`：`{ "field": "<tag列>", "operator": "=", "value": "..." }`，field 必须来自该表的 tags 列表。
 - `INLIST` / `IN` 的 `value` 必须是 **JSON 数组** `["id1","id2"]`，**禁止**写成字符串 `"[\"id1\",\"id2\"]"`（会被当成一个整体匹配，导致查不到数据）。
-- `groupBy`：分组字段，必须来自该表的 tags 列表。
+- `groupBy`：分组字段，必须来自该表的 tags 列表；非空时 `aggregations` 也必须非空。
 - `interval`：时间桶，0 或不传表示单次聚合；正数表示时序。
 - `intervalUnit`：`s`、`m`、`h`、`ms`，默认秒。
 - `start`、`end`：查询时间范围。
@@ -62,9 +65,10 @@ category: 数据查询
 
 ## 维度规则
 
-- 先确定 `measurement`，再选 `wheres.field`、`groupBy`、`aggregations.field`。
+- 每次调用先确定 `measurement`，再按该表清单逐项核对全部 `wheres.field`、`groupBy`、`aggregations.field`；不能借用其他表的列。委派任务给出的候选字段也须独立核对，与当前表冲突的字段不执行，并说明纠正依据。
 - 只有 `serviceId`→`service_id`、`serviceInstance`→`service_instance` 两种列名映射；其余 tag 用目录原名（camelCase）。
-- 调用链表（http/rpc/db/redis/mq 等）支持 `isIn`、`isOut`、`srcService*`。
+- HTTP/RPC/DB/Redis/MQ 表的调用方向和 `srcService*` 以各表 tags 清单为准，不能推及其他调用链表。
+- `metric_service_flow` 的父节点是 `parentService` / `parentServiceId`，当前节点是 `service` / `service_id`；本表不支持 `srcService*`、`isOut`、`service_instance`。查询节点关系时按这四列分组并聚合 `cnt`；空父节点不能填造成调用关系。
 - 自身/JVM/系统表没有 `srcService*`、`isIn`/`isOut`。
 - 不要编造 tag 或 field 名。
 
@@ -226,10 +230,69 @@ category: 数据查询
 - 调用前核对必填项：拓扑需要 `serviceName/fromTime/toTime`，告警需要 `serviceId/fromTime/toTime`；指标每项需要 `measurement/start/end`。时间使用 Asia/Shanghai 的 `yyyy-MM-dd HH:mm:ss`，不是 Unix 毫秒或 ISO 字符串。
 - MCP `isError:true`、正文 `ok:false` / `success:false` 或接口错误状态均是失败。外层 SUCCESS、HTTP 200 不代表业务成功。空数组与失败分别报告，不能把失败解释成没有请求或没有告警。
 - 参数修正必须有 schema、本文契约或错误信息作为依据。同类失败没有新证据时停止；不能通过不断换参数或工具名试探。已有满足需求的有效查询结果就回报，不扩大成穷举接口调查。
+- 已声明的必填项、格式和枚举无需再用非法调用证明：不故意漏掉时间，不传毫秒字符串测试容错，不调用 QUANTILE 验证它会失败。真实调用与声明冲突时保留证据再核实；正常问数和场景调查不承担边界测试。
 - `inspectService(serviceName)` 若在当前工具清单中可用，提供固定最近 1 小时的入口指标与巡检证据，不接收自定义时间。用户选择其他窗口时用带时间参数的查询，不能把固定窗口结果说成所选窗口。
 - 拓扑边的请求数是调用链口径，不将所有上下游边相加冒充服务自身请求量。
 
+## 易错调用对照
+
+以下示例沿用一次已验证的窗口和服务，仅示范参数形状。实际调用使用本轮真实服务与起止时间；已经拿到满足需求的查询结果后，不逐条执行这些示例。
+
+### 拓扑：完整传入服务名和起止时间
+
+调用 `queryServiceTopology`：
+
+```json
+{
+  "serviceName": "service-a",
+  "fromTime": "2026-09-09 19:13:00",
+  "toTime": "2026-09-09 20:13:00"
+}
+```
+
+不要只传 `serviceName` 再观察缺参报错。服务告警使用另一个工具 `queryServiceAlarms`，其目标参数是服务列表返回的 `serviceId`，不能把服务名原样填进 ID。
+
+### 同一个窗口：毫秒值先转换，不能直接变成字符串
+
+| 本轮宿主 timeRange（Unix 毫秒） | 传给 DataBuff 查询的北京时间字符串 |
+| --- | --- |
+| fromTime = 1788952380000 | `2026-09-09 19:13:00` |
+| toTime = 1788955980000 | `2026-09-09 20:13:00` |
+
+不要传 `"1788952380000"`。拓扑使用顶层 `fromTime/toTime`；指标使用每个 `queryRequests` 元素里的 `start/end`，不能因为值相同就混用参数名或层级。
+
+也不要把本地时间直接加 `Z`：上述开始时刻对应 UTC `2026-09-09T11:13:00Z`，不是 `2026-09-09T19:13:00Z`。本工具仍按表中的北京时间格式调用；用错误时刻查到空结果，不能证明另一种格式不受支持。
+
+### 请求量与耗时：使用支持的聚合，不试探非法函数
+
+| 需求或错法 | 正确调用与交付 |
+| --- | --- |
+| 请求量、错误数、平均耗时 | 一次查询合并 SUM(cnt)、SUM(error)、SUM(sumDuration)，见下面完整示例 |
+| `QUANTILE(sumDuration)` 求 P99 | 当前聚合枚举不提供该能力，直接说明；不发明函数、不用平均值替代 P99 |
+| `AVG(sumDuration)` 求平均耗时 | sumDuration 是总耗时；使用总耗时除以请求数，再从纳秒换算毫秒 |
+| 查询成功后再省略时间或扩大跨度“验证一下” | 已有契约与有效样例就回报；除非新的业务问题需要另一窗口，不追加测试 |
+
 ## 指标查询完整示例
+
+### flow 父节点到当前节点的请求量
+
+使用本轮真实时间窗替换示例时间。`srcService*` 是其他表的查询维度，不是可忽略的 JSON 属性；传入本表会造成未知列错误。已有满足需求的合法结果时，不再用清单外字段试探。
+
+```json
+{
+  "queryRequests": [{
+    "measurement": "metric_service_flow",
+    "aggregations": [{"function": "SUM", "field": "cnt", "alias": "total_cnt"}],
+    "groupBy": ["parentService", "parentServiceId", "service", "service_id"],
+    "interval": 0,
+    "start": "2026-09-22 10:00:00",
+    "end": "2026-09-22 10:15:00"
+  }],
+  "size": 50
+}
+```
+
+### 服务请求量、错误数与平均耗时
 
 以下查询参数形状可直接参考；服务名与起止时间必须来自本次真实对象和时间范围，不能固定沿用示例值：
 
@@ -244,16 +307,24 @@ category: 数据查询
     ],
     "wheres": [{"field": "service", "operator": "=", "value": "service-a"}],
     "groupBy": ["service"],
-    "interval": 1,
-    "intervalUnit": "m",
-    "start": "2026-09-07 16:00:00",
-    "end": "2026-09-07 17:00:00"
+    "start": "2026-09-09 19:13:00",
+    "end": "2026-09-09 20:13:00"
   }],
   "size": 200
 }
 ```
 
 `size` 是工具顶层参数，不放在 queryRequests 的单项中。当前返回按请求排列的结果数组；按真实返回的时间列和聚合别名取值，不猜 `data/values` 层次。
+
+该结构用于窗口汇总。需要分钟趋势时，在同一个 QueryRequest 中增加 `"interval":1,"intervalUnit":"m"`；仅为确认参数可用时不必再追加趋势查询。
+
+本次窗口汇总的真实返回样例为：
+
+```json
+[[{"service":"service-a","total_cnt":1,"error_cnt":0,"sum_duration_ns":240000000}]]
+```
+
+据此得到请求量 1、错误数 0、平均耗时 240 毫秒。数值仅是该次试查证据，不写入页面默认数据；后续以本轮真实结果计算。空数组、聚合值为 null 和 total_cnt 为 0 分别按实际结果说明，不从无数据推导平均耗时为 0。
 
 ## 回答要求
 

@@ -15,6 +15,8 @@
 #   BUILDX_PROGRESS=plain
 #   APM_BUILD_DIST      本机保留 stack 包目录（默认 deploy/images/dist）
 
+set -euo pipefail
+
 source "$(cd "$(dirname "$0")" && pwd)/scripts/lib.sh"
 
 RELEASE_VERSION="$(resolve_release_version)"

@@ -141,11 +141,16 @@ public final class SkyWalkingTraceFixture {
                 .addRefs(crossRef(traceId, segmentAId, 5, SERVICE_A, "service-a-1",
                         "Dubbo DemoOrderService.findInventory", "service-b:20880"))
                 .build();
+        // Keep the baseline inventory exception and its logs alongside the cache-TTL scenario.
         SpanObject inventoryDb = exitSpanB(4, 3, "SELECT demo_inventory",
                 t0 + lateStartMs + 10, t0 + lateStartMs + 35, "mysql:3306",
                 tag("db.type", "mysql"),
                 tag("db.name", "demo_apm"),
-                tag("db.statement", "SELECT sku, available FROM demo_inventory WHERE sku = ?"));
+                tag("db.statement", "SELECT sku, available FROM demo_inventory WHERE sku = ?"),
+                tag("error.type", "InsufficientStockException"))
+                .toBuilder()
+                .setIsError(true)
+                .build();
 
         SegmentObject segmentB = SegmentObject.newBuilder()
                 .setTraceId(traceId)
@@ -175,7 +180,9 @@ public final class SkyWalkingTraceFixture {
                 spanRef(segmentBId, 0, SERVICE_B, "service-b-1", HOST_B, t0 + 55),
                 spanRef(segmentBId, 1, SERVICE_B, "service-b-1", HOST_B, t0 + 36),
                 spanRef(segmentBId, 2, SERVICE_B, "service-b-1", HOST_B,
-                        t0 + orderDbStartMs + 5));
+                        t0 + orderDbStartMs + 5),
+                spanRef(segmentBId, 4, SERVICE_B, "service-b-1", HOST_B,
+                        t0 + lateStartMs + 15));
     }
 
     private static KeyStringValuePair[] faultTags(

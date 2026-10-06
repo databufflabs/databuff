@@ -1,0 +1,11 @@
+{
+  "services": {
+    "ai-apm-web": {
+      "environment": {
+        "APM_ALARM_WEBHOOK_URL": "http://host.docker.internal:19100/api/open/v1/ingest/conn-67475fb4-4eee-4142-b790-408f2d23e0ed",
+        "APM_ALARM_WEBHOOK_TOKEN_FILE": "/app/openocta-webhook.token",
+        "APM_ALARM_WEBHOOK_TOKEN_HEADER": "X-OpenOcta-Token"
+      }
+    }
+  }
+}
