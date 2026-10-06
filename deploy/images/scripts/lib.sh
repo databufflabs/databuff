@@ -827,6 +827,13 @@ buildx_export_image_tarball() {
   local jdk_image
   jdk_image="$(jdk_image_for_platform "$platform")"
 
+  # web 基础镜像可指向内网 registry（如 test.xxx.com/databuffhub/ai-apm-web-base:17-jammy），
+  # 与 JDK_REGISTRY 同模式；未设置时用 Dockerfile 默认值
+  local -a base_image_args=()
+  if [[ -n "${WEB_BASE_IMAGE:-}" ]]; then
+    base_image_args+=(--build-arg "WEB_BASE_IMAGE=${WEB_BASE_IMAGE}")
+  fi
+
   docker buildx build \
     --pull \
     --provenance=false \
@@ -834,6 +841,7 @@ buildx_export_image_tarball() {
     --progress="${BUILDX_PROGRESS:-auto}" \
     --platform "$platform" \
     --build-arg "JDK_IMAGE=${jdk_image}" \
+    ${base_image_args[@]+"${base_image_args[@]}"} \
     -t "$image_ref" \
     --output "type=docker,dest=${dest}" \
     "$ctx"

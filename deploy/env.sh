@@ -23,6 +23,9 @@ export LOCAL_JDK_IMAGE="${LOCAL_JDK_IMAGE:-databuff-local/jdk-dev:17-jammy}"
 # 构建 / local 拉取 JDK 基础镜像的 registry 前缀（如 test.xxx.com/databuff，建议写入 shell profile）。
 # 设置后从 ${JDK_REGISTRY}/eclipse-temurin:17-jdk-jammy 拉取并 tag 为 eclipse-temurin:17-jdk-jammy；未设置则直接 pull 短名。
 export JDK_REGISTRY="${JDK_REGISTRY:-}"
+# web 基础镜像（ai-apm-web-base:17-jammy）可整体指向内网 registry，与 JDK_REGISTRY 同模式：
+# 如 test.databuff.com/databuffhub/ai-apm-web-base:17-jammy；未设置则用 Dockerfile 默认值（Docker Hub）。
+export WEB_BASE_IMAGE="${WEB_BASE_IMAGE:-}"
 
 export DORIS_FE_IMAGE=apache/doris:fe-4.1.1
 export DORIS_BE_IMAGE=apache/doris:be-4.1.1
