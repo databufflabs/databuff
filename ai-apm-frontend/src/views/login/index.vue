@@ -25,7 +25,7 @@
 
 <script lang="ts">
 import { Vue, Component } from 'vue-property-decorator';
-import LoginForm from './loginForm.vue';
+import LoginForm from './LoginForm.vue';
 import { toAsyncWait } from '@/utils/common';
 import UserApi from '@/api/user';
 @Component({
