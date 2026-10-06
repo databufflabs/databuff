@@ -659,7 +659,7 @@ publish_version_manifest() {
   printf '%s\n' "$version" >"${tmp_dir}/VERSION"
   publish_pkg "${tmp_dir}/VERSION"
   rm -rf "$tmp_dir"
-  echo "[build]   latest version: ${version} (${pkg_base_url%/}/VERSION)"
+  echo "[build]   latest version: ${version} ($(pkg_base_url)/VERSION)"
 
   resolve_lib="${APM_COMMON_SRC}/scripts/resolve-install-version.sh"
   if [[ ! -f "$resolve_lib" ]]; then
