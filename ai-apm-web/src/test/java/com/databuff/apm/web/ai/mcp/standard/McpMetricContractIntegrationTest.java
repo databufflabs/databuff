@@ -15,6 +15,7 @@ import java.util.Map;
 import java.util.regex.Pattern;
 
 import static org.assertj.core.api.Assertions.assertThat;
+import static org.mockito.ArgumentMatchers.anyInt;
 import static org.mockito.ArgumentMatchers.anyString;
 import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.Mockito.*;
@@ -28,7 +29,7 @@ class McpMetricContractIntegrationTest {
 
     @Test
     void skillExamplesExecuteThroughMcpUsingRealArgumentConversionAndSqlBuilder() throws Exception {
-        when(repository.queryRows(anyString(), eq(200))).thenReturn(List.of());
+        when(repository.queryRows(anyString(), anyInt())).thenReturn(List.of());
         for (String id : List.of("skill.data.metrics", "skill.inspection.health")) {
             String skill = Files.readString(Path.of("../deploy/common/skills", id, "SKILL.md"));
             var example = Pattern.compile("```json\\s*(.*?)```", Pattern.DOTALL).matcher(skill);
@@ -45,9 +46,12 @@ class McpMetricContractIntegrationTest {
             assertThat(result.get("isError")).isEqualTo(false);
         }
         ArgumentCaptor<String> sql = ArgumentCaptor.forClass(String.class);
-        verify(repository, times(2)).queryRows(sql.capture(), eq(200));
-        assertThat(sql.getAllValues()).allSatisfy(query -> assertThat(query)
-                .contains("`metric_service`", "SUM(`cnt`)", "SUM(`error`)", "SUM(`sumDuration`)", "`service` = 'service-a'", "LIMIT 200"));
+        verify(repository, times(2)).queryRows(sql.capture(), anyInt());
+        List<String> queries = sql.getAllValues();
+        // skill.data.metrics 示例：metric_service_flow 流量查询，size=50，无过滤条件
+        assertThat(queries.get(0)).contains("`metric_service_flow`", "SUM(`cnt`)", "LIMIT 50");
+        // skill.inspection.health 示例：metric_service 健康度查询，service-a 过滤 + 1 分钟分桶
+        assertThat(queries.get(1)).contains("`metric_service`", "SUM(`cnt`)", "SUM(`error`)", "SUM(`sumDuration`)", "`service` = 'service-a'", "LIMIT 200");
     }
 
     @Test
